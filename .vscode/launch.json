@@ -1,0 +1,21 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug Starter Session",
+      "program": "${workspaceFolder}/frozen/ps_test_runner.mjs",
+      "args": ["sessions/seed8000-tourist-starter.session.json"],
+      "console": "integratedTerminal"
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug Current Open Session File",
+      "program": "${workspaceFolder}/frozen/ps_test_runner.mjs",
+      "args": ["${file}"],
+      "console": "integratedTerminal"
+    }
+  ]
+}
