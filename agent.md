@@ -3,16 +3,16 @@
 Welcome to the Teleport Contest Agent Harness. This document outlines the standard operating procedure for any AI agent working on porting NetHack 5.0 C code to JavaScript for this project.
 
 ## Objective
-The goal is to produce a JavaScript implementation whose external behavior is exactly indistinguishable from upstream NetHack 5.0. It must perfectly match the PRNG sequence and terminal output, frame by frame.
+The goal is to produce a JavaScript implementation whose external behavior is exactly indistinguishable from upstream NetHack 5.0. It must perfectly match the PRNG sequence and terminal output, frame by frame. **See `docs/API.md` for the exact API contract you must adhere to.**
 
 ## Workflow & Verification Loop
 
 The primary loop you should use to verify your work is running the scoring scripts against the recorded sessions.
 
-1. **Targeting the Starter Session**:
-   Before trying to pass everything, focus on the starter session. Run:
+1. **Targeting a Session**:
+   Before trying to pass everything, focus on one session at a time. Run:
    ```bash
-   node frozen/ps_test_runner.mjs sessions/seed8000-tourist-starter.session.json
+   node frozen/ps_test_runner.mjs sessions/<session_name>.session.json
    ```
    *Look for the output line like `div@392`, which tells you the step at which your output diverged from the recording.*
 
@@ -33,10 +33,12 @@ The primary loop you should use to verify your work is running the scoring scrip
 
 To successfully port the game, apply these steps:
 
-1. **Identify the Divergence**: From the test runner output, find the exact step where the code diverges (either screen or PRNG).
-2. **Find the C Implementation**: Use `grep_search` to search the `nethack-c/upstream/` directory for the relevant logic, strings, or function names. NetHack has a large codebase; use specific function names and constants to locate the code efficiently.
-3. **Trace the PRNG Calls**: Ensure you understand every single time the C code asks for a random number (e.g. `rn2()`, `rnd()`, `rnz()`). *Important: The C codebase was compiled with clang, meaning left-to-right argument evaluation. You must match this in JavaScript so PRNG numbers are drawn in the exact same order.*
-4. **Implement in JS**: Write the corresponding logic in the `js/` directory. Remember not to modify frozen files like `js/isaac64.js`, `js/terminal.js`, or `js/storage.js`.
+1. **Continuous Learning (lessons.md)**: Before you begin any task, you MUST read `lessons.md` to understand established patterns. Whenever you learn something new or solve a complex architectural bug, document your findings in `lessons.md`. Continuously ensure your new lessons remain consistent with the old ones.
+2. **Identify the Divergence**: From the test runner output, find the exact step where the code diverges (either screen or PRNG).
+3. **Find the C Implementation**: Use `grep_search` to search the `nethack-c/upstream/` directory for the relevant logic, strings, or function names.
+4. **Trace the PRNG Calls**: Ensure you understand every single time the C code asks for a random number (e.g. `rn2()`, `rnd()`, `rnz()`). *Important: The C codebase was compiled with clang, meaning left-to-right argument evaluation. You must match this in JavaScript so PRNG numbers are drawn in the exact same order.*
+5. **Implement in JS**: Write the corresponding logic in the `js/` directory. Remember not to modify frozen files.
+6. **Summarize Your Work**: After you have successfully implemented a session/seed, provide a clear summary of your work and the structural bugs you fixed in your final response to the user.
 
 ## Code Context & Pitfalls
 - **fastforward.js**: Initially, the codebase uses `js/fastforward.js` to fake PRNG calls for the starter session. Your job is to eventually replace these hardcoded fakes with the actual replicated logic in `js/`.
@@ -52,3 +54,13 @@ Based on the creator's initial attempt to use agents for this project, here are 
 5. **Get the Core Loop Right**: Ensure `async`/`await` plumbing and event loop ordering (especially for things like waiting for user input prompts) exactly mimic C's execution before building massive amounts of logic on top of it.
 
 You have been provided with VS Code launch and task configs to easily start these scripts if the user decides to run them manually from their editor.
+
+## Standard Agent Prompt Template
+When starting a new iteration or session, the user will typically use the following prompt format to kick off your workflow:
+
+```text
+Please read `agent.md` and `lessons.md`.
+Your mission is to iterate on the codebase until `sessions/<INSERT_SESSION_NAME>.session.json` passes the test suite. 
+Document your findings in `lessons.md` and provide a summary of your work once the session passes.
+Have fun!
+```
