@@ -1,5 +1,58 @@
 # Teleport Implementation Loop
 
+## 2026-05-11 Marathon Restart - Peaceful Monster Predicate Queue
+
+- Full suite baseline before this loop: 50/11406 screens, 0/44 passing.
+- Sentinel baseline before this loop: 50/1063 screens, RNG 13829/64569.
+- Current target: `seed0383-wizard-hallucinate` as evidence for special bigroom monster creation parity.
+- Active hypothesis: the FR 3661 blocker belongs to `makemon.c:peace_minded()` predicate coverage and call ordering. The broad call site is correct in C, but JS must first model the non-RNG predicate front door to avoid extra `rn2(16)` rolls for always-hostile/peaceful and special-sound monsters.
+- Queue:
+  1. Port the non-RNG `peace_minded()` predicates and move ordinary `makemon()` peaceful initialization into C order.
+  2. If `seed0383` moves, follow the same monster-init boundary exposed next.
+  3. Continue `seed0116` missing `dog_goal()` object-state calls.
+  4. Classify `seed8000` live monster movement ownership if monster changes touch turn order.
+  5. Fall back to startup/windowing or visible hack-debt cleanup only if the structural targets block.
+- Verification cadence: target triage after each edit, sentinel suite after each meaningful edit, full suite after 3-5 meaningful iterations and before handoff.
+- Failed probes this loop: none yet.
+
+### Iteration 1 - `peace_minded()` Predicate Front Door
+
+- Change: regenerated monster data with `msound` and `mflags2`, added a checked-in generator for that table, and ported the non-RNG front door of `makemon.c:peace_minded()` (`M2_PEACEFUL`, `M2_HOSTILE`, leader/guardian/nemesis, Erinys, race masks, amulet, and minion cases). Ordinary `makemon()` now applies peacefulness unless `MM_ANGRY` is set.
+- Evidence: `seed0383` moved from FR 3661 (`rn2(16)` expected vs gender `rn2(2)`) to FR 4097, proving the earlier broad peacefulness probe is now contained by predicates.
+- Regression stability: sentinel screens stayed 50/1063; `seed8000`, `seed0002`, `seed0013`, and `seed0116` screen counts were unchanged.
+
+### Iteration 2 - Centaur `m_initweap()` Slice
+
+- Change: added the `S_CENTAUR` bow/crossbow branch with projectile quantity RNG and the shared offensive-item gate.
+- Evidence: `seed0383` moved from FR 4097 to FR 4120 through the `MOUNTAIN_CENTAUR` weapon path.
+- Regression stability: sentinel screens stayed 50/1063.
+
+### Iteration 3 - Greedy Monster Money Gate
+
+- Change: added the `m_initinv()` `likes_gold()` `rn2(5)` chance gate for `M2_GREEDY` monsters. Monster gold retention is still pending.
+- Evidence: `seed0383` moved from FR 4120 to FR 4335, crossing the mountain-centaur inventory tail.
+- Regression stability: sentinel screens stayed 50/1063.
+
+### Iteration 4 - Troll `m_initweap()` Slice
+
+- Change: added the `S_TROLL` polearm branch and shared offensive-item gate.
+- Evidence: `seed0383` moved from FR 4335 to FR 5212.
+- Regression stability: sentinel screens stayed 50/1063.
+
+### Iteration 5 - Quantum Mechanic Inventory Gate
+
+- Change: added the `S_QUANTMECH` `rn2(20)` inventory gate and conservative box/corpse creation for the rare path.
+- Evidence: `seed0383` moved from FR 5212 to FR 5430 through the genetic-engineer/quantum-mechanic inventory gate.
+- Regression stability: sentinel screens stayed 50/1063.
+
+### Iteration 6 - Gnome Generic Weapon Gate
+
+- Change: added the generic normal-monster weapon picker for `S_GNOME` before gnome candle inventory handling.
+- Evidence: `seed0383` moved from FR 5430 to FR 5730. The new blocker is a spatial `collect_coords`/`enexto` candidate-count mismatch (`rn2(17)` expected vs `rn2(24)` actual), not the prior selected-monster inventory sequence.
+- Regression stability: sentinel screens stayed 50/1063.
+- Full-suite checkpoint: corpus remains 50/11406 screens, 0/44 passing. `seed0383` RNG prefix improved from 3716/16915 to 5788/16915. Non-sentinel RNG prefixes shifted as expected from broader monster-init behavior (`seed0361` and `seed4500` improved; `seed0367` moved earlier and needs reclassification if selected next).
+- Current queue: classify `seed0383` `collect_coords` candidate-count drift; continue `seed0116` `dog_goal()` object-state calls; classify `seed0367` monster-init side effect if it becomes a target.
+
 ## 2026-05-10 Marathon Restart - Pet/Object And Monster Init Queue
 
 - Full suite baseline before this loop: 50/11406 screens, 0/44 passing.

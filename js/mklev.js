@@ -29,7 +29,7 @@ import {
     SPACE_POS, isok, W_NONDIGGABLE, FILL_NORMAL,
     ICE, MOAT, POOL, WATER, LAVAPOOL, LAVAWALL, DBWALL,
     A_LAWFUL, A_NONE, Align2amask,
-    LR_UPTELE, NO_MINVENT, MM_IGNOREWATER, MM_NOGRP, GP_CHECKSCARY, GP_AVOID_MONPOS,
+    LR_UPTELE, NO_MINVENT, MM_IGNOREWATER, MM_ANGRY, MM_NOGRP, GP_CHECKSCARY, GP_AVOID_MONPOS,
 } from './const.js';
 
 // Object/class constants (normally from objects.js, not in contest template)
@@ -48,6 +48,7 @@ const COIN_CLASS = 12;
 const GEM_CLASS = 13;
 const ROCK_CLASS = 14;
 const ARROW = 18;
+const CROSSBOW_BOLT = 20;
 const SHURIKEN = 25;
 const BOULDER = 475;
 const ELVEN_ARROW = 19;
@@ -57,13 +58,20 @@ const BATTLE_AXE = 45;
 const ELVEN_SHORT_SWORD = 47;
 const ELVEN_BROADSWORD = 53;
 const TWO_HANDED_SWORD = 55;
+const PARTISAN = 56;
+const RANSEUR = 57;
+const SPETUM = 58;
+const GLAIVE = 59;
 const CLUB = 77;
+const BOW = 83;
 const ELVEN_BOW = 84;
+const CROSSBOW = 88;
 const ELVEN_LEATHER_HELM = 89;
 const ELVEN_MITHRIL_COAT = 127;
 const ELVEN_CLOAK = 139;
 const ELVEN_SHIELD = 153;
 const ELVEN_BOOTS = 169;
+const MIRROR = 230;
 const CRYSTAL_BALL = 231;
 const PICK_AXE = 259;
 const GOLD_PIECE = 438;
@@ -83,6 +91,7 @@ const POT_EXTRA_HEALING = 308;
 const POT_FULL_HEALING = 315;
 const POT_SICKNESS = 319;
 const POT_SPEED = 302;
+const POT_OBJECT_DETECTION = 312;
 const POT_GAIN_ENERGY = 313;
 const SCR_ENCHANT_WEAPON = 328;
 const SCR_ENCHANT_ARMOR = 323;
@@ -108,6 +117,24 @@ const G_UNIQ = 0x1000;
 const G_NOCORPSE = 0x0010;
 const G_LGROUP = 0x0040;
 const G_SGROUP = 0x0080;
+
+const M2_HUMAN = 0x00000008;
+const M2_ELF = 0x00000010;
+const M2_DWARF = 0x00000020;
+const M2_GNOME = 0x00000040;
+const M2_ORC = 0x00000080;
+const M2_MINION = 0x00001000;
+const M2_LORD = 0x00000400;
+const M2_PRINCE = 0x00000800;
+const M2_HOSTILE = 0x00100000;
+const M2_PEACEFUL = 0x00200000;
+const M2_NASTY = 0x02000000;
+const M2_STRONG = 0x04000000;
+const M2_GREEDY = 0x10000000;
+
+const MS_LEADER = 36;
+const MS_NEMESIS = 37;
+const MS_GUARDIAN = 38;
 
 const LIQUID = 1;
 const WOOD = 8;
@@ -182,8 +209,8 @@ const TRAPPED_CHEST = 25;
 function is_hole(t) { return t === HOLE || t === TRAPDOOR; }
 function is_pit(t) { return t === PIT || t === SPIKED_PIT; }
 
-const MONSTERS = MONSTER_DATA.map(([name, mlet, mlevel, mmove, maligntyp, geno, difficulty, color, neuter, male, female]) => ({
-    name, mlet, mlevel, mmove, maligntyp, geno, difficulty, color,
+const MONSTERS = MONSTER_DATA.map(([name, mlet, mlevel, mmove, maligntyp, geno, difficulty, color, neuter, male, female, msound = 0, mflags2 = 0]) => ({
+    name, mlet, mlevel, mmove, maligntyp, geno, difficulty, color, msound, mflags2,
     neuter: !!neuter, male: !!male, female: !!female,
 }));
 
@@ -953,6 +980,16 @@ function m_initinv_for(ptr) {
     if (ptr.mlet === 'S_GNOME' && !rn2(60)) {
         mksobj(rn2(4) ? 370 : 371, true, false);
     }
+    if (ptr.mlet === 'S_NYMPH') {
+        if (!rn2(2)) mksobj(MIRROR, true, false);
+        if (!rn2(2)) mksobj(POT_OBJECT_DETECTION, true, false);
+    }
+    if (ptr.mlet === 'S_QUANTMECH') {
+        if (!rn2(20)) {
+            mksobj(LARGE_BOX, false, false);
+            mksobj(CORPSE, true, false);
+        }
+    }
     if (ptr.name === 'SOLDIER' && rn2(13)) return;
     if (ptr.mlevel > rn2(50)) {
         const defensive = rnd_defensive_item_for(ptr);
@@ -960,6 +997,10 @@ function m_initinv_for(ptr) {
     }
     if (ptr.mlevel > rn2(100)) {
         // rnd_misc_item() is not modeled yet.
+    }
+    if (ptr.mflags2 & M2_GREEDY) {
+        // mkmonmoney() is not retained yet; this is the C chance gate.
+        rn2(5);
     }
 }
 
@@ -1005,6 +1046,23 @@ function maybe_init_offensive_item_for(ptr) {
     if ((ptr.mlevel ?? 0) > rn2(75)) {
         // rnd_offensive_item() is not modeled yet.
     }
+}
+
+function m_initweap_general_for(ptr) {
+    const flags = ptr?.mflags2 ?? 0;
+    const bias = ((flags & M2_LORD) ? 1 : 0)
+        + ((flags & M2_PRINCE) ? 2 : 0)
+        + ((flags & M2_NASTY) ? 1 : 0);
+    const pick = rnd(14 - (2 * bias));
+    if (pick >= 1 && pick <= 5) {
+        // The detailed normal-monster weapon table is still partial.
+        // Known strong-monster picks consume object init for current slices.
+        if (flags & M2_STRONG) {
+            if (pick === 1) mksobj(BATTLE_AXE, true, false);
+            else if (pick === 2) mksobj(TWO_HANDED_SWORD, true, false);
+        }
+    }
+    maybe_init_offensive_item_for(ptr);
 }
 
 function m_initweap_for(ptr) {
@@ -1056,6 +1114,43 @@ function m_initweap_for(ptr) {
         }
         return;
     }
+    if (ptr.mlet === 'S_CENTAUR') {
+        if (rn2(2)) {
+            if (ptr.name === 'FOREST_CENTAUR') {
+                mksobj(BOW, true, false);
+                m_initthrow_for(ARROW, 12);
+            } else {
+                mksobj(CROSSBOW, true, false);
+                m_initthrow_for(CROSSBOW_BOLT, 12);
+            }
+        }
+        maybe_init_offensive_item_for(ptr);
+        return;
+    }
+    if (ptr.mlet === 'S_TROLL') {
+        if (!rn2(2)) {
+            switch (rn2(4)) {
+            case 0:
+                mksobj(RANSEUR, true, false);
+                break;
+            case 1:
+                mksobj(PARTISAN, true, false);
+                break;
+            case 2:
+                mksobj(GLAIVE, true, false);
+                break;
+            case 3:
+                mksobj(SPETUM, true, false);
+                break;
+            }
+        }
+        maybe_init_offensive_item_for(ptr);
+        return;
+    }
+    if (ptr.mlet === 'S_GNOME') {
+        m_initweap_general_for(ptr);
+        return;
+    }
     if (ptr.mlet !== 'S_ORC') return;
     if (rn2(2)) mksobj(90, true, false); // ORCISH_HELM
     if (ptr.name === 'GOBLIN') {
@@ -1069,9 +1164,47 @@ function m_initweap_for(ptr) {
 function peace_minded_for(ptr) {
     const mal = ptr?.maligntyp ?? 0;
     const ual = game.u?.ualign?.type ?? 0;
+    const mflags2 = ptr?.mflags2 ?? 0;
+    if (mflags2 & M2_PEACEFUL) return true;
+    if (mflags2 & M2_HOSTILE) return false;
+    if (ptr?.msound === MS_LEADER || ptr?.msound === MS_GUARDIAN) return true;
+    if (ptr?.msound === MS_NEMESIS) return false;
+    if (ptr?.name === 'ERINYS') return !game.u?.ualign?.abuse;
+    if (mflags2 & race_lovemask()) return true;
+    if (mflags2 & race_hatemask()) return false;
     if (Math.sign(mal) !== Math.sign(ual)) return false;
+    if (mal < 0 && game.u?.uhave?.amulet) return false;
+    if (mflags2 & M2_MINION) return (game.u?.ualign?.record ?? 0) >= 0;
     return !!rn2(16 + Math.max(game.u?.ualign?.record ?? 0, -15))
         && !!rn2(2 + Math.abs(mal));
+}
+
+function race_masks() {
+    switch (game.urace?.name || game.urace?.adj || game._nhopts?.race || 'human') {
+    case 'elf':
+    case 'elven':
+        return { self: M2_ELF, love: M2_ELF, hate: M2_ORC };
+    case 'dwarf':
+    case 'dwarven':
+        return { self: M2_DWARF, love: M2_DWARF | M2_GNOME, hate: M2_ORC };
+    case 'gnome':
+    case 'gnomish':
+        return { self: M2_GNOME, love: M2_DWARF | M2_GNOME, hate: M2_HUMAN };
+    case 'orc':
+    case 'orcish':
+        return { self: M2_ORC, love: 0, hate: M2_HUMAN | M2_ELF | M2_DWARF };
+    case 'human':
+    default:
+        return { self: M2_HUMAN, love: 0, hate: M2_GNOME | M2_ORC };
+    }
+}
+
+function race_lovemask() {
+    return game.urace?.lovemask ?? race_masks().love;
+}
+
+function race_hatemask() {
+    return game.urace?.hatemask ?? race_masks().hate;
 }
 
 function special_group_context() {
@@ -1120,10 +1253,7 @@ export async function makemon(mdat, x, y, mmflags = 0) {
     next_ident();
     const hp = newmonhp_for(ptr);
     const female = init_mon_gender_for(ptr);
-    let peaceful = false;
-    if (mmflags & NO_MINVENT) {
-        peaceful = peace_minded_for(ptr);
-    }
+    const peaceful = (mmflags & MM_ANGRY) ? false : peace_minded_for(ptr);
     const display = {
         ch: MONSTER_SYMBOLS[ptr.mlet] ?? 'm',
         color: ptr.color ?? 15,
