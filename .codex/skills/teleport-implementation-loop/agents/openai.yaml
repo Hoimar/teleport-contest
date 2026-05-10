@@ -1,7 +1,7 @@
 interface:
   display_name: "Teleport Implementation Loop"
-  short_description: "Advance one subsystem in teleport-contest"
-  default_prompt: "Use $teleport-implementation-loop to advance one NetHack subsystem in this repo, using sessions only as evidence."
+  short_description: "Run a sustained parity implementation loop in teleport-contest"
+  default_prompt: "Use $teleport-implementation-loop to complete at least 10 meaningful structural implementation iterations in this repo, using sessions only as evidence. If the current subsystem becomes risky, document the blocker and switch to the next highest-ROI subsystem instead of stopping."
 
 policy:
   allow_implicit_invocation: true

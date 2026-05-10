@@ -86,7 +86,7 @@ The first non-matching screen index tells you where to look. Use the standard de
 1. Make the smallest possible change addressing the root cause.
 2. Re-run the target session to confirm the first divergence moved in the right direction.
 3. Re-run the sentinel suite to confirm the change generalizes and to classify immediate regressions.
-4. Run the full suite (`node frozen/ps_test_runner.mjs`) when starting a new implementation loop, before final handoff if practical, after broad shared changes, and after every 3-5 meaningful iterations.
+4. Run the full suite (`node frozen/ps_test_runner.mjs`) when starting a new implementation loop, before final handoff only after the loop budget is met or a global stopping condition is reached, after broad shared changes, and after every 3-5 meaningful iterations.
 5. Treat regressions as evidence to classify, not automatic grounds for reverting.
    - Fix accidental regressions.
    - Document expected regressions from hack removal or broader architectural cleanup instead of restoring hacks to preserve screen totals.

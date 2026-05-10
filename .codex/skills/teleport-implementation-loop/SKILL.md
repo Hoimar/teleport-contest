@@ -7,13 +7,24 @@ description: Use when working in the teleport-contest repo to run a continuing i
 
 Use this skill in the `teleport-contest` repo when the goal is to make forward engineering progress, not just classify a failure. This is a loop, not a single-patch checklist: continue from blocker to blocker until a stopping condition is reached.
 
+Default loop budget:
+
+- Complete as many meaningful implementation iterations per invocation as possible.
+- A meaningful implementation iteration is one of:
+  - a subsystem fix or extension;
+  - a hack-debt / tech-debt reduction;
+  - a diagnostic, harness, or documentation improvement that directly unlocks a subsystem-level implementation step.
+- Do not hand off after one successful iteration. Continue within the same subsystem, or move to the next queued subsystem or highest-ROI target.
+
 Stopping conditions:
 
 - The user asked for a single pass.
 - Tooling or missing information blocks further progress.
-- No structural next step is clear after triage.
+- No safe structural next step is clear anywhere in the follow-up queue or `feature_map.md`. In that case, refer to the `$teleport-dehack-simplify` and `$teleport-triage-divergence` skills to re-center on a new goal.
 - Context/runtime budget is close to exhausted.
 - Further work would require a risky broad rewrite.
+
+A blocker in the current subsystem is not a stopping condition by itself. If the current subsystem becomes risky, classify and document the blocker, then switch to the next queued subsystem or highest-ROI target. Only stop when no safe structural next step exists globally.
 
 Do not stop after the first small valid fix. Small fixes are acceptable when they unlock or clarify the next structural step; after such a fix, continue the loop.
 
@@ -54,7 +65,7 @@ Workflow:
     ```
     Use this cadence:
     - at the start of a new loop
-    - before final handoff if practical
+    - before final handoff only after the loop budget is met or a global stopping condition is reached, if practical
     - after broad shared changes
     - after every 3-5 meaningful iterations
     Treat regressions as evidence to classify, not automatic grounds for reverting.
@@ -67,6 +78,15 @@ Workflow:
     - implementation delta
     - regression stability
     - score delta as lagging evidence only
+
+Before final handoff, state:
+
+- completed meaningful iteration count;
+- current follow-up queue;
+- why each remaining queued item is not being attempted now;
+- the exact stopping condition being invoked.
+
+If fewer than 10 meaningful implementation iterations were completed, the stopping explanation must be concrete and global, not limited to the current subsystem.
 
 Guardrails:
 

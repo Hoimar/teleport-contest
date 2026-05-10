@@ -18,8 +18,8 @@ Treat screen totals as lagging evidence of subsystem progress, not as the optimi
 
 | Feature | C Reference | JS Implementation | Status | Notes |
 |---|---|---|---|---|
-| `runSegment()` API contract | `nethack-c/upstream/unixmain.c` | `js/jsmain.js` `runSegment()` | ✅ | Entry point, contract correct. Do not break. |
-| Screen capture hook (pre-nhgetch) | `sys/tty/tty_getch()` | `js/jsmain.js` `_installCaptureHook()` | ✅ | Fires before every `nhgetch()` call. Captures `_override_screen` or live terminal. |
+| `runSegment()` API contract | `nethack-c/upstream/unixmain.c` | `js/jsmain.js` `runSegment()` | ✅ | Entry point, contract correct. Segment `datetime` now reaches game state. Do not break. |
+| Screen capture hook (pre-nhgetch) | `sys/tty/tty_getch()` | `js/jsmain.js` `_installCaptureHook()` | ✅ | Fires before every `nhgetch()` call. Captures exactly one screen and one cursor per input boundary. |
 | PRNG log accumulation | `rng.c` | `js/rng.js` + `frozen/isaac64.js` | ✅ | Frozen ISAAC64 engine. Log format must be `rn2(N)=M` etc. |
 | Screen comparison / canonicalization | `frozen/ps_test_runner.mjs` | (frozen — do not modify) | ✅ | DEC→Unicode, SGR normalise, version banner sentinel. |
 | Per-session regression runner | `frozen/ps_test_runner.mjs` | (frozen) | ✅ | `node frozen/ps_test_runner.mjs [session...]` |
@@ -52,7 +52,7 @@ Treat screen totals as lagging evidence of subsystem progress, not as the optimi
 | Stair generation (up stairs, dlvl≥2) | `mklev.c:generate_stairs()` | `js/mklev.js:generate_stairs()` | 🟡 | Correctly skipped on dlvl 1. |
 | Branch entrance placement (Mines etc.) | `mklev.c:place_lregion()` | `js/mklev.js:place_lregion()` | 🟡 | `end1_up: true` hardcoded for seed8000. Verify with other seeds. |
 | Wallification (corner/t-junction glyphs) | `mklev.c:wallification()` | `js/mklev.js` | 🟡 | Present but may have edge cases. |
-| Monster/object fill (mkfill, mineralize) | `mklev.c`, `mkobj.c` | `js/mklev.js` + `js/fastforward.js` + `js/fastforward0002.js` | 🟡 | `mkobj()` now consumes upstream-derived class/object probability and material metadata from `js/object_data.js`. Random weapon/armor `artif` rolls and `mkobj_erosions()` RNG shape are partially modeled. Evidence: `seed8000` screen parity remains `23/23`; first RNG mismatch moved from missing random-armor artifact/erosion handling (`FR 1419`) to room-fill spatial state (`FR 1428`, JS calls statue `rndmonnum()` where C proceeds to bonus-item `rn2(3)`). Fast-forward scaffolding remains in use. |
+| Monster/object fill (mkfill, mineralize) | `mklev.c`, `mkobj.c`, `makemon.c`, `engrave.c`, `rumors.c` | `js/mklev.js` + `js/random_text.js` + startup fast-forward scaffolds | 🟡 | `mkobj()` consumes upstream-derived class/object probability and material metadata. Early level-1 `rndmonst_adj()` uses C's weighted reservoir RNG shape; trap constants match `trap.h`; `occupied()` rejects trap squares; `CORPSE`/`STATUE` and egg init consume closer C RNG. Random graffiti uses NetHack-style padded data-file line selection and `wipeout_text()` rubouts. `level_finalize_topology()` now calls real `mineralize()` and consumes buried/place gates; the dead `fastforward_fill_mineralize()` replay exports were removed from seed replay modules. Evidence: `seed8000` screen parity remains `23/23`; first RNG mismatch is in the live monster movement loop at FR 2984. |
 | Shop generation | `mkroom.c:mkshop()` | — | 🔴 | No shop impl. Blocks `seed0116-wizard-wear-shop` and others. |
 | Special level loading (Lua specials) | `sp_lev.c` | — | 🔴 | No special level support. |
 
@@ -63,13 +63,13 @@ Treat screen totals as lagging evidence of subsystem progress, not as the optimi
 | Feature | C Reference | JS Implementation | Status | Notes |
 |---|---|---|---|---|
 | Name prompt / character selection UI | `pline.c`, `sounds.c` | `js/allmain.js:player_selection()` | 🟡 | **Hardcoded `_override_screen` for seed0002 only.** Must be generalized. |
-| Role/race/gender/align selection from nethackrc | `role.c:plnamesiz()` etc. | `js/options.js` + `js/allmain.js` + `js/roles.js` (partial) | 🟡 | Parsed role/race/gender now drive startup identity and level-1 rank where config supplies them. Align is still hardcoded neutral, and this does not implement chargen RNG or stats. |
+| Role/race/gender/align selection from nethackrc | `role.c:plnamesiz()` etc. | `js/options.js` + `js/allmain.js` + `js/roles.js` (partial) | 🟡 | Parsed role/race/gender/align now drive startup identity, level-1 rank, alignment record, welcome text, and status title where config supplies them. This still does not implement chargen RNG, stats, or inventory. |
 | Random chargen (pick_role etc.) | `role.c:pick4u()` | `js/allmain.js` (hardcoded `rn2()` calls) | 🔴 | Hard-coded for seed0002. Not a real implementation. |
 | Hero placement (`u_on_upstairs`) | `stairs.c:u_on_upstairs()` | `js/mklev.js:u_on_upstairs()` | 🟡 | Works for seed8000/seed0002. **seed0002 step 12 has 1-cell offset bug.** |
 | Player stats (HP, Pw, AC, attributes) | `attrib.c`, `role.c` | `js/allmain.js` (hardcoded) | 🔴 | All stats are hardcoded per-seed. Must compute from PRNG + role data. |
 | Starting inventory (`ini_inv`) | `invent.c:ini_inv()` | `js/fastforward.js` (RNG stub) | 🔴 | No real inventory. Items displayed are hardcoded per-seed. |
 | `o_init` (object type shuffle) | `o_init.c` | `js/o_init.js` (stub) | 🔴 | Object type shuffle not implemented. Blocks all object IDs. |
-| Welcome / lore screens | `sounds.c`, `pline.c`, `role.c:Hello()` | `js/allmain.js:newgame()` + `js/roles.js:roleGreeting()` | 🟡 | Welcome greeting is role-driven rather than seed-driven. Lore, quest text, and some startup screens remain hardcoded per seed; still needs proper role/align text lookup. |
+| Welcome / lore screens | `sounds.c`, `pline.c`, `role.c:Hello()` | `js/allmain.js:newgame()` + `js/roles.js:roleGreeting()` | 🟡 | Welcome greeting is role-driven rather than seed-driven. Configured role/align splash text now uses role god/rank data for the generic quest intro overlay, but full chargen/menu flow and exact windowing remain incomplete. |
 | Tutorial prompt | `pline.c` | `js/allmain.js` (override) | 🟡 | Hardcoded for seed0002. |
 
 ---
@@ -101,7 +101,7 @@ Treat screen totals as lagging evidence of subsystem progress, not as the optimi
 | Command dispatch (`rhack`) | `cmd.c:rhack()` | `js/cmd.js:rhack()` | 🟡 | Only move commands (hjklyubn + `.` `,`) + basic UI stubs. |
 | Cardinal movement (`domove`) | `do.c:domove()` | `js/cmd.js:domove()` | 🟡 | Basic movement. No combat, traps, or item pickup. |
 | Zero-turn commands (inventory, ESC, etc.) | `cmd.c` | `js/cmd.js` | 🟡 | `g.context.move=0` on zero-turn commands confirmed in lessons. |
-| Per-step monster movement / regen RNG | `monmove.c`, `regen.c` | `js/fastforward.js:fastforward_step()` | 🟡 | Hardcoded per-seed fast-forward only. |
+| Per-step monster movement / regen RNG | `monmove.c`, `regen.c` | `js/monmove.js` + partial turn consumers | 🟡 | Per-step replay is no longer called from `moveloop_core()`, and the dead `fastforward_step()` exports have been removed from the seed replay modules. `makemon()` retains generated monsters on the level and time-taking commands now spend/allocate monster movement before random monster generation, `dosounds()`, hunger, and the engraving wipe gate. Movement AI remains skeletal; `seed8000` now blocks at FR 2984 where C has more monsters ready to act than the JS partial monster table/state. |
 | Turn counter | `allmain.c` | `js/allmain.js` | ✅ | `g.moves++` conditional on `g.context.move`. |
 | Game over (`gameover`) | `end.c` | `js/cmd.js` (stub) | 🔴 | Not implemented. Loop never terminates normally. |
 
@@ -112,6 +112,7 @@ Treat screen totals as lagging evidence of subsystem progress, not as the optimi
 | Feature | C Reference | JS Implementation | Status | Notes |
 |---|---|---|---|---|
 | Object type table / `o_init` shuffle | `objects.c`, `o_init.c` | `js/object_data.js` + `js/o_init.js` | 🟡 | Static upstream object class/probability/charge/direction/material metadata is now available for `mkobj` selection and erosion eligibility, removing several bogus handwritten constants. Real `o_init` shuffles, artifact selection/origin tracking, and runtime object-description state are still missing, so item identity parity is not solved yet. |
+| Random text data files | `rumors.c`, `engrave.c`, `makedefs.c` | `js/random_text.js` | 🟡 | Random engraving/rumor selection builds padded/xcrypted virtual chunks from upstream data files and applies C-like `get_rnd_line()` and `wipeout_text()` RNG. It currently serves graffiti generation; broader data-file consumers (epitaphs, bogus monsters, oracle text) still need integration. |
 | Object placement on map | `mkobj.c:mksobj()` | hardcoded arrays in `allmain.js` | 🔴 | Hardcoded per seed. Must be driven by real object generation. |
 | Gold | `mkobj.c` | hardcoded `g._goldCount` | 🔴 | Per-seed hardcoded. |
 | Autopickup | `pickup.c` | — | 🔴 | |
@@ -123,7 +124,7 @@ Treat screen totals as lagging evidence of subsystem progress, not as the optimi
 
 | Feature | C Reference | JS Implementation | Status | Notes |
 |---|---|---|---|---|
-| Monster placement (mklev fill) | `makemon.c` | hardcoded array in `allmain.js` | 🔴 | Per-seed hardcoded. |
+| Monster placement (mklev fill) | `makemon.c` | `js/mklev.js:makemon()` + hardcoded arrays in `allmain.js` | 🟡 | Early ordinary level-1 random monster selection follows `rndmonst_adj()` reservoir sampling and consumes `next_ident`, level-0 HP, baseline inventory gates, and retained level monster records. The full monster table, exact selected monster data, and real movement AI are incomplete; current `seed8000` blocker is live monster movement at FR 2984. |
 | Monster movement | `monmove.c` | — | 🔴 | Fast-forwarded via RNG stubs only. |
 | Combat | `fight.c` | — | 🔴 | |
 | Pet behavior | `dog.c` | — | 🔴 | |
@@ -134,7 +135,7 @@ Treat screen totals as lagging evidence of subsystem progress, not as the optimi
 
 | Feature | C Reference | JS Implementation | Status | Notes |
 |---|---|---|---|---|
-| `datetime` parsing / moon phase | `hacklib.c:timerep()` | not integrated | 🔴 | `datetime` passed in but not used. Blocks `seed0013-friday13`. |
+| `datetime` parsing / moon phase | `calendar.c` / `hacklib.c:timerep()` | `js/hacklib.js` + `js/jsmain.js` | 🟡 | Segment `datetime` is parsed into C-like `tm_*` fields; `flags.moonphase`, `flags.friday13`, `iflags.at_night`, and `iflags.at_midnight` are initialized. Startup luck/message side effects and save/restore date handling are not wired yet. |
 
 ---
 
@@ -154,9 +155,9 @@ Treat screen totals as lagging evidence of subsystem progress, not as the optimi
 
 | Session | Matched | Total | Last Updated | Notes |
 |---|---|---|---|---|
-| seed8000-tourist-starter | **23** | 23 | 2026-05-10 | Screen parity preserved. RNG is `2247/3130`; first remaining mismatch moved from random armor artifact/erosion handling (`FR 1419`) to a room-fill spatial-state divergence (`FR 1428`, statue placement path versus bonus-item branch). |
-| seed0002-healer-reflection-drummer | 11 | 595 | 2026-05-10 | Diverges at screen 11 / RNG 1003. Object-generation work advanced this sentinel from `1229/27158` to `1287/27158` without changing the first visible screen mismatch. |
-| All other sessions | 0 | 10,666 | 2026-05-10 | Need generalized chargen + object or monster gen + datetime + hallucination display context. |
+| seed8000-tourist-starter | **23** | 23 | 2026-05-10 | Screen parity preserved. Real mineralize and partial live-turn movement moved lagging RNG evidence to `2996/3130`; first RNG mismatch is FR 2984: expected another `distfleeck()` `rn2(5)`, actual `mcalcmove()` `rn2(12)`. |
+| seed0002-healer-reflection-drummer | 11 | 595 | 2026-05-10 | First visible screen mismatch unchanged at screen 11. Current lagging RNG evidence is `1230/27158`; first RNG mismatch remains FR 1202 after seed8000 replay was scoped away from unrelated seeds. |
+| All other sessions | 0 | 10,666 | 2026-05-10 | Seed8000 startup replay is no longer applied to unrelated seeds. Need real `o_init`, dungeon init, generalized chargen + object/monster generation + shop/inventory + datetime side effects + hallucination display context. |
 
 **As of 2026-05-10: 34 / 11,284 public screens matched (~0.3%), 0/44 sessions fully passing**
 
@@ -164,7 +165,7 @@ Treat screen totals as lagging evidence of subsystem progress, not as the optimi
 
 ## 🎯 Recommended Next Targets (Highest ROI first)
 
-1. **Finish room-fill and object generation (`mkobj`, `mksobj_init`, mineralize)** — upstream object ids/classes/materials are now wired into mklev, and `seed8000` now pinpoints a room-fill spatial-state divergence after artifact/erosion RNG shape instead of bogus ids.
+1. **Implement real monster table and movement state (`monsters.h`, `makemon.c`, `mon.c`, `monmove.c`)** — real mineralize is now in place, and `seed8000` reaches the live turn loop. The next blocker is that JS retained monsters do not have C-equivalent movement readiness; fix selected monster data and movement state before touching per-step behavior.
 2. **Generalize chargen from nethackrc** — Parse `OPTIONS=role:Healer,race:Human,...` and drive chargen properly. Removes all `player_selection` hardcoding and startup overrides across the corpus.
 3. **Implement real `o_init` / object shuffle** — Without this, item types (scrolls, potions) can't match C. Fundamental blocker for object-dependent parity.
 4. **Implement real `makemon` / monster placement** — Needed to replace hardcoded monster arrays and unblock movement, pet, and combat work.
