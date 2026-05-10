@@ -77,6 +77,49 @@ node scripts/run-sentinel-suite.mjs
 
 Only fall back to custom debug scripts when the compact triage output is insufficient.
 
+### Step 2.7 — Marathon loop contract
+
+Unless the user explicitly asks for a single patch, a review, or a bounded investigation, agents must assume they are in a sustained implementation loop. A checkpoint is not a stopping point.
+
+At loop startup:
+1. Run the full suite and sentinel suite unless a fresh baseline is already present in the current turn.
+2. Create or update `scratch/agent-loop.md` with:
+   - baseline scores and sentinel results
+   - current subsystem target and evidence session
+   - active hypothesis
+   - queued next targets
+   - verification cadence
+   - failed probes and what they proved
+3. Pick work in this order:
+   - user-named subsystem or evidence session
+   - same-subsystem followups exposed by the latest change
+   - highest-ROI target from `feature_map.md`
+   - hack-debt cleanup that unlocks real subsystem work
+
+During the loop:
+- Complete a minimum marathon budget before final handoff: at least 5 meaningful implementation iterations, or every currently queued structural target, whichever is larger. A meaningful implementation iteration means: triage a target, state a subsystem hypothesis, attempt a general implementation/tooling/doc cleanup, verify it, classify any regression, update docs if subsystem truth changed, and select the next queued target.
+- Failed probes count toward the budget only when they are reverted or contained, verified, recorded, and followed by at least one next hypothesis or fallback target.
+- After any meaningful edit, continue to the next queued target unless a valid stop condition below applies.
+- Full-suite verification, sentinel verification, `feature_map.md` updates, `lessons.md` updates, and checkpoint notes are loop maintenance tasks, not handoff triggers.
+- A failed probe is not a global stop. Revert only the probe if needed, record what it proved in `scratch/agent-loop.md` and/or `feature_map.md`, then continue with the next hypothesis or target.
+- A local subsystem blocker is not a global stop. Classify it, record the next required structural work, and move to the next queued subsystem.
+- Run the full suite at startup, after broad shared changes, after every 3-5 meaningful implementation iterations, and before a valid final handoff.
+
+Valid stop conditions are only:
+1. The user explicitly asked for one bounded pass or asks the agent to stop.
+2. Tests cannot run after retrying and any required escalation request.
+3. Continuing requires an unresolved project-direction decision that cannot be answered from `AGENTS.md`, `lessons.md`, `feature_map.md`, or upstream C sources.
+4. No safe structural next step exists globally after checking the active queue, `feature_map.md`, visible hack debt, and the available teleport skills.
+
+Final handoff after a marathon loop must state:
+- iteration count
+- implementation delta by subsystem
+- lagging score delta
+- sentinel stability
+- failed probes and how they were classified
+- current queue
+- exact valid stop condition
+
 ### Step 3 — Find the divergence
 
 The first non-matching screen index tells you where to look. Use the standard debug pattern below to compare cells.
@@ -91,6 +134,7 @@ The first non-matching screen index tells you where to look. Use the standard de
    - Fix accidental regressions.
    - Document expected regressions from hack removal or broader architectural cleanup instead of restoring hacks to preserve screen totals.
 6. Update `feature_map.md` status and `lessons.md`.
+7. If no valid stop condition applies, return to Step 2.6 with the next queued target.
 
 ### Step 5 — Debug the web view (optional)
 ```bash
@@ -216,8 +260,10 @@ Instead of hardcoding session-specific states, agents must implement the actual 
 
 ```text
 Please read `AGENTS.md`, `lessons.md`, and `feature_map.md`.
-Your mission is to iterate on the codebase to improve generalized feature parity by advancing one subsystem,
+Your mission is to run a sustained implementation loop to improve generalized feature parity by advancing subsystems,
 using sessions only as evidence (or pick the highest-ROI subsystem from feature_map.md).
+Do not stop after a checkpoint, full-suite run, documentation update, small fix, failed probe, or local subsystem blocker.
+Keep `scratch/agent-loop.md` current, continue through the queue, and hand off only when a valid stop condition in `AGENTS.md` applies.
 Document your findings in `lessons.md`, update `feature_map.md` status, and provide a summary of your work.
 Have fun!
 ```

@@ -11,6 +11,41 @@ import {
     D_NODOOR, D_ISOPEN, D_CLOSED, D_LOCKED,
 } from './const.js';
 import { NO_COLOR, CLR_GRAY, CLR_BROWN, CLR_WHITE, CLR_YELLOW, CLR_BRIGHT_BLUE, DEC_TO_UNICODE } from './terminal.js';
+import { roleRankForLevel } from './roles.js';
+
+const UNICODE_TO_DEC = Object.fromEntries(
+    Object.entries(DEC_TO_UNICODE).map(([k, v]) => [v, k])
+);
+
+function wireToDecSpans(s) {
+    let out = '';
+    let dec = false;
+    for (let i = 0; i < s.length; i++) {
+        const ch = s[i];
+        if (ch === '\x1b' && s[i + 1] === '[') {
+            if (dec) { out += '\x0f'; dec = false; }
+            const start = i;
+            i += 2;
+            while (i < s.length) {
+                const c = s.charCodeAt(i);
+                if (c >= 0x40 && c <= 0x7e) break;
+                i++;
+            }
+            out += s.slice(start, i + 1);
+            continue;
+        }
+        const decCh = UNICODE_TO_DEC[ch];
+        if (decCh) {
+            if (!dec) { out += '\x0e'; dec = true; }
+            out += decCh;
+        } else {
+            if (dec) { out += '\x0f'; dec = false; }
+            out += ch;
+        }
+    }
+    if (dec) out += '\x0f';
+    return out;
+}
 
 // ── ANSI color codes ──
 // Maps CLR_* constants (0-15) to ANSI SGR color codes.
@@ -203,11 +238,13 @@ function _statusLine1() {
     const u = game.u;
     if (!u) return '';
     const name = game.plname || 'Hero';
-    const role = game.flags?.female
-        ? (game.urole?.rank?.f || game.urole?.name?.f || game.urole?.rank?.m || game.urole?.name?.m || 'Adventurer')
-        : (game.urole?.rank?.m || game.urole?.name?.m || 'Adventurer');
+    const role = roleRankForLevel(game.urole, u.ulevel || 1, !!game.flags?.female)
+        || (game.flags?.female
+            ? (game.urole?.rank?.f || game.urole?.name?.f || game.urole?.rank?.m || game.urole?.name?.m || 'Adventurer')
+            : (game.urole?.rank?.m || game.urole?.name?.m || 'Adventurer'));
     const title = `${name} the ${role}`;
-    const stats = `St:${u.acurr?.a?.[0] || '?'} Dx:${u.acurr?.a?.[1] || '?'} Co:${u.acurr?.a?.[2] || '?'} In:${u.acurr?.a?.[3] || '?'} Wi:${u.acurr?.a?.[4] || '?'} Ch:${u.acurr?.a?.[5] || '?'}`;
+    const attrs = u.acurr?.a || [];
+    const stats = `St:${attrs[0] || '?'} Dx:${attrs[3] || '?'} Co:${attrs[4] || '?'} In:${attrs[1] || '?'} Wi:${attrs[2] || '?'} Ch:${attrs[5] || '?'}`;
     const align = u.ualign?.type === 0 ? 'Neutral' : u.ualign?.type > 0 ? 'Lawful' : 'Chaotic';
     // C uses cursor-forward for gap between title and stats
     // C pads to align stats starting at a fixed column
@@ -228,29 +265,9 @@ function _statusLine2() {
 
 // ── Serialize terminal grid for screen comparison ──
 export function serialize_terminal_grid(display) {
-    let output = '';
-    let lastRow = 0;
-    for (let r = 0; r < display.rows; r++) {
-        for (let c = 0; c < display.cols; c++) {
-            if (display.grid[r][c].ch !== ' ') { lastRow = r; break; }
-        }
-    }
-    for (let r = 0; r <= lastRow; r++) {
-        let lastCol = -1;
-        for (let c = display.cols - 1; c >= 0; c--) {
-            if (display.grid[r][c].ch !== ' ') { lastCol = c; break; }
-        }
-        if (lastCol < 0) { if (r < lastRow) output += '\n'; continue; }
-        let firstCol = 0;
-        for (let c = 0; c <= lastCol; c++) {
-            if (display.grid[r][c].ch !== ' ') { firstCol = c; break; }
-        }
-        if (firstCol > 4) output += `\x1b[${firstCol}C`;
-        else if (firstCol > 0) output += ' '.repeat(firstCol);
-        for (let c = firstCol; c <= lastCol; c++) output += display.grid[r][c].ch;
-        if (r < lastRow) output += '\n';
-    }
-    return output;
+    const term = display?.terminal || display;
+    if (term?.serialize) return wireToDecSpans(term.serialize());
+    return '';
 }
 
 import { decodeScreen } from '../frozen/screen-decode.mjs';
@@ -295,7 +312,7 @@ function _buildScreenOutput() {
     if (display.grid) {
         display.clearScreen();
         // Message line
-        const msg = game._pending_message || '';
+        const msg = (game._pending_message || '') + (game._more ? '--More--' : '');
         for (let c = 0; c < Math.min(msg.length, display.cols); c++)
             display.setCell(c, 0, msg[c], NO_COLOR, 0);
         // Map — write characters to grid (DEC → Unicode for browser display)
@@ -316,7 +333,9 @@ function _buildScreenOutput() {
         for (let c = 0; c < Math.min(s2.length, display.cols); c++)
             display.setCell(c, 23, s2[c], NO_COLOR, 0);
         // Cursor at hero
-        if (game.u?.ux > 0)
+        if (game._prompt_cursor) display.setCursor(game._prompt_cursor[0], game._prompt_cursor[1]);
+        else if (msg && game._more) display.setCursor(Math.min(msg.length, display.cols - 1), 0);
+        else if (game.u?.ux > 0)
             display.setCursor(game.u.ux - 1, game.u.uy + 1);
     }
 }
@@ -346,4 +365,5 @@ export async function pline(msg) {
 export function clear_pending_message() {
     game._pending_message = '';
     game._more = false;
+    game._prompt_cursor = null;
 }

@@ -24,7 +24,7 @@ Treat screen totals as lagging evidence of subsystem progress, not as the optimi
 | Screen comparison / canonicalization | `frozen/ps_test_runner.mjs` | (frozen — do not modify) | ✅ | DEC→Unicode, SGR normalise, version banner sentinel. |
 | Per-session regression runner | `frozen/ps_test_runner.mjs` | (frozen) | ✅ | `node frozen/ps_test_runner.mjs [session...]` |
 | Full regression suite | `frozen/score.sh` | (frozen) | ✅ | Run before committing any change. No regressions allowed. |
-| Debug tooling convention | — | One-off scripts in project root | 🟡 | Temp debug scripts MUST be deleted after use. Never leave `console.log` or `import('fs').writeFileSync` in production paths (jsmain.js, allmain.js). |
+| Debug tooling convention | — | One-off scripts in `scratch/` or `debug/`; batch triage in `scripts/triage-corpus.mjs` | 🟡 | Temp debug scripts MUST be deleted after use. Removed dead tracked `scratch/run_test.mjs` stub; remaining tracked scratch scripts are diagnostics. `scripts/triage-corpus.mjs` regenerates `scratch/divergence-inventory.md` from compact triage data for subsystem-level planning. Never leave `console.log` or `import('fs').writeFileSync` in production paths (jsmain.js, allmain.js). |
 
 ---
 
@@ -47,14 +47,14 @@ Treat screen totals as lagging evidence of subsystem progress, not as the optimi
 |---|---|---|---|---|
 | Room generation (random room count/size/pos) | `mkmaze.c`, `mkroom.c` | `js/mklev.js` | 🟡 | Produces correct room count for seed8000/seed0002. Verify other seeds. |
 | Corridor generation | `mkmaze.c:makecorridors()` | `js/mklev.js` | 🟡 | Connected but exact corridor paths may differ from C for non-tested seeds. |
-| Door placement | `mkmaze.c:makedoor()` | `js/mklev.js` | 🟡 | |
+| Door placement | `mkmaze.c:makedoor()` | `js/mklev.js` | 🟡 | `dosdoor()` now keeps JS `flags` and `doormask` synchronized to mirror C's alias, fixing closed-door rendering/movement state exposed by `seed0116`. |
 | Stair generation (down stairs) | `mklev.c:generate_stairs()` | `js/mklev.js:generate_stairs()` | 🟡 | Down stairs generated. |
 | Stair generation (up stairs, dlvl≥2) | `mklev.c:generate_stairs()` | `js/mklev.js:generate_stairs()` | 🟡 | Correctly skipped on dlvl 1. |
 | Branch entrance placement (Mines etc.) | `mklev.c:place_lregion()` | `js/mklev.js:place_lregion()` | 🟡 | `end1_up: true` hardcoded for seed8000. Verify with other seeds. |
 | Wallification (corner/t-junction glyphs) | `mklev.c:wallification()` | `js/mklev.js` | 🟡 | Present but may have edge cases. |
-| Monster/object fill (mkfill, mineralize) | `mklev.c`, `mkobj.c`, `makemon.c`, `engrave.c`, `rumors.c` | `js/mklev.js` + `js/random_text.js` + startup fast-forward scaffolds | 🟡 | `mkobj()` consumes upstream-derived class/object probability and material metadata. Early level-1 `rndmonst_adj()` uses C's weighted reservoir RNG shape; trap constants match `trap.h`; `occupied()` rejects trap squares; `CORPSE`/`STATUE` and egg init consume closer C RNG. Random graffiti uses NetHack-style padded data-file line selection and `wipeout_text()` rubouts. `level_finalize_topology()` now calls real `mineralize()` and consumes buried/place gates; the dead `fastforward_fill_mineralize()` replay exports were removed from seed replay modules. Evidence: `seed8000` screen parity remains `23/23`; first RNG mismatch is in the live monster movement loop at FR 2984. |
-| Shop generation | `mkroom.c:mkshop()` | — | 🔴 | No shop impl. Blocks `seed0116-wizard-wear-shop` and others. |
-| Special level loading (Lua specials) | `sp_lev.c` | — | 🔴 | No special level support. |
+| Monster/object fill (mkfill, mineralize) | `mklev.c`, `mkobj.c`, `makemon.c`, `engrave.c`, `rumors.c` | `js/mklev.js` + `js/random_text.js` + `js/monster_data.js` + startup fast-forward scaffolds | 🟡 | `mkobj()` consumes upstream-derived class/object probability and material metadata. `rndmonst_adj()` now walks a generated `include/monsters.h` table with C's weighted reservoir RNG shape and numeric dungeon alignment (`A_NONE` for Dungeons of Doom); trap constants match `trap.h`; `occupied()` rejects trap squares; `CORPSE`/`STATUE`, trap-victim role corpse range, no-corpse retry, egg init, grid bug gender, multigen projectile quantity, kobold/giant/elven `m_initweap()` slices, shared offensive-item gate, and defensive-item creation now consume closer C RNG. Random graffiti uses NetHack-style padded data-file selection and `wipeout_text()`. `level_finalize_topology()` calls real `mineralize()`. Evidence: `seed0383` moved through vault fill, room fill, bigroom monster selection, special bigroom group init, selected equipment, and defensive items to FR 3661; `seed8000` screen parity remains `23/23`. |
+| Shop generation | `mkroom.c:mkshop()` | `js/mklev.js:do_mkroom()` / `mkshop()` partial | 🟡 | The ordinary-level special-room decision now runs before fill. `mkshop()` can scan for an eligible one-door ordinary room and mark a shop type, but stocking, shopkeeper setup, `SHOPTYPE`, and full special-room fill remain incomplete. Evidence: `seed0116` moved past the level-2 shop chance gate to FR 4592. |
+| Special level loading (Lua specials) | `sp_lev.c` | `js/mklev.js` static themed-map/bigroom slices | 🔴 | Full special level support is still absent. Static themed `des.map()` fragments now use exact upstream map literals for implemented shapes, enable `in_mk_themerooms` failure semantics, create irregular `filler_region()` rooms from flood-filled floor bounds, and use C-like irregular door search. `bigrm-12` now dispatches before ordinary level generation, consumes the random variant, Lua shuffle/init, scripted percent gates, stair/object/trap placement, and reaches `des.monster()` through the general generated monster table plus special-bigroom group initialization; current blocker is deeper selected-monster initialization/equipment after elven gear, not a level-12 replay table. `seed0116` debug level teleport moved from FR 3011 (`lspo_map`) through room/corridor/vault accounting, arrival placement, and pet migration to dog-goal object scanning. |
 
 ---
 
@@ -66,11 +66,11 @@ Treat screen totals as lagging evidence of subsystem progress, not as the optimi
 | Role/race/gender/align selection from nethackrc | `role.c:plnamesiz()` etc. | `js/options.js` + `js/allmain.js` + `js/roles.js` (partial) | 🟡 | Parsed role/race/gender/align now drive startup identity, level-1 rank, alignment record, welcome text, and status title where config supplies them. This still does not implement chargen RNG, stats, or inventory. |
 | Random chargen (pick_role etc.) | `role.c:pick4u()` | `js/allmain.js` (hardcoded `rn2()` calls) | 🔴 | Hard-coded for seed0002. Not a real implementation. |
 | Hero placement (`u_on_upstairs`) | `stairs.c:u_on_upstairs()` | `js/mklev.js:u_on_upstairs()` | 🟡 | Works for seed8000/seed0002. **seed0002 step 12 has 1-cell offset bug.** |
-| Player stats (HP, Pw, AC, attributes) | `attrib.c`, `role.c` | `js/allmain.js` (hardcoded) | 🔴 | All stats are hardcoded per-seed. Must compute from PRNG + role data. |
-| Starting inventory (`ini_inv`) | `invent.c:ini_inv()` | `js/fastforward.js` (RNG stub) | 🔴 | No real inventory. Items displayed are hardcoded per-seed. |
-| `o_init` (object type shuffle) | `o_init.c` | `js/o_init.js` (stub) | 🔴 | Object type shuffle not implemented. Blocks all object IDs. |
+| Player stats (HP, Pw, AC, attributes) | `attrib.c`, `role.c` | `js/u_init.js` + `js/allmain.js` (partial) | 🟡 | Configured non-replay Wizard/Rogue/Healer/Tourist now use partial role-driven HP/Pw/AC/gold and `init_attr()`/`vary_init_attr()` RNG shape. Attribute storage follows C order (`Str, Int, Wis, Dex, Con, Cha`) and human race maxes are used during redist. `seed0116` first screen now matches; next visible mismatch is deferred armor AC/map state after welcome. Seed replay paths remain scoped. |
+| Starting inventory (`ini_inv`) | `invent.c:ini_inv()` | `js/u_init.js` + `js/mklev.js` object creation (partial) | 🟡 | Wizard `ini_inv(Wizard)` now consumes the general `trobj` path for fixed/random wands, rings, potions, scrolls, spellbooks, and magic marker charges, using `mkobj()`/`mksobj()` rather than replay. The optional Wizard blindfold branch is retained behind its `!rn2(5)` gate. Initial-inventory erosion is suppressed via the upstream `moves <= 1 && !in_mklev` rule. Other roles and full inventory use/wear/discovery side effects remain incomplete. |
+| `o_init` (object type shuffle) | `o_init.c` | `js/o_init.js` | 🟡 | General RNG shape for gem colors, description shuffle ranges, and `WAN_NOTHING` direction is implemented for non-replay sessions. Actual shuffled description/material state is not wired into object identity yet. |
 | Welcome / lore screens | `sounds.c`, `pline.c`, `role.c:Hello()` | `js/allmain.js:newgame()` + `js/roles.js:roleGreeting()` | 🟡 | Welcome greeting is role-driven rather than seed-driven. Configured role/align splash text now uses role god/rank data for the generic quest intro overlay, but full chargen/menu flow and exact windowing remain incomplete. |
-| Tutorial prompt | `pline.c` | `js/allmain.js` (override) | 🟡 | Hardcoded for seed0002. |
+| Tutorial prompt | `pline.c`, `options.c:ask_do_tutorial()` | `js/cmd.js` prompt overlay + seed0002 override | 🟡 | General post-welcome tutorial prompt now appears when `tutorial` was not set in config, including Space/Enter invalid-choice redraw. Seed0002 still uses older startup override screens. |
 
 ---
 
@@ -84,7 +84,7 @@ Treat screen totals as lagging evidence of subsystem progress, not as the optimi
 | Monster rendering on map | `display.c:newsym()` | `js/display.js:newsym()` | 🟡 | Renders from `game.level.monsters[]` — currently hardcoded per-seed. |
 | Remembered glyph (out-of-sight) | `display.c` | `js/display.js` | 🟡 | Implemented via `remembered_glyph`. |
 | Status line (bot) | `status.c` | `js/display.js:bot()` | ✅ | Verified passing for seed8000 (23/23). |
-| Message line (pline) | `pline.c` | `js/display.js:pline()` + `js/cmd.js:rhack()` | 🟡 | Message lifetime now matches prompt-time capture better: persist through `nhgetch`, clear on next command start. Broader message production is still partial. |
+| Message line (pline) | `pline.c` | `js/display.js:pline()` + `js/cmd.js:rhack()` | 🟡 | Message lifetime now matches prompt-time capture better: persist through `nhgetch`, clear on next real command start, and preserve queued messages behind override `--More--` screens. More prompts are rendered into the terminal grid with row-0 cursor placement. Broader message production is still partial. |
 | Sounds system | `sounds.c` | `js/sounds.js` | 🟡 | Basic `dosounds` with "slow drip" implemented. |
 | Full-screen menus (inventory, attributes) | `pline.c`, `invent.c` | `_override_screen` injection | 🟡 | Multi-page menus fixed (ATTR1→ATTR2 via `_override_prev`). Still hardcoded strings for seed8000. |
 | DEC line-drawing output | `curses.c` | `js/display.js` | ✅ | Outputs Unicode directly; runner translates DEC→Unicode for comparison. |
@@ -98,10 +98,10 @@ Treat screen totals as lagging evidence of subsystem progress, not as the optimi
 | Feature | C Reference | JS Implementation | Status | Notes |
 |---|---|---|---|---|
 | Main game loop (`moveloop_core`) | `allmain.c:moveloop_core()` | `js/allmain.js:moveloop_core()` | 🟡 | Basic loop. Fast-forward stubs for per-step RNG. |
-| Command dispatch (`rhack`) | `cmd.c:rhack()` | `js/cmd.js:rhack()` | 🟡 | Only move commands (hjklyubn + `.` `,`) + basic UI stubs. |
+| Command dispatch (`rhack`) | `cmd.c:rhack()` | `js/cmd.js:rhack()` | 🟡 | Move commands, rest/wait (`.`), search (`s`), basic UI stubs, debug `^V` numeric/menu level teleport, and `#levelchange` prompt/level-gain RNG are present. Most commands remain unimplemented. |
 | Cardinal movement (`domove`) | `do.c:domove()` | `js/cmd.js:domove()` | 🟡 | Basic movement. No combat, traps, or item pickup. |
 | Zero-turn commands (inventory, ESC, etc.) | `cmd.c` | `js/cmd.js` | 🟡 | `g.context.move=0` on zero-turn commands confirmed in lessons. |
-| Per-step monster movement / regen RNG | `monmove.c`, `regen.c` | `js/monmove.js` + partial turn consumers | 🟡 | Per-step replay is no longer called from `moveloop_core()`, and the dead `fastforward_step()` exports have been removed from the seed replay modules. `makemon()` retains generated monsters on the level and time-taking commands now spend/allocate monster movement before random monster generation, `dosounds()`, hunger, and the engraving wipe gate. Movement AI remains skeletal; `seed8000` now blocks at FR 2984 where C has more monsters ready to act than the JS partial monster table/state. |
+| Per-step monster movement / regen RNG | `monmove.c`, `regen.c` | `js/monmove.js` + partial turn consumers | 🟡 | Per-step replay is no longer called from `moveloop_core()`, and the dead `fastforward_step()` exports have been removed from the seed replay modules. `makemon()` now preserves C `fmon` head-insertion order, and `mcalcmove()` handles slow/fast speed states. Movement AI remains skeletal; `seed8000` now blocks at FR 2985 where C still has another monster ready for `distfleeck()` while JS begins the next movement allocation. |
 | Turn counter | `allmain.c` | `js/allmain.js` | ✅ | `g.moves++` conditional on `g.context.move`. |
 | Game over (`gameover`) | `end.c` | `js/cmd.js` (stub) | 🔴 | Not implemented. Loop never terminates normally. |
 
@@ -111,9 +111,9 @@ Treat screen totals as lagging evidence of subsystem progress, not as the optimi
 
 | Feature | C Reference | JS Implementation | Status | Notes |
 |---|---|---|---|---|
-| Object type table / `o_init` shuffle | `objects.c`, `o_init.c` | `js/object_data.js` + `js/o_init.js` | 🟡 | Static upstream object class/probability/charge/direction/material metadata is now available for `mkobj` selection and erosion eligibility, removing several bogus handwritten constants. Real `o_init` shuffles, artifact selection/origin tracking, and runtime object-description state are still missing, so item identity parity is not solved yet. |
-| Random text data files | `rumors.c`, `engrave.c`, `makedefs.c` | `js/random_text.js` | 🟡 | Random engraving/rumor selection builds padded/xcrypted virtual chunks from upstream data files and applies C-like `get_rnd_line()` and `wipeout_text()` RNG. It currently serves graffiti generation; broader data-file consumers (epitaphs, bogus monsters, oracle text) still need integration. |
-| Object placement on map | `mkobj.c:mksobj()` | hardcoded arrays in `allmain.js` | 🔴 | Hardcoded per seed. Must be driven by real object generation. |
+| Object type table / `o_init` shuffle | `objects.c`, `o_init.c` | `js/object_data.js` + `js/o_init.js` | 🟡 | Static upstream object class/probability/charge/direction/material metadata is available for `mkobj` selection and erosion eligibility. `init_objects()` now consumes the general C description-shuffle RNG shape for non-replay sessions, reducing seed-specific startup replay reliance. Runtime object-description/material swaps, artifact selection/origin tracking, and item identity parity are still missing. |
+| Random text data files | `rumors.c`, `engrave.c`, `makedefs.c`, `dat/rumors.*`, `dat/engrave.txt` | `js/random_text.js` + `js/random_text_data.js` | 🟡 | Random engraving/rumor selection builds padded/xcrypted virtual chunks from checked-in generated JS data and applies C-like `get_rnd_line()` and `wipeout_text()` RNG. Production JS is browser-safe and does not read upstream data files with `fs` at runtime. It currently serves graffiti generation; broader data-file consumers (epitaphs, bogus monsters, oracle text) still need integration. |
+| Object placement on map | `mkobj.c:mksobj()` | `js/mklev.js:mksobj_at()` / `mkobj_at()` + legacy hardcoded arrays in `allmain.js` | 🟡 | Generated `_at` object creation now retains non-gold objects on `level.objects` with class glyph state, so later systems can inspect floor objects. Seed0002 still has legacy hardcoded startup objects, and object stacking/descriptions/material swaps/container contents remain incomplete. Evidence: `seed0116` dog blocker moved to `dog_goal()` object reachability/resistance rather than missing the pet wanderer gate. |
 | Gold | `mkobj.c` | hardcoded `g._goldCount` | 🔴 | Per-seed hardcoded. |
 | Autopickup | `pickup.c` | — | 🔴 | |
 | Inventory management | `invent.c` | — | 🔴 | |
@@ -124,10 +124,10 @@ Treat screen totals as lagging evidence of subsystem progress, not as the optimi
 
 | Feature | C Reference | JS Implementation | Status | Notes |
 |---|---|---|---|---|
-| Monster placement (mklev fill) | `makemon.c` | `js/mklev.js:makemon()` + hardcoded arrays in `allmain.js` | 🟡 | Early ordinary level-1 random monster selection follows `rndmonst_adj()` reservoir sampling and consumes `next_ident`, level-0 HP, baseline inventory gates, and retained level monster records. The full monster table, exact selected monster data, and real movement AI are incomplete; current `seed8000` blocker is live monster movement at FR 2984. |
+| Monster placement (mklev fill) | `makemon.c`, `include/monsters.h`, `include/monflag.h` | `js/mklev.js:makemon()` + `js/monster_data.js` + hardcoded arrays in `allmain.js` | 🟡 | Random monster selection follows `rndmonst_adj()` reservoir sampling over generated `monsters.h` data and consumes `next_ident`, HP, baseline inventory gates, and retained level monster records. Exact selected-monster initialization/equipment and real movement AI are still incomplete; current `seed8000` blocker is live monster movement at FR 2985. |
 | Monster movement | `monmove.c` | — | 🔴 | Fast-forwarded via RNG stubs only. |
 | Combat | `fight.c` | — | 🔴 | |
-| Pet behavior | `dog.c` | — | 🔴 | |
+| Pet behavior | `dog.c`, `dogmove.c` | `js/dog.js` + `js/mklev.js:makemon()` + `js/monmove.js` (partial) | 🟡 | Starting pet creation is partially ported for configured non-replay roles: role/preferred-pet selection, `MM_EDOG|NO_MINVENT`, near-hero `collect_coords()` ring shuffling, pet tame/peaceful setup, and kitten/little-dog/pony metadata. Tame monster turns now enter a partial `dog_move()` path with the upstream kitten/pony `M2_WANDER` gate and C-like neighbor scan order. `dog_goal()` now scans retained floor objects and hero inventory with `dogfood()`/`obj_resists()` guards for real numeric `otyp` objects. Current `seed0116` blocker is missing three object-resistance calls after the 14 retained Wizard inventory items, likely incomplete floor/object state. Hunger, naming, saddles, full object fetching/eating, migration details, and interactions remain incomplete. |
 
 ---
 
@@ -155,17 +155,19 @@ Treat screen totals as lagging evidence of subsystem progress, not as the optimi
 
 | Session | Matched | Total | Last Updated | Notes |
 |---|---|---|---|---|
-| seed8000-tourist-starter | **23** | 23 | 2026-05-10 | Screen parity preserved. Real mineralize and partial live-turn movement moved lagging RNG evidence to `2996/3130`; first RNG mismatch is FR 2984: expected another `distfleeck()` `rn2(5)`, actual `mcalcmove()` `rn2(12)`. |
-| seed0002-healer-reflection-drummer | 11 | 595 | 2026-05-10 | First visible screen mismatch unchanged at screen 11. Current lagging RNG evidence is `1230/27158`; first RNG mismatch remains FR 1202 after seed8000 replay was scoped away from unrelated seeds. |
-| All other sessions | 0 | 10,666 | 2026-05-10 | Seed8000 startup replay is no longer applied to unrelated seeds. Need real `o_init`, dungeon init, generalized chargen + object/monster generation + shop/inventory + datetime side effects + hallucination display context. |
+| seed8000-tourist-starter | **23** | 23 | 2026-05-10 | Screen parity preserved. First RNG mismatch remains FR 2985 in live monster movement (`distfleeck()` vs movement allocation). |
+| seed0002-healer-reflection-drummer | 11 | 595 | 2026-05-10 | First visible screen mismatch unchanged at screen 11. Current lagging RNG evidence improved to `1303/27158`; first RNG mismatch is FR 1215 after generalized pet/object-state fixes. |
+| seed0116-wizard-wear-shop | 16 | 127 | 2026-05-10 | Door-state aliasing, tutorial prompt lifecycle, rest command, debug `^V` prompt/Enter handling, static themed `des.map()`, irregular region bounds, corridor/vault accounting, random shop decision, level-teleport arrival placement, pet migration, normal Space handling, basic wear/takeoff prompts, pet wanderer handling, and partial `dog_goal()` object/inventory scans moved the first RNG mismatch from FR 2978 to FR 5532. Current blocker is missing object state in `dog_goal()` after taking off the cloak. |
+| seed0383-wizard-hallucinate | 0 | 219 | 2026-05-10 | Improved from `936/16915` to first mismatch FR 3661; vault fill, final special-room refill with gold merging, kobold/giant/elven weapon init slices, multigen projectile quantity, shared offensive-item gate, defensive-item creation, debug `#levelchange`, debug level-teleport menu, partial `bigrm-12` special loading, special bigroom group init, general generated `monsters.h` reservoir sampling, and generated object retention are now modeled. Current blocker is `makemon.c:peace_minded()` predicate coverage before moving the general peaceful call into ordinary monster creation. |
+| All other sessions | 0 | 10,442 | 2026-05-10 | Non-replay sessions now run general `init_objects()`, partial `role_init`, data-driven `init_dungeons()`, partial `u_init_misc`, starting pet placement, Wizard `ini_inv`, and broader mklev/monster equipment RNG. Many RNG prefixes improved, but first-screen parity still awaits broader role/race/inventory side effects, shop/special-room handling, save/restore, and hallucination display context. |
 
-**As of 2026-05-10: 34 / 11,284 public screens matched (~0.3%), 0/44 sessions fully passing**
+**As of 2026-05-10: 50 / 11,406 public screens matched (~0.4%), 0/44 sessions fully passing**
 
 ---
 
 ## 🎯 Recommended Next Targets (Highest ROI first)
 
-1. **Implement real monster table and movement state (`monsters.h`, `makemon.c`, `mon.c`, `monmove.c`)** — real mineralize is now in place, and `seed8000` reaches the live turn loop. The next blocker is that JS retained monsters do not have C-equivalent movement readiness; fix selected monster data and movement state before touching per-step behavior.
-2. **Generalize chargen from nethackrc** — Parse `OPTIONS=role:Healer,race:Human,...` and drive chargen properly. Removes all `player_selection` hardcoding and startup overrides across the corpus.
-3. **Implement real `o_init` / object shuffle** — Without this, item types (scrolls, potions) can't match C. Fundamental blocker for object-dependent parity.
-4. **Implement real `makemon` / monster placement** — Needed to replace hardcoded monster arrays and unblock movement, pet, and combat work.
+1. **Implement `peace_minded()` predicate coverage** — `seed0383` now reaches FR 3661, where C calls `peace_minded()` but JS cannot safely move the call earlier until `always_hostile`/`always_peaceful`, race, minion, and special-sound predicates prevent false RNG rolls.
+2. **Complete `dog_goal()` object state (`dogmove.c`)** — `seed0116` now scans floor objects and hero inventory; current blocker is three missing `obj_resists()` calls before the pet chooses its square, likely incomplete floor/object state.
+3. **Continue startup HP/Pw and hallucination setup** — `#levelchange` HP/Pw RNG is now modeled, but first-screen display still has map glyph drift and hallucination display context remains absent.
+4. **Generalize remaining startup menu/windowing paths** — the tutorial prompt is now general, but seed0002 still relies on hardcoded startup override screens.

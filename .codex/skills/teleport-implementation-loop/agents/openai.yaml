@@ -1,7 +1,7 @@
 interface:
   display_name: "Teleport Implementation Loop"
   short_description: "Run a sustained parity implementation loop in teleport-contest"
-  default_prompt: "Use $teleport-implementation-loop to complete at least 10 meaningful structural implementation iterations in this repo, using sessions only as evidence. If the current subsystem becomes risky, document the blocker and switch to the next highest-ROI subsystem instead of stopping."
+  default_prompt: "Use $teleport-implementation-loop to keep iterating on generalized parity until a true global stopping condition is reached. Treat small failed probes as normal work: revert only the probe, record what it proved, then try the next hypothesis or queued subsystem instead of stopping."
 
 policy:
   allow_implicit_invocation: true
