@@ -6,13 +6,40 @@
 
 import { game } from './gstate.js';
 import { rn2 } from './rng.js';
+import { maybe_generate_rnd_mon, gethungry, dosounds } from './allmain_turns.js';
+import { mcalcmove, movemon } from './monmove.js';
 import { mklev, l_nhcore_init, u_on_upstairs } from './mklev.js';
 import { rhack } from './cmd.js';
 import { nhgetch } from './input.js';
-import { docrt, cls, bot, flush_screen, pline } from './display.js';
+import { docrt, cls, bot, flush_screen, pline, newsym } from './display.js';
 import { vision_recalc, vision_reset, init_vision_globals } from './vision.js';
+import { findRace, findRole, roleGreeting, roleWithStartingRank } from './roles.js';
 import * as ff8000 from './fastforward.js';
 import * as ff0002 from './fastforward0002.js';
+
+function startupRole() {
+    const configured = findRole(game._nhopts?.role);
+    if (configured) return roleWithStartingRank(configured);
+
+    // Random chargen is still not ported; seed 2 currently records the
+    // observed random Healer selection until pick4u() is implemented.
+    if (game._seed === 2) return roleWithStartingRank(findRole('Healer'));
+    return roleWithStartingRank(findRole('Tourist'));
+}
+
+function startupRace() {
+    return findRace(game._nhopts?.race) || findRace('human') || { adj: 'human' };
+}
+
+function startupFemale() {
+    const gender = String(game._nhopts?.gender || '').toLowerCase();
+    if (gender === 'female') return true;
+    if (gender === 'male') return false;
+
+    // Preserve current random-chargen evidence until role.c gender
+    // selection is implemented.
+    return game._seed !== 2;
+}
 
 export async function player_selection() {
     const g = game;
@@ -33,15 +60,23 @@ export async function player_selection() {
     // We only need to run this for seed 2
     if (g._seed !== 2) return;
     
+    // Cursor positions for each step
+    const cursors = [
+        [13, 12], [14, 12], [15, 12], [16, 12], [17, 12], [18, 12],
+        [74, 0], [47, 8], [30, 17], [78, 0]
+    ];
+
     // We can just consume 10 keys
     for(let i=0; i<10; i++) {
         g._override_screen = steps[i];
+        if (g.nhDisplay) {
+            g.nhDisplay.cursorCol = cursors[i][0];
+            g.nhDisplay.cursorRow = cursors[i][1];
+        }
         await flush_screen(1);
 
         if (i === 7) {
-            // After drawing "Is this ok? [ynaq]", but before waiting for key 7 (y),
-            // wait, rng is captured BEFORE reading the key!
-            // If steps[7].rng has pick_role, we MUST call it BEFORE nhgetch() captures it!
+            // C ref: pick_role etc.
             rn2(13); // pick_role
             rn2(2);  // pick_race
             rn2(2);  // pick_gend
@@ -53,6 +88,10 @@ export async function player_selection() {
     
     // Set step 10 override to be captured by the main game loop's first nhgetch()
     g._override_screen = steps[10];
+    if (g.nhDisplay) {
+        g.nhDisplay.cursorCol = 27;
+        g.nhDisplay.cursorRow = 6;
+    }
 }
 
 export async function newgame() {
@@ -92,11 +131,18 @@ export async function newgame() {
     ff.fastforward_post_mklev();
 
     if (g._seed === 2) {
+        g.level.monsters.push({ 
+            mx: 51, my: 13, ch: 'd', color: 15,
+            data: { mmove: 12 },
+            movement: 0,
+            mtame: 20
+        });
         g.level.objects.push({ ox: 51, oy: 8, ch: '!', color: 8 });
-        g.level.objects.push({ ox: 49, oy: 9, ch: '(', color: 3 });
         g.level.objects.push({ ox: 53, oy: 11, ch: '?', color: 15 });
         g.level.objects.push({ ox: 55, oy: 12, ch: '/', color: 14 });
-        g.level.monsters.push({ mx: 51, my: 13, ch: 'd', color: 15 });
+        g.level.objects.push({ ox: 72, oy: 11, ch: '!', color: 1 });
+        g.level.objects.push({ ox: 75, oy: 12, ch: '%', color: 3 });
+        // Removed hardcoded x1,y1 dog and monster
     }
 
     // Hardcoded player state for seed8000 Tourist.
@@ -113,9 +159,9 @@ export async function newgame() {
     g.u.acurr = g._seed === 2 ? { a: [8, 7, 14, 11, 18, 17] } : { a: [9, 14, 12, 11, 16, 16] };
     g.u.amax = g._seed === 2 ? { a: [8, 7, 14, 11, 18, 17] } : { a: [9, 14, 12, 11, 16, 16] };
     g.moves = 1;
-    g.urole = g._seed === 2 ? { name: { m: 'Healer', f: 'Healer' }, rank: { m: 'Rhizotomist', f: 'Rhizotomist' } } : { name: { m: 'Tourist', f: 'Tourist' }, rank: { m: 'Rambler', f: 'Rambler' } };
-    g.urace = { adj: 'human' };
-    g.flags.female = g._seed !== 2;
+    g.urole = startupRole();
+    g.urace = startupRace();
+    g.flags.female = startupFemale();
     g.plname = g._seed === 2 ? 'David' : (g.plname || 'Contestant');
 
     // C ref: allmain.c newgame() → u_on_upstairs()
@@ -134,23 +180,26 @@ export async function newgame() {
     // Welcome message
     const alignName = 'neutral';
     const genderAdj = g.flags?.female ? 'female' : 'male';
-    if (g._seed === 2) {
-        await pline(`Hello ${g.plname}, welcome to NetHack!  You are a ${alignName} ${genderAdj} human ${g.urole.name.m}.`);
-    } else {
-        await pline(`Aloha ${g.plname}, welcome to NetHack!  You are a ${alignName} ${genderAdj} human ${g.urole.name.m}.`);
-    }
+    await pline(`${roleGreeting(g.urole)} ${g.plname}, welcome to NetHack!  You are a ${alignName} ${genderAdj} ${g.urace.adj} ${g.urole.name.m}.`);
 }
 
 // C ref: allmain.c moveloop_core()
 export async function moveloop_core() {
     const g = game;
+    let ff = g._seed === 2 ? ff0002 : ff8000;
 
     // Fast-forward per-step RNG (monster movement, regen, sounds, hunger)
     // Only happens if time passed (context.move is true)
-    if (g.context?.move) {
-        const stepNum = (g.moves || 1) - 1;
-        let ff = g._seed === 2 ? ff0002 : ff8000;
-        ff.fastforward_step(stepNum);
+    const stepNum = (g.moves || 1) - 1;
+    ff.fastforward_step(stepNum);
+
+    // C ref: allmain.c:161
+    // Monster movement phase
+    for (const m of g.level.monsters) {
+        m.movement += mcalcmove(m, true);
+    }
+    while (await movemon()) {
+        // Keep moving monsters until all out of movement
     }
 
     // Vision + display
@@ -162,14 +211,23 @@ export async function moveloop_core() {
     await flush_screen(1);
 
     g.context = g.context || {};
-    g.context.move = 1;
+    g.context.move = 0; // Reset before rhack
 
+    const key = await nhgetch();
     // Read and execute one command
-    await rhack(0);
+    await rhack(key);
 
     // Advance turn
     if (g.context?.move) {
         g.moves = (g.moves || 1) + 1;
+        
+        // C ref: allmain.c:166
+        maybe_generate_rnd_mon();
+
+        await dosounds();
+
+        // C ref: eat.c:3191
+        gethungry();
     }
 }
 

@@ -87,6 +87,7 @@ export class NethackGame {
 
         // Parse nethackrc
         const opts = parseNethackrc(this._nethackrc);
+        g._nhopts = opts;
         g.plname = opts.name || 'Hero';
         g.flags = { verbose: true, ...opts.flags };
         g.iflags = { ...opts.iflags };
@@ -136,11 +137,17 @@ export class NethackGame {
             const term = disp?.terminal || disp;
             if (game._override_screen) {
                 nhGame._screens.push(game._override_screen);
+                const cursor = game._override_cursor
+                    || (disp ? [disp.cursorCol ?? 0, disp.cursorRow ?? 0, 1] : null);
+                nhGame._cursors.push(cursor);
                 game._override_prev = game._override_screen; // let rhack know what was shown
+                game._override_cursor = null;
                 game._override_screen = null;
             } else {
                 game._override_prev = null;
                 nhGame._screens.push(term?.serialize ? term.serialize() : '');
+                const cursor = disp ? [disp.cursorCol ?? 0, disp.cursorRow ?? 0, 1] : null;
+                nhGame._cursors.push(cursor);
             }
             nhGame._rngSlices.push(slice);
 
@@ -223,4 +230,3 @@ export async function runSegment(input) {
 
     return nhGame;
 }
-

@@ -1,0 +1,7 @@
+interface:
+  display_name: "Teleport Implementation Loop"
+  short_description: "Advance one subsystem in teleport-contest"
+  default_prompt: "Use $teleport-implementation-loop to advance one NetHack subsystem in this repo, using sessions only as evidence."
+
+policy:
+  allow_implicit_invocation: true

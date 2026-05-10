@@ -9,8 +9,8 @@ Use this to choose your next implementation target. Update the **Status** and **
 - 🟢 Correct for all tested seeds
 - ✅ Verified passing (screen-level parity confirmed)
 
-**Metric column:** "gates Y screens" means getting this right unlocks Y screens across the public corpus.
-The headline metric is **total matched screens / total screens** summed across all 44 sessions.
+**Metric column:** "gates Y screens" means getting this right is expected to unlock Y screens across the public corpus.
+Treat screen totals as lagging evidence of subsystem progress, not as the optimization target.
 
 ---
 
@@ -52,7 +52,7 @@ The headline metric is **total matched screens / total screens** summed across a
 | Stair generation (up stairs, dlvl≥2) | `mklev.c:generate_stairs()` | `js/mklev.js:generate_stairs()` | 🟡 | Correctly skipped on dlvl 1. |
 | Branch entrance placement (Mines etc.) | `mklev.c:place_lregion()` | `js/mklev.js:place_lregion()` | 🟡 | `end1_up: true` hardcoded for seed8000. Verify with other seeds. |
 | Wallification (corner/t-junction glyphs) | `mklev.c:wallification()` | `js/mklev.js` | 🟡 | Present but may have edge cases. |
-| Monster/object fill (mkfill, mineralize) | `mklev.c`, `mkobj.c` | `js/fastforward.js` + `js/fastforward0002.js` | 🟡 | **Hardcoded fast-forward only for seed8000 and seed0002.** Blocks all other sessions. |
+| Monster/object fill (mkfill, mineralize) | `mklev.c`, `mkobj.c` | `js/mklev.js` + `js/fastforward.js` + `js/fastforward0002.js` | 🟡 | `mkobj()` now consumes upstream-derived class/object probability and material metadata from `js/object_data.js`. Random weapon/armor `artif` rolls and `mkobj_erosions()` RNG shape are partially modeled. Evidence: `seed8000` screen parity remains `23/23`; first RNG mismatch moved from missing random-armor artifact/erosion handling (`FR 1419`) to room-fill spatial state (`FR 1428`, JS calls statue `rndmonnum()` where C proceeds to bonus-item `rn2(3)`). Fast-forward scaffolding remains in use. |
 | Shop generation | `mkroom.c:mkshop()` | — | 🔴 | No shop impl. Blocks `seed0116-wizard-wear-shop` and others. |
 | Special level loading (Lua specials) | `sp_lev.c` | — | 🔴 | No special level support. |
 
@@ -63,13 +63,13 @@ The headline metric is **total matched screens / total screens** summed across a
 | Feature | C Reference | JS Implementation | Status | Notes |
 |---|---|---|---|---|
 | Name prompt / character selection UI | `pline.c`, `sounds.c` | `js/allmain.js:player_selection()` | 🟡 | **Hardcoded `_override_screen` for seed0002 only.** Must be generalized. |
-| Role/race/gender/align selection from nethackrc | `role.c:plnamesiz()` etc. | `js/options.js` (partial) | 🟡 | `parseNethackrc` parses OPTIONS= but does not drive chargen RNG. |
+| Role/race/gender/align selection from nethackrc | `role.c:plnamesiz()` etc. | `js/options.js` + `js/allmain.js` + `js/roles.js` (partial) | 🟡 | Parsed role/race/gender now drive startup identity and level-1 rank where config supplies them. Align is still hardcoded neutral, and this does not implement chargen RNG or stats. |
 | Random chargen (pick_role etc.) | `role.c:pick4u()` | `js/allmain.js` (hardcoded `rn2()` calls) | 🔴 | Hard-coded for seed0002. Not a real implementation. |
 | Hero placement (`u_on_upstairs`) | `stairs.c:u_on_upstairs()` | `js/mklev.js:u_on_upstairs()` | 🟡 | Works for seed8000/seed0002. **seed0002 step 12 has 1-cell offset bug.** |
 | Player stats (HP, Pw, AC, attributes) | `attrib.c`, `role.c` | `js/allmain.js` (hardcoded) | 🔴 | All stats are hardcoded per-seed. Must compute from PRNG + role data. |
 | Starting inventory (`ini_inv`) | `invent.c:ini_inv()` | `js/fastforward.js` (RNG stub) | 🔴 | No real inventory. Items displayed are hardcoded per-seed. |
 | `o_init` (object type shuffle) | `o_init.c` | `js/o_init.js` (stub) | 🔴 | Object type shuffle not implemented. Blocks all object IDs. |
-| Welcome / lore screens | `sounds.c`, `pline.c` | `js/allmain.js:newgame()` | 🟡 | Hardcoded per seed. Needs proper role/align text lookup. |
+| Welcome / lore screens | `sounds.c`, `pline.c`, `role.c:Hello()` | `js/allmain.js:newgame()` + `js/roles.js:roleGreeting()` | 🟡 | Welcome greeting is role-driven rather than seed-driven. Lore, quest text, and some startup screens remain hardcoded per seed; still needs proper role/align text lookup. |
 | Tutorial prompt | `pline.c` | `js/allmain.js` (override) | 🟡 | Hardcoded for seed0002. |
 
 ---
@@ -84,7 +84,8 @@ The headline metric is **total matched screens / total screens** summed across a
 | Monster rendering on map | `display.c:newsym()` | `js/display.js:newsym()` | 🟡 | Renders from `game.level.monsters[]` — currently hardcoded per-seed. |
 | Remembered glyph (out-of-sight) | `display.c` | `js/display.js` | 🟡 | Implemented via `remembered_glyph`. |
 | Status line (bot) | `status.c` | `js/display.js:bot()` | ✅ | Verified passing for seed8000 (23/23). |
-| Message line (pline) | `pline.c` | `js/display.js:pline()` | 🟡 | Basic impl. `--More--` handled. Zero-turn message persistence confirmed. |
+| Message line (pline) | `pline.c` | `js/display.js:pline()` + `js/cmd.js:rhack()` | 🟡 | Message lifetime now matches prompt-time capture better: persist through `nhgetch`, clear on next command start. Broader message production is still partial. |
+| Sounds system | `sounds.c` | `js/sounds.js` | 🟡 | Basic `dosounds` with "slow drip" implemented. |
 | Full-screen menus (inventory, attributes) | `pline.c`, `invent.c` | `_override_screen` injection | 🟡 | Multi-page menus fixed (ATTR1→ATTR2 via `_override_prev`). Still hardcoded strings for seed8000. |
 | DEC line-drawing output | `curses.c` | `js/display.js` | ✅ | Outputs Unicode directly; runner translates DEC→Unicode for comparison. |
 | `cls()` / `docrt()` | `display.c` | `js/display.js` | 🟡 | Functional. |
@@ -110,7 +111,7 @@ The headline metric is **total matched screens / total screens** summed across a
 
 | Feature | C Reference | JS Implementation | Status | Notes |
 |---|---|---|---|---|
-| Object type table / `o_init` shuffle | `objects.c`, `o_init.c` | — | 🔴 | **Fundamental blocker.** Without this, object IDs (potions, scrolls, etc.) cannot match C. |
+| Object type table / `o_init` shuffle | `objects.c`, `o_init.c` | `js/object_data.js` + `js/o_init.js` | 🟡 | Static upstream object class/probability/charge/direction/material metadata is now available for `mkobj` selection and erosion eligibility, removing several bogus handwritten constants. Real `o_init` shuffles, artifact selection/origin tracking, and runtime object-description state are still missing, so item identity parity is not solved yet. |
 | Object placement on map | `mkobj.c:mksobj()` | hardcoded arrays in `allmain.js` | 🔴 | Hardcoded per seed. Must be driven by real object generation. |
 | Gold | `mkobj.c` | hardcoded `g._goldCount` | 🔴 | Per-seed hardcoded. |
 | Autopickup | `pickup.c` | — | 🔴 | |
@@ -141,29 +142,29 @@ The headline metric is **total matched screens / total screens** summed across a
 
 | Feature | C Reference | JS Implementation | Status | Notes |
 |---|---|---|---|---|
-| nethackrc parsing | `options.c` | `js/options.js:parseNethackrc()` | 🟡 | Parses OPTIONS= block. Does not fully drive chargen. |
-| `OPTIONS=name:...` → chargen | `options.c` | `js/options.js` (partial) | 🟡 | Name extracted. Role/race/gender/align parsing incomplete. |
+| nethackrc parsing | `options.c` | `js/options.js:parseNethackrc()` | 🟡 | Parses the current OPTIONS= subset and exposes it on game state for startup. Still incomplete versus upstream options.c. |
+| `OPTIONS=name:...` → chargen | `options.c` | `js/options.js` + `js/allmain.js` (partial) | 🟡 | Name plus parsed role/race/gender now flow into startup identity when present. Align, random role selection, stats, inventory, and menus remain incomplete. |
 | `OPTIONS=!tutorial` | `options.c` | `js/options.js` | 🟡 | Parsed as flag. Not enforced in player_selection. |
 
 ---
 
 ## 📊 Current Score Summary
 
-*(Update this section after every agent run — it is the ground truth for progress.)*
+*(Update this section after every agent run — it is a lagging indicator of progress, not the definition of progress.)*
 
 | Session | Matched | Total | Last Updated | Notes |
 |---|---|---|---|---|
-| seed8000-tourist-starter | **23** | 23 | 2026-05-10 | ✅ **PASSING** — Full session passes! |
-| seed0002-healer-reflection-drummer | 13 | 595 | 2026-05-10 | Diverges at step 14: hero position offset |
-| All other sessions | 0 | ~10,650 | 2026-05-10 | Need generalized chargen + object/monster gen |
+| seed8000-tourist-starter | **23** | 23 | 2026-05-10 | Screen parity preserved. RNG is `2247/3130`; first remaining mismatch moved from random armor artifact/erosion handling (`FR 1419`) to a room-fill spatial-state divergence (`FR 1428`, statue placement path versus bonus-item branch). |
+| seed0002-healer-reflection-drummer | 11 | 595 | 2026-05-10 | Diverges at screen 11 / RNG 1003. Object-generation work advanced this sentinel from `1229/27158` to `1287/27158` without changing the first visible screen mismatch. |
+| All other sessions | 0 | 10,666 | 2026-05-10 | Need generalized chargen + object or monster gen + datetime + hallucination display context. |
 
-**As of 2026-05-10: ~36 / ~11,268 public screens matched (~0.3%), 1/44 sessions PASSING**
+**As of 2026-05-10: 34 / 11,284 public screens matched (~0.3%), 0/44 sessions fully passing**
 
 ---
 
 ## 🎯 Recommended Next Targets (Highest ROI first)
 
-1. **Fix seed0002 step 14 player position** — Hero placed 1 cell off from expected. Unlocks up to 595 screens.
-2. **Generalize chargen from nethackrc** — Parse `OPTIONS=role:Healer,race:Human,...` and drive chargen properly. Removes all `player_selection` hardcoding. Unlocks all 44 sessions' startup screens.
-3. **Implement real `o_init` / object shuffle** — Without this, item types (scrolls, potions) can't match C. Fundamental blocker for items-dependent sessions.
-4. **Implement real `makemon` / monster placement** — Needed for sessions with combat.
+1. **Finish room-fill and object generation (`mkobj`, `mksobj_init`, mineralize)** — upstream object ids/classes/materials are now wired into mklev, and `seed8000` now pinpoints a room-fill spatial-state divergence after artifact/erosion RNG shape instead of bogus ids.
+2. **Generalize chargen from nethackrc** — Parse `OPTIONS=role:Healer,race:Human,...` and drive chargen properly. Removes all `player_selection` hardcoding and startup overrides across the corpus.
+3. **Implement real `o_init` / object shuffle** — Without this, item types (scrolls, potions) can't match C. Fundamental blocker for object-dependent parity.
+4. **Implement real `makemon` / monster placement** — Needed to replace hardcoded monster arrays and unblock movement, pet, and combat work.
