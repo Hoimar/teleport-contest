@@ -5,8 +5,6 @@
   "type": "module",
   "scripts": {
     "score": "bash frozen/score.sh",
-    "sentinel": "node scripts/run-sentinel-suite.mjs",
-    "triage": "node scripts/triage-session.mjs",
     "play": "echo 'Open index.html in a browser to play'"
   },
   "engines": {

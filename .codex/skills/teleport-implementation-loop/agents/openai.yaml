@@ -1,7 +1,0 @@
-interface:
-  display_name: "Teleport Implementation Loop"
-  short_description: "Run a sustained parity implementation loop in teleport-contest"
-  default_prompt: "Use $teleport-implementation-loop to keep iterating on generalized parity until a true global stopping condition is reached. Treat small failed probes as normal work: revert only the probe, record what it proved, then try the next hypothesis or queued subsystem instead of stopping."
-
-policy:
-  allow_implicit_invocation: true
