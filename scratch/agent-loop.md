@@ -114,6 +114,12 @@
 - Evidence: target and sentinel lagging counts were unchanged (`seed0383` 9906/16915 at FR 9716; `seed0116` 5650/12562 at FR 5532; sentinel 50/1063 screens and 20420/64569 RNG), so the active `seed0383` missing `fobj` is not this trap-victim pile. The patch still removes hidden floor-object debt for later pet, pickup, and display behavior.
 - Current queue: classify whether the FR 9716 missing `fobj` comes from pet-arrival position drift, special-level terrain/kelp placement drift, or another retained object source; keep `seed0116` shop/floor object state as the secondary pet-object target.
 
+### Iteration 15 - Retained Special Trap State
+
+- Change: `bigrm-12` `des.trap()` now calls the trap-retention path after choosing each trap type, so the six special traps exist in `level.traps` before optional trap-victim decoration.
+- Evidence: `seed0383` and the sentinel suite stayed unchanged (`seed0383` FR 9716, sentinel 50/1063 and 20420/64569). Live state now shows six retained `bigrm-12` traps. This removes special-level state debt but does not explain the current `dog_goal()` floor-object rectangle.
+- Current classification: reconstructing the floor-object sequence shows C likely has the pet one square east of JS at the first live turn. From `(28,4)`, C's search rectangle would scan kelp at `(33,9)`, then the same nearby kelp objects, then the special object at `(33,6)`, matching the extra `obj_resists()` before movement. The next target is monster occupancy or placement drift that makes C reject earlier pet-arrival candidates.
+
 ## 2026-05-11 Marathon Restart - Peaceful Monster Predicate Queue
 
 - Full suite baseline before this loop: 50/11406 screens, 0/44 passing.

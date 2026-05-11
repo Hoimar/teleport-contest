@@ -1553,6 +1553,7 @@ function loadBigrm12Special() {
         const loc = bigrm12GetFloorLocation();
         let kind;
         do { kind = traptype_rnd(); } while (kind === NO_TRAP);
+        maketrap(loc.x, loc.y, kind);
         const lvl = game.u?.uz?.dlevel ?? 1;
         if (game.in_mklev && kind !== NO_TRAP
             && lvl <= rnd(4)
