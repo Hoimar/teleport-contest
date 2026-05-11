@@ -78,6 +78,13 @@
 - Regression stability: sentinel screens stayed 50/1063. Full suite screens stayed 50/11406, 0/44 passing; RNG totals shifted in object-order-sensitive sessions as expected from replacing reversed floor-list order.
 - Current queue: compare `seed0383` nearby floor objects against C expectations through object type/classification; continue `seed0116` missing-object evidence in parallel as the same dog/floor-object subsystem.
 
+### Iteration 10 - Pet Food And Terrain Reachability Gates
+
+- Change: `dogfood()` now applies a partial C diet split for carnivorous cats/dogs and herbivorous ponies instead of treating all food as `DOGFOOD`; `could_reach_item()` now rejects pools and lava for pets that cannot enter them before allowing object goals.
+- Evidence: `seed0383` moved from FR 9713 to FR 9715. The temporary early apport regression on nearby kelp classified the missing piece: non-swimming kittens should skip pool-square food instead of turning it into a reachable apport candidate. JS now reaches C's `rn2(8)` apport roll and diverges at the following movement/allocation call.
+- Regression stability: sentinel screens stayed 50/1063; sentinel RNG is 20430/64569. `seed0116` remained stable at 16/127 and FR 5532.
+- Current queue: inspect `seed0383` FR 9715 to determine whether the next call belongs to dog movement candidate selection or another monster movement allocation; keep `seed0116` missing floor/shop object evidence as the parallel pet/object target.
+
 ## 2026-05-11 Marathon Restart - Peaceful Monster Predicate Queue
 
 - Full suite baseline before this loop: 50/11406 screens, 0/44 passing.

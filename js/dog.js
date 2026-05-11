@@ -5,17 +5,28 @@ import { game } from './gstate.js';
 import { enexto_core, makemon } from './mklev.js';
 import { OBJECT_CLASS } from './object_data.js';
 import {
-    APPORT, DOGFOOD, MANFOOD, TABU, UNDEF,
+    ACCFOOD, APPORT, CADAVER, DOGFOOD, MANFOOD, TABU, UNDEF,
     D_CLOSED, D_LOCKED, GP_AVOID_MONPOS, GP_CHECKSCARY, IS_DOOR, IS_OBSTRUCTED,
-    IS_ROOM, MM_EDOG, NO_MINVENT, SPACE_POS,
+    IS_LAVA, IS_POOL, IS_ROOM, MM_EDOG, NO_MINVENT, SPACE_POS,
     isok,
 } from './const.js';
 import { rn2 } from './rng.js';
 
 const FOOD_CLASS = 7;
 const ROCK_CLASS = 14;
+const TRIPE_RATION = 264;
 const BOULDER = 475;
 const CORPSE = 265;
+const EGG = 266;
+const MEATBALL = 267;
+const MEAT_STICK = 268;
+const ENORMOUS_MEATBALL = 269;
+const GLOB_OF_GREEN_SLIME = 273;
+const BANANA = 281;
+const CARROT = 282;
+const CLOVE_OF_GARLIC = 284;
+const SLIME_MOLD = 285;
+const TIN = 296;
 const BELL_OF_OPENING = 263;
 const CANDELABRUM_OF_INVOCATION = 262;
 
@@ -192,17 +203,50 @@ function obj_resists(obj, ochance, achance) {
     return chance < (obj.oartifact ? achance : ochance);
 }
 
+function pet_diet(mtmp) {
+    if (mtmp.data?.mlet === 'S_UNICORN') return { carni: false, herbi: true };
+    return { carni: true, herbi: false };
+}
+
 function dogfood(mtmp, obj) {
     // C ref: dog.c:dogfood().  The object-resistance check is deliberately
     // first; it is a common hidden RNG consumer before pet goal selection.
     if (obj_resists(obj, 0, 95)) return obj.cursed ? TABU : APPORT;
-    if (object_class(obj.otyp) === FOOD_CLASS) return obj.cursed ? TABU : DOGFOOD;
+    if (object_class(obj.otyp) === FOOD_CLASS) {
+        const { carni, herbi } = pet_diet(mtmp);
+        switch (obj.otyp) {
+        case TRIPE_RATION:
+        case MEATBALL:
+        case MEAT_STICK:
+        case ENORMOUS_MEATBALL:
+            return carni ? DOGFOOD : MANFOOD;
+        case CORPSE:
+            return carni ? CADAVER : MANFOOD;
+        case EGG:
+            return carni ? CADAVER : MANFOOD;
+        case GLOB_OF_GREEN_SLIME:
+            return MANFOOD;
+        case CLOVE_OF_GARLIC:
+            return herbi ? ACCFOOD : MANFOOD;
+        case TIN:
+            return MANFOOD;
+        case BANANA:
+            return herbi ? ACCFOOD : MANFOOD;
+        case CARROT:
+            return herbi ? DOGFOOD : MANFOOD;
+        default:
+            if (obj.otyp > SLIME_MOLD) return carni ? ACCFOOD : MANFOOD;
+            return herbi ? ACCFOOD : MANFOOD;
+        }
+    }
     return obj.cursed ? UNDEF : APPORT;
 }
 
 function could_reach_item(mtmp, x, y) {
     const loc = game.level?.at(x, y);
     if (!loc) return false;
+    if (IS_POOL(loc.typ) && !mtmp.data?.swimmer) return false;
+    if (IS_LAVA(loc.typ) && !mtmp.data?.likes_lava) return false;
     if (is_boulder_at(x, y) && !mtmp.data?.throws_rocks) return false;
     return true;
 }
