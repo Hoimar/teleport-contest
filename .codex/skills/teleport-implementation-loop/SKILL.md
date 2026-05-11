@@ -30,3 +30,5 @@ Follow `AGENTS.md` Step 2.7, then continue through Steps 3 and 4 for each queued
 - Use `$teleport-triage-divergence` before editing whenever the next target is not localized to a subsystem.
 - Use `$teleport-dehack-simplify` whenever the useful next step is removing scaffolding, stale truth, or reward-hacking debt.
 - Do not hand off after a checkpoint, verification run, local blocker, or classified regression unless a valid `AGENTS.md` stop condition applies.
+- If the user asks for progress or percentages, report them as a brief interruption and then continue the queue unless the user explicitly asks to stop or only report.
+- Before any final response, verify that no safe structural next step remains or quote the exact user stop request. Otherwise, keep working.

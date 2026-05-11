@@ -106,6 +106,7 @@ At loop startup:
 
 During the loop:
 - Complete a real marathon budget before final handoff: unless the user gives a smaller budget, this harness is designed to work for hundreds of iterations. This is a floor, not a cap; if useful structural work remains and no valid stop condition applies, continue. Iteration count is progress accounting, not a stop criterion. A meaningful implementation iteration means: triage a target, state a subsystem hypothesis, implement or clean up general subsystem behavior, verify it, classify any regression, update docs/checkpoints if subsystem truth changed, and select the next queued target.
+- Treat status/progress questions as interrupts, not stop requests. Answer them briefly, update the live checkpoint if needed, then resume the active queue unless the user explicitly says to stop, pause, or perform only the report.
 - Do not stop merely because the current queue is empty. Refresh the queue from `feature_map.md`, visible hack debt, latest regressions, upstream C blockers, and the available teleport skills. Hand off only when a valid stop condition applies or the user interrupts.
 - Use the helper skills as loop phases, not optional reading: use `$teleport-triage-divergence` whenever the next target is not localized to a subsystem, and use `$teleport-dehack-simplify` whenever the useful next step is removing seed-specific scaffolding, replay tables, override debt, stale truth, or other hack debt.
 - Prefer robust feature iterations over probe accounting. Regressions and wrong porting directions can and will happen; larger short-term regressions are acceptable when removing hacks or moving toward a more faithful architecture, as long as they are understood and recorded.
@@ -114,6 +115,7 @@ During the loop:
 - A wrong direction is not a global stop. Revert accidental damage when that is the clearest path, or roll forward when the regression exposes missing subsystem work. Record only durable lessons in `scratch/agent-loop.md` and/or `feature_map.md`, then continue with the next hypothesis or target.
 - A local subsystem blocker is not a global stop. Classify it, record the next required structural work, and move to the next queued subsystem.
 - Run the full suite at startup, after broad shared changes, after every 3-5 meaningful implementation iterations, and before a valid final handoff.
+- Before any final handoff, explicitly check the active queue, `feature_map.md`, visible hack debt, latest regressions, and relevant upstream C sources. If any safe structural next step remains, do not hand off; continue the loop. A final handoff that does not quote one of the valid stop conditions below is invalid.
 
 Valid stop conditions are only:
 1. The user explicitly asked for one bounded pass or asks the agent to stop.
@@ -130,6 +132,7 @@ Final handoff after a marathon loop must state:
 - notable regressions, discarded directions, and how they were classified
 - current queue
 - exact valid stop condition
+- global-next-step check performed immediately before stopping
 
 ### Step 3 — Find the divergence
 
