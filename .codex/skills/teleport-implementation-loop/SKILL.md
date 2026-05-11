@@ -12,7 +12,7 @@ Use this skill to enter the sustained implementation workflow defined in `AGENTS
 `AGENTS.md` is authoritative for:
 - baseline and triage commands
 - branch and commit discipline
-- minimum loop budget
+- marathon budget
 - queue order
 - regression handling
 - full-suite cadence
@@ -21,11 +21,12 @@ Use this skill to enter the sustained implementation workflow defined in `AGENTS
 
 Follow `AGENTS.md` Step 2.7, then continue through Steps 3 and 4 for each queued target. Do not duplicate or reinterpret those rules here; update `AGENTS.md` if the loop contract changes.
 
-## Skill-Specific Reminders
+## Loop Reminders
 
 - Read `AGENTS.md`, `lessons.md`, and `feature_map.md` before starting.
 - Keep `scratch/agent-loop.md` as the live checkpoint while the loop runs.
-- Apply the branch, commit, and regression policy from `AGENTS.md` Step 2.7; do not invent a branch strategy or probe quota.
+- Apply the branch, commit, marathon-budget, and regression policy from `AGENTS.md` Step 2.7; do not invent a branch strategy or probe quota.
 - Use sessions as evidence for generalized NetHack parity, not as scoreboard targets.
-- If triage is unclear, use `$teleport-triage-divergence`.
-- If the next useful work is removing scaffolding, stale truth, or reward-hacking debt, use `$teleport-dehack-simplify`.
+- Use `$teleport-triage-divergence` before editing whenever the next target is not localized to a subsystem.
+- Use `$teleport-dehack-simplify` whenever the useful next step is removing scaffolding, stale truth, or reward-hacking debt.
+- Do not hand off after a checkpoint, verification run, local blocker, or classified regression unless a valid `AGENTS.md` stop condition applies.

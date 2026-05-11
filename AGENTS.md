@@ -105,7 +105,9 @@ At loop startup:
    - hack-debt cleanup that unlocks real subsystem work
 
 During the loop:
-- Complete a minimum marathon budget before final handoff: at least 5 meaningful implementation iterations, or every currently queued structural target, whichever is larger. A meaningful implementation iteration means: triage a target, state a subsystem hypothesis, implement or clean up general subsystem behavior, verify it, classify any regression, update docs if subsystem truth changed, and select the next queued target.
+- Complete a real marathon budget before final handoff: unless the user gives a smaller budget, this harness is designed to work for hundreds of iterations. This is a floor, not a cap; if useful structural work remains and no valid stop condition applies, continue. Iteration count is progress accounting, not a stop criterion. A meaningful implementation iteration means: triage a target, state a subsystem hypothesis, implement or clean up general subsystem behavior, verify it, classify any regression, update docs/checkpoints if subsystem truth changed, and select the next queued target.
+- Do not stop merely because the current queue is empty. Refresh the queue from `feature_map.md`, visible hack debt, latest regressions, upstream C blockers, and the available teleport skills. Hand off only when a valid stop condition applies or the user interrupts.
+- Use the helper skills as loop phases, not optional reading: use `$teleport-triage-divergence` whenever the next target is not localized to a subsystem, and use `$teleport-dehack-simplify` whenever the useful next step is removing seed-specific scaffolding, replay tables, override debt, stale truth, or other hack debt.
 - Prefer robust feature iterations over probe accounting. Regressions and wrong porting directions can and will happen; larger short-term regressions are acceptable when removing hacks or moving toward a more faithful architecture, as long as they are understood and recorded.
 - After any meaningful edit, continue to the next queued target unless a valid stop condition below applies.
 - Full-suite verification, sentinel verification, `feature_map.md` updates, `lessons.md` updates, and checkpoint notes are loop maintenance tasks, not handoff triggers.
@@ -120,6 +122,7 @@ Valid stop conditions are only:
 4. No safe structural next step exists globally after checking the active queue, `feature_map.md`, visible hack debt, and the available teleport skills.
 
 Final handoff after a marathon loop must state:
+- active loop time
 - iteration count
 - implementation delta by subsystem
 - lagging score delta
@@ -140,7 +143,8 @@ The first non-matching screen index tells you where to look. Use the standard de
 4. Run the full suite (`node frozen/ps_test_runner.mjs`) when starting a new implementation loop, before final handoff only after the loop budget is met or a global stopping condition is reached, after broad shared changes, and after every 3-5 meaningful iterations.
 5. Treat regressions as evidence to classify, not automatic grounds for reverting.
    - Fix accidental regressions.
-   - Document expected regressions from hack removal or broader architectural cleanup instead of restoring hacks to preserve screen totals.
+   - Document expected regressions from hack removal or broader architectural cleanup, including impact when known, instead of restoring hacks to preserve screen totals.
+   - Queue unclear regressions with a subsystem hypothesis and continue elsewhere when safe.
 6. Update `feature_map.md` status and `lessons.md`.
 7. If no valid stop condition applies, return to Step 2.6 with the next queued target.
 

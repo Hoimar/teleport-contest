@@ -1,6 +1,6 @@
 ---
 name: teleport-dehack-simplify
-description: Use when working in the teleport-contest repo to remove seed-specific hacks, stale operational truth, and other scaffolding that blocks generalized feature parity.
+description: Use when working in the teleport-contest repo to remove seed-specific hacks, stale operational truth, and other scaffolding that blocks generalized feature parity. Also use inside teleport-implementation-loop when the next useful step is reducing replay, override, or reward-hacking debt.
 ---
 
 # Teleport Dehack And Simplify

@@ -1,6 +1,6 @@
 ---
 name: teleport-triage-divergence
-description: Use when working in the teleport-contest repo to classify a failing session or divergence before editing code, and to translate the first mismatch into a subsystem-level hypothesis.
+description: Use when working in the teleport-contest repo to classify a failing session or divergence before editing code, and to translate the first mismatch into a subsystem-level hypothesis. Also use inside teleport-implementation-loop when the next target is not localized to a subsystem.
 ---
 
 # Teleport Triage Divergence
