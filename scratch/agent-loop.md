@@ -57,6 +57,13 @@
 - Regression stability: sentinel screens stayed 50/1063. Full suite remains 50/11406 screens, 0/44 passing; `seed0383` lagging RNG is 9884/16915 because the correct fog-cloud effect is still in the wrong slot.
 - Current queue: compare C/JS `fmon` ordering after `bigrm-12` monster/group creation and pet arrival; continue `seed0116` object/wear-state work if list-order classification blocks locally.
 
+### Iteration 7 - Preserve Migrating Pet Movement
+
+- Change: debug level teleport now snapshots the existing tame monster before `mklev()` clears the old level, and `pet_arrive_with_you()` places that migrating pet with preserved data, edog state, and movement budget instead of constructing a fresh fixed-movement pet.
+- Evidence: `seed0116` returned to the dog-goal object boundary: FR 5532, after matching `distfleeck()`, the kitten wanderer gate, and 14 carried-inventory `obj_resists()` calls. `seed0383` remains at FR 9666, so this does not mask the bigroom monster-order blocker.
+- Regression stability: sentinel screens stayed 50/1063. Full suite remains 50/11406 screens, 0/44 passing; current `seed0116` RNG is 5650/12562.
+- Current queue: implement or classify the three missing `obj_resists()` calls from nearby floor/shop object state for `seed0116`; compare special-level `fmon` ordering for `seed0383`.
+
 ## 2026-05-11 Marathon Restart - Peaceful Monster Predicate Queue
 
 - Full suite baseline before this loop: 50/11406 screens, 0/44 passing.

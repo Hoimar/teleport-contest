@@ -113,7 +113,9 @@ function init_edog(mon) {
 }
 
 export function pet_arrive_with_you() {
-    let pet = game.pet_type || configuredPetType();
+    const migrating = game._migrating_pet || null;
+    game._migrating_pet = null;
+    let pet = migrating?.data || game.pet_type || configuredPetType();
     if (!pet) return null;
     game.pet_type = pet;
 
@@ -132,16 +134,17 @@ export function pet_arrive_with_you() {
     const ch = pet === PM_KITTEN ? 'f' : pet === PM_PONY ? 'u' : 'd';
     const mon = {
         mx: x, my: y,
-        ch,
-        color: 15,
+        ch: migrating?.ch || ch,
+        color: migrating?.color ?? 15,
         data: { ...pet },
-        mhp: 1,
-        female: false,
-        msleeping: 0,
-        mpeaceful: 1,
-        mtame: 10,
-        movement: 0,
+        mhp: migrating?.mhp ?? 1,
+        female: migrating?.female ?? false,
+        msleeping: migrating?.msleeping ?? 0,
+        mpeaceful: migrating?.mpeaceful ?? 1,
+        mtame: migrating?.mtame ?? 10,
+        movement: migrating?.movement ?? 0,
     };
+    if (migrating?.edog) mon.edog = { ...migrating.edog };
     init_edog(mon);
     if (game.level?.monsters) game.level.monsters.unshift(mon);
     return mon;

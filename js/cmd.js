@@ -175,6 +175,12 @@ function buildLevelTeleportMenu() {
 }
 
 async function performLevelTeleport(target) {
+    const migratingPet = (game.level?.monsters || []).find(m => m.mtame);
+    game._migrating_pet = migratingPet ? {
+        ...migratingPet,
+        data: migratingPet.data ? { ...migratingPet.data } : migratingPet.data,
+        edog: migratingPet.edog ? { ...migratingPet.edog } : migratingPet.edog,
+    } : null;
     game.u.uz = { ...(game.u.uz || { dnum: 0 }), dlevel: target };
     await mklev();
     place_lregion(0, 0, 0, 0, 0, 0, 0, 0, LR_UPTELE, null);
