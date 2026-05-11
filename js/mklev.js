@@ -357,7 +357,7 @@ export function collect_coords(cx, cy, maxradius = 0, cc_flags = 0, filter = nul
 function goodpos(x, y, entflags = 0) {
     if (!isok(x, y)) return false;
     if (!(entflags & 0x00400000) && u_at(x, y)) return false; // GP_ALLOW_U
-    if ((entflags & GP_AVOID_MONPOS) && m_at(x, y)) return false;
+    if (m_at(x, y)) return false;
     const loc = game.level?.at(x, y);
     if (!loc || !SPACE_POS(loc.typ)) return false;
     if (!(entflags & MM_IGNOREWATER) && IS_POOL(loc.typ)) return false;

@@ -120,6 +120,12 @@
 - Evidence: `seed0383` and the sentinel suite stayed unchanged (`seed0383` FR 9716, sentinel 50/1063 and 20420/64569). Live state now shows six retained `bigrm-12` traps. This removes special-level state debt but does not explain the current `dog_goal()` floor-object rectangle.
 - Current classification: reconstructing the floor-object sequence shows C likely has the pet one square east of JS at the first live turn. From `(28,4)`, C's search rectangle would scan kelp at `(33,9)`, then the same nearby kelp objects, then the special object at `(33,6)`, matching the extra `obj_resists()` before movement. The next target is monster occupancy or placement drift that makes C reject earlier pet-arrival candidates.
 
+### Iteration 16 - Monster Occupancy Placement Predicate
+
+- Change: `enexto_core()`/`goodpos()` now rejects occupied monster squares regardless of `GP_AVOID_MONPOS`, matching C's normal placement check. `GP_AVOID_MONPOS` is stricter than ordinary placement, not the only monster-occupancy guard.
+- Evidence: sentinel and target counts were unchanged (`seed0383` 9906/16915, `seed0116` 5650/12562, sentinel 50/1063 and 20420/64569), so JS was not losing the current pet-arrival square through group stacking in this evidence path. The predicate is still more faithful for future group and arrival placement.
+- Current queue: the `seed0383` pet one-cell drift likely needs deeper special-level monster placement/selection comparison, or a C-side trace of monsters occupying the first ring around `(27,5)`. Move to another pet/object target if this local path stalls.
+
 ## 2026-05-11 Marathon Restart - Peaceful Monster Predicate Queue
 
 - Full suite baseline before this loop: 50/11406 screens, 0/44 passing.
