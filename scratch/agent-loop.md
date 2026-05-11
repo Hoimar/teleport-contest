@@ -50,6 +50,13 @@
 - Full-suite checkpoint: corpus screens remain 50/11406, 0/44 passing. `seed0383` is now 9895/16915; `seed8000` remains 23/23 screens.
 - Current queue: classify the FR 9666 gas-cloud creation source; continue `seed0116` `dog_goal()`/wear object-state calls; reclassify broader command/inventory wish behavior if `seed0108` or `seed0383` command paths become the active target.
 
+### Iteration 6 - Fog Cloud Every-Turn Effect
+
+- Change: `mcalcmove()` now applies the `FOG_CLOUD` `m_everyturn_effect()` vapor-cloud TTL (`create_gas_cloud(..., 1, 0)` -> `rn1(3,4)`) before speed rounding.
+- Evidence: the vapor TTL exists in JS but appears at RNG index 9677 rather than C's FR 9666. That classifies the remaining blocker as monster list/order drift around the first movement allocation, not a missing gas-cloud TTL implementation. In the current JS order, the fog cloud is after the pet and several bigroom monsters; C reaches the fog-cloud effect first.
+- Regression stability: sentinel screens stayed 50/1063. Full suite remains 50/11406 screens, 0/44 passing; `seed0383` lagging RNG is 9884/16915 because the correct fog-cloud effect is still in the wrong slot.
+- Current queue: compare C/JS `fmon` ordering after `bigrm-12` monster/group creation and pet arrival; continue `seed0116` object/wear-state work if list-order classification blocks locally.
+
 ## 2026-05-11 Marathon Restart - Peaceful Monster Predicate Queue
 
 - Full suite baseline before this loop: 50/11406 screens, 0/44 passing.

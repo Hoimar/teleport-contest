@@ -9,6 +9,10 @@ const MFAST = 2;
 export function mcalcmove(mtmp, m_moving) {
     let mmove = mtmp.data.mmove;
 
+    if (mtmp.data?.name === 'FOG_CLOUD') {
+        rn2(3); // create_gas_cloud(..., 1, 0) TTL via rn1(3, 4)
+    }
+
     // C ref: mon.c:mcalcmove() speed adjustments.
     if (mtmp.mspeed === MSLOW) {
         if (mmove < NORMAL_SPEED) mmove = Math.trunc((2 * mmove + 1) / 3);
