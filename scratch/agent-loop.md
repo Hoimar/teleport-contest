@@ -47,7 +47,16 @@
 - Change: `js/dog.js:dog_move()` now resets the equal-candidate reservoir counter when a strictly closer square is selected, matching `dogmove.c`'s `if (j < 0) chcnt = 0` rule.
 - Evidence: `seed0116` and `seed0383` target triage stayed unchanged, so this selector fix is not the current first blocker.
 - Regression stability: sentinel suite stayed at 50/1063 screens and RNG 20420/64569.
+- Full-suite checkpoint: screens stayed 50/11406, 0/44 passing. Non-sentinel RNG prefixes shifted in pet/movement-sensitive sessions as expected from the general selector fix (`seed0014`, `seed0360`, `seed0361`, `seed2200`, `seed5006`), with no screen-count regressions.
 - Current queue: keep the immediate focus on missing object-state scans, not candidate-selection order.
+
+### Iteration 4 - Expected/Actual Dog-Goal RNG Trace
+
+- Change: enhanced `scripts/trace-dog-goal.mjs` so an `--rng start:end` window prints expected C calls beside actual JS calls and marks the first mismatches.
+- Evidence: `seed0116 --moves 16 --rng 5510:5540` now proves exact prefix parity through 14 `obj_resists()` calls, then C expects three more `obj_resists()` calls at 5532-5534 before dog movement candidate RNG starts.
+- Evidence: `seed0383 --moves 163 --rng 9706:9724` proves exact prefix parity through the kitten wanderer gate, five floor-object resistance rolls, first apport roll, one more resistance roll, and second apport roll; JS then emits the follow-player `rn2(4)` where C has one more `obj_resists()` call.
+- Regression stability: sentinel suite stayed at 50/1063 screens and RNG 20420/64569.
+- Current queue: classify the missing `seed0116` three-object source first because it has exact prefix parity and a smaller object-count gap; then use the same trace on `seed0383` after any object-state or pet-position fix.
 
 ## 2026-05-11 Marathon Restart - Bigroom Candidate Drift
 

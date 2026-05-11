@@ -69,6 +69,19 @@ function rngCalls(nhGame) {
         .filter((entry) => /^(?:rn2|rnd|rn1|rnl|rne|rnz|d)\(/.test(entry));
 }
 
+function expectedRngCalls(session) {
+    const calls = [];
+    for (const seg of session.segments) {
+        for (const step of seg.steps || []) {
+            for (const entry of step.rng || []) {
+                const normalized = String(entry || '').replace(/^\d+\s+/, '').trim();
+                if (/^(?:rn2|rnd|rn1|rnl|rne|rnz|d)\(/.test(normalized)) calls.push(normalized);
+            }
+        }
+    }
+    return calls;
+}
+
 function parseRngWindow(spec, total) {
     if (!spec) return null;
     const [rawStart, rawEnd] = spec.split(':');
@@ -148,10 +161,14 @@ async function main() {
     console.log('inventory', JSON.stringify(inventory));
 
     const calls = rngCalls(nhGame);
-    const window = parseRngWindow(opts.rng, calls.length);
+    const expectedCalls = expectedRngCalls(session);
+    const window = parseRngWindow(opts.rng, Math.max(calls.length, expectedCalls.length));
     if (window) {
         for (let i = window.start; i < window.end; i++) {
-            console.log(`${i}:${calls[i] ?? '<missing>'}`);
+            const expected = expectedCalls[i] ?? '<missing>';
+            const actual = calls[i] ?? '<missing>';
+            const mark = expected.replace(/\s*@.*/, '') === actual ? ' ' : '!';
+            console.log(`${mark} ${i}: exp ${expected} | act ${actual}`);
         }
     }
 }
