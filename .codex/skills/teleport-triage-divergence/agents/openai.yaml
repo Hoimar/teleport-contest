@@ -1,0 +1,7 @@
+interface:
+  display_name: "Teleport Triage Divergence"
+  short_description: "Classify a divergence before editing"
+  default_prompt: "Use $teleport-triage-divergence to classify the first mismatch in this teleport-contest session and state the subsystem-level hypothesis."
+
+policy:
+  allow_implicit_invocation: true
