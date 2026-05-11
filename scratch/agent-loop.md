@@ -1,5 +1,47 @@
 # Teleport Implementation Loop
 
+## 2026-05-11 Marathon Restart - Bigroom Candidate Drift
+
+- Branch/baseline commit: `main` at `baf0231`.
+- Full suite baseline before this loop: 50/11406 screens, 0/44 passing.
+- Sentinel baseline before this loop: 50/1063 screens, RNG 16368/64569.
+- Current target: `seed0383-wizard-hallucinate` as evidence for special bigroom monster placement parity.
+- Active hypothesis: the FR 5730 blocker is not another monster inventory gate; C and JS both enter `collect_coords()` after selected-monster init, but JS shuffles a full radius-3 ring (`rn2(24)`) where C's center is close enough to a map edge to produce `rn2(17)`. The next useful step is to identify which placement center drifted and whether the cause is special-level floor selection, monster collision relocation, or group-origin propagation.
+- Queue:
+  1. Classify the `seed0383` FR 5730 `collect_coords()` center/caller drift.
+  2. Fix the general special bigroom placement/topology cause if localized.
+  3. Continue `seed0116` missing `dog_goal()` object-state calls if bigroom placement locally blocks.
+  4. Reclassify `seed0367` monster-init side effect if selected-monster changes touch role quest levels.
+  5. Refresh hack-debt cleanup targets from `feature_map.md` if the structural queue blocks.
+- Verification cadence: target triage after each edit, sentinel suite after each meaningful edit, full suite after 3-5 meaningful iterations and before handoff.
+- Failed probes this loop: none yet.
+
+### Iteration 1 - `bigrm-12` Centered Map Offset
+
+- Change: applied C's centered `des.map([[...]])` placement for the 75x19 `bigrm-12` static map (`x=3,y=1`) to terrain loading and random floor-location coordinates.
+- Evidence: `seed0383` moved from FR 5730 (`collect_coords()` `rn2(17)` expected vs JS full-ring `rn2(24)`) to FR 6406, confirming the candidate-count drift was map placement, not `collect_coords()` itself.
+- Regression stability: sentinel screens stayed 50/1063.
+
+### Iteration 2 - Default Monster Weapon Branches
+
+- Change: filled the normal `m_initweap()` default cases for darts, crossbows/bolts, bows/arrows, daggers, aklyses, and strong-monster long sword/lucern hammer selections. The kobold dart branch now calls the same `m_initthrow()`-shaped helper.
+- Evidence: `seed0383` crossed the `rnd(14)=4` non-strong dagger path and moved from FR 6406 to FR 6636.
+- Regression stability: sentinel screens stayed 50/1063.
+
+### Iteration 3 - Monster Instance Level And Defensive Predicates
+
+- Change: monster item chance gates now use `adj_lev()`-shaped instance level instead of species `mlevel`; generated monster data now carries `mflags1`; `rnd_defensive_item()` skips animals, mindless monsters, ghosts, and Kops before consuming selection RNG.
+- Evidence: `seed0383` moved through false defensive-item rolls from FR 6636 to FR 8264.
+- Regression stability: sentinel screens stayed 50/1063.
+
+### Iteration 4 - Mummy, Ogre, Greedy Gold, And Golem HP
+
+- Change: added mummy wrapping inventory, ogre axe/club weapon initialization, minvent-shaped greedy gold amount/object creation, and golem fixed-HP no-RNG handling.
+- Evidence: `seed0383` moved from FR 8264 to FR 9383 and matched RNG rose from 5788/16915 at loop start to 10004/16915. The current blocker is `rn2(2)` expected vs `rn2(10)` actual after deeper special bigroom monster/object initialization.
+- Regression stability: sentinel screens stayed 50/1063; sentinel RNG improved from 16368/64569 to 20584/64569.
+- Full-suite checkpoint: corpus screens remain 50/11406, 0/44 passing. Non-sentinel RNG prefixes shifted in monster-heavy sessions as expected from broader monster initialization (`seed0360`, `seed0367`, `seed0373`, `seed4500` need reclassification if selected), with no screen-count regressions.
+- Current queue: classify `seed0383` FR 9383; continue `seed0116` `dog_goal()` object-state calls; reclassify non-sentinel monster-init side effects if they become the active target.
+
 ## 2026-05-11 Marathon Restart - Peaceful Monster Predicate Queue
 
 - Full suite baseline before this loop: 50/11406 screens, 0/44 passing.

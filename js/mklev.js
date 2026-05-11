@@ -49,25 +49,31 @@ const GEM_CLASS = 13;
 const ROCK_CLASS = 14;
 const ARROW = 18;
 const CROSSBOW_BOLT = 20;
+const DART = 23;
 const SHURIKEN = 25;
 const BOULDER = 475;
 const ELVEN_ARROW = 19;
 const ELVEN_SPEAR = 28;
+const DAGGER = 34;
 const ELVEN_DAGGER = 35;
 const BATTLE_AXE = 45;
 const ELVEN_SHORT_SWORD = 47;
 const ELVEN_BROADSWORD = 53;
+const LONG_SWORD = 54;
 const TWO_HANDED_SWORD = 55;
 const PARTISAN = 56;
 const RANSEUR = 57;
 const SPETUM = 58;
 const GLAIVE = 59;
+const LUCERN_HAMMER = 66;
 const CLUB = 77;
+const AKLYS = 80;
 const BOW = 83;
 const ELVEN_BOW = 84;
 const CROSSBOW = 88;
 const ELVEN_LEATHER_HELM = 89;
 const ELVEN_MITHRIL_COAT = 127;
+const MUMMY_WRAPPING = 138;
 const ELVEN_CLOAK = 139;
 const ELVEN_SHIELD = 153;
 const ELVEN_BOOTS = 169;
@@ -131,6 +137,8 @@ const M2_PEACEFUL = 0x00200000;
 const M2_NASTY = 0x02000000;
 const M2_STRONG = 0x04000000;
 const M2_GREEDY = 0x10000000;
+const M1_MINDLESS = 0x00010000;
+const M1_ANIMAL = 0x00040000;
 
 const MS_LEADER = 36;
 const MS_NEMESIS = 37;
@@ -209,8 +217,8 @@ const TRAPPED_CHEST = 25;
 function is_hole(t) { return t === HOLE || t === TRAPDOOR; }
 function is_pit(t) { return t === PIT || t === SPIKED_PIT; }
 
-const MONSTERS = MONSTER_DATA.map(([name, mlet, mlevel, mmove, maligntyp, geno, difficulty, color, neuter, male, female, msound = 0, mflags2 = 0]) => ({
-    name, mlet, mlevel, mmove, maligntyp, geno, difficulty, color, msound, mflags2,
+const MONSTERS = MONSTER_DATA.map(([name, mlet, mlevel, mmove, maligntyp, geno, difficulty, color, neuter, male, female, msound = 0, mflags1 = 0, mflags2 = 0]) => ({
+    name, mlet, mlevel, mmove, maligntyp, geno, difficulty, color, msound, mflags1, mflags2,
     neuter: !!neuter, male: !!male, female: !!female,
 }));
 
@@ -612,6 +620,7 @@ export function mksobj(otyp, init, artif) {
     if (init) {
         mksobj_init(otmp, otyp, artif);
     }
+    if (game._in_monster_init) game._monster_init_item_count = (game._monster_init_item_count || 0) + 1;
     return otmp;
 }
 
@@ -964,6 +973,7 @@ function adj_lev_for(ptr) {
 function newmonhp_for(ptr) {
     if (!ptr) return 0;
     const lev = adj_lev_for(ptr);
+    if (ptr.mlet === 'S_GOLEM') return lev;
     if (!lev) return rnd(4);
     let hp = d(lev, 8);
     if (hp === lev) hp++;
@@ -977,6 +987,7 @@ function init_mon_gender_for(ptr) {
 
 function m_initinv_for(ptr) {
     if (!ptr) return;
+    const monLevel = adj_lev_for(ptr);
     if (ptr.mlet === 'S_GNOME' && !rn2(60)) {
         mksobj(rn2(4) ? 370 : 371, true, false);
     }
@@ -990,21 +1001,28 @@ function m_initinv_for(ptr) {
             mksobj(CORPSE, true, false);
         }
     }
+    if (ptr.mlet === 'S_MUMMY') {
+        if (rn2(7)) mksobj(MUMMY_WRAPPING, true, false);
+    }
     if (ptr.name === 'SOLDIER' && rn2(13)) return;
-    if (ptr.mlevel > rn2(50)) {
+    if (monLevel > rn2(50)) {
         const defensive = rnd_defensive_item_for(ptr);
         if (defensive) mksobj(defensive, true, false);
     }
-    if (ptr.mlevel > rn2(100)) {
+    if (monLevel > rn2(100)) {
         // rnd_misc_item() is not modeled yet.
     }
     if (ptr.mflags2 & M2_GREEDY) {
-        // mkmonmoney() is not retained yet; this is the C chance gate.
-        rn2(5);
+        if (!rn2(5)) {
+            d(level_difficulty(), game._monster_init_item_count ? 5 : 10);
+            mksobj(GOLD_PIECE, false, false);
+        }
     }
 }
 
 function rnd_defensive_item_for(ptr) {
+    if ((ptr?.mflags1 ?? 0) & (M1_ANIMAL | M1_MINDLESS)) return 0;
+    if (ptr?.mlet === 'S_GHOST' || ptr?.mlet === 'S_KOP') return 0;
     const difficulty = ptr?.difficulty ?? 0;
     switch (rn2(8 + (difficulty > 3 ? 1 : 0) + (difficulty > 6 ? 1 : 0) + (difficulty > 8 ? 1 : 0))) {
     case 6:
@@ -1043,7 +1061,7 @@ function is_elf_mon(ptr) {
 }
 
 function maybe_init_offensive_item_for(ptr) {
-    if ((ptr.mlevel ?? 0) > rn2(75)) {
+    if (adj_lev_for(ptr) > rn2(75)) {
         // rnd_offensive_item() is not modeled yet.
     }
 }
@@ -1054,13 +1072,33 @@ function m_initweap_general_for(ptr) {
         + ((flags & M2_PRINCE) ? 2 : 0)
         + ((flags & M2_NASTY) ? 1 : 0);
     const pick = rnd(14 - (2 * bias));
-    if (pick >= 1 && pick <= 5) {
-        // The detailed normal-monster weapon table is still partial.
-        // Known strong-monster picks consume object init for current slices.
-        if (flags & M2_STRONG) {
-            if (pick === 1) mksobj(BATTLE_AXE, true, false);
-            else if (pick === 2) mksobj(TWO_HANDED_SWORD, true, false);
+    const strong = !!(flags & M2_STRONG);
+    switch (pick) {
+    case 1:
+        if (strong) mksobj(BATTLE_AXE, true, false);
+        else m_initthrow_for(DART, 12);
+        break;
+    case 2:
+        if (strong) mksobj(TWO_HANDED_SWORD, true, false);
+        else {
+            mksobj(CROSSBOW, true, false);
+            m_initthrow_for(CROSSBOW_BOLT, 12);
         }
+        break;
+    case 3:
+        mksobj(BOW, true, false);
+        m_initthrow_for(ARROW, 12);
+        break;
+    case 4:
+        if (strong) mksobj(LONG_SWORD, true, false);
+        else m_initthrow_for(DAGGER, 3);
+        break;
+    case 5:
+        if (strong) mksobj(LUCERN_HAMMER, true, false);
+        else mksobj(AKLYS, true, false);
+        break;
+    default:
+        break;
     }
     maybe_init_offensive_item_for(ptr);
 }
@@ -1107,9 +1145,9 @@ function m_initweap_for(ptr) {
     }
     if (ptr.mlet === 'S_KOBOLD') {
         if (!rn2(4)) {
-            // m_initthrow(DART, 12) quantity/details are not modeled yet.
+            m_initthrow_for(DART, 12);
         }
-        if ((ptr.mlevel ?? 0) > rn2(75)) {
+        if (adj_lev_for(ptr) > rn2(75)) {
             // rnd_offensive_item() is not modeled yet.
         }
         return;
@@ -1147,6 +1185,13 @@ function m_initweap_for(ptr) {
         maybe_init_offensive_item_for(ptr);
         return;
     }
+    if (ptr.mlet === 'S_OGRE') {
+        const divisor = ptr.name === 'OGRE_KING' ? 3 : ptr.name === 'OGRE_LORD' ? 6 : 12;
+        if (!rn2(divisor)) mksobj(BATTLE_AXE, true, false);
+        else mksobj(CLUB, true, false);
+        maybe_init_offensive_item_for(ptr);
+        return;
+    }
     if (ptr.mlet === 'S_GNOME') {
         m_initweap_general_for(ptr);
         return;
@@ -1156,7 +1201,7 @@ function m_initweap_for(ptr) {
     if (ptr.name === 'GOBLIN') {
         if (rn2(2)) mksobj(30, true, false); // ORCISH_DAGGER
     }
-    if ((ptr.mlevel ?? 0) > rn2(75)) {
+    if (adj_lev_for(ptr) > rn2(75)) {
         // rnd_offensive_item() is not modeled yet.
     }
 }
@@ -1285,9 +1330,16 @@ export async function makemon(mdat, x, y, mmflags = 0) {
         }
     }
     if (!(mmflags & NO_MINVENT)) {
-        m_initweap_for(ptr);
-        m_initinv_for(ptr);
-        rn2(100); // saddle chance gate; type predicates may short-circuit after it
+        game._in_monster_init = true;
+        game._monster_init_item_count = 0;
+        try {
+            m_initweap_for(ptr);
+            m_initinv_for(ptr);
+            rn2(100); // saddle chance gate; type predicates may short-circuit after it
+        } finally {
+            game._in_monster_init = false;
+            game._monster_init_item_count = 0;
+        }
     }
     return mon;
 }
@@ -1346,6 +1398,8 @@ const BIGRM_12_MAP = [
     '         .......................           .......................         ',
     '                                                                           ',
 ];
+const BIGRM_12_XSTART = 3;
+const BIGRM_12_YSTART = 1;
 
 function bigrm12TerrainAt(x, y) {
     return BIGRM_12_MAP[y]?.[x] || ' ';
@@ -1354,7 +1408,7 @@ function bigrm12TerrainAt(x, y) {
 function loadBigrm12Terrain() {
     for (let y = 0; y < BIGRM_12_MAP.length; y++) {
         for (let x = 0; x < BIGRM_12_MAP[y].length; x++) {
-            const loc = game.level.at(x + 1, y);
+            const loc = game.level.at(x + BIGRM_12_XSTART, y + BIGRM_12_YSTART);
             if (!loc) continue;
             switch (BIGRM_12_MAP[y][x]) {
             case '.': loc.typ = ROOM; break;
@@ -1375,7 +1429,7 @@ function bigrm12GetFloorLocation() {
         x = rn2(75);
         y = rn2(19);
     } while (bigrm12TerrainAt(x, y) !== '.');
-    return { x: x + 1, y };
+    return { x: x + BIGRM_12_XSTART, y: y + BIGRM_12_YSTART };
 }
 
 function loadBigrm12Special() {

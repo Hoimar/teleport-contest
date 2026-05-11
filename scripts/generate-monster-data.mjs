@@ -53,6 +53,42 @@ const M2 = {
     M2_MAGIC: 0x80000000,
 };
 
+const M1 = {
+    M1_FLY: 0x00000001,
+    M1_SWIM: 0x00000002,
+    M1_AMORPHOUS: 0x00000004,
+    M1_WALLWALK: 0x00000008,
+    M1_CLING: 0x00000010,
+    M1_TUNNEL: 0x00000020,
+    M1_NEEDPICK: 0x00000040,
+    M1_CONCEAL: 0x00000080,
+    M1_HIDE: 0x00000100,
+    M1_AMPHIBIOUS: 0x00000200,
+    M1_BREATHLESS: 0x00000400,
+    M1_NOTAKE: 0x00000800,
+    M1_NOEYES: 0x00001000,
+    M1_NOHANDS: 0x00002000,
+    M1_NOLIMBS: 0x00006000,
+    M1_NOHEAD: 0x00008000,
+    M1_MINDLESS: 0x00010000,
+    M1_HUMANOID: 0x00020000,
+    M1_ANIMAL: 0x00040000,
+    M1_SLITHY: 0x00080000,
+    M1_UNSOLID: 0x00100000,
+    M1_THICK_HIDE: 0x00200000,
+    M1_OVIPAROUS: 0x00400000,
+    M1_REGEN: 0x00800000,
+    M1_SEE_INVIS: 0x01000000,
+    M1_TPORT: 0x02000000,
+    M1_TPORT_CNTRL: 0x04000000,
+    M1_ACID: 0x08000000,
+    M1_POIS: 0x10000000,
+    M1_CARNIVORE: 0x20000000,
+    M1_HERBIVORE: 0x40000000,
+    M1_OMNIVORE: 0x60000000,
+    M1_METALLIVORE: 0x80000000,
+};
+
 const MS = {
     MS_SILENT: 0,
     MS_BARK: 1,
@@ -132,7 +168,7 @@ const CLR = {
     DRAGON_SILVER: 14,
 };
 
-const CONSTS = { ...GEN, ...M2, ...MS, ...CLR };
+const CONSTS = { ...GEN, ...M1, ...M2, ...MS, ...CLR };
 CONSTS.A_NONE = 0;
 
 function splitTopLevel(s) {
@@ -220,6 +256,7 @@ function collectMonsters(text) {
         const maligntyp = CONSTS[lvl[4]?.trim()] ?? Number(lvl[4]);
         const geno = evalMask(args[3]);
         const msound = evalMask(siz[2]);
+        const mflags1 = evalMask(args[8]);
         const mflags2 = evalMask(args[9]);
         const difficulty = Number(args[11]);
         const color = evalMask(args[12]);
@@ -228,7 +265,7 @@ function collectMonsters(text) {
         const female = (mflags2 & M2.M2_FEMALE) !== 0 ? 1 : 0;
         rows.push([
             name, mlet, mlevel, mmove, maligntyp, geno, difficulty, color,
-            neuter, male, female, msound, mflags2,
+            neuter, male, female, msound, mflags1, mflags2,
         ]);
     }
     return rows;
@@ -240,7 +277,7 @@ const rows = collectMonsters(source);
 const lines = [
     '// Generated from nethack-c/upstream/include/monsters.h (NetHack 5.0).',
     '// C refs: include/monsters.h MON() rows, include/monflag.h G_* flags, makemon.c:rndmonst_adj().',
-    '// Fields: name, mlet, mlevel, mmove, maligntyp, geno, difficulty, color, neuter, male, female, msound, mflags2.',
+    '// Fields: name, mlet, mlevel, mmove, maligntyp, geno, difficulty, color, neuter, male, female, msound, mflags1, mflags2.',
     'export const MONSTER_DATA = [',
     ...rows.map((row) => `    ${JSON.stringify(row)},`),
     '];',
