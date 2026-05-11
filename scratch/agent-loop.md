@@ -100,6 +100,14 @@
 - Full-suite checkpoint: corpus screens remain 50/11406, 0/44 passing. Full-suite RNG prefixes are stable with the sentinel classification; `seed0383` is 9889/16915 and `seed0116` is 5650/12562.
 - Current queue: continue classifying missing `fobj` entries around the `seed0383` pet; recheck display wall glyphs separately because this wallify pass alone did not change the first-screen mismatch.
 
+### Iteration 13 - Retained Wizard Wish Inventory
+
+- Change: wizard wish creation now keeps the wished `mksobj()` result in hero inventory after the wish timeout roll, matching `makewish()` handing the object to `hold_another_object()` instead of discarding it after RNG shape.
+- Evidence: `seed0383` improved from 9889/16915 to 9906/16915. The first mismatch remains FR 9716, but raw comparison and a temporary in-memory trace reclassified it: JS matches the kitten wanderer gate, six nearby floor-object resistance checks, and two failed apport rolls; it then reaches the follow-player `rn2(4)` gate while C still has another `obj_resists()` from the `fobj` scan. `seed0116` remains at 16/127 screens and shifts to FR 5532 with retained wish inventory not on that path.
+- Discarded direction: removing the kitten `is_wanderer()` gate before `dog_move()` was tested and reverted. C does consume that `rn2(4)` in `dochug()` before reaching `m_move()`/`dog_move()` because the ordinary movement-opportunity predicate is evaluated before the tame special case.
+- Regression stability: sentinel screens stayed 50/1063; sentinel RNG is 20420/64569.
+- Current queue: fix or classify the missing/position-drifted special-level floor object near the `seed0383` pet; then continue `seed0116` shop/floor object state and broader object placement fidelity.
+
 ## 2026-05-11 Marathon Restart - Peaceful Monster Predicate Queue
 
 - Full suite baseline before this loop: 50/11406 screens, 0/44 passing.
