@@ -20,17 +20,26 @@ A **session** is one or more **segments** played in sequence. A
 session passes when both its PRNG and screen output match the
 recorded C reference 100%, end to end.
 
-For each session, scoring runs:
+For each session, the official scorer runs each segment independently
+and concatenates the returned segment outputs:
 
 ```
-game = null
+storage = new Storage()
+allScreens = []
+allRng = []
+allCursors = []
 for segment in session.segments:
-    game = await runSegment(segment, game)
-
-screens  = game.getScreens()    // collected across all segments
-rngLog   = game.getRngLog()     // collected across all segments
-cursors  = game.getCursors()    // collected across all segments
+    game = await runSegment({ ...segment, storage })
+    allScreens.push(...game.getScreens())
+    allRng.push(...game.getRngLog())
+    allCursors.push(...game.getCursors())
 ```
+
+The browser Session Viewer uses the same public session files, but
+calls the API as `runSegment(input, prevGame)` so it can scrub a whole
+multi-segment session from one cumulative return object. Contestant
+code should support both call shapes; the official scorer path remains
+the one-argument per-segment contract above.
 
 Then it compares positionally:
 
@@ -38,16 +47,15 @@ Then it compares positionally:
 |---|---|
 | **PRNG** | Every entry in `rngLog` is positionally checked against the C trace. Format and ordering are exact. |
 | **Screen** | Every entry in `screens` is decoded into a 24×80 cell grid and cell-compared against the recorded C frame. Two encodings that produce the same pixels match. |
-| **Cursor** | Tiebreaker only — match if you can. |
+| **Cursor** | Returned for diagnostics and viewer overlays. Keep it accurate, but official public screen points are based on decoded cell grids. |
 | **Animation frames** | **Supplemental, not part of ranking.** If your port calls `await game.animationFrame()` between intermediate display states (zap beams, thrown objects, hurtle steps, runmode-walk travel), each captured frame is positionally checked against C's. Reported on the leaderboard as a separate `Anim%` column. See "Animation frames" below. |
 
 **Partial credit:** your score is the number of steps where the
 rendered screen matches C, summed across all sessions. A session
 that diverges at step 50 still earns 50 screen points; you don't
 need to pass the whole session. Across the public corpus
-(44 sessions, 11,284 steps) and the held-out pool (44 sessions,
-10,538 steps), your headline metric is the *total fraction of
-matched screens*. PRNG matching is reported alongside as advisory
+and the held-out pool, your headline metric is the total fraction of
+matched screens. PRNG matching is reported alongside as advisory
 progress — it's the structural prerequisite for screens to match,
 but it doesn't earn points on its own. Passing whole sessions
 (every screen and every PRNG call matched) is the strict-perfect
@@ -121,8 +129,11 @@ itself. Persistent C-side state (save file, bones, record) lives in
 
 ## `game` — what you return
 
-Any object with the following methods. Their cumulative output across
-all segments of a session is what gets compared.
+Any object with the following methods. In official scoring, each
+returned object covers one segment and the harness concatenates the
+arrays. In Session Viewer compatibility mode, `runSegment(input,
+prevGame)` may return cumulative arrays so browser scrubbing can align
+multi-segment sessions.
 
 ```js
 {
@@ -188,8 +199,9 @@ C-side recordings carry).
 
 ### `getCursors()`
 
-Currently scored as a tiebreaker only — match it if you can; not
-required for a session to pass.
+Diagnostic cursor state parallel to `getScreens()`. The Session
+Viewer overlays cursor differences, so keep it accurate even though
+official public screen points are based on decoded cell grids.
 
 ### Animation frames — supplemental, optional
 

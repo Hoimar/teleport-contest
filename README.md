@@ -59,6 +59,9 @@ python3 -m http.server 8000
 
 # Score locally against all 44 public sessions
 bash frozen/score.sh
+
+# Score against the currently hosted public session files
+npm run score:live-public
 ```
 
 Out of the box, the skeleton scores partial credit on
@@ -309,15 +312,22 @@ Two channels are scored, both required:
   saying "draw a space").
 
 **Scoring is per-step, screens-only.** Your score is the count of
-steps where the captured 24×80 grid matches C's exactly (character +
-color + attribute + cursor position). The 44 public sessions contain
-11,284 steps (max 11,284 points). The 44 held-out pool adds 10,538
-more steps (max 10,538 more) for a global maximum of 21,822 points.
+steps where the captured 24×80 grid matches C's exactly after the
+official screen decoder and canonicalizer have rendered both sides.
+Use `bash frozen/score.sh` for the checked-in public suite, and
+`npm run score:live-public` when you want to compare against the
+currently hosted public session files used by the leaderboard.
 
 PRNG match is the structural prerequisite — if your PRNG diverges
 from C's, the game state diverges and screens can't match — but
 PRNG matches alone don't score points. The leaderboard publishes
 your PRNG match percentage as advisory progress.
+
+The online Session Viewer is diagnostic, not the scoring authority.
+It runs the fork in a browser, shows cursor and per-step RNG details,
+and only has public sessions. If its visual count disagrees with
+`frozen/score.sh`, trust the scorer and use the viewer to inspect the
+first visible divergence.
 
 ### What's frozen
 

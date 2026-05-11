@@ -23,7 +23,8 @@ Treat screen totals as lagging evidence of subsystem progress, not as the optimi
 | PRNG log accumulation | `rng.c` | `js/rng.js` + `frozen/isaac64.js` | ✅ | Frozen ISAAC64 engine. Log format must be `rn2(N)=M` etc. |
 | Screen comparison / canonicalization | `frozen/ps_test_runner.mjs` | (frozen — do not modify) | ✅ | DEC→Unicode, SGR normalise, version banner sentinel. |
 | Per-session regression runner | `frozen/ps_test_runner.mjs` | (frozen) | ✅ | `node frozen/ps_test_runner.mjs [session...]` |
-| Full regression suite | `frozen/score.sh` | (frozen) | ✅ | Run before committing any change. No regressions allowed. |
+| Full regression suite | `frozen/score.sh` | (frozen) | ✅ | Run before committing broad changes and before handoff. Regressions must be classified; accidental regressions should be fixed, while expected regressions from hack removal or upstream-shaped refactors should be documented. |
+| Live public regression suite | hosted `/sessions/` | `scripts/fetch-live-public-sessions.mjs` | ✅ | `npm run score:live-public` fetches the current public session files into `.cache/live-sessions` before running the frozen scorer. Use this when comparing against leaderboard public totals. |
 | Debug tooling convention | — | One-off scripts in `scratch/` or `debug/`; batch triage in `scripts/triage-corpus.mjs` | 🟡 | Temp debug scripts MUST be deleted after use. Removed dead tracked `scratch/run_test.mjs` stub; remaining tracked scratch scripts are diagnostics. `scripts/triage-corpus.mjs` regenerates `scratch/divergence-inventory.md` from compact triage data for subsystem-level planning. Never leave `console.log` or `import('fs').writeFileSync` in production paths (jsmain.js, allmain.js). |
 
 ---

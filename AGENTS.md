@@ -81,27 +81,35 @@ Only fall back to custom debug scripts when the compact triage output is insuffi
 
 Unless the user explicitly asks for a single patch, a review, or a bounded investigation, agents must assume they are in a sustained implementation loop. A checkpoint is not a stopping point.
 
+Branch and commit discipline:
+- Use the current branch as the long-running work lane unless the user names another branch. Do not create extra work branches as routine loop bookkeeping.
+- Do not push or force-push during the loop unless the user explicitly asks for that operation. Treat pushes to `main` as deliberate leaderboard submissions.
+- Make local commits after coherent, verified implementation improvements. Failed experiments do not need commits; either revert the experiment, narrow it into a real fix, or leave it only as a scratch note.
+- Record the current branch at startup so handoffs can distinguish local implementation work from leaderboard submission state.
+
 At loop startup:
-1. Run the full suite and sentinel suite unless a fresh baseline is already present in the current turn.
-2. Create or update `scratch/agent-loop.md` with:
+1. Confirm branch, dirty state, and baseline commit with `git status --short --branch` and a suitable revision command.
+2. Run the full suite and sentinel suite unless a fresh baseline is already present in the current turn.
+3. Create or update `scratch/agent-loop.md` with:
+   - current branch and baseline commit
    - baseline scores and sentinel results
    - current subsystem target and evidence session
    - active hypothesis
    - queued next targets
    - verification cadence
-   - failed probes and what they proved
-3. Pick work in this order:
+   - notable regressions, discarded directions, and what they imply
+4. Pick work in this order:
    - user-named subsystem or evidence session
    - same-subsystem followups exposed by the latest change
    - highest-ROI target from `feature_map.md`
    - hack-debt cleanup that unlocks real subsystem work
 
 During the loop:
-- Complete a minimum marathon budget before final handoff: at least 5 meaningful implementation iterations, or every currently queued structural target, whichever is larger. A meaningful implementation iteration means: triage a target, state a subsystem hypothesis, attempt a general implementation/tooling/doc cleanup, verify it, classify any regression, update docs if subsystem truth changed, and select the next queued target.
-- Failed probes count toward the budget only when they are reverted or contained, verified, recorded, and followed by at least one next hypothesis or fallback target.
+- Complete a minimum marathon budget before final handoff: at least 5 meaningful implementation iterations, or every currently queued structural target, whichever is larger. A meaningful implementation iteration means: triage a target, state a subsystem hypothesis, implement or clean up general subsystem behavior, verify it, classify any regression, update docs if subsystem truth changed, and select the next queued target.
+- Prefer robust feature iterations over probe accounting. Regressions and wrong porting directions can and will happen; larger short-term regressions are acceptable when removing hacks or moving toward a more faithful architecture, as long as they are understood and recorded.
 - After any meaningful edit, continue to the next queued target unless a valid stop condition below applies.
 - Full-suite verification, sentinel verification, `feature_map.md` updates, `lessons.md` updates, and checkpoint notes are loop maintenance tasks, not handoff triggers.
-- A failed probe is not a global stop. Revert only the probe if needed, record what it proved in `scratch/agent-loop.md` and/or `feature_map.md`, then continue with the next hypothesis or target.
+- A wrong direction is not a global stop. Revert accidental damage when that is the clearest path, or roll forward when the regression exposes missing subsystem work. Record only durable lessons in `scratch/agent-loop.md` and/or `feature_map.md`, then continue with the next hypothesis or target.
 - A local subsystem blocker is not a global stop. Classify it, record the next required structural work, and move to the next queued subsystem.
 - Run the full suite at startup, after broad shared changes, after every 3-5 meaningful implementation iterations, and before a valid final handoff.
 
@@ -116,7 +124,7 @@ Final handoff after a marathon loop must state:
 - implementation delta by subsystem
 - lagging score delta
 - sentinel stability
-- failed probes and how they were classified
+- notable regressions, discarded directions, and how they were classified
 - current queue
 - exact valid stop condition
 
@@ -217,7 +225,7 @@ console.log('Total diffs:', n);
 A change counts as real progress only if all of the following are true:
 
 1. A subsystem advances or a known divergence becomes more structurally correct in subsystem terms.
-2. The sentinel suite does not regress.
+2. The sentinel suite is run when required, and any regression is classified as accidental damage to fix or an expected consequence of removing hacks / moving toward upstream architecture.
 3. `feature_map.md` becomes more truthful:
    - status advances toward general implementation, or
    - notes identify a blocker more precisely, or
@@ -262,7 +270,8 @@ Instead of hardcoding session-specific states, agents must implement the actual 
 Please read `AGENTS.md`, `lessons.md`, and `feature_map.md`.
 Your mission is to run a sustained implementation loop to improve generalized feature parity by advancing subsystems,
 using sessions only as evidence (or pick the highest-ROI subsystem from feature_map.md).
-Do not stop after a checkpoint, full-suite run, documentation update, small fix, failed probe, or local subsystem blocker.
+Use the branch and commit discipline from Step 2.7; do not create branch chaos or touch `main` unless the user asks.
+Do not stop after a checkpoint, full-suite run, documentation update, small fix, wrong direction, or local subsystem blocker.
 Keep `scratch/agent-loop.md` current, continue through the queue, and hand off only when a valid stop condition in `AGENTS.md` applies.
 Document your findings in `lessons.md`, update `feature_map.md` status, and provide a summary of your work.
 Have fun!
