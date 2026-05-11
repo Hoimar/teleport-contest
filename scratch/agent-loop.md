@@ -108,6 +108,12 @@
 - Regression stability: sentinel screens stayed 50/1063; sentinel RNG is 20420/64569.
 - Current queue: fix or classify the missing/position-drifted special-level floor object near the `seed0383` pet; then continue `seed0116` shop/floor object state and broader object placement fidelity.
 
+### Iteration 14 - Trap-Victim Possession Retention
+
+- Change: `mktrap_victim()` now places the trap-generated item, each cursed random possession, and optional gnome candle on the trap square instead of only consuming their RNG and retaining the final corpse. The remaining simplification is PIT/landmine `breaktest()` destruction for fragile possessions.
+- Evidence: target and sentinel lagging counts were unchanged (`seed0383` 9906/16915 at FR 9716; `seed0116` 5650/12562 at FR 5532; sentinel 50/1063 screens and 20420/64569 RNG), so the active `seed0383` missing `fobj` is not this trap-victim pile. The patch still removes hidden floor-object debt for later pet, pickup, and display behavior.
+- Current queue: classify whether the FR 9716 missing `fobj` comes from pet-arrival position drift, special-level terrain/kelp placement drift, or another retained object source; keep `seed0116` shop/floor object state as the secondary pet-object target.
+
 ## 2026-05-11 Marathon Restart - Peaceful Monster Predicate Queue
 
 - Full suite baseline before this loop: 50/11406 screens, 0/44 passing.

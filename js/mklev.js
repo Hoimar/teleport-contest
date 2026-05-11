@@ -3199,17 +3199,20 @@ function mktrap_victim(trap) {
     const kind = trap.ttyp;
     const x = trap.tx, y = trap.ty;
     // Object based on trap type
+    let otmp = null;
     switch (kind) {
-    case ARROW_TRAP: mksobj(349, true, false); break; // ARROW
-    case DART_TRAP: mksobj(353, true, false); break; // DART
-    case ROCKTRAP: mksobj(ROCK, true, false); break;
+    case ARROW_TRAP: otmp = mksobj(349, true, false); break; // ARROW
+    case DART_TRAP: otmp = mksobj(353, true, false); break; // DART
+    case ROCKTRAP: otmp = mksobj(ROCK, true, false); break;
     default: break;
     }
+    if (otmp) place_object(otmp, x, y);
     // Random items on victim
     do {
         const cls = [WEAPON_CLASS, TOOL_CLASS, FOOD_CLASS, GEM_CLASS][rn2(4)];
-        const otmp = mkobj(cls, false);
+        otmp = mkobj(cls, false);
         curse(otmp);
+        place_object(otmp, x, y);
     } while (!rn2(5));
     // Victim type
     const PM_ELF = 18, PM_DWARF = 19, PM_ORC = 20, PM_GNOME = 21, PM_HUMAN = 22;
@@ -3227,8 +3230,9 @@ function mktrap_victim(trap) {
     case 6: case 7: case 8: case 9:
         victim_mnum = PM_GNOME;
         if (!rn2(10)) {
-            const otmp = mksobj(rn2(4) ? 370 : 371, true, false); // TALLOW_CANDLE / WAX_CANDLE
+            otmp = mksobj(rn2(4) ? 370 : 371, true, false); // TALLOW_CANDLE / WAX_CANDLE
             curse(otmp);
+            place_object(otmp, x, y);
         }
         break;
     default: victim_mnum = PM_HUMAN; break;
