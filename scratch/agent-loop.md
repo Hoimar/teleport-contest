@@ -42,6 +42,14 @@
 - Full-suite checkpoint: corpus screens remain 50/11406, 0/44 passing. Non-sentinel RNG prefixes shifted in monster-heavy sessions as expected from broader monster initialization (`seed0360`, `seed0367`, `seed0373`, `seed4500` need reclassification if selected), with no screen-count regressions.
 - Current queue: classify `seed0383` FR 9383; continue `seed0116` `dog_goal()` object-state calls; reclassify non-sentinel monster-init side effects if they become the active target.
 
+### Iteration 5 - Special Flip, Region Placement, Wishes, And Pet Arrival
+
+- Change: added the post-load `flip_level_rnd()` path and horizontal-only `bigrm-12` gate for `noflipy`; `mineralize()` now keeps kelp placement but skips buried gold/gems on most special levels; `place_lregion()` now rejects occupied teleport candidates with a `put_lregion_here()`-shaped helper; wizard Ctrl-W wishes consume object-name lookup, normal `mksobj()` init, and `makewish()` timeout RNG for the current amulet/DSM/wand evidence; amulet init now includes the cursed-amulet `rn2(10)` gate; level-teleport pet arrival starts with zero movement.
+- Evidence: `seed0383` moved from FR 9383 through special flip, kelp/mineralize, arrival placement, pet-arrival coordinate shuffles, and three wizard wish object creations to FR 9666. Current blocker is `rn2(3) @ create_gas_cloud(region.c:1303)` expected vs `rn2(12) @ mcalcmove`, likely missing a gas-cloud/region side effect before monster movement accrual.
+- Regression stability: sentinel screens stayed 50/1063. Sentinel RNG total is now 20420/64569; `seed0116` screen stability remains 16/127 but its RNG prefix shifted to 5658/12562 after the more accurate amulet/pet-arrival behavior.
+- Full-suite checkpoint: corpus screens remain 50/11406, 0/44 passing. `seed0383` is now 9895/16915; `seed8000` remains 23/23 screens.
+- Current queue: classify the FR 9666 gas-cloud creation source; continue `seed0116` `dog_goal()`/wear object-state calls; reclassify broader command/inventory wish behavior if `seed0108` or `seed0383` command paths become the active target.
+
 ## 2026-05-11 Marathon Restart - Peaceful Monster Predicate Queue
 
 - Full suite baseline before this loop: 50/11406 screens, 0/44 passing.

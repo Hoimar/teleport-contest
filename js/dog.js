@@ -140,7 +140,7 @@ export function pet_arrive_with_you() {
         msleeping: 0,
         mpeaceful: 1,
         mtame: 10,
-        movement: 12,
+        movement: 0,
     };
     init_edog(mon);
     if (game.level?.monsters) game.level.monsters.unshift(mon);

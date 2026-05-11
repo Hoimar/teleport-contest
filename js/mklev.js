@@ -29,7 +29,7 @@ import {
     SPACE_POS, isok, W_NONDIGGABLE, FILL_NORMAL,
     ICE, MOAT, POOL, WATER, LAVAPOOL, LAVAWALL, DBWALL,
     A_LAWFUL, A_NONE, Align2amask,
-    LR_UPTELE, NO_MINVENT, MM_IGNOREWATER, MM_ANGRY, MM_NOGRP, GP_CHECKSCARY, GP_AVOID_MONPOS,
+    LR_TELE, LR_UPTELE, LR_DOWNTELE, NO_MINVENT, MM_IGNOREWATER, MM_ANGRY, MM_NOGRP, GP_CHECKSCARY, GP_AVOID_MONPOS,
 } from './const.js';
 
 // Object/class constants (normally from objects.js, not in contest template)
@@ -279,12 +279,22 @@ function m_at(x, y) {
 function bad_location(x, y, nlx, nly, nhx, nhy) {
     const loc = game.level?.at(x, y);
     if (!loc) return true;
+    if (occupied(x, y)) return true;
     // Excluded region
     if (nlx && x >= nlx && x <= nhx && y >= nly && y <= nhy) return true;
     // Must be ROOM or (CORR in maze)
     if (loc.typ !== ROOM && !(loc.typ === CORR && game.level?.flags?.is_maze_lev))
         return true;
     return false;
+}
+
+function put_lregion_here(x, y, nlx, nly, nhx, nhy, rtype, oneshot) {
+    if (bad_location(x, y, nlx, nly, nhx, nhy)) return false;
+    if ((rtype === LR_TELE || rtype === LR_UPTELE || rtype === LR_DOWNTELE) && m_at(x, y)) {
+        return !!oneshot;
+    }
+    u_on_newpos(x, y);
+    return true;
 }
 
 const CC_INCL_CENTER = 0x01;
@@ -378,21 +388,16 @@ export function place_lregion(lx, ly, hx, hy, nlx, nly, nhx, nhy, rtype, lev) {
     if (hy > ROWNO - 1) hy = ROWNO - 1;
 
     // Probabilistic search
+    const oneshot = lx === hx && ly === hy;
     for (let trycnt = 0; trycnt < 200; trycnt++) {
         const x = rn1((hx - lx) + 1, lx);
         const y = rn1((hy - ly) + 1, ly);
-        if (!bad_location(x, y, nlx, nly, nhx, nhy)) {
-            u_on_newpos(x, y);
-            return;
-        }
+        if (put_lregion_here(x, y, nlx, nly, nhx, nhy, rtype, oneshot)) return;
     }
     // Deterministic fallback
     for (let x = lx; x <= hx; x++)
         for (let y = ly; y <= hy; y++)
-            if (!bad_location(x, y, nlx, nly, nhx, nhy)) {
-                u_on_newpos(x, y);
-                return;
-            }
+            if (put_lregion_here(x, y, nlx, nly, nhx, nhy, rtype, true)) return;
 }
 
 // C ref: stairs.c u_on_upstairs — place hero on upstairs or fallback
@@ -775,6 +780,7 @@ function mksobj_init(otmp, otyp, artif) {
         if (artif) maybe_artifact(otmp, 40);
         break;
     case AMULET_CLASS:
+        rn2(10); // cursed-amulet gate; only specific amulets use the result
         blessorcurse(otmp, 10);
         break;
     default:
@@ -1432,6 +1438,65 @@ function bigrm12GetFloorLocation() {
     return { x: x + BIGRM_12_XSTART, y: y + BIGRM_12_YSTART };
 }
 
+function flipXForBounds(x, minx, maxx) {
+    return (maxx - x) + minx;
+}
+
+function flipYForBounds(y, miny, maxy) {
+    return (maxy - y) + miny;
+}
+
+function flipPoint(pt, flp, minx, miny, maxx, maxy, xprop = 'x', yprop = 'y') {
+    if (!pt) return;
+    const x = pt[xprop], y = pt[yprop];
+    if (x == null || y == null || x < minx || x > maxx || y < miny || y > maxy) return;
+    if (flp & 1) pt[yprop] = flipYForBounds(y, miny, maxy);
+    if (flp & 2) pt[xprop] = flipXForBounds(x, minx, maxx);
+}
+
+function flip_level(flp) {
+    if (!(flp & 3) || !game.level) return;
+    const { xmin, xmax, ymin, ymax } = get_level_extends();
+    const minx = Math.max(1, xmin);
+    const maxx = Math.min(COLNO - 1, xmax);
+    const miny = Math.max(0, ymin);
+    const maxy = Math.min(ROWNO - 1, ymax);
+    const map = game.level;
+
+    if (flp & 1) {
+        for (let y = miny; y < Math.trunc((miny + maxy + 1) / 2); y++) {
+            const yy = flipYForBounds(y, miny, maxy);
+            for (let x = minx; x <= maxx; x++)
+                [map.locations[x][y], map.locations[x][yy]] = [map.locations[x][yy], map.locations[x][y]];
+        }
+    }
+    if (flp & 2) {
+        for (let x = minx; x < Math.trunc((minx + maxx + 1) / 2); x++) {
+            const xx = flipXForBounds(x, minx, maxx);
+            for (let y = miny; y <= maxy; y++)
+                [map.locations[x][y], map.locations[xx][y]] = [map.locations[xx][y], map.locations[x][y]];
+        }
+    }
+
+    for (const obj of map.objects || []) flipPoint(obj, flp, minx, miny, maxx, maxy, 'ox', 'oy');
+    for (const trap of map.traps || []) {
+        flipPoint(trap, flp, minx, miny, maxx, maxy, 'tx', 'ty');
+        flipPoint(trap.launch, flp, minx, miny, maxx, maxy);
+    }
+    for (const mon of map.monsters || []) flipPoint(mon, flp, minx, miny, maxx, maxy, 'mx', 'my');
+    for (let st = game.stairs; st; st = st.next)
+        flipPoint(st, flp, minx, miny, maxx, maxy, 'sx', 'sy');
+    flipPoint(map.upstair, flp, minx, miny, maxx, maxy);
+    flipPoint(map.dnstair, flp, minx, miny, maxx, maxy);
+}
+
+function flip_level_rnd(allow_flips) {
+    let flp = 0;
+    if ((allow_flips & 1) && rn2(2)) flp |= 1;
+    if ((allow_flips & 2) && rn2(2)) flp |= 2;
+    if (flp) flip_level(flp);
+}
+
 function loadBigrm12Special() {
     loadBigrm12Terrain();
     const align = [0, 0, 0];
@@ -1479,6 +1544,7 @@ function makemaz_special(slev) {
     }
     if (game._last_special_protofile === 'bigrm-12') {
         loadBigrm12Special();
+        flip_level_rnd(2); // des.level_flags("noflipy") leaves horizontal flipping enabled.
         return;
     }
     game.level.flags.is_maze_lev = true;
@@ -3351,6 +3417,8 @@ function mineralize_kelp(kelp_pool, kelp_moat) {
 function mineralize(kelp_pool, kelp_moat, goldprob, gemprob, skip_lvl_checks) {
     const map = game.level;
     mineralize_kelp(kelp_pool, kelp_moat);
+    const sp = currentSpecialLevel();
+    if (!skip_lvl_checks && sp?.proto && sp.proto !== 'oracle') return;
     const absDepth = depth_of_level(game.u?.uz);
     const dunLevel = game.u?.uz?.dlevel ?? 1;
     if (goldprob < 0) goldprob = 20 + Math.trunc(absDepth / 3);
