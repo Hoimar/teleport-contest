@@ -908,7 +908,7 @@ function mkcorpstat(objtyp, mtmp, pm, x, y, flags) {
         // rndmonnum — pick random monster
         otmp.corpsenm = rndmonnum();
     }
-    return otmp;
+    return isok(x, y) ? place_object(otmp, x, y) : otmp;
 }
 
 function monmin_difficulty(levdif) { return Math.trunc(levdif / 6); }

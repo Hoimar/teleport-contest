@@ -64,6 +64,13 @@
 - Regression stability: sentinel screens stayed 50/1063. Full suite remains 50/11406 screens, 0/44 passing; current `seed0116` RNG is 5650/12562.
 - Current queue: implement or classify the three missing `obj_resists()` calls from nearby floor/shop object state for `seed0116`; compare special-level `fmon` ordering for `seed0383`.
 
+### Iteration 8 - Fog Effect Phase And Pet Visibility Gates
+
+- Change: moved fog-cloud vapor from `mcalcmove()` into the `movemon_singlemon()`-shaped movement phase before the movement-budget check; added the C lighting/visibility front door to the pet apport branch; retained `mkcorpstat()` corpse/statue objects on the level instead of dropping the created object state.
+- Evidence: `seed0383` moved from FR 9666 to FR 9713. JS now matches the fog-cloud `create_gas_cloud()` TTL, every subsequent `mcalcmove()` rounding roll through FR 9702, `maybe_generate_rnd_mon()`, `gethungry()`, the slippery-finger gate, and five `dog_goal()` object-resistance calls. The next mismatch is C rolling `rn2(8)` for apport while JS scans one additional object, so the active blocker is `dog_goal()` visibility/object ordering rather than fog or special-level monster order.
+- Regression stability: sentinel screens stayed 50/1063; sentinel RNG is 20407/64569. Full suite screens stayed 50/11406, 0/44 passing.
+- Current queue: refine `dog_goal()` object visibility/apport ordering using `seed0383` and the persistent `seed0116` missing-object evidence; then recheck special-level monster/list effects if dog movement advances.
+
 ## 2026-05-11 Marathon Restart - Peaceful Monster Predicate Queue
 
 - Full suite baseline before this loop: 50/11406 screens, 0/44 passing.

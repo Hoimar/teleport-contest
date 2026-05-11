@@ -234,6 +234,11 @@ function can_carry(mtmp, obj) {
     return Math.max(1, obj.quan || 1);
 }
 
+function pet_can_see_object(mtmp, x, y) {
+    const loc = game.level?.at(x, y);
+    return !!loc && (loc.lit || distmin(mtmp.mx, mtmp.my, x, y) <= 1);
+}
+
 function pet_can_step(mtmp, x, y) {
     if (!isok(x, y)) return false;
     if (x === game.u?.ux && y === game.u?.uy) return false;
@@ -248,6 +253,7 @@ function pet_goal(mtmp, after, udist) {
     const gx = game.u?.ux ?? mtmp.mx;
     const gy = game.u?.uy ?? mtmp.my;
     const loc = game.level?.at(gx, gy);
+    const petLoc = game.level?.at(mtmp.mx, mtmp.my);
     const edog = init_edog(mtmp);
     let goalType = UNDEF;
     let goalX = 0;
@@ -282,7 +288,8 @@ function pet_goal(mtmp, after, udist) {
                 goalType = foodType;
             }
         } else if (goalType === UNDEF && inMastersSight && !dogHasMinvent
-                   && (foodType === MANFOOD || true)
+                   && (!petLoc?.lit || loc?.lit)
+                   && (foodType === MANFOOD || pet_can_see_object(mtmp, nx, ny))
                    && edog.apport > rn2(8)
                    && can_carry(mtmp, obj) > 0) {
             goalX = nx;
