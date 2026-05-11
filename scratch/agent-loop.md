@@ -42,6 +42,13 @@
 - Regression stability: sentinel suite stayed at 50/1063 screens and RNG 20420/64569.
 - Current queue: inspect shop and floor-object generation for `seed0116` level 2 near the pet; then compare special-level object placement/pet-arrival rectangle drift for `seed0383`.
 
+### Iteration 3 - Dog Movement `chcnt` Reset
+
+- Change: `js/dog.js:dog_move()` now resets the equal-candidate reservoir counter when a strictly closer square is selected, matching `dogmove.c`'s `if (j < 0) chcnt = 0` rule.
+- Evidence: `seed0116` and `seed0383` target triage stayed unchanged, so this selector fix is not the current first blocker.
+- Regression stability: sentinel suite stayed at 50/1063 screens and RNG 20420/64569.
+- Current queue: keep the immediate focus on missing object-state scans, not candidate-selection order.
+
 ## 2026-05-11 Marathon Restart - Bigroom Candidate Drift
 
 - Branch/baseline commit: `main` at `baf0231`.

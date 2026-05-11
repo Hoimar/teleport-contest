@@ -401,6 +401,7 @@ export function dog_move(mtmp, after = true) {
                 nix = nx;
                 niy = ny;
                 nidist = ndist;
+                if (j < 0) chcnt = 0;
             }
         }
     }
