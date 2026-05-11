@@ -85,6 +85,13 @@
 - Regression stability: sentinel screens stayed 50/1063; sentinel RNG is 20430/64569. `seed0116` remained stable at 16/127 and FR 5532.
 - Current queue: inspect `seed0383` FR 9715 to determine whether the next call belongs to dog movement candidate selection or another monster movement allocation; keep `seed0116` missing floor/shop object evidence as the parallel pet/object target.
 
+### Iteration 11 - Pet Apport Startup And Clear-Path Visibility
+
+- Change: non-replay startup now zeros `u.acurr` before `makedog()`, matching C's `newgame()` order where the starting pet's `edog->apport` sees pre-inventory `ACURR(A_CHA)` and clamps to 3. The pet apport visibility check now uses exported `vision.clear_path()` for `m_cansee()` instead of a lit-or-adjacent approximation.
+- Evidence: `seed0383` now matches the first failed apport roll and the second apport visibility roll, moving the first mismatch to FR 9716. The lower lagging RNG total is classified as structural: JS accepts the second floor-object goal and begins movement because it has no more nearby retained `fobj` entries, while C continues scanning additional floor objects before movement.
+- Regression stability: sentinel screens stayed 50/1063; sentinel RNG is 20403/64569. `seed0116` remained stable at 16/127 and FR 5532.
+- Current queue: classify missing/position-drifted floor objects near the `seed0383` pet after the second apport check; likely candidates are special-level terrain/floor-location fidelity and remaining object placement state, not dog movement allocation.
+
 ## 2026-05-11 Marathon Restart - Peaceful Monster Predicate Queue
 
 - Full suite baseline before this loop: 50/11406 screens, 0/44 passing.

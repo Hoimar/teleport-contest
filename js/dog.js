@@ -11,6 +11,7 @@ import {
     isok,
 } from './const.js';
 import { rn2 } from './rng.js';
+import { clear_path } from './vision.js';
 
 const FOOD_CLASS = 7;
 const ROCK_CLASS = 14;
@@ -106,7 +107,10 @@ export async function makedog() {
 }
 
 function hero_charisma() {
-    return Math.max(1, game.u?.acurr?.a?.[5] ?? 10);
+    const cha = game.u?.acurr?.a?.[5] ?? 0;
+    if (cha <= 3) return 3;
+    if (cha >= 25) return 25;
+    return cha;
 }
 
 function init_edog(mon) {
@@ -279,8 +283,7 @@ function can_carry(mtmp, obj) {
 }
 
 function pet_can_see_object(mtmp, x, y) {
-    const loc = game.level?.at(x, y);
-    return !!loc && (loc.lit || distmin(mtmp.mx, mtmp.my, x, y) <= 1);
+    return clear_path(mtmp.mx, mtmp.my, x, y);
 }
 
 function pet_can_step(mtmp, x, y) {
