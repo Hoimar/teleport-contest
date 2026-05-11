@@ -243,6 +243,7 @@ function dogfood(mtmp, obj) {
             return herbi ? ACCFOOD : MANFOOD;
         }
     }
+    if (object_class(obj.otyp) === ROCK_CLASS) return UNDEF;
     return obj.cursed ? UNDEF : APPORT;
 }
 

@@ -1,5 +1,47 @@
 # Teleport Implementation Loop
 
+## 2026-05-12 Marathon Restart - Dehack/Triage Backlog
+
+- Branch/baseline commit: `main` at `0497013`.
+- Startup wall time: 2026-05-12 00:44 CEST.
+- Full suite baseline: 50/11406 screens, 0/44 passing.
+- Sentinel baseline: 50/1063 screens, RNG 20420/64569.
+- Corpus triage baseline: 44 sessions, 41 compact buckets regenerated in `scratch/divergence-inventory.md`.
+- Current target: pet/floor-object parity using `seed0383-wizard-hallucinate` and `seed0116-wizard-wear-shop` as evidence.
+- Active hypothesis: the next useful subsystem move is not another pet step special case. Both evidence paths are blocked by the same C subsystem boundary: `dogmove.c:dog_goal()` scans `fobj` and then `gi.invent`, and JS still lacks enough retained/position-correct floor and inventory objects to feed that scan.
+- Dehack scan:
+  1. Remaining production replay scaffolds are still scoped to `js/fastforward.js` and `js/fastforward0002.js`.
+  2. Remaining `_override_screen` debt is startup/menu/windowing, especially seed0002 chargen and seed8000 hardcoded menu strings.
+  3. Untracked `debug/` replay-generation scripts exist, but they are not tracked production debt; do not treat them as subsystem truth.
+  4. Tracked `scratch/` diagnostics remain lightweight, with `scratch/divergence-inventory.md` now regenerated from compact triage.
+- Deep triage facts:
+  1. `seed0116`: C consumes `distfleeck()` then kitten wanderer, then 17 `obj_resists()` calls in `dog_goal()` before candidate selection. JS currently consumes 14 `obj_resists()` calls, then starts dog movement candidate RNG. This is three missing object-scan entries, not a movement-selector bug.
+  2. `seed0116`: at the active screen, JS has the kitten at roughly `(9,13)`, hero at `(11,14)`, 14 Wizard inventory objects, and no nearby retained floor objects. C's extra `obj_resists()` calls therefore point at missing/position-drifted floor/shop objects or inventory state around the pet, not a new RNG gate.
+  3. `seed0383`: C consumes two apport `rn2(8)` failures and then a long run of `obj_resists()` calls from `dog_goal()`. JS reaches the same broad phase but remains sensitive to pet position and retained special-level floor objects around `(27..33,4..9)`.
+  4. `seed0383`: when JS advances past the first mismatch, the nearby object set includes kelp at `(33,9)`, `(29,6)`, `(25,6)`, `(24,7)`, armor at `(33,6)`, and a tool at `(25,3)`. C's longer scan implies more `fobj` entries in the pet rectangle or a one-cell pet/hero placement drift changing the scan rectangle.
+- Queue:
+  1. Port enough `dogmove.c:dog_goal()` traceability into a reusable diagnostic so future loops can print scanned `fobj`/`gi.invent` entries without editing production code.
+  2. For `seed0116`, identify the three missing object entries by comparing retained shop/floor generation near the pet after `T`.
+  3. For `seed0383`, classify whether the extra `obj_resists()` run is caused by pet-arrival position drift, special `des.object()` placement, kelp/mineralize state, or object-class filtering.
+  4. Once localized, implement the general subsystem owner: shop stocking/floor object retention, special-level object placement, or pet-arrival placement predicates.
+  5. Keep startup override replay debt visible but secondary unless pet/object work blocks locally.
+- Verification cadence: target triage after each production edit, sentinel after each meaningful edit, full suite after 3-5 meaningful implementation iterations or broad shared changes.
+
+### Iteration 1 - Pet `dogfood()` Rock-Class Predicate
+
+- Change: `js/dog.js:dogfood()` now returns `UNDEF` for rock-class objects after the upstream `obj_resists(obj,0,95)` front door. This removes a general pet-goal predicate mismatch where rocks could become apport goals in JS.
+- Evidence: `seed0383` and `seed0116` target triage remained at the same first mismatch (`seed0383` FR 9716, `seed0116` FR 5532), classifying this as predicate-debt cleanup rather than the active blocker.
+- Regression stability: sentinel suite stayed at 50/1063 screens and RNG 20420/64569.
+- Current queue: build a reusable dog-goal scan diagnostic; then localize the three missing `seed0116` object scans and the longer `seed0383` special-level object scan.
+
+### Iteration 2 - Reusable Dog-Goal Scan Diagnostic
+
+- Change: added `scripts/trace-dog-goal.mjs`, a browser-production-safe Node diagnostic that runs a session prefix and prints the tame pet, hero, dog-goal search rectangle, retained floor objects, hero inventory, and optional RNG window.
+- Evidence: `node scripts/trace-dog-goal.mjs seed0116 --moves 16 --rng 5510:5545` shows the kitten at `(9,13)`, hero at `(11,14)`, search rectangle `x=4..14,y=8..18`, zero retained floor objects, and 14 Wizard inventory objects. C consumes 17 `obj_resists()` calls before movement, so the active gap is three missing floor/shop/inventory object entries.
+- Evidence: `node scripts/trace-dog-goal.mjs seed0383 --moves 140 --rng 9700:9725` shows the kitten at `(27,4)`, hero at `(27,5)`, six retained floor objects in the initial search rectangle, and 17 inventory objects including wishes. This gives future loops a stable state dump for the longer FR 9716 `obj_resists()` gap.
+- Regression stability: sentinel suite stayed at 50/1063 screens and RNG 20420/64569.
+- Current queue: inspect shop and floor-object generation for `seed0116` level 2 near the pet; then compare special-level object placement/pet-arrival rectangle drift for `seed0383`.
+
 ## 2026-05-11 Marathon Restart - Bigroom Candidate Drift
 
 - Branch/baseline commit: `main` at `baf0231`.
