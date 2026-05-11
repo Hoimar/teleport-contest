@@ -839,7 +839,7 @@ function place_object(otmp, x, y) {
     otmp.oy = y;
     otmp.ch = glyph.ch;
     otmp.color = glyph.color;
-    game.level.objects.push(otmp);
+    game.level.objects.unshift(otmp);
     return otmp;
 }
 
@@ -876,7 +876,7 @@ function mkgold(amount, x, y) {
     // mksobj_at(GOLD_PIECE) calls next_ident
     next_ident();
     if (game.level?.objects) {
-        game.level.objects.push({
+        game.level.objects.unshift({
             otyp: GOLD_PIECE,
             ox: x, oy: y,
             quan: amount,

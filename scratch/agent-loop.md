@@ -71,6 +71,13 @@
 - Regression stability: sentinel screens stayed 50/1063; sentinel RNG is 20407/64569. Full suite screens stayed 50/11406, 0/44 passing.
 - Current queue: refine `dog_goal()` object visibility/apport ordering using `seed0383` and the persistent `seed0116` missing-object evidence; then recheck special-level monster/list effects if dog movement advances.
 
+### Iteration 9 - C-Like Floor Object Chain Order
+
+- Change: `place_object()` and new gold piles now insert at the head of `level.objects`, matching C `fobj` head insertion instead of appending in creation order.
+- Evidence: `seed0383` still blocks at FR 9713, but live inspection now shows dog floor-object scans in newest-first order. The unchanged first mismatch indicates the remaining problem is not JS list direction; likely candidates are extra/missing special-level floor objects near the pet or incomplete `dogfood()` classification for those objects.
+- Regression stability: sentinel screens stayed 50/1063. Full suite screens stayed 50/11406, 0/44 passing; RNG totals shifted in object-order-sensitive sessions as expected from replacing reversed floor-list order.
+- Current queue: compare `seed0383` nearby floor objects against C expectations through object type/classification; continue `seed0116` missing-object evidence in parallel as the same dog/floor-object subsystem.
+
 ## 2026-05-11 Marathon Restart - Peaceful Monster Predicate Queue
 
 - Full suite baseline before this loop: 50/11406 screens, 0/44 passing.
