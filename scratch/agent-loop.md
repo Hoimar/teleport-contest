@@ -92,6 +92,14 @@
 - Regression stability: sentinel screens stayed 50/1063; sentinel RNG is 20403/64569. `seed0116` remained stable at 16/127 and FR 5532.
 - Current queue: classify missing/position-drifted floor objects near the `seed0383` pet after the second apport check; likely candidates are special-level terrain/floor-location fidelity and remaining object placement state, not dog movement allocation.
 
+### Iteration 12 - Special-Level Wallify Map Pass
+
+- Change: added the `des.wallify()`/`wallify_map()` pass used by `bigrm-12` before stair/object/trap/monster placement. This converts adjacent STONE cells around room/crosswall terrain into preliminary wall terrain without consuming RNG.
+- Evidence: sentinel stayed stable and `seed0383` remained at FR 9716, so this was a geometry-fidelity cleanup rather than the active floor-object fix. The unchanged blocker keeps the queue focused on floor object population/position drift after the second apport check.
+- Regression stability: sentinel screens stayed 50/1063; sentinel RNG is 20403/64569.
+- Full-suite checkpoint: corpus screens remain 50/11406, 0/44 passing. Full-suite RNG prefixes are stable with the sentinel classification; `seed0383` is 9889/16915 and `seed0116` is 5650/12562.
+- Current queue: continue classifying missing `fobj` entries around the `seed0383` pet; recheck display wall glyphs separately because this wallify pass alone did not change the first-screen mismatch.
+
 ## 2026-05-11 Marathon Restart - Peaceful Monster Predicate Queue
 
 - Full suite baseline before this loop: 50/11406 screens, 0/44 passing.

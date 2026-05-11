@@ -25,7 +25,7 @@ import {
     ROOMOFFSET, MAXNROFROOMS, SHARED,
     SDOOR, SCORR, IRONBARS, FOUNTAIN, SINK, ALTAR, GRAVE,
     DIR_N, DIR_S, DIR_E, DIR_W, DIR_180,
-    IS_WALL, IS_STWALL, IS_DOOR, IS_OBSTRUCTED, IS_FURNITURE, IS_POOL,
+    IS_WALL, IS_STWALL, IS_DOOR, IS_OBSTRUCTED, IS_FURNITURE, IS_POOL, IS_ROOM,
     SPACE_POS, isok, W_NONDIGGABLE, FILL_NORMAL,
     ICE, MOAT, POOL, WATER, LAVAPOOL, LAVAWALL, DBWALL,
     A_LAWFUL, A_NONE, Align2amask,
@@ -1497,6 +1497,36 @@ function flip_level_rnd(allow_flips) {
     if (flp) flip_level(flp);
 }
 
+function wallify_map(x1, y1, x2, y2) {
+    const map = game.level;
+    if (!map) return;
+    y1 = Math.max(y1, 0);
+    x1 = Math.max(x1, 1);
+    y2 = Math.min(y2, ROWNO - 1);
+    x2 = Math.min(x2, COLNO - 1);
+    for (let y = y1; y <= y2; y++) {
+        const loY = y > 0 ? y - 1 : 0;
+        const hiY = y < y2 ? y + 1 : y2;
+        for (let x = x1; x <= x2; x++) {
+            const loc = map.at(x, y);
+            if (!loc || loc.typ !== STONE) continue;
+            const loX = x > 1 ? x - 1 : 1;
+            const hiX = x < x2 ? x + 1 : x2;
+            let wallTyp = null;
+            for (let yy = loY; yy <= hiY && wallTyp == null; yy++) {
+                for (let xx = loX; xx <= hiX; xx++) {
+                    const typ = map.at(xx, yy)?.typ;
+                    if (IS_ROOM(typ) || typ === CROSSWALL) {
+                        wallTyp = (yy !== y) ? HWALL : VWALL;
+                        break;
+                    }
+                }
+            }
+            if (wallTyp != null) loc.typ = wallTyp;
+        }
+    }
+}
+
 function loadBigrm12Special() {
     loadBigrm12Terrain();
     const align = [0, 0, 0];
@@ -1509,6 +1539,9 @@ function loadBigrm12Special() {
     rn2(100); // percent(25), water side replacement
     rn2(100); // percent(25), lava side replacement
     rn2(100); // percent(20), terrain mirroring
+
+    // C ref: bigrm-12.lua des.wallify() -> sp_lev.c:wallify_map().
+    wallify_map(0, 0, COLNO - 1, ROWNO - 1);
 
     bigrm12GetFloorLocation(); // up stair
     bigrm12GetFloorLocation(); // down stair
