@@ -5,15 +5,16 @@ description: Use when working in the teleport-contest repo to run a sustained au
 
 # Teleport Implementation Loop
 
-Use this skill to enter the marathon workflow defined in `AGENTS.md`.
+Use this skill to enter the sustained implementation workflow defined in `AGENTS.md`.
 
 ## Source Of Truth
 
 `AGENTS.md` is authoritative for:
 - baseline and triage commands
-- minimum marathon budget
+- branch and commit discipline
+- minimum loop budget
 - queue order
-- probe and regression handling
+- regression handling
 - full-suite cadence
 - valid stop conditions
 - final handoff requirements
@@ -24,6 +25,7 @@ Follow `AGENTS.md` Step 2.7, then continue through Steps 3 and 4 for each queued
 
 - Read `AGENTS.md`, `lessons.md`, and `feature_map.md` before starting.
 - Keep `scratch/agent-loop.md` as the live checkpoint while the loop runs.
+- Apply the branch, commit, and regression policy from `AGENTS.md` Step 2.7; do not invent a branch strategy or probe quota.
 - Use sessions as evidence for generalized NetHack parity, not as scoreboard targets.
 - If triage is unclear, use `$teleport-triage-divergence`.
 - If the next useful work is removing scaffolding, stale truth, or reward-hacking debt, use `$teleport-dehack-simplify`.
