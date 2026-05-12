@@ -167,6 +167,29 @@
   3. Broaden `#wizintrinsic` beyond hallucination only when evidence reaches additional intrinsic selections.
   4. Continue special-level object/monster parity and visible hack-debt cleanup when it unlocks active subsystem work.
 
+### Iteration 9 - Wear Command Timing And Startup Worn State
+
+- Implementation delta:
+  1. Added generated upstream `objects[otyp].oc_delay` metadata as `OBJECT_DELAY` for command-side wear timing evidence.
+  2. Split displayed `P`/`W` prompt filters from accepted wearable classes: `W` lists unworn armor, `P` lists rings/amulets, but `getobj()` selections can still accept the current armor/amulet evidence.
+  3. Marked the deferred Wizard startup cloak object as worn when deferred startup AC is applied, and cleared that worn state on `T`.
+  4. Changed `#wizintrinsic h` back to a zero-time prompt selection so it does not move west or run the monster phase.
+  5. Added initial delayed-armor wear handling for gray dragon scale mail and amulet wear messages. Full occupation continuation remains incomplete.
+- Evidence:
+  1. `seed0383` moved beyond the FR 9933 pet melee/spatial blocker to `S 0/219 R 10324/16915`, first RNG mismatch FR 10079 (`rn2(1)=0` expected from `dog_move()` candidate choice versus JS `rnd(20)=2` from pet melee).
+  2. C trace around the key sequence shows `P o` starts delayed gray dragon scale mail dressing with `nomul=-5`, while `#wizintrinsic h` has only prompt/UI traces and no RNG.
+  3. A too-broad `W` prompt initially regressed `seed0116` to screen 15 by listing a worn startup cloak; this was classified as missing worn startup object state and fixed by marking the deferred cloak worn and clearing it on `T`.
+- Regression stability:
+  1. Target triage: `seed0116-wizard-wear-shop` stays `S 109/127 R 12562/12562 FS 109:attr:map:e FR - C 4`.
+  2. Target triage: `seed0383-wizard-hallucinate` reports `S 0/219 R 10324/16915 FS 0:char:map:init FR 10079:rn2(1)=0=>rnd(20)=2 C 0`.
+  3. Sentinel suite: `seed8000` `S 23/23 R 3060/3130`, `seed0002` `S 11/595 R 1249/27158`, `seed0013` `S 0/99 R 540/4804`, `seed0116` `S 109/127 R 12562/12562`, `seed0383` `S 0/219 R 10324/16915`; total `S 143/1063 R 27735/64569`.
+  4. Full suite: `S 143/11406`, 0/44 passing. No matched-screen regressions; the seed0383 RNG gain is structural command/inventory timing, not a screen-score target.
+- Current queue:
+  1. Continue user-priority `seed0383` at FR 10079 by classifying why JS sees an adjacent pet melee target after the gnome death where C continues `dog_move()` candidate selection and ranged scoring. Focus on post-kill monster occupancy, pet candidate flags, and `mattackm()` eligibility.
+  2. Keep full delayed occupation continuation for armor dressing in the command/inventory backlog; the current implementation owns the initial timing and object delay metadata only.
+  3. Keep `seed0116` screen 109 as a secondary object identity/description-state target: two visible potions, one arrow stack, and one ring still have exact-RNG color/state drift.
+  4. Continue special-level object/monster parity and visible hack-debt cleanup when it unlocks active subsystem work.
+
 ## 2026-05-12 08:55 CEST Restart - Dehack, Deep Triage, Implementation Loop
 
 - Branch/baseline commit: `main` at `f4be79ac016690ec4a293cadad6427ed4d4715e3`.

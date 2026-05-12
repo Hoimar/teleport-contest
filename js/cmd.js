@@ -10,6 +10,7 @@ import { nhgetch } from './input.js';
 import { newsym, flush_screen, pline, clear_pending_message, docrt, serialize_terminal_grid } from './display.js';
 import { vision_recalc, vision_reset } from './vision.js';
 import { mklev, mksobj, place_lregion, place_object } from './mklev.js';
+import { OBJECT_DELAY } from './object_data.js';
 import { pet_arrive_with_you } from './dog.js';
 import { merge_inventory_object, pluslvl } from './u_init.js';
 import { adjalign, exercise } from './allmain_turns.js';
@@ -34,8 +35,11 @@ const WAN_FIRE = 411;
 const WAN_DEATH = 414;
 const WAN_DIGGING = 428;
 const QUARTERSTAFF = 79;
+const CLOAK_OF_MAGIC_RESISTANCE = 139;
 const RIN_TELEPORT_CONTROL = 195;
+const ARMOR_CLASS = 3;
 const RING_CLASS = 4;
+const AMULET_CLASS = 5;
 const WAND_CLASS = 11;
 
 function wishedObjectSpec(name) {
@@ -141,6 +145,8 @@ function indefiniteArticle(name) {
 
 function baseObjectName(obj) {
     if (obj?.appearanceName) return obj.appearanceName;
+    if (obj?.otyp === GRAY_DRAGON_SCALE_MAIL) return 'gray dragon scale mail';
+    if (obj?.otyp === AMULET_OF_LIFE_SAVING) return 'amulet of life saving';
     if (obj?.oclass === RING_CLASS) return 'ring';
     return 'object';
 }
@@ -158,9 +164,58 @@ function inventoryListing(obj) {
 function putonLetters() {
     ensureInventoryLetters();
     return (game.inventory || [])
-        .filter((obj) => obj?.oclass === RING_CLASS && !obj.wornSide)
+        .filter((obj) => (obj?.oclass === RING_CLASS && !obj.wornSide)
+            || (obj?.oclass === AMULET_CLASS && !obj.worn))
         .map((obj) => obj.invlet)
         .join('');
+}
+
+function wearLetters() {
+    ensureInventoryLetters();
+    return (game.inventory || [])
+        .filter((obj) => obj?.oclass === ARMOR_CLASS && !obj.worn && !obj.owornmask)
+        .map((obj) => obj.invlet)
+        .join('');
+}
+
+function is_puton_candidate(obj) {
+    if (!obj) return false;
+    if (obj.oclass === RING_CLASS) return !obj.wornSide;
+    return obj.oclass === ARMOR_CLASS || obj.oclass === AMULET_CLASS;
+}
+
+function apply_deferred_startup_wear() {
+    const cloak = (game.inventory || []).find((obj) => obj?.otyp === CLOAK_OF_MAGIC_RESISTANCE);
+    if (cloak) cloak.worn = true;
+}
+
+function takeoff_worn_cloak() {
+    const cloak = (game.inventory || []).find((obj) => obj?.otyp === CLOAK_OF_MAGIC_RESISTANCE && obj.worn);
+    if (cloak) cloak.worn = false;
+}
+
+async function start_wearing_object(obj) {
+    if (obj.worn || obj.wornSide || obj.owornmask) {
+        game.context.move = 0;
+        await pline('You are already wearing that!');
+        return;
+    }
+
+    if (obj.oclass === RING_CLASS) {
+        game._awaiting_ring_finger = obj;
+        game.context.move = 0;
+        await showPromptLine('Which ring-finger, Right or Left? [rl] ');
+        return;
+    }
+
+    obj.worn = true;
+    const delay = OBJECT_DELAY[obj.otyp] || 0;
+    if (obj.oclass === ARMOR_CLASS && delay > 1) {
+        await pline(`You start putting on ${inventoryObjectName(obj)}.`);
+    } else {
+        await pline(`${inventoryListing(obj)} (being worn).`);
+    }
+    game.context.move = 1;
 }
 
 function zapLetters() {
@@ -660,7 +715,7 @@ export async function rhack(key) {
             game.u.uprops = game.u.uprops || {};
             game.u.uprops.hallucination = 30;
             await pline('Timeout for hallucination set to 30.');
-            game.context.move = 1;
+            game.context.move = 0;
             return;
         }
         if (ch === '\r' || ch === '\n' || ch === ' ' || ch === '\x1b') {
@@ -740,12 +795,18 @@ export async function rhack(key) {
     if (game._awaiting_wear_item) {
         clear_pending_message();
         game._awaiting_wear_item = false;
-        game.context.move = 0;
-        if (ch === 'b') {
+        const idx = inventoryIndexForLetter(ch);
+        const obj = idx >= 0 ? game.inventory?.[idx] : null;
+        if (obj && (obj.oclass === ARMOR_CLASS || obj.oclass === AMULET_CLASS || obj.oclass === RING_CLASS)) {
+            await start_wearing_object(obj);
+        } else if (ch === 'b') {
+            game.context.move = 0;
             await pline('You are already wearing that!');
         } else if (ch === '\x1b') {
+            game.context.move = 0;
             await pline('Never mind.');
         } else {
+            game.context.move = 0;
             await pline("You can't wear that.");
         }
         return;
@@ -773,14 +834,12 @@ export async function rhack(key) {
         game._awaiting_puton_item = false;
         const idx = inventoryIndexForLetter(ch);
         const obj = idx >= 0 ? game.inventory?.[idx] : null;
-        if (!obj || obj.oclass !== RING_CLASS) {
+        if (!is_puton_candidate(obj)) {
             game.context.move = 0;
             await pline('Never mind.');
             return;
         }
-        game._awaiting_ring_finger = obj;
-        game.context.move = 0;
-        await showPromptLine('Which ring-finger, Right or Left? [rl] ');
+        await start_wearing_object(obj);
         return;
     }
 
@@ -883,6 +942,7 @@ export async function rhack(key) {
         if (game._deferred_startup_uac != null) {
             game.u.uac = game._deferred_startup_uac;
             game._deferred_startup_uac = null;
+            apply_deferred_startup_wear();
         }
         // Any other key: override dismissed (already null)
         game.context.move = 0;
@@ -948,13 +1008,15 @@ export async function rhack(key) {
         game._wish_input = '';
     } else if (ch === 'W') {
         game.context.move = 0;
-        const msg = 'What do you want to wear? [*] ';
+        const letters = wearLetters();
+        const msg = letters ? `What do you want to wear? [${letters} or ?*] ` : 'What do you want to wear? [*] ';
         await pline(msg);
         game._prompt_cursor = [msg.length, 0];
         game._awaiting_wear_item = true;
     } else if (ch === 'T') {
         game.context.move = 1;
         if (game.u) game.u.uac = 10;
+        takeoff_worn_cloak();
         await pline('You were wearing an uncursed +0 cloak of magic resistance.');
     } else if (ch === '\\') {
         game.context.move = 0;
