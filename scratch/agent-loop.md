@@ -17,19 +17,19 @@ This file is the live handoff checkpoint, not a full history. It was compacted o
 
 - Branch: `main`.
 - Baseline requested by user: resume from commit `04d9360` and continue on the current branch without pushing.
-- Latest committed loop work: `d9f72d4 Handle pet abuse on hero kill`.
+- Latest committed loop work: `fd917aa Tighten monster item search state`.
 - Local divergence from remote: branch is ahead of `origin/main`; do not push unless explicitly asked.
 - Current target: `seed0383-wizard-hallucinate` after the Oracle special-level / turn-tail generation slice.
-- Active subsystem hypothesis: ordinary monster movement deterministic position drift after Oracle loading. C reaches `rn2(24)` in `m_move()` for the gnome's backtracking roll; JS has the gnome at `69,17` with 8 candidates and reaches `rn2(32)`. The likely owner is the previous item-seeking `m_move()` target/position choice toward the nearby scroll, not turn ordering.
+- Active subsystem hypothesis: ordinary monster movement and weapon-attack ownership after Oracle loading. The gnome `rn2(24)` denominator drift was caused by JS treating a remove-curse scroll as a general item target; after tightening item search, the current first mismatch is FR `16755`, where C expects `rnd(2)` in `mattacku()` while JS enters the next monster's `distfleeck()`.
 
 ## Latest Verified Scores
 
-- Sentinel after the Oracle/turn-tail generation slice: total `S 162/1063 R 34224/64569`.
+- Sentinel after the item-search/minvent slice: total `S 162/1063 R 34184/64569`.
 - `seed8000-tourist-starter`: `S 23/23 R 3060/3130`, FR `3047`.
 - `seed0002-healer-reflection-drummer`: `S 11/595 R 1266/27158`, FR `1215`.
 - `seed0013-friday13-save-then-fullmoon-restore`: `S 0/99 R 535/4804`, FR `507`.
 - `seed0116-wizard-wear-shop`: `S 127/127 R 12562/12562`, PASS; remaining comparison notes are four cursor-only prompt positions.
-- `seed0383-wizard-hallucinate`: `S 1/219 R 16801/16915`, FR `16750`.
+- `seed0383-wizard-hallucinate`: `S 1/219 R 16761/16915`, FR `16755`.
 - Full suite after latest production slice: `S 162/11406`, 1/44 passing (`seed0116`).
 
 ## Recent Implementation Delta
@@ -49,7 +49,7 @@ Latest committed production slice:
 - Classification: the pet-abuse blocker is resolved for current evidence; remaining blocker is ordinary movement candidate geometry after the pet is removed.
 - Known limitation: hero combat is still only a narrow front door. Corpses, treasure object creation, luck/accounting, passive effects, and general `uhitm()` remain incomplete.
 
-Uncommitted verified production slice:
+Committed production slice:
 
 - Oracle / turn-tail generation slice:
   - added `AGENTS.md` C-reference breadcrumb guidance
@@ -61,13 +61,22 @@ Uncommitted verified production slice:
 - Evidence: `seed0383` moved from `R 11430/16915` / FR `11387` to `R 16801/16915` / FR `16750`. Sentinel screens stayed `S 162/1063`; sentinel RNG total moved to `R 34224/64569`.
 - Residual debt: Oracle screen 0 still has map glyph drift, random-room/ordinary movement deterministic state still diverges, and full Oracle Lua/runtime special level support remains partial.
 
+Latest committed production slice:
+
+- Ordinary monster item-search / minvent slice:
+  - tightened `muse.c:searches_for_item()` front door so ordinary intelligent collectors chase specific usable magic instead of every scroll/potion/amulet
+  - added the `m_move()` `lined_up()` suppression gate so monsters already positioned for an attack do not detour into item search
+  - retained monster-init objects on `mon.inventory` and applied `m_initthrow()` stack quantities via `rn1(oquan, 3)`
+- Evidence: the original `seed0383` gnome blocker moved from FR `16750` (`rn2(24)` vs `rn2(32)`) to FR `16755` (`rnd(2)` in C `mattacku()` vs JS next-monster `distfleeck()`). Sentinel screens stayed `S 162/1063`; `seed0116` remains a full pass.
+- Classification: lagging `seed0383` RNG total decreased to `R 16761/16915` because retaining real monster inventory changes later divergent state, but this is structural minvent debt reduction, not score optimization.
+
 ## Current Queue
 
-1. Classify `seed0383` FR `16750` with compact tooling first:
+1. Classify `seed0383` FR `16755` with compact tooling first:
    - `node scripts/triage-session.mjs sessions/seed0383-wizard-hallucinate.session.json`
-   - inspect step `199` (`key: l`) and compare the gnome's previous deterministic `m_move()` from `68,16` toward the scroll at `71,17`
+   - inspect the monster phase around RNG `16749..16756`; temporary trace showed the gnome item-search denominator is resolved and the new boundary is a later ordinary monster/weapon attack slot
    - If compact tooling is insufficient, add temporary guarded movement tracing and remove it before any commit.
-2. Identify why C's gnome backtracking denominator is `4 * 6` while JS has `4 * 8`: prior position drift, object-goal selection, `mfndpos()` exclusions, or room/topology state.
+2. Identify why C reaches `mattacku()` `rnd(2)` while JS reaches the next monster's `distfleeck()`: compare monster order, movement budget, `I_SPECIAL` gear-delay handling, and ranged/weapon attack front doors before adding any attack RNG.
 3. Replace the menu/discovery residual scaffolding with real `o_init` description storage, discovery persistence, and broader role inventory/menu text when it becomes the highest safe structural next step.
 4. Keep broader startup/display/save blockers secondary unless the active queue is blocked.
 

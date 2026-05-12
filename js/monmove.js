@@ -2,7 +2,7 @@ import { game } from './gstate.js';
 import { d, rn2, rnd } from './rng.js';
 import { dog_move } from './dog.js';
 import { enexto_core } from './mklev.js';
-import { OBJECT_CLASS, OBJECT_DELAY } from './object_data.js';
+import { OBJECT_CLASS, OBJECT_DELAY, OBJECT_DIR } from './object_data.js';
 import {
     D_CLOSED, D_LOCKED, IS_DOOR, IS_LAVA, IS_OBSTRUCTED, IS_POOL,
     IS_WATERWALL, I_SPECIAL, M_AP_FURNITURE, M_AP_OBJECT, W_ARMF,
@@ -43,6 +43,34 @@ const SPBOOK_CLASS = 10;
 const WAND_CLASS = 11;
 const GEM_CLASS = 13;
 const ROCK = 474;
+const RAY = 3;
+const AMULET_OF_LIFE_SAVING = 202;
+const AMULET_OF_REFLECTION = 208;
+const AMULET_OF_GUARDING = 210;
+const POT_CONFUSION = 299;
+const POT_BLINDNESS = 300;
+const POT_PARALYSIS = 301;
+const POT_SPEED = 302;
+const POT_INVISIBILITY = 305;
+const POT_HEALING = 307;
+const POT_EXTRA_HEALING = 308;
+const POT_GAIN_LEVEL = 309;
+const POT_SLEEPING = 314;
+const POT_FULL_HEALING = 315;
+const POT_POLYMORPH = 316;
+const POT_ACID = 320;
+const SCR_CREATE_MONSTER = 329;
+const SCR_TELEPORTATION = 333;
+const SCR_FIRE = 339;
+const SCR_EARTH = 340;
+const WAN_CREATE_MONSTER = 413;
+const WAN_STRIKING = 417;
+const WAN_MAKE_INVISIBLE = 418;
+const WAN_SPEED_MONSTER = 420;
+const WAN_UNDEAD_TURNING = 421;
+const WAN_POLYMORPH = 422;
+const WAN_TELEPORTATION = 424;
+const WAN_DIGGING = 428;
 const BASIC_MELEE_ATTACKS = new Set(['AT_CLAW', 'AT_KICK', 'AT_BITE', 'AT_STNG', 'AT_TUCH', 'AT_BUTT', 'AT_TENT']);
 
 export function mcalcmove(mtmp, m_moving) {
@@ -170,6 +198,20 @@ function distmin(x0, y0, x1, y1) {
     return Math.max(Math.abs(x0 - x1), Math.abs(y0 - y1));
 }
 
+function lined_up_basic(mtmp) {
+    const tx = mtmp.mux ?? game.u?.ux ?? mtmp.mx;
+    const ty = mtmp.muy ?? game.u?.uy ?? mtmp.my;
+    const dx = Math.abs(tx - mtmp.mx);
+    const dy = Math.abs(ty - mtmp.my);
+    if ((dx && dy && dx !== dy) || Math.max(dx, dy) >= BOLT_LIM) return false;
+    return clear_path(tx, ty, mtmp.mx, mtmp.my);
+}
+
+function hero_throw_range_basic() {
+    const str = game.u?.ustr ?? game.u?.strength ?? 12;
+    return Math.trunc(str / 2) + 1;
+}
+
 function object_class(obj) {
     return obj?.oclass ?? OBJECT_CLASS[obj?.otyp] ?? 0;
 }
@@ -198,8 +240,20 @@ function mon_is_animal(mtmp) {
     return !!((mtmp.data?.mflags1 ?? 0) & M1_ANIMAL);
 }
 
+function mon_is_ghost(mtmp) {
+    return mtmp.data?.name === 'GHOST';
+}
+
 function mon_has_hands(mtmp) {
     return !((mtmp.data?.mflags1 ?? 0) & M1_NOHANDS);
+}
+
+function mon_has_attack_type(mtmp, atyp) {
+    return (mtmp.data?.mattk || []).some((attack) => attack?.[0] === atyp);
+}
+
+function mon_is_floater(mtmp) {
+    return mtmp.data?.mlet === 'S_EYE' || mtmp.data?.mlet === 'S_LIGHT';
 }
 
 function current_mon_load(mtmp) {
@@ -217,12 +271,49 @@ function can_carry(mtmp, obj) {
 }
 
 function searches_for_item_basic(mtmp, obj) {
+    if (mon_is_animal(mtmp) || mon_is_mindless(mtmp) || mon_is_ghost(mtmp)) return false;
+
     const cls = object_class(obj);
-    // Full muse.c:searches_for_item() has many type-specific consumables.
-    // This front door keeps general collectors interested in practical
-    // equipment without inventing RNG or seed-specific targets.
-    if (cls === WAND_CLASS) return (obj.spe ?? 1) > 0;
-    if (cls === POTION_CLASS || cls === SCROLL_CLASS || cls === AMULET_CLASS) return true;
+    const typ = obj?.otyp;
+    // C ref: muse.c:searches_for_item().  Ordinary collectors only chase
+    // specific usable magic; broad M2_MAGIC collection is handled separately.
+    if (typ === WAN_MAKE_INVISIBLE || typ === POT_INVISIBILITY) {
+        return !mtmp.minvis && !mtmp.invis_blkd && !mon_has_attack_type(mtmp, 'AT_GAZE');
+    }
+    if (typ === WAN_SPEED_MONSTER || typ === POT_SPEED) return mtmp.mspeed !== MFAST;
+
+    if (cls === WAND_CLASS) {
+        if ((obj.spe ?? 1) <= 0) return false;
+        if (typ === WAN_DIGGING) return !mon_is_floater(mtmp);
+        if (typ === WAN_POLYMORPH) return (mtmp.data?.difficulty ?? mtmp.data?.mlevel ?? 0) < 6;
+        return OBJECT_DIR[typ] === RAY
+            || typ === WAN_STRIKING
+            || typ === WAN_UNDEAD_TURNING
+            || typ === WAN_TELEPORTATION
+            || typ === WAN_CREATE_MONSTER;
+    }
+    if (cls === POTION_CLASS) {
+        return typ === POT_HEALING
+            || typ === POT_EXTRA_HEALING
+            || typ === POT_FULL_HEALING
+            || typ === POT_POLYMORPH
+            || typ === POT_GAIN_LEVEL
+            || typ === POT_PARALYSIS
+            || typ === POT_SLEEPING
+            || typ === POT_ACID
+            || typ === POT_CONFUSION
+            || (typ === POT_BLINDNESS && !mon_has_attack_type(mtmp, 'AT_GAZE'));
+    }
+    if (cls === SCROLL_CLASS) {
+        return typ === SCR_TELEPORTATION
+            || typ === SCR_CREATE_MONSTER
+            || typ === SCR_EARTH
+            || typ === SCR_FIRE;
+    }
+    if (cls === AMULET_CLASS) {
+        if (typ === AMULET_OF_LIFE_SAVING) return true;
+        return typ === AMULET_OF_REFLECTION || typ === AMULET_OF_GUARDING;
+    }
     return false;
 }
 
@@ -539,7 +630,11 @@ function m_move_basic(mtmp) {
     }
     let getitems = false;
     if (!mtmp.mpeaceful || !rn2(10)) {
-        getitems = true;
+        // C ref: monmove.c:m_move().  Monsters already lined up for a
+        // weapon/ranged attack do not detour into m_search_items().
+        const inLine = lined_up_basic(mtmp)
+            && distmin(mtmp.mx, mtmp.my, mtmp.mux ?? ggx, mtmp.muy ?? ggy) <= hero_throw_range_basic();
+        if (appr !== 1 || !inLine) getitems = true;
     }
     if (getitems) {
         const itemGoal = m_search_items_basic(mtmp, ggx, ggy, appr);

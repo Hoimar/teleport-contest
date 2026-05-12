@@ -836,8 +836,18 @@ export function mksobj(otyp, init, artif) {
     if (init) {
         mksobj_init(otmp, otyp, artif);
     }
-    if (game._in_monster_init) game._monster_init_item_count = (game._monster_init_item_count || 0) + 1;
-    if (game._in_monster_init && otyp === GOLD_PIECE) game._monster_init_has_gold = true;
+    if (game._in_monster_init) {
+        game._monster_init_item_count = (game._monster_init_item_count || 0) + 1;
+        if (otyp === GOLD_PIECE) game._monster_init_has_gold = true;
+        const mon = game._monster_init_current;
+        if (mon) {
+            // C ref: makemon.c:mongets() links monster-init objects into minvent.
+            otmp.ox = mon.mx;
+            otmp.oy = mon.my;
+            mon.inventory = mon.inventory || [];
+            mon.inventory.unshift(otmp);
+        }
+    }
     return otmp;
 }
 
@@ -1425,8 +1435,10 @@ function rnd_defensive_item_for(ptr) {
 }
 
 function m_initthrow_for(otyp, oquan) {
-    mksobj(otyp, true, false);
-    rn1(oquan, 3);
+    const otmp = mksobj(otyp, true, false);
+    // C ref: makemon.c:m_initthrow() sets stack quantity from rn1(oquan, 3).
+    otmp.quan = rn1(oquan, 3);
+    otmp.owt = Math.max(1, otmp.quan);
 }
 
 function is_elf_mon(ptr) {
@@ -1867,6 +1879,7 @@ export async function makemon(mdat, x, y, mmflags = 0) {
     }
     if (!(mmflags & NO_MINVENT)) {
         game._in_monster_init = true;
+        game._monster_init_current = mon;
         game._monster_init_item_count = 0;
         game._monster_init_has_gold = false;
         try {
@@ -1875,6 +1888,7 @@ export async function makemon(mdat, x, y, mmflags = 0) {
             rn2(100); // saddle chance gate; type predicates may short-circuit after it
         } finally {
             game._in_monster_init = false;
+            game._monster_init_current = null;
             game._monster_init_item_count = 0;
             game._monster_init_has_gold = false;
         }
