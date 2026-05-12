@@ -12,9 +12,10 @@ import { init_rect, rnd_rect, get_rect, split_rects } from './rect.js';
 import { depth as depth_of_level, distmin, dist2 } from './hacklib.js';
 import { randomEngraving } from './random_text.js';
 import {
-    OBJECT_CLASS, OBJECT_PROB, OBJECT_CHARGED, OBJECT_DIR, OBJECT_MATERIAL, OBJECT_COLOR,
+    OBJECT_CLASS, OBJECT_PROB, OBJECT_CHARGED, OBJECT_DIR,
     CLASS_BASES, CLASS_TOTALS,
 } from './object_data.js';
+import { getObjectColor, getObjectMaterial } from './o_init.js';
 import { MONSTER_DATA } from './monster_data.js';
 import {
     COLNO, ROWNO, STONE, ROOM, CORR, DOOR, STAIRS,
@@ -511,7 +512,7 @@ function maybe_artifact(otmp, chance) {
 }
 
 function object_material(otyp) {
-    return OBJECT_MATERIAL[otyp] ?? 0;
+    return getObjectMaterial(otyp) ?? 0;
 }
 
 function is_flammable(otmp) {
@@ -885,7 +886,7 @@ const OBJECT_CLASS_GLYPH = {
 };
 
 function object_display_color(otmp) {
-    return OBJECT_COLOR[otmp?.otyp] ?? OBJECT_CLASS_GLYPH[otmp?.oclass]?.color ?? 7;
+    return getObjectColor(otmp?.otyp) ?? OBJECT_CLASS_GLYPH[otmp?.oclass]?.color ?? 7;
 }
 
 export function place_object(otmp, x, y) {

@@ -333,6 +333,25 @@
   2. Use the exact-RNG `seed0116` screen 109 attr mismatch as the next localized object-state target if the seed0383 live-state owner remains locally blocked.
   3. Continue special-level object/monster parity and visible hack-debt cleanup when it unlocks active subsystem work.
 
+### Iteration 17 - Runtime `o_init` Appearance Colors
+
+- Implementation delta:
+  1. `js/o_init.js` now retains mutable per-otype color and material arrays, applies the C `randomize_gem_colors()` color copies, and performs the `shuffle_all()` color/material swaps for amulets, potions, rings, scrolls, spellbooks, wands, venoms, and the armor description ranges.
+  2. `place_object()` now takes floor-object display colors from the runtime shuffled object state instead of the static `object_data.js` defaults. `object_material()` also reads the runtime material table for later object behavior that depends on shuffled material.
+- Evidence:
+  1. `seed0116` stayed exact on RNG and the screen 109 attr mismatch narrowed from four cells to three: the shuffled ring cell at `[15,15]` now matches C's white `=` display.
+  2. The remaining visible object drift is two potions and an arrow stack. The potions now use shuffled colors (`otyp 298` cyan, `otyp 300` yellow) but C displays default-color potions there, so the next owner is object identity/state in Soko/trap-victim/special-level object creation rather than the base renderer. The arrow stack remains an orcish-arrow-looking black object where C displays a default-color weapon glyph.
+  3. `seed0383` target triage stayed unchanged at FR 10374, so the object-display fix does not disturb the current swallowed-monster movement blocker.
+- Regression stability:
+  1. `node scripts/triage-session.mjs sessions/seed0116-wizard-wear-shop.session.json` => `S 109/127 R 12562/12562 FS 109:attr:map:e FR - C 4`; direct sample shows three attr cells plus the existing cursor-only diagnostics.
+  2. `node scripts/triage-session.mjs sessions/seed0383-wizard-hallucinate.session.json` => `S 0/219 R 10675/16915 FS 0:char:map:init FR 10374:rnd(2)=1=>rn2(5)=4 C 0`.
+  3. `node scripts/run-sentinel-suite.mjs` => total `S 143/1063 R 28111/64569`.
+  4. `node frozen/ps_test_runner.mjs` => total `S 143/11406`, 0/44 passing. No matched-screen regressions.
+- Current queue:
+  1. Continue `seed0383` FR 10374 gnome state/list membership unless a narrower live-state diagnostic remains blocked.
+  2. For `seed0116`, trace the remaining three object identities back to Soko/trap-victim/special-level object creation. Focus on why C has default-color potion/weapon glyphs where JS has `POT_RESTORE_ABILITY`, `POT_BLINDNESS`, and orcish arrows.
+  3. Keep broader description/name identity wiring in the object backlog; this slice only owns runtime color/material appearance.
+
 ## 2026-05-12 08:55 CEST Restart - Dehack, Deep Triage, Implementation Loop
 
 - Branch/baseline commit: `main` at `f4be79ac016690ec4a293cadad6427ed4d4715e3`.
