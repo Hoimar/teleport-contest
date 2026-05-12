@@ -1,7 +1,7 @@
 import { game } from './gstate.js';
 import { rn2 } from './rng.js';
 import { dog_move } from './dog.js';
-import { isok, SPACE_POS } from './const.js';
+import { D_CLOSED, D_LOCKED, IS_DOOR, isok, SPACE_POS } from './const.js';
 import { newsym } from './display.js';
 
 const NORMAL_SPEED = 12;
@@ -87,7 +87,8 @@ function can_mon_step(mtmp, x, y) {
     if (x === game.u?.ux && y === game.u?.uy) return false;
     if (mon_at(x, y, mtmp)) return false;
     const loc = game.level?.at(x, y);
-    return !!loc && SPACE_POS(loc.typ);
+    return !!loc && (SPACE_POS(loc.typ)
+        || (IS_DOOR(loc.typ) && !(loc.doormask & (D_CLOSED | D_LOCKED))));
 }
 
 function mon_track_add(mtmp, x, y) {

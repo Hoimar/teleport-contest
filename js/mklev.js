@@ -90,6 +90,10 @@ const EGG = 266;
 const MEAT_RING = 270;
 const STATUE = 476;
 const SPBOOK_no_NOVEL = -SPBOOK_CLASS;
+const RIN_HUNGER = 184;
+const RIN_AGGRAVATE_MONSTER = 185;
+const RIN_TELEPORTATION = 194;
+const RIN_POLYMORPH = 196;
 
 // Supply chest items
 const POT_HEALING = 307;
@@ -746,11 +750,8 @@ function mksobj_init(otmp, otyp, artif) {
                 }
                 if (otmp.spe < 0 && rn2(5)) curse(otmp);
             }
-        } else if ((game.moves ?? 0) <= 1 && !game.in_mklev && rn2(10)) {
-            // The full set of cursed non-chargeable ring predicates is not
-            // modeled yet; keep the common harmless-ring !rn2(9) gate in
-            // the right place for startup inventory.
-            rn2(9);
+        } else if (rn2(10) && (is_bad_uncursed_ring(otyp) || !rn2(9))) {
+            curse(otmp);
         }
         break;
     case WEAPON_CLASS:
@@ -816,6 +817,11 @@ function is_special_cursed_armor(otyp) {
     return otyp === 99 || otyp === 144 || otyp === 171 || otyp === 172;
 }
 
+function is_bad_uncursed_ring(otyp) {
+    return otyp === RIN_TELEPORTATION || otyp === RIN_POLYMORPH
+        || otyp === RIN_AGGRAVATE_MONSTER || otyp === RIN_HUNGER;
+}
+
 const OBJECT_CLASS_GLYPH = {
     [WEAPON_CLASS]: { ch: ')', color: 7 },
     [ARMOR_CLASS]: { ch: '[', color: 6 },
@@ -832,13 +838,15 @@ const OBJECT_CLASS_GLYPH = {
     [ROCK_CLASS]: { ch: '`', color: 7 },
 };
 
-function place_object(otmp, x, y) {
+const MATERIAL_WOOD = 8;
+
+export function place_object(otmp, x, y) {
     if (!otmp || !game.level?.objects) return otmp;
     const glyph = OBJECT_CLASS_GLYPH[otmp.oclass] || { ch: '?', color: 7 };
     otmp.ox = x;
     otmp.oy = y;
     otmp.ch = glyph.ch;
-    otmp.color = glyph.color;
+    otmp.color = OBJECT_MATERIAL[otmp.otyp] === MATERIAL_WOOD ? 3 : glyph.color;
     game.level.objects.unshift(otmp);
     return otmp;
 }

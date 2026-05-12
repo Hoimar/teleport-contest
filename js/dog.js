@@ -294,7 +294,8 @@ function pet_can_step(mtmp, x, y) {
     if (x === game.u?.ux && y === game.u?.uy) return false;
     if (mon_at(x, y, mtmp)) return false;
     const loc = game.level?.at(x, y);
-    return !!loc && SPACE_POS(loc.typ);
+    return !!loc && (SPACE_POS(loc.typ)
+        || (IS_DOOR(loc.typ) && !(loc.doormask & (D_CLOSED | D_LOCKED))));
 }
 
 function pet_goal(mtmp, after, udist, whappr) {
@@ -395,6 +396,18 @@ export function dog_move(mtmp, after = true) {
             if (distmin(mtmp.mx, mtmp.my, game.u?.ux ?? mtmp.mx, game.u?.uy ?? mtmp.my) > 5) {
                 // Placeholder for dogmove.c mtrack avoidance; no RNG without
                 // real track state because that would invent consumers.
+            }
+
+            const canReachFood = could_reach_item(mtmp, nx, ny);
+            for (const obj of objects_at(nx, ny)) {
+                if (!obj.cursed && canReachFood) {
+                    const foodType = dogfood(mtmp, obj);
+                    if (foodType < MANFOOD
+                        && (foodType < ACCFOOD || init_edog(mtmp).hungrytime <= (game.moves || 1))) {
+                        // Eating/fetching the object is still future work;
+                        // this preserves the candidate-square dogfood probe.
+                    }
+                }
             }
 
             const ndist = dist2(nx, ny, goal.gx, goal.gy);

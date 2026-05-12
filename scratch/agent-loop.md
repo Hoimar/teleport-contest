@@ -10,7 +10,7 @@
 - Iteration 1 implementation delta:
   1. Extended `scripts/trace-dog-goal.mjs` with `--monsters` so movement work can inspect `fmon` order, movement budgets, species speed, and tame state alongside dog-goal scans.
   2. Ported a narrow ordinary-monster movement owner in `js/monmove.js`: `distfleeck()` now returns C-like nearby/inrange state, non-tame monsters use the `dochug()` movement-opportunity front door, ordinary movement performs post-`m_move()` `distfleeck()`, and a minimal adjacent `m_move()` retains `mtrack` and consumes backtracking rolls.
-  3. Added the empty-square pickup message for `,`, preserving that it still takes a turn.
+  3. Added the empty-square pickup message for `,`; later C-source review corrected this path to remain zero-turn when no object is present.
 - Evidence:
   1. `seed0116` crossed FR 5573 and FR 5616, including the missing non-pet post-`m_move()` `distfleeck()` and the `mtrack` `rn2(32)` roll. It now blocks at FR 5710: C consumes the kitten nearby `M2_WANDER` gate while JS starts `dog_goal()` object resistance.
   2. Visible `seed0116` screens improved from `17/127` to `21/127`; current visible mismatch is pet/status state after `,`, not the pickup message.
@@ -25,6 +25,27 @@
   3. Recheck special-level monster/list effects after pet state advances.
   4. Continue startup/windowing dehack work only when it unlocks real subsystem parity.
 - Verification cadence remains: target triage after each production edit, sentinel after each meaningful edit, full suite after broad shared changes or every 3-5 meaningful iterations.
+
+### Iteration 2 - Command/Object Ownership Through Wizard Wish And Zap
+
+- Implementation delta:
+  1. Added zero-turn command/message handling for empty pickup and no-shopkeeper `#pay`.
+  2. Added persistent inventory letters, basic drop-to-floor behavior, retained wished inventory objects, partial shuffled descriptions for the current wished ring/wand evidence, `P` ring put-on prompts, and `z` wand selection/direction prompts.
+  3. Generalized non-charged ring init to the upstream cursed-ring gate instead of startup-only harmless-ring RNG, and exported `place_object()` for command-side floor placement.
+  4. Added early turn-tail exercise/seer RNG ownership and pet/ordinary-monster open-door stepping plus candidate-square `dogfood()` probes.
+- Evidence:
+  1. `seed0116` moved from `S 21/127 R 5809/12562` after iteration 1 to `S 80/127 R 5958/12562`.
+  2. It now passes the ring wish (`o - an ivory ring.`), `P`/ring-finger prompts, right-hand ring message, digging-wand wish (`p - a curved wand.`), `z` wand prompt, and direction prompt.
+  3. Current first blocker is `FR 5911`: C consumes `rn2(19)` from `exercise()` after `zap_dig()` while JS starts `distfleeck()`. The visible mismatch is pet/map state after the zap direction key, so the next owner is turn/movement phase ordering or remaining wand-effect disclosure timing.
+- Regression stability:
+  1. Sentinel moved from iteration-1 `55/1063 R 20611/64569` to `114/1063 R 20722/64569`.
+  2. Full suite moved from iteration-1 `55/11406` to `114/11406`, 0/44 passing.
+  3. `seed8000` stayed complete at `23/23`; non-target sentinel RNG shifts are classified as expected consequences of command/object/turn ownership becoming less stubbed.
+- Current queue:
+  1. Classify `seed0116` FR 5911 post-zap exercise/monster phase order against `zap.c:weffects()`, `dig.c:zap_dig()`, `attrib.c:exerper()`, and `allmain.c:moveloop_core()`.
+  2. Continue `seed0383` FR 9716 `dog_goal()` floor-object/state parity once the shared movement phase question is classified or locally blocked.
+  3. Recheck special-level monster/list effects after dog-goal or phase-order state advances.
+  4. Keep startup/windowing dehack work secondary unless it unlocks active subsystem parity.
 
 ## 2026-05-12 08:55 CEST Restart - Dehack, Deep Triage, Implementation Loop
 

@@ -9,13 +9,14 @@ import { game } from './gstate.js';
 import { nhgetch } from './input.js';
 import { newsym, flush_screen, pline, clear_pending_message, docrt, serialize_terminal_grid } from './display.js';
 import { vision_recalc, vision_reset } from './vision.js';
-import { mklev, mksobj, place_lregion } from './mklev.js';
+import { mklev, mksobj, place_lregion, place_object } from './mklev.js';
 import { pet_arrive_with_you } from './dog.js';
 import { pluslvl } from './u_init.js';
-import { rn2 } from './rng.js';
+import { exercise } from './allmain_turns.js';
+import { rn1, rn2 } from './rng.js';
 import { ATR_INVERSE, NO_COLOR } from './terminal.js';
 import { COLNO, ROWNO, STONE, DOOR, D_CLOSED, D_LOCKED,
-         IS_WALL, IS_OBSTRUCTED, LR_UPTELE } from './const.js';
+         IS_WALL, IS_OBSTRUCTED, LR_UPTELE, A_WIS } from './const.js';
 
 // Direction deltas: y u k
 //                   h . l
@@ -27,33 +28,151 @@ const RUN_KEY = { H: 'h', L: 'l', J: 'j', K: 'k', Y: 'y', U: 'u', B: 'b', N: 'n'
 const AMULET_OF_LIFE_SAVING = 202;
 const GRAY_DRAGON_SCALE_MAIL = 101;
 const WAN_FIRE = 411;
+const WAN_DEATH = 414;
+const WAN_DIGGING = 428;
+const QUARTERSTAFF = 79;
+const RIN_TELEPORT_CONTROL = 195;
+const RING_CLASS = 4;
+const WAND_CLASS = 11;
 
-function wishedObjectType(name) {
+function wishedObjectSpec(name) {
     const wish = String(name || '').toLowerCase();
     if (wish.includes('amulet of life saving')) {
         rn2(76);
-        return AMULET_OF_LIFE_SAVING;
+        return { otyp: AMULET_OF_LIFE_SAVING };
     }
     if (wish.includes('gray dragon scale mail') || wish.includes('grey dragon scale mail')) {
         rn2(67);
-        return GRAY_DRAGON_SCALE_MAIL;
+        return { otyp: GRAY_DRAGON_SCALE_MAIL };
     }
     if (wish.includes('wand of fire')) {
         rn2(41);
-        return WAN_FIRE;
+        return { otyp: WAN_FIRE };
     }
-    return 0;
+    if (wish.includes('wand of death')) {
+        rn2(41);
+        return { otyp: WAN_DEATH, appearanceName: 'curved wand' };
+    }
+    if (wish.includes('wand of digging')) {
+        rn2(41);
+        return { otyp: WAN_DIGGING, appearanceName: 'curved wand' };
+    }
+    if (wish.includes('ring of teleport control')) {
+        rn2(2);
+        return { otyp: RIN_TELEPORT_CONTROL, appearanceName: 'ivory ring' };
+    }
+    return null;
+}
+
+function validInvlet(ch) {
+    return typeof ch === 'string' && /^[a-z]$/.test(ch);
+}
+
+function ensureInventoryLetters() {
+    game.inventory = game.inventory || [];
+    const used = new Set();
+    for (const obj of game.inventory) {
+        if (validInvlet(obj?.invlet)) used.add(obj.invlet);
+    }
+
+    let nextCode = 97;
+    for (const obj of game.inventory) {
+        if (!obj || validInvlet(obj.invlet)) continue;
+        while (nextCode <= 122 && used.has(String.fromCharCode(nextCode))) nextCode++;
+        if (nextCode > 122) break;
+        obj.invlet = String.fromCharCode(nextCode++);
+        used.add(obj.invlet);
+    }
+
+    let maxCode = 96;
+    for (const letter of used) maxCode = Math.max(maxCode, letter.charCodeAt(0));
+    game._next_invlet_code = Math.max(game._next_invlet_code || 97, maxCode + 1);
+}
+
+function assignInventoryLetter(obj) {
+    ensureInventoryLetters();
+    let code = game._next_invlet_code || 97;
+    while (code <= 122 && game.inventory.some((item) => item?.invlet === String.fromCharCode(code))) {
+        code++;
+    }
+    obj.invlet = code <= 122 ? String.fromCharCode(code) : '?';
+    game._next_invlet_code = code + 1;
+    return obj.invlet;
 }
 
 function make_wish_object(name) {
-    const otyp = wishedObjectType(name);
-    if (!otyp) return null;
-    const otmp = mksobj(otyp, true, false);
+    const spec = wishedObjectSpec(name);
+    if (!spec?.otyp) return null;
+    const otmp = mksobj(spec.otyp, true, false);
     otmp.wishedfor = true;
+    if (spec.appearanceName) otmp.appearanceName = spec.appearanceName;
     rn2(100);
-    game.inventory = game.inventory || [];
+    assignInventoryLetter(otmp);
     game.inventory.push(otmp);
     return otmp;
+}
+
+function inventoryIndexForLetter(ch) {
+    ensureInventoryLetters();
+    const idx = game.inventory.findIndex((obj) => obj?.invlet === ch);
+    if (idx >= 0) return idx;
+    const code = ch.charCodeAt(0);
+    if (code < 97 || code > 122) return -1;
+    return code - 97;
+}
+
+function lastInventoryLetter() {
+    ensureInventoryLetters();
+    let maxCode = 97;
+    for (const obj of game.inventory || []) {
+        if (validInvlet(obj?.invlet)) maxCode = Math.max(maxCode, obj.invlet.charCodeAt(0));
+    }
+    return String.fromCharCode(maxCode);
+}
+
+function indefiniteArticle(name) {
+    return /^[aeiou]/i.test(name) ? 'an' : 'a';
+}
+
+function baseObjectName(obj) {
+    if (obj?.appearanceName) return obj.appearanceName;
+    if (obj?.oclass === RING_CLASS) return 'ring';
+    return 'object';
+}
+
+function inventoryObjectName(obj) {
+    const name = baseObjectName(obj);
+    return `${indefiniteArticle(name)} ${name}`;
+}
+
+function inventoryListing(obj) {
+    ensureInventoryLetters();
+    return `${obj.invlet} - ${inventoryObjectName(obj)}`;
+}
+
+function putonLetters() {
+    ensureInventoryLetters();
+    return (game.inventory || [])
+        .filter((obj) => obj?.oclass === RING_CLASS && !obj.wornSide)
+        .map((obj) => obj.invlet)
+        .join('');
+}
+
+function zapLetters() {
+    ensureInventoryLetters();
+    return (game.inventory || [])
+        .filter((obj) => obj?.oclass === WAND_CLASS)
+        .map((obj) => obj.invlet)
+        .join('');
+}
+
+function dropObjectName(obj) {
+    if (obj?.otyp === QUARTERSTAFF) {
+        const buc = obj.blessed ? 'blessed ' : obj.cursed ? 'cursed ' : 'uncursed ';
+        const spe = typeof obj.spe === 'number' ? `${obj.spe >= 0 ? '+' : ''}${obj.spe} ` : '';
+        return `a ${buc}${spe}quarterstaff`;
+    }
+    return 'an object';
 }
 
 function isMovementKey(ch) {
@@ -347,7 +466,8 @@ export async function rhack(key) {
             clear_pending_message();
             game._awaiting_wish = false;
             game._wish_input = '';
-            make_wish_object(wish);
+            const obj = make_wish_object(wish);
+            if (obj) await pline(`${inventoryListing(obj)}.`);
             game.context.move = 0;
             return;
         }
@@ -375,6 +495,88 @@ export async function rhack(key) {
         } else {
             await pline("You can't wear that.");
         }
+        return;
+    }
+
+    if (game._awaiting_drop_item) {
+        clear_pending_message();
+        game._awaiting_drop_item = false;
+        const idx = inventoryIndexForLetter(ch);
+        const obj = idx >= 0 ? game.inventory?.[idx] : null;
+        if (!obj) {
+            game.context.move = 0;
+            await pline('Never mind.');
+            return;
+        }
+        game.inventory.splice(idx, 1);
+        place_object(obj, game.u.ux, game.u.uy);
+        await pline(`You drop ${dropObjectName(obj)}.`);
+        game.context.move = 1;
+        return;
+    }
+
+    if (game._awaiting_puton_item) {
+        clear_pending_message();
+        game._awaiting_puton_item = false;
+        const idx = inventoryIndexForLetter(ch);
+        const obj = idx >= 0 ? game.inventory?.[idx] : null;
+        if (!obj || obj.oclass !== RING_CLASS) {
+            game.context.move = 0;
+            await pline('Never mind.');
+            return;
+        }
+        game._awaiting_ring_finger = obj;
+        game.context.move = 0;
+        await showPromptLine('Which ring-finger, Right or Left? [rl] ');
+        return;
+    }
+
+    if (game._awaiting_ring_finger) {
+        clear_pending_message();
+        const obj = game._awaiting_ring_finger;
+        game._awaiting_ring_finger = null;
+        if (ch !== 'r' && ch !== 'R' && ch !== 'l' && ch !== 'L') {
+            game.context.move = 0;
+            await pline('Never mind.');
+            return;
+        }
+        obj.wornSide = (ch === 'r' || ch === 'R') ? 'right' : 'left';
+        await pline(`${inventoryListing(obj)} (on ${obj.wornSide} hand).`);
+        game.context.move = 1;
+        return;
+    }
+
+    if (game._awaiting_zap_item) {
+        clear_pending_message();
+        game._awaiting_zap_item = false;
+        const idx = inventoryIndexForLetter(ch);
+        const obj = idx >= 0 ? game.inventory?.[idx] : null;
+        if (!obj || obj.oclass !== WAND_CLASS) {
+            game.context.move = 0;
+            await pline('Never mind.');
+            return;
+        }
+        game._awaiting_zap_direction = obj;
+        game.context.move = 0;
+        await showPromptLine('In what direction? ');
+        return;
+    }
+
+    if (game._awaiting_zap_direction) {
+        clear_pending_message();
+        const obj = game._awaiting_zap_direction;
+        game._awaiting_zap_direction = null;
+        if (!'hykulnjb<>.'.includes(ch)) {
+            game.context.move = 0;
+            await pline('Never mind.');
+            return;
+        }
+        if (typeof obj.spe === 'number' && obj.spe > 0) obj.spe--;
+        exercise(A_WIS, true);
+        if (obj.otyp === WAN_DIGGING) {
+            rn1(18, 8);
+        }
+        game.context.move = 1;
         return;
     }
 
@@ -485,10 +687,35 @@ export async function rhack(key) {
         game.context.move = 0;
         await pline("You see no objects here.");
     } else if (ch === ',') {
-        game.context.move = 1;
         const here = (game.level?.objects || []).some((obj) =>
             typeof obj.otyp === 'number' && obj.ox === game.u?.ux && obj.oy === game.u?.uy);
+        game.context.move = here ? 1 : 0;
         if (!here) await pline('There is nothing here to pick up.');
+    } else if (ch === 'p') {
+        game.context.move = 0;
+        await pline('There appears to be no shopkeeper here to receive your payment.');
+    } else if (ch === 'P') {
+        game.context.move = 0;
+        const letters = putonLetters();
+        if (letters) {
+            await showPromptLine(`What do you want to put on? [${letters} or ?*] `);
+            game._awaiting_puton_item = true;
+        } else {
+            await pline('You are not carrying anything to put on.');
+        }
+    } else if (ch === 'z') {
+        game.context.move = 0;
+        const letters = zapLetters();
+        if (letters) {
+            await showPromptLine(`What do you want to zap? [${letters} or ?*] `);
+            game._awaiting_zap_item = true;
+        } else {
+            await pline('You have nothing to zap.');
+        }
+    } else if (ch === 'd') {
+        game.context.move = 0;
+        await showPromptLine(`What do you want to drop? [a-${lastInventoryLetter()} or ?*] `);
+        game._awaiting_drop_item = true;
     } else if (ch === ' ' && showStartupTutorial) {
         game.context.move = 0;
         await showTutorialPrompt(false);

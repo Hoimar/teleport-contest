@@ -6,7 +6,10 @@
 
 import { game } from './gstate.js';
 import { rn2, rnd } from './rng.js';
-import { maybe_generate_rnd_mon, gethungry, maybe_wipe_engraving, dosounds } from './allmain_turns.js';
+import {
+    maybe_generate_rnd_mon, gethungry, exerchk,
+    maybe_wipe_engraving, maybe_update_seer_turn, dosounds,
+} from './allmain_turns.js';
 import { mcalcmove, movemon } from './monmove.js';
 import { mklev, l_nhcore_init, u_on_upstairs } from './mklev.js';
 import { init_objects } from './o_init.js';
@@ -46,7 +49,8 @@ function postInventoryStartupRng() {
     rn2(3);
     rn2(2);
     rnd(9000);
-    rnd(30);
+    game.context = game.context || {};
+    game.context.seer_turn = rnd(30);
 }
 
 function startupRole() {
@@ -299,7 +303,9 @@ export async function advanceTurn() {
     await dosounds();
 
     gethungry();
+    exerchk();
     maybe_wipe_engraving();
+    maybe_update_seer_turn();
 
     g.moves = (g.moves || 1) + 1;
 }
