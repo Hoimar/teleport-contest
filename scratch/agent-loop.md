@@ -251,6 +251,27 @@
   3. Keep `seed0116` screen 109 as a secondary object identity/description-state target: two visible potions, one arrow stack, and one ring still have exact-RNG color/state drift.
   4. Continue special-level object/monster parity and visible hack-debt cleanup when it unlocks active subsystem work.
 
+### Iteration 13 - First Monster-To-Hero Physical `mattacku()`
+
+- Implementation delta:
+  1. `scripts/generate-monster-data.mjs` now includes `mattk[]` attack metadata from `include/monsters.h`, and `js/mklev.js` carries that metadata on monster data records.
+  2. Wizard wish handling now preserves explicit blessed/cursed/uncursed state and enchantment from wish text; delayed armor recalculates AC and applies it for the final occupation turn before the finish message.
+  3. `monmove.js` now has a constrained post-move `mattacku()` front door for generated multiattack physical melee monsters, including `AC_VALUE()`, the occupation `multi` hit bonus, per-attack `rnd(20+i)`, damage dice, `mhitm_knockback()`'s initial `rn2(3)`/`rn2(6)`, negative-AC damage reduction, and hero HP updates.
+- Evidence:
+  1. `seed0383` moved from FR 10213 to FR 10280. The ape attack sequence at FR 10213 now matches C through three physical attacks: `rnd(2)`, hit rolls, `d(1,3)`, `d(1,3)`, `d(1,6)`, knockback front-door rolls, and negative-AC reductions.
+  2. The +3 blessed gray dragon scale mail wish state is necessary: without it JS keeps `u.uac=10` and misses C's `AC_VALUE(-2)` roll. Applying deferred AC on the final occupation turn is also necessary because C's attack still has `gm.multi < 0` and receives the +4 hit bonus.
+  3. A direct `AT_ENGL`/`gulpmu()` attempt for the ice vortex matched the expected FR 10280 shape locally, but it fired too early at FR 10183 because JS already has the vortex adjacent before C. That direction was reverted and classified as a spatial/list-timing blocker, not an attack-RNG blocker.
+- Regression stability:
+  1. Target triage: `seed0383-wizard-hallucinate` reports `S 0/219 R 10640/16915 FS 0:char:map:init FR 10280:rnd(2)=1=>rn2(12)=10 C 0`.
+  2. `seed0116-wizard-wear-shop` stayed exact on RNG: `S 109/127 R 12562/12562 FS 109:attr:map:e FR - C 4`.
+  3. Sentinel suite: `seed8000` `S 23/23 R 3060/3130`, `seed0002` `S 11/595 R 1274/27158`, `seed0013` `S 0/99 R 540/4804`, `seed0116` `S 109/127 R 12562/12562`, `seed0383` `S 0/219 R 10640/16915`; total `S 143/1063 R 28076/64569`.
+  4. Full suite: `S 143/11406`, 0/44 passing. No matched-screen regressions; total public screens are unchanged because the remaining seed0383 screen blocker is still the initial hallucination/map display drift.
+- Current queue:
+  1. Continue user-priority `seed0383` at FR 10280 by classifying ice-vortex `AT_ENGL` timing. Compare the vortex's C/JS position, movement budget, and list order before enabling `gulpmu()`; a broad engulf front door currently regresses to FR 10183.
+  2. Keep message-interrupted occupation continuation as a known approximation; current implementation owns final-turn AC and attack timing better but not full `--More--` choreography.
+  3. Keep `seed0116` screen 109 as a secondary object identity/description-state target: two visible potions, one arrow stack, and one ring still have exact-RNG color/state drift.
+  4. Continue special-level object/monster parity and visible hack-debt cleanup when it unlocks active subsystem work.
+
 ## 2026-05-12 08:55 CEST Restart - Dehack, Deep Triage, Implementation Loop
 
 - Branch/baseline commit: `main` at `f4be79ac016690ec4a293cadad6427ed4d4715e3`.

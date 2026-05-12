@@ -171,6 +171,11 @@ const CLR = {
 const CONSTS = { ...GEN, ...M1, ...M2, ...MS, ...CLR };
 CONSTS.A_NONE = 0;
 
+const ATTACK_MACROS = {
+    SEDUCTION_ATTACKS_YES: 'A(ATTK(AT_BITE, AD_SSEX, 0, 0), ATTK(AT_CLAW, AD_PHYS, 1, 3), ATTK(AT_CLAW, AD_PHYS, 1, 3), NO_ATTK, NO_ATTK, NO_ATTK)',
+    SEDUCTION_ATTACKS_NO: 'A(ATTK(AT_CLAW, AD_PHYS, 1, 3), ATTK(AT_CLAW, AD_PHYS, 1, 3), ATTK(AT_BITE, AD_DRLI, 2, 6), NO_ATTK, NO_ATTK, NO_ATTK)',
+};
+
 function splitTopLevel(s) {
     const out = [];
     let depth = 0;
@@ -228,6 +233,16 @@ function monsterName(nameArg, fallback) {
     return quoted[1].toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_|_$/g, '');
 }
 
+function parseAttacks(expr) {
+    expr = ATTACK_MACROS[expr.trim()] ?? expr;
+    const attacks = splitTopLevel(insideCall(expr, 'A'));
+    return attacks.map((entry) => {
+        if (entry === 'NO_ATTK') return null;
+        const parts = splitTopLevel(insideCall(entry, 'ATTK'));
+        return [parts[0].trim(), parts[1].trim(), Number(parts[2]), Number(parts[3])];
+    });
+}
+
 function collectMonsters(text) {
     const rows = [];
     for (let pos = 0; (pos = text.indexOf('MON(', pos)) >= 0;) {
@@ -250,6 +265,7 @@ function collectMonsters(text) {
         const lvl = splitTopLevel(insideCall(args[2], 'LVL'));
         const siz = splitTopLevel(insideCall(args[5], 'SIZ'));
         const name = monsterName(args[0], args[13]);
+        const mattk = parseAttacks(args[4]);
         const mlet = args[1].trim();
         const mlevel = Number(lvl[0]);
         const mmove = Number(lvl[1]);
@@ -265,7 +281,7 @@ function collectMonsters(text) {
         const female = (mflags2 & M2.M2_FEMALE) !== 0 ? 1 : 0;
         rows.push([
             name, mlet, mlevel, mmove, maligntyp, geno, difficulty, color,
-            neuter, male, female, msound, mflags1, mflags2,
+            neuter, male, female, msound, mflags1, mflags2, mattk,
         ]);
     }
     return rows;
@@ -277,7 +293,7 @@ const rows = collectMonsters(source);
 const lines = [
     '// Generated from nethack-c/upstream/include/monsters.h (NetHack 5.0).',
     '// C refs: include/monsters.h MON() rows, include/monflag.h G_* flags, makemon.c:rndmonst_adj().',
-    '// Fields: name, mlet, mlevel, mmove, maligntyp, geno, difficulty, color, neuter, male, female, msound, mflags1, mflags2.',
+    '// Fields: name, mlet, mlevel, mmove, maligntyp, geno, difficulty, color, neuter, male, female, msound, mflags1, mflags2, mattk.',
     'export const MONSTER_DATA = [',
     ...rows.map((row) => `    ${JSON.stringify(row)},`),
     '];',

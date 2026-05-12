@@ -312,6 +312,13 @@ export async function advanceTurn() {
     g.moves = (g.moves || 1) + 1;
 }
 
+function applyOccupationFinalTurnState(g) {
+    if ((g._occupation_turns_remaining || 0) <= 1 && g._occupation_finish_uac != null) {
+        g.u.uac = g._occupation_finish_uac;
+        g._occupation_finish_uac = null;
+    }
+}
+
 // C ref: allmain.c moveloop_core()
 export async function moveloop_core() {
     const g = game;
@@ -334,12 +341,18 @@ export async function moveloop_core() {
     // Advance turn; run/rush movement may consume multiple turns before
     // returning to the input boundary.
     if (g.context?.move) {
+        applyOccupationFinalTurnState(g);
         await advanceTurn();
         while ((g._occupation_turns_remaining || 0) > 0) {
             g._occupation_turns_remaining--;
+            applyOccupationFinalTurnState(g);
             await advanceTurn();
         }
         if (g._occupation_finish_message) {
+            if (g._occupation_finish_uac != null) {
+                g.u.uac = g._occupation_finish_uac;
+                g._occupation_finish_uac = null;
+            }
             await pline(g._occupation_finish_message);
             g._occupation_finish_message = null;
         }

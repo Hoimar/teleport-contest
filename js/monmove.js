@@ -1,5 +1,5 @@
 import { game } from './gstate.js';
-import { rn2 } from './rng.js';
+import { d, rn2, rnd } from './rng.js';
 import { dog_move } from './dog.js';
 import {
     D_CLOSED, D_LOCKED, IS_DOOR, IS_LAVA, IS_OBSTRUCTED, IS_POOL,
@@ -18,6 +18,7 @@ const M1_HIDE = 0x00000100;
 const MTSZ = 4;
 const MSLOW = 1;
 const MFAST = 2;
+const BASIC_MELEE_ATTACKS = new Set(['AT_CLAW', 'AT_KICK', 'AT_BITE', 'AT_STNG', 'AT_TUCH', 'AT_BUTT', 'AT_TENT']);
 
 export function mcalcmove(mtmp, m_moving) {
     let mmove = mtmp.data.mmove;
@@ -136,6 +137,87 @@ function mon_track_add(mtmp, x, y) {
     if (!mtmp.mtrack) mtmp.mtrack = [];
     mtmp.mtrack.unshift({ x, y });
     if (mtmp.mtrack.length > MTSZ) mtmp.mtrack.length = MTSZ;
+}
+
+function monster_level(mtmp) {
+    return mtmp?.m_lev ?? mtmp?.data?.mlevel ?? 0;
+}
+
+function attack_is_basic_physical(attack) {
+    if (!attack) return true;
+    const [aatyp, adtyp, damn, damd] = attack;
+    return BASIC_MELEE_ATTACKS.has(aatyp)
+        && adtyp === 'AD_PHYS'
+        && damn > 0
+        && damd > 0;
+}
+
+function basic_physical_attacks(mtmp) {
+    const attacks = mtmp.data?.mattk || [];
+    if (attacks.filter(Boolean).length < 2) return null;
+    if (!attacks.every(attack_is_basic_physical)) return null;
+    return attacks;
+}
+
+function hero_ac_value() {
+    const uac = game.u?.uac ?? 10;
+    return uac >= 0 ? uac : -rnd(-uac);
+}
+
+function reduce_damage_by_negative_ac(damage) {
+    const uac = game.u?.uac ?? 10;
+    if (damage > 0 && uac < 0) {
+        damage -= rnd(-uac);
+        if (damage < 1) damage = 1;
+    }
+    return damage;
+}
+
+function mhitm_knockback_frontdoor() {
+    // C ref: uhitm.c:mhitm_knockback() computes these two rolls before
+    // most qualification checks, including attack-type eligibility.
+    rn2(3);
+    rn2(6);
+}
+
+function mattacku_to_hit(mtmp) {
+    let toHit = hero_ac_value() + 10 + monster_level(mtmp);
+    if ((game._occupation_turns_remaining || 0) > 0) toHit += 4;
+    if (mtmp.mcansee === 0) toHit -= 2;
+    if (mtmp.mtrapped) toHit -= 2;
+    if (toHit <= 0) toHit = 1;
+    return toHit;
+}
+
+function apply_hero_damage(damage) {
+    if (damage > 0) game.u.uhp = Math.max(0, (game.u.uhp ?? 0) - damage);
+}
+
+function physical_melee_attacks(mtmp, attacks, toHit) {
+    for (let i = 0; i < attacks.length; i++) {
+        const attack = attacks[i];
+        if (!attack) continue;
+        const [, , damn, damd] = attack;
+        if (toHit > rnd(20 + i)) {
+            let damage = d(damn, damd);
+            mhitm_knockback_frontdoor();
+            damage = reduce_damage_by_negative_ac(damage);
+            apply_hero_damage(damage);
+            if ((game.u?.uhp ?? 0) <= 0) break;
+        }
+    }
+    return true;
+}
+
+function mattacku_basic(mtmp, state) {
+    if (!state?.nearby || state.scared || mtmp.mpeaceful || mtmp.mtame) return false;
+    if ((game._occupation_turns_remaining || 0) > 1 || game._occupation_finish_uac != null) return false;
+    if ((game.u?.uhp ?? 1) <= 0) return false;
+
+    const physical = basic_physical_attacks(mtmp);
+    if (!physical) return false;
+    const toHit = mattacku_to_hit(mtmp);
+    return physical_melee_attacks(mtmp, physical, toHit);
 }
 
 function m_move_basic(mtmp) {
@@ -293,11 +375,15 @@ export async function movemon() {
             if (is_wanderer(mtmp) && monnear_hero(mtmp)) rn2(4);
             dog_move(mtmp, false);
             distfleeck(mtmp);
-        } else if (non_tame_movement_opportunity(mtmp, fleeState)) {
-            m_move_basic(mtmp);
-            // C calls distfleeck() again after m_move() returns for ordinary
-            // movement, even when the monster is off-screen.
-            distfleeck(mtmp);
+        } else {
+            let postMoveState = fleeState;
+            if (non_tame_movement_opportunity(mtmp, fleeState)) {
+                m_move_basic(mtmp);
+                // C calls distfleeck() again after m_move() returns for ordinary
+                // movement, even when the monster is off-screen.
+                postMoveState = distfleeck(mtmp);
+            }
+            mattacku_basic(mtmp, postMoveState);
         }
     }
     

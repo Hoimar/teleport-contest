@@ -258,8 +258,8 @@ const TRAPPED_CHEST = 25;
 function is_hole(t) { return t === HOLE || t === TRAPDOOR; }
 function is_pit(t) { return t === PIT || t === SPIKED_PIT; }
 
-const MONSTERS = MONSTER_DATA.map(([name, mlet, mlevel, mmove, maligntyp, geno, difficulty, color, neuter, male, female, msound = 0, mflags1 = 0, mflags2 = 0]) => ({
-    name, mlet, mlevel, mmove, maligntyp, geno, difficulty, color, msound, mflags1, mflags2,
+const MONSTERS = MONSTER_DATA.map(([name, mlet, mlevel, mmove, maligntyp, geno, difficulty, color, neuter, male, female, msound = 0, mflags1 = 0, mflags2 = 0, mattk = []]) => ({
+    name, mlet, mlevel, mmove, maligntyp, geno, difficulty, color, msound, mflags1, mflags2, mattk,
     neuter: !!neuter, male: !!male, female: !!female,
 }));
 

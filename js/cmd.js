@@ -44,29 +44,42 @@ const WAND_CLASS = 11;
 
 function wishedObjectSpec(name) {
     const wish = String(name || '').toLowerCase();
+    const spec = {};
+    const speMatch = wish.match(/(?:^|\s)([+-]\d+)(?:\s|$)/);
+    if (speMatch) spec.spe = Number(speMatch[1]);
+    if (wish.includes('blessed')) {
+        spec.blessed = true;
+        spec.cursed = false;
+    } else if (wish.includes('cursed') && !wish.includes('uncursed')) {
+        spec.cursed = true;
+        spec.blessed = false;
+    } else if (wish.includes('uncursed')) {
+        spec.cursed = false;
+        spec.blessed = false;
+    }
     if (wish.includes('amulet of life saving')) {
         rn2(76);
-        return { otyp: AMULET_OF_LIFE_SAVING };
+        return { ...spec, otyp: AMULET_OF_LIFE_SAVING };
     }
     if (wish.includes('gray dragon scale mail') || wish.includes('grey dragon scale mail')) {
         rn2(67);
-        return { otyp: GRAY_DRAGON_SCALE_MAIL };
+        return { ...spec, otyp: GRAY_DRAGON_SCALE_MAIL };
     }
     if (wish.includes('wand of fire')) {
         rn2(41);
-        return { otyp: WAN_FIRE };
+        return { ...spec, otyp: WAN_FIRE };
     }
     if (wish.includes('wand of death')) {
         rn2(41);
-        return { otyp: WAN_DEATH, appearanceName: 'curved wand' };
+        return { ...spec, otyp: WAN_DEATH, appearanceName: 'curved wand' };
     }
     if (wish.includes('wand of digging')) {
         rn2(41);
-        return { otyp: WAN_DIGGING, appearanceName: 'curved wand' };
+        return { ...spec, otyp: WAN_DIGGING, appearanceName: 'curved wand' };
     }
     if (wish.includes('ring of teleport control')) {
         rn2(2);
-        return { otyp: RIN_TELEPORT_CONTROL, appearanceName: 'ivory ring' };
+        return { ...spec, otyp: RIN_TELEPORT_CONTROL, appearanceName: 'ivory ring' };
     }
     return null;
 }
@@ -112,6 +125,9 @@ function make_wish_object(name) {
     if (!spec?.otyp) return null;
     const otmp = mksobj(spec.otyp, true, false);
     otmp.wishedfor = true;
+    if (typeof spec.spe === 'number') otmp.spe = spec.spe;
+    if (typeof spec.blessed === 'boolean') otmp.blessed = spec.blessed;
+    if (typeof spec.cursed === 'boolean') otmp.cursed = spec.cursed;
     if (spec.appearanceName) otmp.appearanceName = spec.appearanceName;
     rn2(100);
     const merged = merge_inventory_object(otmp);
@@ -189,9 +205,36 @@ function apply_deferred_startup_wear() {
     if (cloak) cloak.worn = true;
 }
 
+function armor_base_bonus(obj) {
+    switch (obj?.otyp) {
+    case GRAY_DRAGON_SCALE_MAIL:
+        return 9;
+    case CLOAK_OF_MAGIC_RESISTANCE:
+        return 1;
+    default:
+        return 0;
+    }
+}
+
+function armor_bonus(obj) {
+    if (!obj?.worn && !obj?.owornmask) return 0;
+    return armor_base_bonus(obj) + (obj.spe || 0);
+}
+
+function calculated_armor_class() {
+    let uac = 10;
+    for (const obj of game.inventory || []) {
+        if (obj?.oclass === ARMOR_CLASS) uac -= armor_bonus(obj);
+    }
+    return Math.max(-99, Math.min(99, uac));
+}
+
 function takeoff_worn_cloak() {
     const cloak = (game.inventory || []).find((obj) => obj?.otyp === CLOAK_OF_MAGIC_RESISTANCE && obj.worn);
-    if (cloak) cloak.worn = false;
+    if (cloak) {
+        cloak.worn = false;
+        game.u.uac = calculated_armor_class();
+    }
 }
 
 async function start_wearing_object(obj) {
@@ -213,8 +256,10 @@ async function start_wearing_object(obj) {
     if (obj.oclass === ARMOR_CLASS && delay > 1) {
         game._occupation_turns_remaining = Math.max(0, delay - 1);
         game._occupation_finish_message = 'You finish your dressing maneuver.';
+        game._occupation_finish_uac = calculated_armor_class();
         await pline(`You start putting on ${inventoryObjectName(obj)}.`);
     } else {
+        if (obj.oclass === ARMOR_CLASS) game.u.uac = calculated_armor_class();
         await pline(`${inventoryListing(obj)} (being worn).`);
     }
     game.context.move = 1;
