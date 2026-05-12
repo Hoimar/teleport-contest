@@ -1,5 +1,31 @@
 # Teleport Implementation Loop
 
+## 2026-05-12 09:47 CEST Resume From 04d9360 - Live Monster Movement
+
+- Branch/baseline commit: `main` at `04d9360`.
+- Startup verification:
+  1. Full suite baseline at resume: `51/11406` screens, 0/44 passing.
+  2. Sentinel baseline at resume: `51/1063` screens, RNG `20354/64569`.
+  3. Target baseline: `seed0116-wizard-wear-shop` at `S 17/127 R 5682/12562`, first RNG mismatch FR 5573 (`rn2(5)` expected vs `rn2(100)` actual).
+- Iteration 1 implementation delta:
+  1. Extended `scripts/trace-dog-goal.mjs` with `--monsters` so movement work can inspect `fmon` order, movement budgets, species speed, and tame state alongside dog-goal scans.
+  2. Ported a narrow ordinary-monster movement owner in `js/monmove.js`: `distfleeck()` now returns C-like nearby/inrange state, non-tame monsters use the `dochug()` movement-opportunity front door, ordinary movement performs post-`m_move()` `distfleeck()`, and a minimal adjacent `m_move()` retains `mtrack` and consumes backtracking rolls.
+  3. Added the empty-square pickup message for `,`, preserving that it still takes a turn.
+- Evidence:
+  1. `seed0116` crossed FR 5573 and FR 5616, including the missing non-pet post-`m_move()` `distfleeck()` and the `mtrack` `rn2(32)` roll. It now blocks at FR 5710: C consumes the kitten nearby `M2_WANDER` gate while JS starts `dog_goal()` object resistance.
+  2. Visible `seed0116` screens improved from `17/127` to `21/127`; current visible mismatch is pet/status state after `,`, not the pickup message.
+  3. `seed0383` RNG prefix improved from `9877/16915` to `9937/16915` while its screen count stayed unchanged.
+- Regression stability:
+  1. Sentinel moved from `51/1063 R 20354/64569` to `55/1063 R 20611/64569`.
+  2. No sentinel screen-count regressions. `seed0002` and `seed0013` RNG prefixes shifted with unchanged screens and are classified as expected structural side effects of ordinary-monster movement ownership.
+  3. Full suite moved from `51/11406` to `55/11406`, 0/44 passing.
+- Current queue:
+  1. Classify `seed0116` FR 5710 pet apparent-nearby/position parity after the `L`, `j`, `j`, `l`, `,` command sequence. JS pet state before `,` is two squares from the hero, but C reaches the nearby kitten wanderer gate.
+  2. Continue `seed0383` FR 9716 `dog_goal()` object visibility/state once the shared pet-position issue is classified.
+  3. Recheck special-level monster/list effects after pet state advances.
+  4. Continue startup/windowing dehack work only when it unlocks real subsystem parity.
+- Verification cadence remains: target triage after each production edit, sentinel after each meaningful edit, full suite after broad shared changes or every 3-5 meaningful iterations.
+
 ## 2026-05-12 08:55 CEST Restart - Dehack, Deep Triage, Implementation Loop
 
 - Branch/baseline commit: `main` at `f4be79ac016690ec4a293cadad6427ed4d4715e3`.

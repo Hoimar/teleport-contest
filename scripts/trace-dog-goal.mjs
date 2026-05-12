@@ -26,16 +26,17 @@ const PROJECT_ROOT = path.resolve(SCRIPT_DIR, '..');
 
 function usage() {
     return [
-        'Usage: node scripts/trace-dog-goal.mjs <session-ref> [--moves <count>] [--rng <start>:<end>] [--scan]',
+        'Usage: node scripts/trace-dog-goal.mjs <session-ref> [--moves <count>] [--rng <start>:<end>] [--scan] [--monsters]',
         '',
         'Examples:',
         '  node scripts/trace-dog-goal.mjs seed0116 --moves 16 --rng 5510:5545',
         '  node scripts/trace-dog-goal.mjs seed0383 --moves 140 --rng 9700:9725 --scan',
+        '  node scripts/trace-dog-goal.mjs seed0116 --moves 17 --monsters',
     ].join('\n');
 }
 
 function parseArgs(argv) {
-    const out = { ref: null, moves: null, rng: null, scan: false };
+    const out = { ref: null, moves: null, rng: null, scan: false, monsters: false };
     for (let i = 0; i < argv.length; i++) {
         const arg = argv[i];
         if (arg === '--help' || arg === '-h') {
@@ -60,6 +61,10 @@ function parseArgs(argv) {
         }
         if (arg === '--scan') {
             out.scan = true;
+            continue;
+        }
+        if (arg === '--monsters') {
+            out.monsters = true;
             continue;
         }
         if (arg.startsWith('--')) throw new Error(`unknown option ${arg}`);
@@ -113,6 +118,25 @@ function objectSummary(obj) {
         cursed: !!obj.cursed,
         blessed: !!obj.blessed,
         quan: obj.quan ?? 1,
+    };
+}
+
+function monsterSummary(mon, index) {
+    return {
+        index,
+        name: mon.data?.name,
+        mx: mon.mx,
+        my: mon.my,
+        movement: mon.movement ?? 0,
+        mmove: mon.data?.mmove,
+        mtame: mon.mtame ?? 0,
+        mpeaceful: mon.mpeaceful ?? 0,
+        msleeping: mon.msleeping ?? 0,
+        mflee: mon.mflee ?? 0,
+        mcanmove: mon.mcanmove ?? 1,
+        mstate: mon.mstate ?? 0,
+        strategy: mon.mstrategy ?? 0,
+        ch: mon.ch,
     };
 }
 
@@ -422,6 +446,11 @@ async function main() {
         inventory: pet.inventory?.length || 0,
     }));
     console.log('search', JSON.stringify({ minX, maxX, minY, maxY }));
+    if (opts.monsters) {
+        console.log('monsters', JSON.stringify(
+            (game.level?.monsters || []).map((mon, index) => monsterSummary(mon, index)),
+        ));
+    }
     console.log('floorObjects', JSON.stringify(floorObjects));
     console.log('inventory', JSON.stringify(inventory));
     if (opts.scan) {
