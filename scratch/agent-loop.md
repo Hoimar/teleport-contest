@@ -1,5 +1,59 @@
 # Teleport Implementation Loop
 
+## 2026-05-12 08:55 CEST Restart - Dehack, Deep Triage, Implementation Loop
+
+- Branch/baseline commit: `main` at `f4be79ac016690ec4a293cadad6427ed4d4715e3`.
+- Startup wall time: 2026-05-12 08:55 CEST.
+- Full suite baseline: 50/11406 screens, 0/44 passing.
+- Sentinel baseline: 50/1063 screens, RNG 20420/64569.
+- Corpus triage baseline: 44 sessions, 41 compact buckets regenerated in `scratch/divergence-inventory.md`.
+- Current target: pet/floor-object parity, with `seed0116-wizard-wear-shop` as the smaller exact-prefix evidence path and `seed0383-wizard-hallucinate` as the deeper special-level evidence path.
+- Active hypothesis: both leading live blockers are missing retained or position-correct objects feeding `dogmove.c:dog_goal()`. This should be solved by object/shop/special-level state fidelity, not by changing the dog movement selector for a single session.
+- Dehack iteration:
+  1. Deleted stale tracked probes `scratch/check_features.mjs`, `scratch/check_mklev.mjs`, and `scratch/inspect_screens.mjs`.
+  2. Kept reusable diagnostics in `scripts/triage-corpus.mjs`, `scripts/triage-session.mjs`, and `scripts/trace-dog-goal.mjs`.
+  3. Verification after cleanup: sentinel stayed at 50/1063 screens and direct `seed0002` triage stayed 11/595 screens, FR 1215.
+- Deep triage facts:
+  1. `seed0116`: exact prefix parity reaches 14 `obj_resists()` calls in `dog_goal()`; C then expects three more `obj_resists()` calls before candidate selection. JS has 14 Wizard inventory objects and no nearby retained floor objects in the pet search rectangle.
+  2. `seed0383`: exact prefix parity reaches six nearby floor-object resistance checks and two failed apport rolls; C then scans at least one more `fobj` entry while JS starts the follow-player gate. The likely cause is a missing object near the search rectangle or a one-cell pet-arrival/search-rectangle drift.
+  3. Corpus startup remains broad: 10 early-startup buckets still block on chargen/options, 19 mklev-or-uinit buckets block on level generation or initial inventory, and 10 late-startup buckets block on object/monster/special-level/display side effects. The pet/object target is still highest-value because it sits past much deeper initialized state and has precise RNG evidence.
+- Queue:
+  1. Improve `scripts/trace-dog-goal.mjs` so it can print the exact dog-goal floor/inventory scan order and classification decisions, not just the retained object set.
+  2. Localize the three missing `seed0116` object scans: inspect shop stocking, cloak takeoff/wear state, retained floor/shop objects around the kitten, and inventory objects after `T`.
+  3. Localize the extra `seed0383` scan: compare special `des.object()`/kelp placement, pet-arrival candidate rejection, and nearby `fobj` order after the second apport failure.
+  4. Implement the general subsystem owner once localized: shop object retention, special-level object placement, pet-arrival placement predicates, or dog-goal classification.
+  5. Continue visible hack-debt cleanup when it unlocks the active work, especially seed0002 startup `_override_screen` debt and seed replay tables.
+- Verification cadence: target triage after each production edit, sentinel after each meaningful edit, full suite after 3-5 meaningful implementation iterations or broad shared changes.
+
+### Close-Up Checkpoint - User Stop Request
+
+- Active loop time for this restarted lane: about 25 minutes, from 08:55 CEST startup through final verification.
+- Meaningful implementation iterations completed in this lane: 5.
+- Implementation delta:
+  1. Removed stale tracked scratch probes and regenerated compact corpus divergence inventory.
+  2. Retained unburied `mineralize()` gold/gem objects on the live floor object chain.
+  3. Matched tame movement short-circuiting around the wanderer roll and kept post-pet `distfleeck()` in the turn path.
+  4. Added uppercase vi run command state so `L` and related commands consume repeated full turns instead of one step or an unknown-command screen.
+  5. Added early pet `whappr` handling and old/new pet square redraws, exposing the next real live-movement blocker.
+- Lagging score delta:
+  1. Full public corpus moved from 50/11406 screens, 0/44 passing to 51/11406 screens, 0/44 passing.
+  2. Sentinel suite moved from 50/1063 screens and RNG 20420/64569 to 51/1063 screens and RNG 20354/64569.
+  3. Evidence session `seed0116-wizard-wear-shop` moved from 16/127 screens to 17/127 screens and now blocks at FR 5573 during the internal uppercase-`L` run turns.
+- Sentinel stability: no sentinel screen-count regressions. `seed8000` stayed complete at 23/23; `seed0002`, `seed0013`, and `seed0383` kept their screen counts while RNG prefixes shifted from structural movement/pet predicate changes.
+- Regression classification:
+  1. `seed0002` RNG prefix shifted from 1314 to 1247, `seed0013` from 543 to 538, and `seed0383` from 9906 to 9877 with unchanged screen counts. These are classified as expected structural side effects of generalized movement/run/pet predicates, not accidental display regressions.
+  2. The discarded direction was treating the pet/object mismatch as another dog-goal candidate selector issue. Current traces show the next `seed0116` blocker is live monster movement ownership around `distfleeck()`, while `seed0383` remains floor-object/position state.
+- Final verification:
+  1. `node scripts/triage-session.mjs sessions/seed0116-wizard-wear-shop.session.json` => `S 17/127 R 5682/12562`, first mismatch screen 17, first RNG mismatch FR 5573 (`rn2(5)` expected vs `rn2(100)` actual).
+  2. `node scripts/run-sentinel-suite.mjs` => total `S 51/1063 R 20354/64569`.
+  3. `node frozen/ps_test_runner.mjs` => total `S 51/11406`, 0/44 passing.
+- Current queue:
+  1. Classify live monster movement ownership during run turns: `seed0116` FR 5573 expects another `distfleeck()` before JS continues pet object scanning.
+  2. Continue `seed0383` `dog_goal()` object visibility/state at FR 9716, especially missing or position-drifted special-level floor objects near the pet.
+  3. Recheck special-level monster/list ordering after dog-goal state advances.
+  4. Continue startup/windowing dehack work only when it unlocks real subsystem parity.
+- Global next-step check before stopping: active queue, `feature_map.md`, visible replay/override hack debt, latest regressions, and relevant upstream owners (`monmove.c`, `dogmove.c`, `mklev.c`) were checked. Safe structural next steps remain, but the exact valid stop condition is that the user explicitly asked to close the current iteration so they can push to `main`.
+
 ## 2026-05-12 Marathon Restart - Dehack/Triage Backlog
 
 - Branch/baseline commit: `main` at `0497013`.

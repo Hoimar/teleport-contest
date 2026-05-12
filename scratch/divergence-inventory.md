@@ -7,7 +7,7 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 
 | Sessions | Buckets | Screens | RNG calls | Errors |
 | --- | --- | --- | --- | --- |
-| 44 | 41 | 50/11406 | 61987/781691 | 0 |
+| 44 | 41 | 51/11406 | 61591/781691 | 0 |
 
 ## Bucket Summary
 
@@ -62,7 +62,7 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 - Count: 2
 - Bucket key: `early-startup | FS=0 | FR=0-250 | char/mixed | rn2(13)=>rn2(3) | rows=0,2,3,4,5,6+12`
 - Canonical screens: 0/267
-- Canonical RNG: 1381/4194
+- Canonical RNG: 1373/4194
 - First screen mismatch: 0 (char/mixed, rows 0,2,3,4,5,6+12)
 - First RNG mismatch: 199 (rn2(13)=>rn2(3))
 - Sample cells: [0,8] ch I/8 ->  /8; [0,9] ch t/8 ->  /8; [0,11] ch i/8 ->  /8; [0,12] ch s/8 ->  /8; [0,14] ch w/8 ->  /8
@@ -76,7 +76,7 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 - Count: 2
 - Bucket key: `late-startup | FS=0 | FR=>1200 | char/mixed | rn2(1)=>rn2(3) | rows=0,2,3,4,5,6+12`
 - Canonical screens: 0/67
-- Canonical RNG: 2603/3465
+- Canonical RNG: 2605/3465
 - First screen mismatch: 0 (char/mixed, rows 0,2,3,4,5,6+12)
 - First RNG mismatch: 2595 (rn2(1)=>rn2(3))
 - Sample cells: [0,23] ch  /8 -> I/8; [0,24] ch  /8 -> t/8; [0,26] ch  /8 -> i/8; [0,27] ch  /8 -> s/8; [0,29] ch  /8 -> w/8
@@ -90,7 +90,7 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 - Count: 2
 - Bucket key: `mklev-or-uinit | FS=0 | FR=251-1200 | char/mixed | rn2(68)=>rn2(100) | rows=8,11,15,16,17,18+2`
 - Canonical screens: 0/99
-- Canonical RNG: 540/4804
+- Canonical RNG: 538/4804
 - First screen mismatch: 0 (char/mixed, rows 8,11,15,16,17,18+2)
 - First RNG mismatch: 507 (rn2(68)=>rn2(100))
 - Sample cells: [8,54] ch  /8 -> ─/8; [8,55] ch  /8 -> ·/8; [8,56] ch  /8 -> ·/8; [8,57] ch  /8 -> ·/8; [8,58] ch  /8 -> ·/8
@@ -104,7 +104,7 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 - Count: 1
 - Bucket key: `early-startup | FS=0 | FR=0-250 | char/mixed | rn2(1)=>rn2(2) | rows=0,2,3,4,5,6+4`
 - Canonical screens: 0/123
-- Canonical RNG: 90/6736
+- Canonical RNG: 88/6736
 - First screen mismatch: 0 (char/mixed, rows 0,2,3,4,5,6+4)
 - First RNG mismatch: 0 (rn2(1)=>rn2(2))
 - Sample cells: [0,0] ch  /8 -> A/8; [0,1] ch  /8 -> l/8; [0,2] ch  /8 -> o/8; [0,3] ch  /8 -> h/8; [0,4] ch  /8 -> a/8
@@ -132,7 +132,7 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 - Count: 1
 - Bucket key: `early-startup | FS=0 | FR=0-250 | char/mixed | rn2(1)=>rn2(2) | rows=0,4,5,6,7,12+7`
 - Canonical screens: 0/714
-- Canonical RNG: 225/59178
+- Canonical RNG: 220/59178
 - First screen mismatch: 0 (char/mixed, rows 0,4,5,6,7,12+7)
 - First RNG mismatch: 0 (rn2(1)=>rn2(2))
 - Sample cells: [0,0] ch  /8 -> A/8; [0,1] ch  /8 -> l/8; [0,2] ch  /8 -> o/8; [0,3] ch  /8 -> h/8; [0,4] ch  /8 -> a/8
@@ -160,7 +160,7 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 - Count: 1
 - Bucket key: `early-startup | FS=0 | FR=0-250 | char/mixed | rn2(13)=>rn2(2) | rows=0,2,3,4,5,6+4`
 - Canonical screens: 0/73
-- Canonical RNG: 138/3713
+- Canonical RNG: 127/3713
 - First screen mismatch: 0 (char/mixed, rows 0,2,3,4,5,6+4)
 - First RNG mismatch: 0 (rn2(13)=>rn2(2))
 - Sample cells: [0,0] ch  /8 -> A/8; [0,1] ch  /8 -> l/8; [0,2] ch  /8 -> o/8; [0,3] ch  /8 -> h/8; [0,4] ch  /8 -> a/8
@@ -174,7 +174,7 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 - Count: 1
 - Bucket key: `early-startup | FS=0 | FR=0-250 | char/mixed | rn2(13)=>rn2(2) | rows=0,4,5,6,7,12+5`
 - Canonical screens: 0/302
-- Canonical RNG: 214/16373
+- Canonical RNG: 216/16373
 - First screen mismatch: 0 (char/mixed, rows 0,4,5,6,7,12+5)
 - First RNG mismatch: 0 (rn2(13)=>rn2(2))
 - Sample cells: [0,0] ch  /8 -> A/8; [0,1] ch  /8 -> l/8; [0,2] ch  /8 -> o/8; [0,3] ch  /8 -> h/8; [0,4] ch  /8 -> a/8
@@ -188,7 +188,7 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 - Count: 1
 - Bucket key: `early-startup | FS=0 | FR=0-250 | char/mixed | rn2(13)=>rn2(2) | rows=0,4,5,6,7,12+7`
 - Canonical screens: 0/409
-- Canonical RNG: 207/12084
+- Canonical RNG: 158/12084
 - First screen mismatch: 0 (char/mixed, rows 0,4,5,6,7,12+7)
 - First RNG mismatch: 0 (rn2(13)=>rn2(2))
 - Sample cells: [0,0] ch  /8 -> A/8; [0,1] ch  /8 -> l/8; [0,2] ch  /8 -> o/8; [0,3] ch  /8 -> h/8; [0,4] ch  /8 -> a/8
@@ -202,7 +202,7 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 - Count: 1
 - Bucket key: `early-startup | FS=0 | FR=0-250 | char/mixed | rn2(13)=>rn2(3) | rows=0,9,13,15,16,17+4`
 - Canonical screens: 0/324
-- Canonical RNG: 449/50125
+- Canonical RNG: 403/50125
 - First screen mismatch: 0 (char/mixed, rows 0,9,13,15,16,17+4)
 - First RNG mismatch: 199 (rn2(13)=>rn2(3))
 - Sample cells: [0,52] ch L/8 -> M/8; [0,53] ch o/8 -> a/8; [0,54] ch k/8 -> r/8; [0,55] ch i/8 -> d/8; [0,56] ch :/8 -> u/8
@@ -216,7 +216,7 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 - Count: 1
 - Bucket key: `late-startup | FS=0 | FR=>1200 | char/map | rn2(100)=>rn2(4) | rows=3,8`
 - Canonical screens: 0/219
-- Canonical RNG: 9906/16915
+- Canonical RNG: 9877/16915
 - First screen mismatch: 0 (char/map, rows 3,8)
 - First RNG mismatch: 9716 (rn2(100)=>rn2(4))
 - Sample cells: [3,71] ch  /8 -> ─/8; [3,72] ch  /8 -> ─/8; [3,73] ch  /8 -> ─/8; [3,74] ch  /8 -> ┐/8; [8,61] ch  /8 -> └/8
@@ -244,7 +244,7 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 - Count: 1
 - Bucket key: `late-startup | FS=0 | FR=>1200 | char/mixed | rn2(2)=>rn2(10) | rows=9,10,11,12,13,14+1`
 - Canonical screens: 0/230
-- Canonical RNG: 2451/3018
+- Canonical RNG: 2446/3018
 - First screen mismatch: 0 (char/mixed, rows 9,10,11,12,13,14+1)
 - First RNG mismatch: 1248 (rn2(2)=>rn2(10))
 - Sample cells: [9,22] ch  /8 -> ─/8; [10,22] ch  /8 -> ·/8; [11,16] ch x/15 -> `/7; [11,17] ch (/3 -> ·/8; [11,20] ch ·/8 -> f/15
@@ -258,7 +258,7 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 - Count: 1
 - Bucket key: `late-startup | FS=0 | FR=>1200 | char/mixed | rn2(2894)=>rn2(3014) | rows=17,22`
 - Canonical screens: 0/833
-- Canonical RNG: 2718/120639
+- Canonical RNG: 2715/120639
 - First screen mismatch: 0 (char/mixed, rows 17,22)
 - First RNG mismatch: 1355 (rn2(2894)=>rn2(3014))
 - Sample cells: [17,52] ch  /8 -> └/8; [17,53] ch  /8 -> ─/8; [17,54] ch  /8 -> ─/8; [17,55] ch  /8 -> ─/8; [17,56] ch  /8 -> ┘/8
@@ -272,7 +272,7 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 - Count: 1
 - Bucket key: `late-startup | FS=0 | FR=>1200 | char/mixed | rn2(3)=>rn2(5) | rows=17,18,19,20,22`
 - Canonical screens: 0/303
-- Canonical RNG: 1452/16958
+- Canonical RNG: 1455/16958
 - First screen mismatch: 0 (char/mixed, rows 17,18,19,20,22)
 - First RNG mismatch: 1431 (rn2(3)=>rn2(5))
 - Sample cells: [17,38] ch  /8 -> │/8; [17,39] ch  /8 -> ·/8; [17,40] ch  /8 -> f/15; [17,41] ch  /8 -> ·/8; [17,42] ch  /8 -> ·/8
@@ -314,7 +314,7 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 - Count: 1
 - Bucket key: `late-startup | FS=0 | FR=>1200 | char/mixed | rn2(9)=>rn2(398) | rows=0,2,3,4,5,6+13`
 - Canonical screens: 0/51
-- Canonical RNG: 1741/3230
+- Canonical RNG: 1737/3230
 - First screen mismatch: 0 (char/mixed, rows 0,2,3,4,5,6+13)
 - First RNG mismatch: 1718 (rn2(9)=>rn2(398))
 - Sample cells: [0,8] ch I/8 ->  /8; [0,9] ch t/8 ->  /8; [0,11] ch i/8 ->  /8; [0,12] ch s/8 ->  /8; [0,14] ch w/8 ->  /8
@@ -328,7 +328,7 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 - Count: 1
 - Bucket key: `late-startup | FS=0 | FR=>1200 | char/mixed | rnd(1000)=>rn2(100) | rows=0,1,2,3,4,5+12`
 - Canonical screens: 0/249
-- Canonical RNG: 2350/13923
+- Canonical RNG: 2335/13923
 - First screen mismatch: 0 (char/mixed, rows 0,1,2,3,4,5+12)
 - First RNG mismatch: 2246 (rnd(1000)=>rn2(100))
 - Sample cells: [0,0] ch A/8 ->  /8; [0,1] ch l/8 ->  /8; [0,2] ch o/8 ->  /8; [0,3] ch h/8 ->  /8; [0,4] ch a/8 ->  /8
@@ -342,7 +342,7 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 - Count: 1
 - Bucket key: `late-startup | FS=0 | FR=>1200 | char+attr/mixed | rn2(3)=>rn2(6) | rows=0,7,8,9,10,11+5`
 - Canonical screens: 0/25
-- Canonical RNG: 1308/4485
+- Canonical RNG: 1301/4485
 - First screen mismatch: 0 (char+attr/mixed, rows 0,7,8,9,10,11+5)
 - First RNG mismatch: 1281 (rn2(3)=>rn2(6))
 - Sample cells: [0,55] ch s/8 -> d/8; [0,56] ch :/8 -> u/8; [0,57] ch  /8 -> k/8; [0,58] ch  /8 -> :/8; [7,22] ch  /8 -> ─/8
@@ -356,7 +356,7 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 - Count: 1
 - Bucket key: `mklev-or-uinit | FS=0 | FR=251-1200 | char/mixed | rn2(1)=>rn2(4) | rows=12,13,14,15,16,17+1`
 - Canonical screens: 0/38
-- Canonical RNG: 1308/11647
+- Canonical RNG: 1311/11647
 - First screen mismatch: 0 (char/mixed, rows 12,13,14,15,16,17+1)
 - First RNG mismatch: 382 (rn2(1)=>rn2(4))
 - Sample cells: [12,6] ch  /8 -> ┌/8; [12,7] ch  /8 -> ─/8; [12,9] ch  /8 -> ─/8; [12,10] ch  /8 -> ─/8; [12,11] ch  /8 -> ─/8
@@ -370,7 +370,7 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 - Count: 1
 - Bucket key: `mklev-or-uinit | FS=0 | FR=251-1200 | char/mixed | rn2(10)=>rn2(5) | rows=0,2,3,4,5,6+13`
 - Canonical screens: 0/26
-- Canonical RNG: 2006/2458
+- Canonical RNG: 2004/2458
 - First screen mismatch: 0 (char/mixed, rows 0,2,3,4,5,6+13)
 - First RNG mismatch: 875 (rn2(10)=>rn2(5))
 - Sample cells: [0,17] ch I/8 ->  /8; [0,18] ch t/8 ->  /8; [0,20] ch i/8 ->  /8; [0,21] ch s/8 ->  /8; [0,23] ch w/8 -> I/8
@@ -398,7 +398,7 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 - Count: 1
 - Bucket key: `mklev-or-uinit | FS=0 | FR=251-1200 | char/mixed | rn2(11)=>rn2(5) | rows=0,9,12,13,14,15+6`
 - Canonical screens: 0/30
-- Canonical RNG: 987/2499
+- Canonical RNG: 988/2499
 - First screen mismatch: 0 (char/mixed, rows 0,9,12,13,14,15+6)
 - First RNG mismatch: 974 (rn2(11)=>rn2(5))
 - Sample cells: [0,52] ch O/8 -> M/8; [0,53] ch d/8 -> a/8; [0,54] ch i/8 -> r/8; [0,55] ch n/8 -> d/8; [0,56] ch :/8 -> u/8
@@ -412,7 +412,7 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 - Count: 1
 - Bucket key: `mklev-or-uinit | FS=0 | FR=251-1200 | char/mixed | rn2(5)=>rn2(3) | rows=0,2,3,4,5,6+12`
 - Canonical screens: 0/84
-- Canonical RNG: 361/2983
+- Canonical RNG: 358/2983
 - First screen mismatch: 0 (char/mixed, rows 0,2,3,4,5,6+12)
 - First RNG mismatch: 302 (rn2(5)=>rn2(3))
 - Sample cells: [0,17] ch I/8 ->  /8; [0,18] ch t/8 ->  /8; [0,20] ch i/8 ->  /8; [0,21] ch s/8 ->  /8; [0,23] ch w/8 -> I/8
@@ -426,7 +426,7 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 - Count: 1
 - Bucket key: `mklev-or-uinit | FS=0 | FR=251-1200 | char/mixed | rn2(5)=>rn2(3) | rows=0,2,3,4,5,6+14`
 - Canonical screens: 0/51
-- Canonical RNG: 338/3137
+- Canonical RNG: 337/3137
 - First screen mismatch: 0 (char/mixed, rows 0,2,3,4,5,6+14)
 - First RNG mismatch: 302 (rn2(5)=>rn2(3))
 - Sample cells: [0,19] ch I/8 ->  /8; [0,20] ch t/8 ->  /8; [0,22] ch i/8 ->  /8; [0,23] ch s/8 -> I/8; [0,24] ch  /8 -> t/8
@@ -440,7 +440,7 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 - Count: 1
 - Bucket key: `mklev-or-uinit | FS=0 | FR=251-1200 | char/mixed | rn2(6)=>rn2(4) | rows=16,17,22`
 - Canonical screens: 0/40
-- Canonical RNG: 2238/2768
+- Canonical RNG: 2234/2768
 - First screen mismatch: 0 (char/mixed, rows 16,17,22)
 - First RNG mismatch: 1162 (rn2(6)=>rn2(4))
 - Sample cells: [16,58] ch  /8 -> ·/8; [16,59] ch  /8 -> ·/8; [16,60] ch  /8 -> ·/8; [16,61] ch  /8 -> ·/8; [16,62] ch  /8 -> ·/8
@@ -454,7 +454,7 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 - Count: 1
 - Bucket key: `mklev-or-uinit | FS=0 | FR=251-1200 | char/mixed | rn2(68)=>rn2(100) | rows=6,7,8,9,10,11+4`
 - Canonical screens: 0/532
-- Canonical RNG: 690/11409
+- Canonical RNG: 691/11409
 - First screen mismatch: 0 (char/mixed, rows 6,7,8,9,10,11+4)
 - First RNG mismatch: 599 (rn2(68)=>rn2(100))
 - Sample cells: [6,11] ch ┌/8 ->  /8; [6,12] ch ─/8 ->  /8; [6,13] ch ─/8 ->  /8; [6,14] ch ─/8 ->  /8; [6,15] ch ─/8 ->  /8
@@ -468,7 +468,7 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 - Count: 1
 - Bucket key: `mklev-or-uinit | FS=0 | FR=251-1200 | char/mixed | rn2(70)=>rn2(100) | rows=0,1,2,3,4,5+13`
 - Canonical screens: 0/410
-- Canonical RNG: 546/12167
+- Canonical RNG: 544/12167
 - First screen mismatch: 0 (char/mixed, rows 0,1,2,3,4,5+13)
 - First RNG mismatch: 415 (rn2(70)=>rn2(100))
 - Sample cells: [0,0] ch H/8 ->  /8; [0,1] ch e/8 ->  /8; [0,2] ch l/8 ->  /8; [0,3] ch l/8 ->  /8; [0,4] ch o/8 ->  /8
@@ -482,7 +482,7 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 - Count: 1
 - Bucket key: `mklev-or-uinit | FS=0 | FR=251-1200 | char/mixed | rn2(71)=>rn2(100) | rows=0,9,13,16,18,22+1`
 - Canonical screens: 0/44
-- Canonical RNG: 386/8563
+- Canonical RNG: 382/8563
 - First screen mismatch: 0 (char/mixed, rows 0,9,13,16,18,22+1)
 - First RNG mismatch: 339 (rn2(71)=>rn2(100))
 - Sample cells: [0,52] ch O/8 -> M/8; [0,53] ch d/8 -> a/8; [0,54] ch i/8 -> r/8; [0,55] ch n/8 -> d/8; [0,56] ch :/8 -> u/8
@@ -510,7 +510,7 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 - Count: 1
 - Bucket key: `mklev-or-uinit | FS=0 | FR=251-1200 | char/mixed | rnd(2)=>rn2(10) | rows=0,3,4,5,6,7+4`
 - Canonical screens: 0/308
-- Canonical RNG: 529/13878
+- Canonical RNG: 534/13878
 - First screen mismatch: 0 (char/mixed, rows 0,3,4,5,6,7+4)
 - First RNG mismatch: 300 (rnd(2)=>rn2(10))
 - Sample cells: [0,0] ch  /8 -> A/8; [0,1] ch  /8 -> l/8; [0,2] ch  /8 -> o/8; [0,3] ch  /8 -> h/8; [0,4] ch  /8 -> a/8
@@ -524,7 +524,7 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 - Count: 1
 - Bucket key: `mklev-or-uinit | FS=0 | FR=251-1200 | char/mixed | rnd(4)=>rn2(10) | rows=0,1,3,4,5,6+12`
 - Canonical screens: 0/1814
-- Canonical RNG: 1685/108275
+- Canonical RNG: 1722/108275
 - First screen mismatch: 0 (char/mixed, rows 0,1,3,4,5,6+12)
 - First RNG mismatch: 254 (rnd(4)=>rn2(10))
 - Sample cells: [0,12] ch w/8 -> k/8; [0,13] ch i/8 -> n/8; [0,14] ch z/8 -> i/8; [0,15] ch a/8 -> g/8; [0,16] ch r/8 -> h/8
@@ -538,7 +538,7 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 - Count: 1
 - Bucket key: `mklev-or-uinit | FS=0 | FR=251-1200 | char/mixed | rnd(4)=>rn2(10) | rows=0,2,3,4,5,6+13`
 - Canonical screens: 0/1954
-- Canonical RNG: 985/94382
+- Canonical RNG: 758/94382
 - First screen mismatch: 0 (char/mixed, rows 0,2,3,4,5,6+13)
 - First RNG mismatch: 299 (rnd(4)=>rn2(10))
 - Sample cells: [0,0] ch H/8 ->  /8; [0,1] ch e/8 ->  /8; [0,2] ch l/8 ->  /8; [0,3] ch l/8 ->  /8; [0,4] ch o/8 ->  /8
@@ -580,7 +580,7 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 - Count: 1
 - Bucket key: `mklev-or-uinit | FS=0 | FR=251-1200 | char+attr/mixed | rn2(100)=>rn2(5) | rows=12,14,22,23`
 - Canonical screens: 0/41
-- Canonical RNG: 1052/3626
+- Canonical RNG: 1064/3626
 - First screen mismatch: 0 (char+attr/mixed, rows 12,14,22,23)
 - First RNG mismatch: 1036 (rn2(100)=>rn2(5))
 - Sample cells: [12,4] ch f/15 -> ·/8; [12,6] attr $/11 -> $/14; [14,4] ch ·/8 -> d/15; [22,34] ch 1/8 -> 8/8; [22,35] ch 4/8 ->  /8
@@ -608,7 +608,7 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 - Count: 1
 - Bucket key: `post-startup-live | FS=11 | FR=>1200 | char+attr/mixed | rn2(6)=>rn2(4) | rows=0,9,10`
 - Canonical screens: 11/595
-- Canonical RNG: 1314/27158
+- Canonical RNG: 1247/27158
 - First screen mismatch: 11 (char+attr/mixed, rows 0,9,10)
 - First RNG mismatch: 1215 (rn2(6)=>rn2(4))
 - Sample cells: [0,0] ch  /8 -> H/8; [0,1] ch  /8 -> e/8; [0,2] ch  /8 -> l/8; [0,3] ch  /8 -> l/8; [0,4] ch  /8 -> o/8
@@ -620,12 +620,12 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 ### post-startup-live: seed0116-wizard-wear-shop
 
 - Count: 1
-- Bucket key: `post-startup-live | FS=16 | FR=>1200 | char/map | rn2(100)=>rn2(1) | rows=14,15`
-- Canonical screens: 16/127
-- Canonical RNG: 5650/12562
-- First screen mismatch: 16 (char/map, rows 14,15)
-- First RNG mismatch: 5532 (rn2(100)=>rn2(1))
-- Sample cells: [14,8] ch f/15 -> ·/8; [15,9] ch ·/8 -> f/15
+- Bucket key: `post-startup-live | FS=17 | FR=>1200 | char/map | rn2(5)=>rn2(100) | rows=15,16`
+- Canonical screens: 17/127
+- Canonical RNG: 5682/12562
+- First screen mismatch: 17 (char/map, rows 15,16)
+- First RNG mismatch: 5573 (rn2(5)=>rn2(100))
+- Sample cells: [15,12] ch f/15 -> ·/8; [16,12] ch ·/8 -> f/15
 - Hypothesis: Pet behavior: dog_goal() object scan, reachability, carry checks, and object resistance in dogmove.c.
 - Next owner: Monsters / pets
 - Needs deeper debug: yes
@@ -635,55 +635,55 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 
 | Session | Screens | RNG | First screen | First RNG | Hypothesis |
 | --- | --- | --- | --- | --- | --- |
-| seed0116-wizard-wear-shop | 16/127 | 5650/12562 | 16:char:map:T | 5532:rn2(100)=>rn2(1) | Pet behavior: dog_goal() object scan, reachability, carry checks, and object resistance in dogmove.c. |
-| seed0383-wizard-hallucinate | 0/219 | 9906/16915 | 0:char:map:init | 9716:rn2(100)=>rn2(4) | Special-level monster setup: des.monster() selected-monster initialization, equipment, and hallucination display context. |
+| seed0116-wizard-wear-shop | 17/127 | 5682/12562 | 17:char:map:L | 5573:rn2(5)=>rn2(100) | Pet behavior: dog_goal() object scan, reachability, carry checks, and object resistance in dogmove.c. |
+| seed0383-wizard-hallucinate | 0/219 | 9877/16915 | 0:char:map:init | 9716:rn2(100)=>rn2(4) | Special-level monster setup: des.monster() selected-monster initialization, equipment, and hallucination display context. |
 | seed8000-tourist-starter | 23/23 | 3010/3130 | -:none:none:- | 2985:rn2(5)=>rn2(12) | Live turn loop: post-screen monster movement RNG ownership after visible screen parity. |
 
 ## Session Inventory
 
 | Session | Screens | RNG | Phase | First screen | First RNG | Rows | Samples |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| seed0002-healer-reflection-drummer | 11/595 | 1314/27158 | post-startup-live | 11:char+attr:mixed:n | 1215:rn2(6)=>rn2(4) | 0,9,10 | [0,0] ch  /8 -> H/8; [0,1] ch  /8 -> e/8; [0,2] ch  /8 -> l/8; [0,3] ch  /8 -> l/8; [0,4] ch  /8 -> o/8 |
-| seed0004-feeding-pony | 0/409 | 207/12084 | early-startup | 0:char:mixed:init | 0:rn2(13)=>rn2(2) | 0,4,5,6,7,12+7 | [0,0] ch  /8 -> A/8; [0,1] ch  /8 -> l/8; [0,2] ch  /8 -> o/8; [0,3] ch  /8 -> h/8; [0,4] ch  /8 -> a/8 |
-| seed0006-wizard-water-demon | 0/123 | 90/6736 | early-startup | 0:char:mixed:init | 0:rn2(1)=>rn2(2) | 0,2,3,4,5,6+4 | [0,0] ch  /8 -> A/8; [0,1] ch  /8 -> l/8; [0,2] ch  /8 -> o/8; [0,3] ch  /8 -> h/8; [0,4] ch  /8 -> a/8 |
-| seed0007-rogue-snake-swamp | 0/302 | 214/16373 | early-startup | 0:char:mixed:init | 0:rn2(13)=>rn2(2) | 0,4,5,6,7,12+5 | [0,0] ch  /8 -> A/8; [0,1] ch  /8 -> l/8; [0,2] ch  /8 -> o/8; [0,3] ch  /8 -> h/8; [0,4] ch  /8 -> a/8 |
-| seed0009-swimmer-mforce | 0/73 | 138/3713 | early-startup | 0:char:mixed:init | 0:rn2(13)=>rn2(2) | 0,2,3,4,5,6+4 | [0,0] ch  /8 -> A/8; [0,1] ch  /8 -> l/8; [0,2] ch  /8 -> o/8; [0,3] ch  /8 -> h/8; [0,4] ch  /8 -> a/8 |
-| seed0012-monk-vault-escort | 0/308 | 529/13878 | mklev-or-uinit | 0:char:mixed:init | 300:rnd(2)=>rn2(10) | 0,3,4,5,6,7+4 | [0,0] ch  /8 -> A/8; [0,1] ch  /8 -> l/8; [0,2] ch  /8 -> o/8; [0,3] ch  /8 -> h/8; [0,4] ch  /8 -> a/8 |
-| seed0013-friday13-save-then-fullmoon-restore | 0/99 | 540/4804 | mklev-or-uinit | 0:char:mixed:init | 507:rn2(68)=>rn2(100) | 8,11,15,16,17,18+2 | [8,54] ch  /8 -> ─/8; [8,55] ch  /8 -> ·/8; [8,56] ch  /8 -> ·/8; [8,57] ch  /8 -> ·/8; [8,58] ch  /8 -> ·/8 |
-| seed0013-rogue-friday13-combat | 0/59 | 533/4838 | mklev-or-uinit | 0:char:mixed:init | 507:rn2(68)=>rn2(100) | 8,11,15,16,17,18+2 | [8,54] ch  /8 -> ─/8; [8,55] ch  /8 -> ·/8; [8,56] ch  /8 -> ·/8; [8,57] ch  /8 -> ·/8; [8,58] ch  /8 -> ·/8 |
-| seed0014-dequa-fountain-explore | 0/714 | 225/59178 | early-startup | 0:char:mixed:init | 0:rn2(1)=>rn2(2) | 0,4,5,6,7,12+7 | [0,0] ch  /8 -> A/8; [0,1] ch  /8 -> l/8; [0,2] ch  /8 -> o/8; [0,3] ch  /8 -> h/8; [0,4] ch  /8 -> a/8 |
-| seed0015-valk-level2-pit-dog-wait | 0/44 | 386/8563 | mklev-or-uinit | 0:char:mixed:init | 339:rn2(71)=>rn2(100) | 0,9,13,16,18,22+1 | [0,52] ch O/8 -> M/8; [0,53] ch d/8 -> a/8; [0,54] ch i/8 -> r/8; [0,55] ch n/8 -> d/8; [0,56] ch :/8 -> u/8 |
+| seed0002-healer-reflection-drummer | 11/595 | 1247/27158 | post-startup-live | 11:char+attr:mixed:n | 1215:rn2(6)=>rn2(4) | 0,9,10 | [0,0] ch  /8 -> H/8; [0,1] ch  /8 -> e/8; [0,2] ch  /8 -> l/8; [0,3] ch  /8 -> l/8; [0,4] ch  /8 -> o/8 |
+| seed0004-feeding-pony | 0/409 | 158/12084 | early-startup | 0:char:mixed:init | 0:rn2(13)=>rn2(2) | 0,4,5,6,7,12+7 | [0,0] ch  /8 -> A/8; [0,1] ch  /8 -> l/8; [0,2] ch  /8 -> o/8; [0,3] ch  /8 -> h/8; [0,4] ch  /8 -> a/8 |
+| seed0006-wizard-water-demon | 0/123 | 88/6736 | early-startup | 0:char:mixed:init | 0:rn2(1)=>rn2(2) | 0,2,3,4,5,6+4 | [0,0] ch  /8 -> A/8; [0,1] ch  /8 -> l/8; [0,2] ch  /8 -> o/8; [0,3] ch  /8 -> h/8; [0,4] ch  /8 -> a/8 |
+| seed0007-rogue-snake-swamp | 0/302 | 216/16373 | early-startup | 0:char:mixed:init | 0:rn2(13)=>rn2(2) | 0,4,5,6,7,12+5 | [0,0] ch  /8 -> A/8; [0,1] ch  /8 -> l/8; [0,2] ch  /8 -> o/8; [0,3] ch  /8 -> h/8; [0,4] ch  /8 -> a/8 |
+| seed0009-swimmer-mforce | 0/73 | 127/3713 | early-startup | 0:char:mixed:init | 0:rn2(13)=>rn2(2) | 0,2,3,4,5,6+4 | [0,0] ch  /8 -> A/8; [0,1] ch  /8 -> l/8; [0,2] ch  /8 -> o/8; [0,3] ch  /8 -> h/8; [0,4] ch  /8 -> a/8 |
+| seed0012-monk-vault-escort | 0/308 | 534/13878 | mklev-or-uinit | 0:char:mixed:init | 300:rnd(2)=>rn2(10) | 0,3,4,5,6,7+4 | [0,0] ch  /8 -> A/8; [0,1] ch  /8 -> l/8; [0,2] ch  /8 -> o/8; [0,3] ch  /8 -> h/8; [0,4] ch  /8 -> a/8 |
+| seed0013-friday13-save-then-fullmoon-restore | 0/99 | 538/4804 | mklev-or-uinit | 0:char:mixed:init | 507:rn2(68)=>rn2(100) | 8,11,15,16,17,18+2 | [8,54] ch  /8 -> ─/8; [8,55] ch  /8 -> ·/8; [8,56] ch  /8 -> ·/8; [8,57] ch  /8 -> ·/8; [8,58] ch  /8 -> ·/8 |
+| seed0013-rogue-friday13-combat | 0/59 | 534/4838 | mklev-or-uinit | 0:char:mixed:init | 507:rn2(68)=>rn2(100) | 8,11,15,16,17,18+2 | [8,54] ch  /8 -> ─/8; [8,55] ch  /8 -> ·/8; [8,56] ch  /8 -> ·/8; [8,57] ch  /8 -> ·/8; [8,58] ch  /8 -> ·/8 |
+| seed0014-dequa-fountain-explore | 0/714 | 220/59178 | early-startup | 0:char:mixed:init | 0:rn2(1)=>rn2(2) | 0,4,5,6,7,12+7 | [0,0] ch  /8 -> A/8; [0,1] ch  /8 -> l/8; [0,2] ch  /8 -> o/8; [0,3] ch  /8 -> h/8; [0,4] ch  /8 -> a/8 |
+| seed0015-valk-level2-pit-dog-wait | 0/44 | 382/8563 | mklev-or-uinit | 0:char:mixed:init | 339:rn2(71)=>rn2(100) | 0,9,13,16,18,22+1 | [0,52] ch O/8 -> M/8; [0,53] ch d/8 -> a/8; [0,54] ch i/8 -> r/8; [0,55] ch n/8 -> d/8; [0,56] ch :/8 -> u/8 |
 | seed0016-healer-newmoon-eat-zap | 0/36 | 1354/3656 | late-startup | 0:char:mixed:init | 1341:rn2(4)=>rnd(4) | 0,2,3,4,5,6+11 | [0,22] ch I/8 ->  /8; [0,23] ch t/8 -> I/8; [0,24] ch  /8 -> t/8; [0,25] ch i/8 ->  /8; [0,26] ch s/8 -> i/8 |
-| seed0017-samurai-altar-pray | 0/67 | 2603/3465 | late-startup | 0:char:mixed:init | 2595:rn2(1)=>rn2(3) | 0,2,3,4,5,6+12 | [0,23] ch  /8 -> I/8; [0,24] ch  /8 -> t/8; [0,26] ch  /8 -> i/8; [0,27] ch  /8 -> s/8; [0,29] ch  /8 -> w/8 |
-| seed0030-ten-diverse-deaths | 0/1954 | 985/94382 | mklev-or-uinit | 0:char:mixed:init | 299:rnd(4)=>rn2(10) | 0,2,3,4,5,6+13 | [0,0] ch H/8 ->  /8; [0,1] ch e/8 ->  /8; [0,2] ch l/8 ->  /8; [0,3] ch l/8 ->  /8; [0,4] ch o/8 ->  /8 |
-| seed0060-orc-rogue-kick-search | 0/41 | 1052/3626 | mklev-or-uinit | 0:char+attr:mixed:init | 1036:rn2(100)=>rn2(5) | 12,14,22,23 | [12,4] ch f/15 -> ·/8; [12,6] attr $/11 -> $/14; [14,4] ch ·/8 -> d/15; [22,34] ch 1/8 -> 8/8; [22,35] ch 4/8 ->  /8 |
+| seed0017-samurai-altar-pray | 0/67 | 2605/3465 | late-startup | 0:char:mixed:init | 2595:rn2(1)=>rn2(3) | 0,2,3,4,5,6+12 | [0,23] ch  /8 -> I/8; [0,24] ch  /8 -> t/8; [0,26] ch  /8 -> i/8; [0,27] ch  /8 -> s/8; [0,29] ch  /8 -> w/8 |
+| seed0030-ten-diverse-deaths | 0/1954 | 758/94382 | mklev-or-uinit | 0:char:mixed:init | 299:rnd(4)=>rn2(10) | 0,2,3,4,5,6+13 | [0,0] ch H/8 ->  /8; [0,1] ch e/8 ->  /8; [0,2] ch l/8 ->  /8; [0,3] ch l/8 ->  /8; [0,4] ch o/8 ->  /8 |
+| seed0060-orc-rogue-kick-search | 0/41 | 1064/3626 | mklev-or-uinit | 0:char+attr:mixed:init | 1036:rn2(100)=>rn2(5) | 12,14,22,23 | [12,4] ch f/15 -> ·/8; [12,6] attr $/11 -> $/14; [14,4] ch ·/8 -> d/15; [22,34] ch 1/8 -> 8/8; [22,35] ch 4/8 ->  /8 |
 | seed0077-rogue-chargen | 0/33 | 96/3242 | early-startup | 0:char:mixed:init | 0:rn2(1)=>rn2(2) | 0,3,4,5,6,7+4 | [0,0] ch  /8 -> A/8; [0,1] ch  /8 -> l/8; [0,2] ch  /8 -> o/8; [0,3] ch  /8 -> h/8; [0,4] ch  /8 -> a/8 |
 | seed0101-ranger-quiver-throw-travel-engrave | 0/27 | 1005/2371 | mklev-or-uinit | 0:char:mixed:init | 996:rn2(10)=>rn2(5) | 0,3,4,5,6,9+4 | [0,55] ch s/8 -> d/8; [0,56] ch :/8 -> u/8; [0,57] ch  /8 -> k/8; [0,58] ch  /8 -> :/8; [3,22] ch  /8 -> ─/8 |
-| seed0102-ranger-name-cancel | 0/25 | 1308/4485 | late-startup | 0:char+attr:mixed:init | 1281:rn2(3)=>rn2(6) | 0,7,8,9,10,11+5 | [0,55] ch s/8 -> d/8; [0,56] ch :/8 -> u/8; [0,57] ch  /8 -> k/8; [0,58] ch  /8 -> :/8; [7,22] ch  /8 -> ─/8 |
+| seed0102-ranger-name-cancel | 0/25 | 1301/4485 | late-startup | 0:char+attr:mixed:init | 1281:rn2(3)=>rn2(6) | 0,7,8,9,10,11+5 | [0,55] ch s/8 -> d/8; [0,56] ch :/8 -> u/8; [0,57] ch  /8 -> k/8; [0,58] ch  /8 -> :/8; [7,22] ch  /8 -> ─/8 |
 | seed0103-knight-ride-pony | 0/60 | 339/2640 | mklev-or-uinit | 0:char:mixed:init | 299:rnd(4)=>rn2(10) | 0,9,13,16,17,18+4 | [0,52] ch L/8 -> M/8; [0,53] ch u/8 -> a/8; [0,54] ch g/8 -> r/8; [0,55] ch h/8 -> d/8; [0,56] ch :/8 -> u/8 |
 | seed0104-knight-ride-combat | 0/43 | 364/3223 | mklev-or-uinit | 0:char:mixed:init | 299:rnd(4)=>rn2(10) | 0,3,4,5,6,7+9 | [0,52] ch L/8 -> M/8; [0,53] ch u/8 -> a/8; [0,54] ch g/8 -> r/8; [0,55] ch h/8 -> d/8; [0,56] ch :/8 -> u/8 |
-| seed0105-valk-chat-lamp-ration | 0/30 | 987/2499 | mklev-or-uinit | 0:char:mixed:init | 974:rn2(11)=>rn2(5) | 0,9,12,13,14,15+6 | [0,52] ch O/8 -> M/8; [0,53] ch d/8 -> a/8; [0,54] ch i/8 -> r/8; [0,55] ch n/8 -> d/8; [0,56] ch :/8 -> u/8 |
-| seed0106-priest-extcmd-sweep | 0/267 | 1381/4194 | early-startup | 0:char:mixed:init | 199:rn2(13)=>rn2(3) | 0,2,3,4,5,6+12 | [0,8] ch I/8 ->  /8; [0,9] ch t/8 ->  /8; [0,11] ch i/8 ->  /8; [0,12] ch s/8 ->  /8; [0,14] ch w/8 ->  /8 |
-| seed0107-samurai-twoweapon-enhance | 0/98 | 2581/2902 | late-startup | 0:char:mixed:init | 2577:rn2(1)=>rn2(3) | 0,2,3,4,5,6+12 | [0,8] ch I/8 ->  /8; [0,9] ch t/8 ->  /8; [0,11] ch i/8 ->  /8; [0,12] ch s/8 ->  /8; [0,14] ch w/8 ->  /8 |
-| seed0108-wizard-extcmd-wishlist | 0/303 | 1452/16958 | late-startup | 0:char:mixed:init | 1431:rn2(3)=>rn2(5) | 17,18,19,20,22 | [17,38] ch  /8 -> │/8; [17,39] ch  /8 -> ·/8; [17,40] ch  /8 -> f/15; [17,41] ch  /8 -> ·/8; [17,42] ch  /8 -> ·/8 |
-| seed0116-wizard-wear-shop | 16/127 | 5650/12562 | post-startup-live | 16:char:map:T | 5532:rn2(100)=>rn2(1) | 14,15 | [14,8] ch f/15 -> ·/8; [15,9] ch ·/8 -> f/15 |
+| seed0105-valk-chat-lamp-ration | 0/30 | 988/2499 | mklev-or-uinit | 0:char:mixed:init | 974:rn2(11)=>rn2(5) | 0,9,12,13,14,15+6 | [0,52] ch O/8 -> M/8; [0,53] ch d/8 -> a/8; [0,54] ch i/8 -> r/8; [0,55] ch n/8 -> d/8; [0,56] ch :/8 -> u/8 |
+| seed0106-priest-extcmd-sweep | 0/267 | 1373/4194 | early-startup | 0:char:mixed:init | 199:rn2(13)=>rn2(3) | 0,2,3,4,5,6+12 | [0,8] ch I/8 ->  /8; [0,9] ch t/8 ->  /8; [0,11] ch i/8 ->  /8; [0,12] ch s/8 ->  /8; [0,14] ch w/8 ->  /8 |
+| seed0107-samurai-twoweapon-enhance | 0/98 | 2582/2902 | late-startup | 0:char:mixed:init | 2577:rn2(1)=>rn2(3) | 0,2,3,4,5,6+12 | [0,8] ch I/8 ->  /8; [0,9] ch t/8 ->  /8; [0,11] ch i/8 ->  /8; [0,12] ch s/8 ->  /8; [0,14] ch w/8 ->  /8 |
+| seed0108-wizard-extcmd-wishlist | 0/303 | 1455/16958 | late-startup | 0:char:mixed:init | 1431:rn2(3)=>rn2(5) | 17,18,19,20,22 | [17,38] ch  /8 -> │/8; [17,39] ch  /8 -> ·/8; [17,40] ch  /8 -> f/15; [17,41] ch  /8 -> ·/8; [17,42] ch  /8 -> ·/8 |
+| seed0116-wizard-wear-shop | 17/127 | 5682/12562 | post-startup-live | 17:char:map:L | 5573:rn2(5)=>rn2(100) | 15,16 | [15,12] ch f/15 -> ·/8; [16,12] ch ·/8 -> f/15 |
 | seed0200-monk-north-search | 0/40 | 426/3822 | mklev-or-uinit | 0:char:mixed:init | 299:rnd(2)=>rn2(10) | 0,2,3,4,5,6+11 | [0,15] ch I/8 ->  /8; [0,16] ch t/8 ->  /8; [0,18] ch i/8 ->  /8; [0,19] ch s/8 ->  /8; [0,21] ch w/8 ->  /8 |
-| seed0360-wizard-world-tour | 0/833 | 2718/120639 | late-startup | 0:char:mixed:init | 1355:rn2(2894)=>rn2(3014) | 17,22 | [17,52] ch  /8 -> └/8; [17,53] ch  /8 -> ─/8; [17,54] ch  /8 -> ─/8; [17,55] ch  /8 -> ─/8; [17,56] ch  /8 -> ┘/8 |
+| seed0360-wizard-world-tour | 0/833 | 2715/120639 | late-startup | 0:char:mixed:init | 1355:rn2(2894)=>rn2(3014) | 17,22 | [17,52] ch  /8 -> └/8; [17,53] ch  /8 -> ─/8; [17,54] ch  /8 -> ─/8; [17,55] ch  /8 -> ─/8; [17,56] ch  /8 -> ┘/8 |
 | seed0361-archeologist-tour | 0/366 | 344/53865 | early-startup | 0:char:mixed:init | 199:rn2(100)=>rn2(3) | 0,2,3,4,5,6+13 | [0,20] ch I/8 ->  /8; [0,21] ch t/8 ->  /8; [0,23] ch i/8 -> I/8; [0,24] ch s/8 -> t/8; [0,26] ch w/8 -> i/8 |
-| seed0367-priest-quest-tour | 0/324 | 449/50125 | early-startup | 0:char:mixed:init | 199:rn2(13)=>rn2(3) | 0,9,13,15,16,17+4 | [0,52] ch L/8 -> M/8; [0,53] ch o/8 -> a/8; [0,54] ch k/8 -> r/8; [0,55] ch i/8 -> d/8; [0,56] ch :/8 -> u/8 |
+| seed0367-priest-quest-tour | 0/324 | 403/50125 | early-startup | 0:char:mixed:init | 199:rn2(13)=>rn2(3) | 0,9,13,15,16,17+4 | [0,52] ch L/8 -> M/8; [0,53] ch o/8 -> a/8; [0,54] ch k/8 -> r/8; [0,55] ch i/8 -> d/8; [0,56] ch :/8 -> u/8 |
 | seed0373-barbarian-quest-tour | 0/124 | 2264/35386 | late-startup | 0:char:mixed:init | 1289:rn2(2)=>rn2(10) | 0,3,4,5,8,9+5 | [0,52] ch C/8 -> M/8; [0,53] ch r/8 -> a/8; [0,54] ch o/8 -> r/8; [0,55] ch m/8 -> d/8; [0,56] ch :/8 -> u/8 |
-| seed0383-wizard-hallucinate | 0/219 | 9906/16915 | late-startup | 0:char:map:init | 9716:rn2(100)=>rn2(4) | 3,8 | [3,71] ch  /8 -> ─/8; [3,72] ch  /8 -> ─/8; [3,73] ch  /8 -> ─/8; [3,74] ch  /8 -> ┐/8; [8,61] ch  /8 -> └/8 |
+| seed0383-wizard-hallucinate | 0/219 | 9877/16915 | late-startup | 0:char:map:init | 9716:rn2(100)=>rn2(4) | 3,8 | [3,71] ch  /8 -> ─/8; [3,72] ch  /8 -> ─/8; [3,73] ch  /8 -> ─/8; [3,74] ch  /8 -> ┐/8; [8,61] ch  /8 -> └/8 |
 | seed0398-wizard-wandpoly-pile | 0/87 | 1525/3026 | late-startup | 0:char:mixed:init | 1513:rn2(6)=>rn2(4) | 0,6,22,23 | [0,73] ch  /8 -> -/8; [0,74] ch  /8 -> -/8; [0,75] ch  /8 -> M/8; [0,76] ch  /8 -> o/8; [0,77] ch  /8 -> r/8 |
-| seed0399-wizard-hallu-actions | 0/532 | 690/11409 | mklev-or-uinit | 0:char:mixed:init | 599:rn2(68)=>rn2(100) | 6,7,8,9,10,11+4 | [6,11] ch ┌/8 ->  /8; [6,12] ch ─/8 ->  /8; [6,13] ch ─/8 ->  /8; [6,14] ch ─/8 ->  /8; [6,15] ch ─/8 ->  /8 |
+| seed0399-wizard-hallu-actions | 0/532 | 691/11409 | mklev-or-uinit | 0:char:mixed:init | 599:rn2(68)=>rn2(100) | 6,7,8,9,10,11+4 | [6,11] ch ┌/8 ->  /8; [6,12] ch ─/8 ->  /8; [6,13] ch ─/8 ->  /8; [6,14] ch ─/8 ->  /8; [6,15] ch ─/8 ->  /8 |
 | seed0501-priest-cast-read-turn | 0/28 | 298/2238 | early-startup | 0:char:mixed:init | 199:rn2(13)=>rn2(3) | 0,2,3,4,5,6+12 | [0,17] ch I/8 ->  /8; [0,18] ch t/8 ->  /8; [0,20] ch i/8 ->  /8; [0,21] ch s/8 ->  /8; [0,23] ch w/8 -> I/8 |
-| seed0700-samurai-explore-descend | 0/51 | 1741/3230 | late-startup | 0:char:mixed:init | 1718:rn2(9)=>rn2(398) | 0,2,3,4,5,6+13 | [0,8] ch I/8 ->  /8; [0,9] ch t/8 ->  /8; [0,11] ch i/8 ->  /8; [0,12] ch s/8 ->  /8; [0,14] ch w/8 ->  /8 |
-| seed0900-tourist-explore-actions | 0/84 | 361/2983 | mklev-or-uinit | 0:char:mixed:init | 302:rn2(5)=>rn2(3) | 0,2,3,4,5,6+12 | [0,17] ch I/8 ->  /8; [0,18] ch t/8 ->  /8; [0,20] ch i/8 ->  /8; [0,21] ch s/8 ->  /8; [0,23] ch w/8 -> I/8 |
-| seed1150-caveman-explore-move | 0/51 | 338/3137 | mklev-or-uinit | 0:char:mixed:init | 302:rn2(5)=>rn2(3) | 0,2,3,4,5,6+14 | [0,19] ch I/8 ->  /8; [0,20] ch t/8 ->  /8; [0,22] ch i/8 ->  /8; [0,23] ch s/8 -> I/8; [0,24] ch  /8 -> t/8 |
-| seed1500-rogue-explore-move | 0/40 | 2238/2768 | mklev-or-uinit | 0:char:mixed:init | 1162:rn2(6)=>rn2(4) | 16,17,22 | [16,58] ch  /8 -> ·/8; [16,59] ch  /8 -> ·/8; [16,60] ch  /8 -> ·/8; [16,61] ch  /8 -> ·/8; [16,62] ch  /8 -> ·/8 |
-| seed1800-tourist-eat-throw | 0/26 | 2006/2458 | mklev-or-uinit | 0:char:mixed:init | 875:rn2(10)=>rn2(5) | 0,2,3,4,5,6+13 | [0,17] ch I/8 ->  /8; [0,18] ch t/8 ->  /8; [0,20] ch i/8 ->  /8; [0,21] ch s/8 ->  /8; [0,23] ch w/8 -> I/8 |
-| seed2200-wizard-quaff-zap-read | 0/230 | 2451/3018 | late-startup | 0:char:mixed:init | 1248:rn2(2)=>rn2(10) | 9,10,11,12,13,14+1 | [9,22] ch  /8 -> ─/8; [10,22] ch  /8 -> ·/8; [11,16] ch x/15 -> `/7; [11,17] ch (/3 -> ·/8; [11,20] ch ·/8 -> f/15 |
-| seed2600-wizard-custom-binds | 0/38 | 1308/11647 | mklev-or-uinit | 0:char:mixed:init | 382:rn2(1)=>rn2(4) | 12,13,14,15,16,17+1 | [12,6] ch  /8 -> ┌/8; [12,7] ch  /8 -> ─/8; [12,9] ch  /8 -> ─/8; [12,10] ch  /8 -> ─/8; [12,11] ch  /8 -> ─/8 |
-| seed4500-knight-coverage | 0/1814 | 1685/108275 | mklev-or-uinit | 0:char:mixed:init | 254:rnd(4)=>rn2(10) | 0,1,3,4,5,6+12 | [0,12] ch w/8 -> k/8; [0,13] ch i/8 -> n/8; [0,14] ch z/8 -> i/8; [0,15] ch a/8 -> g/8; [0,16] ch r/8 -> h/8 |
-| seed5002-wizard-coverage-pair | 0/410 | 546/12167 | mklev-or-uinit | 0:char:mixed:init | 415:rn2(70)=>rn2(100) | 0,1,2,3,4,5+13 | [0,0] ch H/8 ->  /8; [0,1] ch e/8 ->  /8; [0,2] ch l/8 ->  /8; [0,3] ch l/8 ->  /8; [0,4] ch o/8 ->  /8 |
-| seed5006-tourist-stress-disaster | 0/249 | 2350/13923 | late-startup | 0:char:mixed:init | 2246:rnd(1000)=>rn2(100) | 0,1,2,3,4,5+12 | [0,0] ch A/8 ->  /8; [0,1] ch l/8 ->  /8; [0,2] ch o/8 ->  /8; [0,3] ch h/8 ->  /8; [0,4] ch a/8 ->  /8 |
+| seed0700-samurai-explore-descend | 0/51 | 1737/3230 | late-startup | 0:char:mixed:init | 1718:rn2(9)=>rn2(398) | 0,2,3,4,5,6+13 | [0,8] ch I/8 ->  /8; [0,9] ch t/8 ->  /8; [0,11] ch i/8 ->  /8; [0,12] ch s/8 ->  /8; [0,14] ch w/8 ->  /8 |
+| seed0900-tourist-explore-actions | 0/84 | 358/2983 | mklev-or-uinit | 0:char:mixed:init | 302:rn2(5)=>rn2(3) | 0,2,3,4,5,6+12 | [0,17] ch I/8 ->  /8; [0,18] ch t/8 ->  /8; [0,20] ch i/8 ->  /8; [0,21] ch s/8 ->  /8; [0,23] ch w/8 -> I/8 |
+| seed1150-caveman-explore-move | 0/51 | 337/3137 | mklev-or-uinit | 0:char:mixed:init | 302:rn2(5)=>rn2(3) | 0,2,3,4,5,6+14 | [0,19] ch I/8 ->  /8; [0,20] ch t/8 ->  /8; [0,22] ch i/8 ->  /8; [0,23] ch s/8 -> I/8; [0,24] ch  /8 -> t/8 |
+| seed1500-rogue-explore-move | 0/40 | 2234/2768 | mklev-or-uinit | 0:char:mixed:init | 1162:rn2(6)=>rn2(4) | 16,17,22 | [16,58] ch  /8 -> ·/8; [16,59] ch  /8 -> ·/8; [16,60] ch  /8 -> ·/8; [16,61] ch  /8 -> ·/8; [16,62] ch  /8 -> ·/8 |
+| seed1800-tourist-eat-throw | 0/26 | 2004/2458 | mklev-or-uinit | 0:char:mixed:init | 875:rn2(10)=>rn2(5) | 0,2,3,4,5,6+13 | [0,17] ch I/8 ->  /8; [0,18] ch t/8 ->  /8; [0,20] ch i/8 ->  /8; [0,21] ch s/8 ->  /8; [0,23] ch w/8 -> I/8 |
+| seed2200-wizard-quaff-zap-read | 0/230 | 2446/3018 | late-startup | 0:char:mixed:init | 1248:rn2(2)=>rn2(10) | 9,10,11,12,13,14+1 | [9,22] ch  /8 -> ─/8; [10,22] ch  /8 -> ·/8; [11,16] ch x/15 -> `/7; [11,17] ch (/3 -> ·/8; [11,20] ch ·/8 -> f/15 |
+| seed2600-wizard-custom-binds | 0/38 | 1311/11647 | mklev-or-uinit | 0:char:mixed:init | 382:rn2(1)=>rn2(4) | 12,13,14,15,16,17+1 | [12,6] ch  /8 -> ┌/8; [12,7] ch  /8 -> ─/8; [12,9] ch  /8 -> ─/8; [12,10] ch  /8 -> ─/8; [12,11] ch  /8 -> ─/8 |
+| seed4500-knight-coverage | 0/1814 | 1722/108275 | mklev-or-uinit | 0:char:mixed:init | 254:rnd(4)=>rn2(10) | 0,1,3,4,5,6+12 | [0,12] ch w/8 -> k/8; [0,13] ch i/8 -> n/8; [0,14] ch z/8 -> i/8; [0,15] ch a/8 -> g/8; [0,16] ch r/8 -> h/8 |
+| seed5002-wizard-coverage-pair | 0/410 | 544/12167 | mklev-or-uinit | 0:char:mixed:init | 415:rn2(70)=>rn2(100) | 0,1,2,3,4,5+13 | [0,0] ch H/8 ->  /8; [0,1] ch e/8 ->  /8; [0,2] ch l/8 ->  /8; [0,3] ch l/8 ->  /8; [0,4] ch o/8 ->  /8 |
+| seed5006-tourist-stress-disaster | 0/249 | 2335/13923 | late-startup | 0:char:mixed:init | 2246:rnd(1000)=>rn2(100) | 0,1,2,3,4,5+12 | [0,0] ch A/8 ->  /8; [0,1] ch l/8 ->  /8; [0,2] ch o/8 ->  /8; [0,3] ch h/8 ->  /8; [0,4] ch a/8 ->  /8 |
 | seed8000-tourist-starter | 23/23 | 3010/3130 | post-screen-rng | -:none:none:- | 2985:rn2(5)=>rn2(12) | - | - |
