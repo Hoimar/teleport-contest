@@ -1,7 +1,7 @@
 import { game } from './gstate.js';
 import { rn2 } from './rng.js';
 import { dosounds } from './sounds.js';
-import { A_CON, A_DEX } from './const.js';
+import { A_CON, A_DEX, A_WIS } from './const.js';
 
 export function maybe_generate_rnd_mon() {
     // C ref: allmain.c:166
@@ -63,6 +63,11 @@ export function exerchk() {
     if (moves % 10 === 0) {
         const hunger = game.u?.uhunger ?? 900;
         if (hunger > 150 && hunger <= 1000) exercise(A_CON, true);
+    }
+    if (moves % 5 === 0) {
+        if (game.u?.uprops?.confusion || game.u?.uprops?.hallucination) {
+            exercise(A_WIS, false);
+        }
     }
 }
 

@@ -916,3 +916,12 @@
 - Implementation delta: monster/region movement is closer to `region.c:run_regions()` plus `inside_gas_cloud()` behavior. No seed-specific branches, replay tables, or screen overrides were added.
 - Discarded direction: temporary RNG stack tracing in `js/rng.js` identified the vapor gate and was removed; no trace/debug I/O remains in production paths.
 - Current queue: classify `seed0383` FR 10843 by comparing C `attrib.c:exerchk()` / `exercise()` turn-tail calls with JS `allmain_turns.js`; then continue `seed0116` screen 109 object identity/color drift; keep `seed0383` dog-goal floor-object/state parity in view after the exercise cadence blocker.
+
+## Iteration 22 - Hallucination Status Exercise
+
+- Change: `exerchk()` now applies the `exerper()` status branch for hallucination/confusion on 5-turn boundaries, consuming `exercise(A_WIS, false)` / `rn2(2)` when the hero is hallucinating.
+- Evidence: `seed0383-wizard-hallucinate` moved from FR 10843 / `R 10970/16915` to FR 10916 / `R 11035/16915`. The missing call was C's hallucination Wisdom abuse after hunger/Con exercise, not another movement selector.
+- Score delta: full public suite remains `S 143/11406`, 0/44 passing; focused evidence session screens remain `0/219`, but the first RNG mismatch moved later by 73 calls.
+- Regression stability: target triage after the edit reports `seed0383` `S 0/219 R 11035/16915 FR 10916`; `seed0116` remains exact on RNG at `S 109/127 R 12562/12562`; sentinel suite is stable at total `S 143/1063 R 28471/64569`; full suite is stable at `S 143/11406`.
+- Implementation delta: turn-tail attribute exercise is closer to `attrib.c:exerper()` for hallucination/confusion status without adding seed-specific branches.
+- Current queue: classify `seed0383` FR 10916, where C expects `rnd(2)` after status exercise while JS enters `distfleeck()` with `rn2(5)`; likely owner is remaining combat/adjacent-attack or movement phase state. Then continue `seed0116` screen 109 object identity/color drift.
