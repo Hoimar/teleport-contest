@@ -34,6 +34,10 @@ Some project-memory files are large enough that full reads waste agent context. 
 | `scratch/divergence-inventory.md` | Treat as generated/index material; grep or regenerate with `scripts/triage-corpus.mjs`. |
 | `sessions/*.session.json` | Avoid reading in full. Use `scripts/triage-session.mjs`, `scripts/trace-dog-goal.mjs`, or narrow JSON searches. |
 
+### C Reference Breadcrumbs
+
+Concise upstream references are encouraged in source comments, `feature_map.md`, `lessons.md`, and scratch checkpoints when they make future lookups cheaper. Prefer the compact `C ref: path:function()` style, optionally with a stable line number only when it is likely to remain useful. Use references to anchor ported behavior and subsystem notes; do not paste large upstream excerpts or add noisy citations for obvious code.
+
 ## Workflow & Verification Loop
 
 ### Step 1 — Read first

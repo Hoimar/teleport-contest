@@ -1,5 +1,5 @@
 import { game } from './gstate.js';
-import { d, rn2, rnd, pushRngLogEntry } from './rng.js';
+import { d, rn2, rnd } from './rng.js';
 import { dog_move } from './dog.js';
 import { enexto_core } from './mklev.js';
 import { OBJECT_CLASS, OBJECT_DELAY } from './object_data.js';
@@ -9,7 +9,7 @@ import {
     GP_CHECKSCARY,
     isok, SPACE_POS,
 } from './const.js';
-import { newsym } from './display.js';
+import { newsym, queue_more_prompt } from './display.js';
 import { clear_path } from './vision.js';
 
 const NORMAL_SPEED = 12;
@@ -44,16 +44,6 @@ const WAND_CLASS = 11;
 const GEM_CLASS = 13;
 const ROCK = 474;
 const BASIC_MELEE_ATTACKS = new Set(['AT_CLAW', 'AT_KICK', 'AT_BITE', 'AT_STNG', 'AT_TUCH', 'AT_BUTT', 'AT_TENT']);
-
-function traceMonMove(msg) {
-    if (globalThis.__teleportTraceMonMove) {
-        pushRngLogEntry(`TRACE monmove move=${game.moves} ${msg}`);
-    }
-}
-
-function monsterTraceName(mtmp) {
-    return mtmp.data?.name || mtmp.ch || '?';
-}
 
 export function mcalcmove(mtmp, m_moving) {
     let mmove = mtmp.data.mmove;
@@ -432,7 +422,6 @@ function apply_hero_damage(damage) {
 
 function unstuck_swallowed_hero(mtmp) {
     if (!game.u?.uswallow || game.u.ustuck !== mtmp) return;
-    traceMonMove(`expel-start ${monsterTraceName(mtmp)} @${mtmp.mx},${mtmp.my} hero=${game.u.ux},${game.u.uy} timer=${game.u.uswldtim || 0}`);
     game.u.uswallow = false;
     game.u.ustuck = null;
     game.u.uswldtim = 0;
@@ -448,7 +437,6 @@ function unstuck_swallowed_hero(mtmp) {
         const omy = mtmp.my;
         mtmp.mx = spot.x;
         mtmp.my = spot.y;
-        traceMonMove(`expel-spot ${monsterTraceName(mtmp)} ${omx},${omy} -> ${mtmp.mx},${mtmp.my}`);
         newsym(omx, omy);
         newsym(mtmp.mx, mtmp.my);
     }
@@ -457,7 +445,6 @@ function unstuck_swallowed_hero(mtmp) {
 
 function engulf_attack(mtmp, attack, toHit) {
     const [, adtyp, damn, damd] = attack;
-    traceMonMove(`attack-engulf ${monsterTraceName(mtmp)} ad=${adtyp} damn=${damn} damd=${damd} toHit=${toHit} heroAC=${game.u?.uac}`);
     const alreadySwallowed = game.u?.uswallow && game.u?.ustuck === mtmp;
     if (!alreadySwallowed && !(toHit > rnd(20))) return true;
     let damage = d(damn, damd);
@@ -496,7 +483,6 @@ function engulf_attack(mtmp, attack, toHit) {
 }
 
 function physical_melee_attacks(mtmp, attacks, toHit) {
-    traceMonMove(`attack-physical ${monsterTraceName(mtmp)} attacks=${JSON.stringify(attacks)} toHit=${toHit} heroAC=${game.u?.uac}`);
     for (let i = 0; i < attacks.length; i++) {
         const attack = attacks[i];
         if (!attack) continue;
@@ -521,12 +507,14 @@ function mattacku_basic(mtmp, state) {
 
     const cooldownAttack = cooldown_replacement_attack(mtmp);
     if (cooldownAttack) {
+        if (game._hero_melee_message_pending && game._pending_message) queue_more_prompt();
         return physical_melee_attacks(mtmp, [cooldownAttack], mattacku_to_hit(mtmp));
     }
     const engulf = basic_engulf_attack(mtmp);
     const physical = engulf ? null : basic_physical_attacks(mtmp);
     if (!engulf && !physical) return false;
     const toHit = mattacku_to_hit(mtmp);
+    if (game._hero_melee_message_pending && game._pending_message) queue_more_prompt();
     return engulf ? engulf_attack(mtmp, engulf, toHit) : physical_melee_attacks(mtmp, physical, toHit);
 }
 
@@ -564,26 +552,16 @@ function m_move_basic(mtmp) {
             if (appr === -1) appr = 1;
         }
     }
-    traceMonMove(`start ${monsterTraceName(mtmp)} @${omx},${omy} target=${ggx},${ggy} appr=${appr} flee=${mtmp.mflee ? 1 : 0} peaceful=${mtmp.mpeaceful ? 1 : 0} tame=${mtmp.mtame ? 1 : 0} track=${JSON.stringify(mtmp.mtrack || [])}`);
     const candidates = [];
-    const traceCells = [];
     const maxx = Math.min(omx + 1, 79);
     const maxy = Math.min(omy + 1, 20);
     for (let nx = Math.max(1, omx - 1); nx <= maxx; nx++) {
         for (let ny = Math.max(0, omy - 1); ny <= maxy; ny++) {
-            let reason = 'ok';
-            if (nx === omx && ny === omy) reason = 'origin';
-            else if (nx === game.u?.ux && ny === game.u?.uy) reason = 'hero';
-            else if (mon_at(nx, ny, mtmp)) reason = `mon:${monsterTraceName(mon_at(nx, ny, mtmp))}:typ${game.level?.at(nx, ny)?.typ}`;
-            else if (!mfndpos_terrain_ok(mtmp, nx, ny)) reason = `terrain:${game.level?.at(nx, ny)?.typ}`;
-            if (globalThis.__teleportTraceMonMove) {
-                traceCells.push(`${nx},${ny}:${reason}`);
-            }
-            if (reason !== 'ok') continue;
+            if (nx === omx && ny === omy) continue;
+            if (!can_mon_step(mtmp, nx, ny)) continue;
             candidates.push({ x: nx, y: ny });
         }
     }
-    traceMonMove(`candidates ${monsterTraceName(mtmp)} @${omx},${omy} cnt=${candidates.length} cells=${traceCells.join('|')}`);
     if (!candidates.length) return MMOVE_NOTHING;
 
     let nix = omx;
@@ -600,7 +578,6 @@ function m_move_basic(mtmp) {
                 const trk = mtmp.mtrack[j];
                 if (cand.x === trk.x && cand.y === trk.y) {
                     const denom = 4 * (candidates.length - j);
-                    traceMonMove(`backtrack ${monsterTraceName(mtmp)} @${omx},${omy} cand=${cand.x},${cand.y} j=${j} cnt=${candidates.length} denom=${denom}`);
                     if (rn2(denom)) {
                         continue candidateLoop;
                     }
@@ -622,7 +599,6 @@ function m_move_basic(mtmp) {
     }
 
     if (!moved || (nix === omx && niy === omy)) return MMOVE_NOTHING;
-    traceMonMove(`select ${monsterTraceName(mtmp)} @${omx},${omy} -> ${nix},${niy} target=${ggx},${ggy} nidist=${nidist}`);
     const engulfingHero = game.u?.uswallow && game.u?.ustuck === mtmp;
     mtmp.mx = nix;
     mtmp.my = niy;

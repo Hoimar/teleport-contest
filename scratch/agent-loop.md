@@ -19,17 +19,17 @@ This file is the live handoff checkpoint, not a full history. It was compacted o
 - Baseline requested by user: resume from commit `04d9360` and continue on the current branch without pushing.
 - Latest committed loop work: `d9f72d4 Handle pet abuse on hero kill`.
 - Local divergence from remote: branch is ahead of `origin/main`; do not push unless explicitly asked.
-- Current target: return to `seed0383-wizard-hallucinate` after completing the `seed0116` display/menu follow-up.
-- Active subsystem hypothesis: ordinary monster movement candidate geometry after hero-killed pet removal. C reaches `rn2(20)` in `m_move()`; JS reaches `rn2(16)`, likely from incomplete `mfndpos()` flags, actor ownership, live position state, or backtracking candidate count rather than a missing seed-specific roll.
+- Current target: `seed0383-wizard-hallucinate` after the Oracle special-level / turn-tail generation slice.
+- Active subsystem hypothesis: ordinary monster movement deterministic position drift after Oracle loading. C reaches `rn2(24)` in `m_move()` for the gnome's backtracking roll; JS has the gnome at `69,17` with 8 candidates and reaches `rn2(32)`. The likely owner is the previous item-seeking `m_move()` target/position choice toward the nearby scroll, not turn ordering.
 
 ## Latest Verified Scores
 
-- Sentinel after the latest menu/display slice: total `S 162/1063 R 28848/64569`.
+- Sentinel after the Oracle/turn-tail generation slice: total `S 162/1063 R 34224/64569`.
 - `seed8000-tourist-starter`: `S 23/23 R 3060/3130`, FR `3047`.
-- `seed0002-healer-reflection-drummer`: `S 11/595 R 1255/27158`, FR `1215`.
-- `seed0013-friday13-save-then-fullmoon-restore`: `S 0/99 R 541/4804`, FR `507`.
+- `seed0002-healer-reflection-drummer`: `S 11/595 R 1266/27158`, FR `1215`.
+- `seed0013-friday13-save-then-fullmoon-restore`: `S 0/99 R 535/4804`, FR `507`.
 - `seed0116-wizard-wear-shop`: `S 127/127 R 12562/12562`, PASS; remaining comparison notes are four cursor-only prompt positions.
-- `seed0383-wizard-hallucinate`: `S 1/219 R 11430/16915`, FR `11387`.
+- `seed0383-wizard-hallucinate`: `S 1/219 R 16801/16915`, FR `16750`.
 - Full suite after latest production slice: `S 162/11406`, 1/44 passing (`seed0116`).
 
 ## Recent Implementation Delta
@@ -51,22 +51,23 @@ Latest committed production slice:
 
 Uncommitted verified production slice:
 
-- `seed0116` display/menu completion:
-  - fixed Elemental Planes dummy-depth status with `depth()` and dungeon dummy fixup
-  - pre-mapped Sokoban remembered terrain/boulders/traps and repaired wall spines after Soko flip
-  - displayed Soko blue walls, seen traps, object-appearance mimics, and visible cells over remembered terrain
-  - replaced the raw `STR_I` tourist inventory replay on `i` with a live inventory menu builder, preserving seed8000 via visible Tourist starter fallback debt
-  - added Wizard spell, discovery, and attributes menu paths needed by current evidence
-- Evidence: `seed0116` moved from `S 109/127` at checkpoint startup and `S 122/127` after Soko display work to `S 127/127`, full RNG parity. Sentinel total moved `143 -> 162` screens; full suite moved `143 -> 162` screens and `0/44 -> 1/44` passing.
-- Residual debt: `\` discovery strings and some non-target menu text still use limited evidence tables; real `o_init` descriptor state and discovery persistence remain queued structural work.
+- Oracle / turn-tail generation slice:
+  - added `AGENTS.md` C-reference breadcrumb guidance
+  - loaded `dat/oracle.lua` structure: centered room, centaur statues, Delphi subroom, fountains, Oracle, random rooms, corridors, and wallification
+  - added C-order `makemon(NULL,0,0)` random placement before species selection and wired `maybe_generate_rnd_mon()` to live `makemon()`
+  - prevented dead pets from reappearing through level-teleport arrival fallback
+  - added Oracle ambient `dosounds()` gate and tame-kill alignment abuse
+  - added queued message-more handling and the paranoid pool prompt front door
+- Evidence: `seed0383` moved from `R 11430/16915` / FR `11387` to `R 16801/16915` / FR `16750`. Sentinel screens stayed `S 162/1063`; sentinel RNG total moved to `R 34224/64569`.
+- Residual debt: Oracle screen 0 still has map glyph drift, random-room/ordinary movement deterministic state still diverges, and full Oracle Lua/runtime special level support remains partial.
 
 ## Current Queue
 
-1. Classify `seed0383` FR `11387` with compact tooling first:
+1. Classify `seed0383` FR `16750` with compact tooling first:
    - `node scripts/triage-session.mjs sessions/seed0383-wizard-hallucinate.session.json`
-   - `node scripts/trace-dog-goal.mjs sessions/seed0383-wizard-hallucinate.session.json --moves 179 --rng 11370:11405 --monsters`
+   - inspect step `199` (`key: l`) and compare the gnome's previous deterministic `m_move()` from `68,16` toward the scroll at `71,17`
    - If compact tooling is insufficient, add temporary guarded movement tracing and remove it before any commit.
-2. Identify which monster owns JS `rn2(16)` and compare its position, movement budget, `mtrack`, and `mfndpos()` candidate set with C's expected `rn2(20)`.
+2. Identify why C's gnome backtracking denominator is `4 * 6` while JS has `4 * 8`: prior position drift, object-goal selection, `mfndpos()` exclusions, or room/topology state.
 3. Replace the menu/discovery residual scaffolding with real `o_init` description storage, discovery persistence, and broader role inventory/menu text when it becomes the highest safe structural next step.
 4. Keep broader startup/display/save blockers secondary unless the active queue is blocked.
 
