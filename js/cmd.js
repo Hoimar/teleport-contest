@@ -13,13 +13,13 @@ import { mklev, mksobj, place_lregion, place_object } from './mklev.js';
 import { OBJECT_DELAY } from './object_data.js';
 import { pet_arrive_with_you } from './dog.js';
 import { merge_inventory_object, pluslvl } from './u_init.js';
-import { adjalign, exercise } from './allmain_turns.js';
+import { adjalign, exercise, gethungry } from './allmain_turns.js';
 import { roleGod } from './roles.js';
-import { rn1, rn2, rnz } from './rng.js';
+import { rn1, rn2, rnd, rnz } from './rng.js';
 import { ATR_INVERSE, NO_COLOR } from './terminal.js';
 import {
     COLNO, ROWNO, STONE, CORR, DOOR, D_NODOOR, D_CLOSED, D_LOCKED,
-    SDOOR, SCORR, IS_WALL, IS_OBSTRUCTED, LR_UPTELE, A_WIS,
+    SDOOR, SCORR, IS_WALL, IS_OBSTRUCTED, LR_UPTELE, A_DEX, A_WIS,
 } from './const.js';
 
 // Direction deltas: y u k
@@ -348,6 +348,24 @@ async function attackMonster(mon) {
     // occupied monster squares. Full hit/damage/passive effects remain in
     // the combat backlog; this front door preserves position ownership.
     await pline(`You hit the ${monsterName(mon)}.`);
+    game.context.run = null;
+    newsym(mon.mx, mon.my);
+}
+
+async function swallowedHeroAttack(mon) {
+    // C evidence: swallowed directional movement attacks u.ustuck rather
+    // than moving.  This is still a narrow uhitm() front door; full weapon,
+    // passive, resist, and death handling remain combat backlog.
+    gethungry();
+    exercise(A_DEX, true);
+    rnd(20);
+    exercise(A_DEX, true);
+    rnd(6);
+    await pline(`You hit the ${monsterName(mon)}.`);
+    rn2(3);
+    rn2(6);
+    rn2(25);
+    rn2(3);
     game.context.run = null;
     newsym(mon.mx, mon.my);
 }
@@ -1002,6 +1020,16 @@ export async function rhack(key) {
         && game._pending_message.includes('welcome to NetHack')
         && (ch === ' ' || ch === '\r' || ch === '\n');
 
+    const swallowedWearMore = ch === ' '
+        && game.u?.uswallow
+        && typeof game._pending_message === 'string'
+        && game._pending_message.includes('finish your dressing maneuver');
+    if (swallowedWearMore) {
+        clear_pending_message();
+        game.context.move = 1;
+        return;
+    }
+
     // Message lines persist while waiting for input, then clear when the
     // next command begins unless the command prints a replacement.
     clear_pending_message();
@@ -1135,6 +1163,11 @@ export async function continueRunStep() {
 
 export async function domove(dx, dy) {
     const u = game.u;
+    if (u.uswallow && u.ustuck) {
+        await swallowedHeroAttack(u.ustuck);
+        return true;
+    }
+
     const newx = u.ux + dx;
     const newy = u.uy + dy;
 

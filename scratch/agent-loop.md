@@ -393,6 +393,26 @@
   2. Keep `seed0116` screen 109 as the secondary exact-RNG object identity target: two visible potions and one arrow stack still have object identity/color drift.
   3. Broaden monster inventory/equipment only from evidence; current implementation owns collector pickup and boot wear delay, not full `minvent`, armor preference, or all `m_search_items()` type predicates.
 
+### Iteration 20 - Swallowed Hero Attack Front Door
+
+- Implementation delta:
+  1. `rhack()` now treats the space after `You finish your dressing maneuver.` while swallowed as a message dismissal that resumes the pending turn sequence, instead of an unknown zero-time command. A broader attempt to treat every `(being worn)` message this way overshot C and was discarded.
+  2. `domove()` now routes swallowed directional movement into a narrow `u.ustuck` hero-attack front door rather than moving the swallowed hero. The current evidence shape includes the leading hunger/exercise calls, `hitum()` hit roll, `dmgval()` `rnd(6)`, message, knockback front-door rolls, known-hit, and passive roll.
+  3. Discarded direction: changing delayed armor occupation from `delay - 1` to `delay` regressed `seed0383` to FR 10213. Keep the existing occupation count; the missing boundary was message continuation, not object delay.
+- Evidence:
+  1. `seed0383` moved from `S 0/219 R 10907/16915` at FR 10608 to `S 0/219 R 10903/16915` at FR 10646. The lagging matched-call count dipped by 4, but the first mismatch moved structurally from before the swallowed attack to post-attack ordinary monster movement.
+  2. The in-attack mismatch `rnd(6)` expected vs `d(1,6)` actual was fixed by using `dmgval()`'s one-die `rnd(6)` shape instead of dice notation.
+  3. Current blocker: after the swallowed hero attack, C expects another `distfleeck()` gate in ordinary monster movement, while JS consumes an extra `rn2(3)` approach/candidate gate. The next useful step is to identify the live monster/predicate owner, not to change combat again.
+- Regression stability:
+  1. `node scripts/triage-session.mjs sessions/seed0383-wizard-hallucinate.session.json` => `S 0/219 R 10903/16915 FS 0:char:map:init FR 10646:rn2(5)=0=>rn2(3)=1 C 0`.
+  2. `node scripts/triage-session.mjs sessions/seed0116-wizard-wear-shop.session.json` => `S 109/127 R 12562/12562 FS 109:attr:map:e FR - C 4`.
+  3. `node scripts/run-sentinel-suite.mjs` => total `S 143/1063 R 28339/64569`; no sentinel screen-count regressions.
+  4. `node frozen/ps_test_runner.mjs` => total `S 143/11406`, 0/44 passing. No public screen-count regressions; non-target RNG prefixes remained stable except the expected structural shift in `seed0383`.
+- Current queue:
+  1. Classify `seed0383` FR 10646 post-attack movement: identify which monster owns the extra JS `rn2(3)` and compare its C/JS `distfleeck()`, approach gate, candidate geometry, and movement budget state.
+  2. Keep `seed0116` screen 109 as the secondary exact-RNG object identity target: two visible potions and one arrow stack still have object identity/color drift.
+  3. Broaden monster inventory/equipment only from evidence; current implementation owns collector pickup and boot wear delay, not full `minvent`, armor preference, or all `m_search_items()` type predicates.
+
 ## 2026-05-12 08:55 CEST Restart - Dehack, Deep Triage, Implementation Loop
 
 - Branch/baseline commit: `main` at `f4be79ac016690ec4a293cadad6427ed4d4715e3`.
