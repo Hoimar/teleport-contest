@@ -4,10 +4,11 @@ import { dog_move } from './dog.js';
 import { enexto_core } from './mklev.js';
 import { OBJECT_CLASS, OBJECT_DIR } from './object_data.js';
 import {
-    D_BROKEN, D_CLOSED, D_LOCKED, IS_DOOR, IS_LAVA, IS_OBSTRUCTED, IS_POOL,
-    IS_WATERWALL, I_SPECIAL, M_AP_FURNITURE, M_AP_OBJECT,
+    D_BROKEN, D_CLOSED, D_ISOPEN, D_LOCKED, D_NODOOR, D_TRAPPED,
+    IS_DOOR, IS_LAVA, IS_OBSTRUCTED, IS_POOL, IS_STWALL, IS_WATERWALL,
+    I_SPECIAL, M_AP_FURNITURE, M_AP_OBJECT,
     NEED_HTH_WEAPON, NEED_RANGED_WEAPON, NEED_WEAPON, W_WEP,
-    GP_CHECKSCARY,
+    GP_CHECKSCARY, W_NONPASSWALL,
     isok, SPACE_POS,
 } from './const.js';
 import { newsym, queue_more_prompt } from './display.js';
@@ -21,7 +22,9 @@ const M2_HUMAN = 0x00000008;
 const M2_WANDER = 0x00800000;
 const M1_FLY = 0x00000001;
 const M1_SWIM = 0x00000002;
+const M1_WALLWALK = 0x00000008;
 const M1_HIDE = 0x00000100;
+const M1_NOHANDS = 0x00002000;
 const M1_MINDLESS = 0x00010000;
 const M1_ANIMAL = 0x00040000;
 const M2_STRONG = 0x04000000;
@@ -32,6 +35,7 @@ const MSLOW = 1;
 const MFAST = 2;
 const MMOVE_NOTHING = 0;
 const MMOVE_MOVED = 1;
+const MMOVE_DIED = 2;
 const MMOVE_DONE = 3;
 const WEAPON_CLASS = 2;
 const ARMOR_CLASS = 3;
@@ -165,8 +169,24 @@ function mon_swims(mtmp) {
     return !!((mtmp.data?.mflags1 ?? 0) & M1_SWIM) || !!mtmp.data?.swimmer;
 }
 
+function mon_passes_walls(mtmp) {
+    return !!((mtmp.data?.mflags1 ?? 0) & M1_WALLWALK);
+}
+
+function mon_can_open_doors(mtmp) {
+    return !((mtmp.data?.mflags1 ?? 0) & M1_NOHANDS);
+}
+
 function mon_likes_lava(mtmp) {
     return !!mtmp.data?.likes_lava;
+}
+
+function may_passwall(x, y) {
+    const loc = game.level?.at(x, y);
+    if (!loc) return false;
+    // C ref: hack.c:may_passwall() only blocks special wall types that
+    // explicitly carry W_NONPASSWALL.
+    return !(IS_STWALL(loc.typ) && (loc.wall_info & W_NONPASSWALL));
 }
 
 function mfndpos_terrain_ok(mtmp, x, y) {
@@ -174,19 +194,24 @@ function mfndpos_terrain_ok(mtmp, x, y) {
     const loc = game.level?.at(x, y);
     if (!loc) return false;
     const typ = loc.typ;
+    const passwallOk = IS_OBSTRUCTED(typ) && mon_passes_walls(mtmp) && may_passwall(x, y);
 
-    // C ref: mon.c:mfndpos().  Obstructed rock/walls are blocked here
-    // until ALLOW_WALL/ALLOW_DIG are ported.
-    if (IS_OBSTRUCTED(typ)) return false;
+    // C ref: mon.c:mfndpos().  Obstructed rock/walls are blocked unless
+    // the monster has ALLOW_WALL-style phasing. Digging remains future work.
+    if (IS_OBSTRUCTED(typ) && !passwallOk) return false;
     if (IS_WATERWALL(typ) && !mon_swims(mtmp)) return false;
-    if (IS_DOOR(typ)) return !(loc.doormask & (D_CLOSED | D_LOCKED));
+    if (IS_DOOR(typ)) {
+        if (loc.doormask & D_LOCKED) return false;
+        if (loc.doormask & D_CLOSED) return mon_can_open_doors(mtmp);
+        return true;
+    }
 
     const wantpool = mtmp.data?.mlet === 'S_EEL';
     const poolok = mon_in_air(mtmp) || (mon_swims(mtmp) && !wantpool);
     const lavaok = mon_in_air(mtmp) || mon_likes_lava(mtmp);
     if (!poolok && (IS_POOL(typ) !== wantpool)) return false;
     if (!lavaok && IS_LAVA(typ)) return false;
-    return SPACE_POS(typ) || IS_POOL(typ) || IS_LAVA(typ);
+    return passwallOk || SPACE_POS(typ) || IS_POOL(typ) || IS_LAVA(typ);
 }
 
 function can_mon_step(mtmp, x, y) {
@@ -430,6 +455,57 @@ function mpickstuff_basic(mtmp) {
     return false;
 }
 
+function set_door_mask_basic(loc, mask) {
+    loc.flags = mask;
+    loc.doormask = mask;
+}
+
+function remove_dead_monster(mtmp) {
+    const monsters = game.level?.monsters || [];
+    const idx = monsters.indexOf(mtmp);
+    if (idx >= 0) monsters.splice(idx, 1);
+    newsym(mtmp.mx, mtmp.my);
+}
+
+function mb_trapped_basic(mtmp) {
+    // C ref: monmove.c:mb_trapped(). Messages, wakeup, and trap memory have
+    // no RNG in the current evidence; the required ownership is rnd(15).
+    mtmp.mstun = 1;
+    if (typeof mtmp.mhp === 'number') {
+        mtmp.mhp -= rnd(15);
+        if (mtmp.mhp <= 0) {
+            remove_dead_monster(mtmp);
+            return true;
+        }
+    } else {
+        rnd(15);
+    }
+    return false;
+}
+
+function postmove_door_basic(mtmp) {
+    const loc = game.level?.at(mtmp.mx, mtmp.my);
+    if (!loc || !IS_DOOR(loc.typ) || mon_passes_walls(mtmp)) return MMOVE_MOVED;
+    const trapped = !!(loc.doormask & D_TRAPPED);
+    if ((loc.doormask & D_LOCKED) && trapped) {
+        set_door_mask_basic(loc, D_NODOOR);
+        newsym(mtmp.mx, mtmp.my);
+        game.vision_full_recalc = 1;
+        return mb_trapped_basic(mtmp) ? MMOVE_DIED : MMOVE_MOVED;
+    }
+    if (loc.doormask === D_CLOSED && mon_can_open_doors(mtmp)) {
+        set_door_mask_basic(loc, D_ISOPEN);
+        newsym(mtmp.mx, mtmp.my);
+        game.vision_full_recalc = 1;
+    } else if ((loc.doormask & D_CLOSED) && trapped) {
+        set_door_mask_basic(loc, D_NODOOR);
+        newsym(mtmp.mx, mtmp.my);
+        game.vision_full_recalc = 1;
+        return mb_trapped_basic(mtmp) ? MMOVE_DIED : MMOVE_MOVED;
+    }
+    return MMOVE_MOVED;
+}
+
 function mon_track_add(mtmp, x, y) {
     if (!mtmp.mtrack) mtmp.mtrack = [];
     mtmp.mtrack.unshift({ x, y });
@@ -655,7 +731,7 @@ function mattacku_basic(mtmp, state) {
 function m_move_basic(mtmp) {
     // C ref: monmove.c:m_move().  This is a narrow ordinary-monster
     // movement skeleton: adjacent candidates, mtrack backtracking rolls, and
-    // deterministic approach/flee selection.  Item pickup, doors, tunneling,
+    // deterministic approach/flee selection.  Tunneling, most traps, full
     // attacks, and special monsters remain future subsystem work.
     const omx = mtmp.mx;
     const omy = mtmp.my;
@@ -756,8 +832,10 @@ function m_move_basic(mtmp) {
     mon_track_add(mtmp, omx, omy);
     newsym(omx, omy);
     newsym(nix, niy);
+    const doorStatus = postmove_door_basic(mtmp);
+    if (doorStatus === MMOVE_DIED) return MMOVE_DIED;
     if (mpickstuff_basic(mtmp)) return MMOVE_DONE;
-    return MMOVE_MOVED;
+    return doorStatus;
 }
 
 function m_everyturn_effect(mtmp) {
@@ -859,6 +937,11 @@ export async function movemon() {
             continue;
         }
 
+        // C ref: monmove.c:dochug().  Awake movable monsters roll confusion
+        // and stun recovery before targeting, fleeing, or ordinary movement.
+        if (mtmp.mconf && !rn2(50)) mtmp.mconf = 0;
+        if (mtmp.mstun && !rn2(10)) mtmp.mstun = 0;
+
         // dochugw -> dochug
         set_apparxy_basic(mtmp);
         const fleeState = distfleeck(mtmp); // consuming rn2(5)
@@ -875,6 +958,7 @@ export async function movemon() {
             let moveStatus = 0;
             if (non_tame_movement_opportunity(mtmp, fleeState)) {
                 moveStatus = m_move_basic(mtmp);
+                if (moveStatus === MMOVE_DIED) continue;
                 // C calls distfleeck() again after m_move() returns for ordinary
                 // movement, even when the monster is off-screen.
                 postMoveState = distfleeck(mtmp);

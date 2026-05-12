@@ -17,20 +17,20 @@ This file is the live handoff checkpoint, not a full history. It was compacted o
 
 - Branch: `main`.
 - Baseline requested by user: resume from commit `04d9360` and continue on the current branch without pushing.
-- Latest committed loop work: current `HEAD` (`Advance monster weapon movement`).
+- Latest committed loop work: current `HEAD` (`Handle monster trapped-door movement`).
 - Local divergence from remote: branch is ahead of `origin/main`; do not push unless explicitly asked.
-- Current target: `seed0383-wizard-hallucinate` after the Oracle special-level / turn-tail generation slice.
-- Active subsystem hypothesis: ordinary monster movement candidate geometry after Oracle loading. The FR `16755` moved-then-ranged `mattacku()` boundary is resolved; the current first mismatch is FR `16834`, where C expects `rn2(32)` in `m_move()` while JS reaches `rn2(20)`, so the next slice should compare live monster position, target, `mtrack`, and `mfndpos()` flags.
+- Current target: `seed0383-wizard-hallucinate` exact-RNG screen-0 map glyph drift after Oracle movement parity.
+- Active subsystem hypothesis: core RNG ownership for `seed0383` is complete (`R 16915/16915`). The remaining first mismatch is display/map state on screen 0, with wall-glyph cells around the Oracle/startup map missing in JS. Next work should compare map terrain, remembered terrain, wallification, and hallucination/display context before touching RNG-bearing turn code.
 
 ## Latest Verified Scores
 
-- Sentinel after the monster wear / weapon movement slice: total `S 162/1063 R 34291/64569`.
+- Sentinel after the monster passwall / trapped-door movement slice: total `S 162/1063 R 34338/64569`.
 - `seed8000-tourist-starter`: `S 23/23 R 3060/3130`, FR `3047`.
 - `seed0002-healer-reflection-drummer`: `S 11/595 R 1266/27158`, FR `1215`.
 - `seed0013-friday13-save-then-fullmoon-restore`: `S 0/99 R 535/4804`, FR `507`.
 - `seed0116-wizard-wear-shop`: `S 127/127 R 12562/12562`, PASS; remaining comparison notes are four cursor-only prompt positions.
-- `seed0383-wizard-hallucinate`: `S 1/219 R 16868/16915`, FR `16834`.
-- Full suite after latest production slice: `S 162/11406`, 1/44 passing (`seed0116`).
+- `seed0383-wizard-hallucinate`: `S 1/219 R 16915/16915`, no RNG mismatch; remaining mismatch is screen 0 map glyph drift.
+- Full suite after latest production slice: `S 163/11406`, 1/44 passing (`seed0116`).
 
 ## Recent Implementation Delta
 
@@ -70,7 +70,7 @@ Latest committed production slice:
 - Evidence: the original `seed0383` gnome blocker moved from FR `16750` (`rn2(24)` vs `rn2(32)`) to FR `16755` (`rnd(2)` in C `mattacku()` vs JS next-monster `distfleeck()`). Sentinel screens stayed `S 162/1063`; `seed0116` remains a full pass.
 - Classification: lagging `seed0383` RNG total decreased to `R 16761/16915` because retaining real monster inventory changes later divergent state, but this is structural minvent debt reduction, not score optimization.
 
-Latest verified production slice:
+Previous verified production slice:
 
 - Monster wear / weapon movement slice:
   - factored basic monster boot wear into `js/mon_wear.js`
@@ -79,23 +79,33 @@ Latest verified production slice:
   - modeled the failed ranged-selection `weapon_check = NEED_WEAPON` handoff and the later close HTH wield turn
   - added `mfndpos()`'s no-diagonal-through-door rule for ordinary movement candidates
 - Evidence: `seed0383` moved from FR `16755` / `R 16761/16915` to FR `16834` / `R 16868/16915`. Sentinel screens stayed `S 162/1063`; sentinel RNG total moved to `R 34291/64569`; full public screens stayed `S 162/11406`.
-- Classification: the FR `16755` weapon/AC boundary is resolved structurally. Current blocker is a later ordinary `m_move()` denominator gap (`rn2(32)` expected vs `rn2(20)` actual), likely candidate geometry or movement-state drift.
+- Classification: the FR `16755` weapon/AC boundary was resolved structurally. It exposed the later ordinary `m_move()` denominator gap that the passwall/trapped-door movement slice resolved.
+
+Latest verified production slice:
+
+- Monster passwall / trapped-door movement slice:
+  - added `mfndpos()` wall-passability front door for `M1_WALLWALK` plus C ref `hack.c:may_passwall()`
+  - allowed hand-capable monsters to include closed doors as openable movement candidates
+  - added post-move closed/trapped door handling with synchronized `flags`/`doormask`, C ref `monmove.c:postmov()` and `mb_trapped()` `rnd(15)` damage ownership
+  - added awake confusion/stun recovery gates before `distfleeck()`, C ref `monmove.c:dochug()`
+- Evidence: `seed0383` moved from FR `16834` / `R 16868/16915` to `R 16915/16915` with no RNG mismatch. Sentinel screens stayed `S 162/1063`; sentinel RNG total moved to `R 34338/64569`; full public screens moved to `S 163/11406`.
+- Classification: later ordinary movement denominator drift and trapped-door status recovery are resolved structurally. Remaining `seed0383` blocker is display/map glyph drift on screen 0, not RNG ownership.
 
 ## Current Queue
 
-1. Classify `seed0383` FR `16834` with compact tooling first:
+1. Classify `seed0383` exact-RNG screen-0 map glyph drift:
    - `node scripts/triage-session.mjs sessions/seed0383-wizard-hallucinate.session.json`
-   - inspect the monster phase around RNG `16826..16836`; current mismatch is `rn2(32)` expected vs `rn2(20)` actual in ordinary `m_move()`
-   - If compact tooling is insufficient, add temporary guarded movement tracing and remove it before any commit.
-2. Identify why C has a larger movement denominator than JS at FR `16834`: compare monster order, current actor, target square, `mtrack`, diagonal door/terrain filters, `NOTONL`/line flags, and ranged/approach state before changing candidate geometry.
-3. Replace the menu/discovery residual scaffolding with real `o_init` description storage, discovery persistence, and broader role inventory/menu text when it becomes the highest safe structural next step.
-4. Keep broader startup/display/save blockers secondary unless the active queue is blocked.
+   - compare the reported Oracle/startup wall cells against actual terrain, remembered glyph state, `wallification()`, and `display.c` rendering
+   - because RNG is exact, do not change turn ordering or movement to chase this mismatch.
+2. Replace the menu/discovery residual scaffolding with real `o_init` description storage, discovery persistence, and broader role inventory/menu text when it becomes the highest safe structural next step.
+3. Broaden sleeping/hider front doors only from C evidence if a session reaches them.
+4. Keep save/restore and broader startup/display blockers secondary unless the active queue is blocked.
 
 ## Regression Notes
 
 - `seed0116` now passes fully. Avoid broad changes that disturb Soko zoo, pet movement, command prompt, object color, menu lifecycle, or turn-tail state without a clear classification and sentinel rerun.
 - `seed0002` and other non-target RNG prefixes shifted during shared hero-kill/death-side-effect work while matched screens stayed unchanged. Treat these as queued evidence only if those sessions become active targets.
-- `seed0383` still has screen `0` mismatch because hallucination/display context and startup rendering remain incomplete; do not optimize visible screens directly.
+- `seed0383` now has exact RNG but still has screen `0` mismatch because map/display context remains incomplete; do not optimize visible screens directly or change RNG-bearing movement for this blocker.
 
 ## Verification Cadence
 
