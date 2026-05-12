@@ -290,6 +290,15 @@ export async function newgame() {
 export async function advanceTurn() {
     const g = game;
 
+    // C ref: hack.c:domove_core() and monmove.c keep a swallowed hero's
+    // coordinates pinned to the engulfing monster.  Command paths in this
+    // partial port can temporarily drift them, so restore the invariant
+    // before monster movement and pet goal logic observe the master square.
+    if (g.u?.uswallow && g.u?.ustuck) {
+        g.u.ux = g.u.ustuck.mx;
+        g.u.uy = g.u.ustuck.my;
+    }
+
     while (await movemon()) {
         // Keep moving monsters until all out of movement.
     }

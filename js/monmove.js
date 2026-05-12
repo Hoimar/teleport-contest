@@ -517,8 +517,16 @@ function m_move_basic(mtmp) {
     }
 
     if (!moved || (nix === omx && niy === omy)) return MMOVE_NOTHING;
+    const engulfingHero = game.u?.uswallow && game.u?.ustuck === mtmp;
     mtmp.mx = nix;
     mtmp.my = niy;
+    if (engulfingHero) {
+        game.u.ux0 = game.u.ux;
+        game.u.uy0 = game.u.uy;
+        game.u.ux = nix;
+        game.u.uy = niy;
+        game.vision_full_recalc = 1;
+    }
     mon_track_add(mtmp, omx, omy);
     newsym(omx, omy);
     newsym(nix, niy);
@@ -537,14 +545,19 @@ function m_everyturn_effect(mtmp) {
 
 function visible_gas_region_at(x, y) {
     return (game.level?.gasClouds || []).some((region) =>
-        region.ttl > 0 && region.x === x && region.y === y);
+        region.ttl >= 0 && region.x === x && region.y === y);
 }
 
 function age_gas_clouds() {
     const clouds = game.level?.gasClouds;
     if (!clouds?.length) return;
-    for (const cloud of clouds) cloud.ttl--;
-    game.level.gasClouds = clouds.filter((cloud) => cloud.ttl > 0);
+    const survivors = [];
+    for (const cloud of clouds) {
+        if (cloud.ttl === 0) continue;
+        if (cloud.ttl > 0) cloud.ttl--;
+        survivors.push(cloud);
+    }
+    game.level.gasClouds = survivors;
 }
 
 function were_change(mtmp) {
@@ -576,10 +589,6 @@ export function mcalcdistress() {
 export async function movemon() {
     const g = game;
     let somebody_can_move = false;
-    if (g._gas_clouds_aged_turn !== g.moves) {
-        age_gas_clouds();
-        g._gas_clouds_aged_turn = g.moves;
-    }
 
     // C ref: mon.c:iter_mons_safe() snapshots fmon before the movement
     // pass so removals or insertions during combat do not shift ownership
@@ -640,6 +649,14 @@ export async function movemon() {
             if (moveStatus !== MMOVE_MOVED && moveStatus !== MMOVE_DONE) mattacku_basic(mtmp, postMoveState);
         }
     }
-    
+
+    // C ref: allmain.c:run_regions() ages regions after the monster
+    // movement loop for the turn, not before m_everyturn_effect() can see
+    // regions created on previous passes.
+    if (!somebody_can_move && g._gas_clouds_aged_turn !== g.moves) {
+        age_gas_clouds();
+        g._gas_clouds_aged_turn = g.moves;
+    }
+
     return somebody_can_move;
 }

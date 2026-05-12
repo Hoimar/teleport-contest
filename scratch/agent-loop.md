@@ -372,6 +372,27 @@
   2. Keep `seed0116` screen 109 as the secondary exact-RNG object identity target: two visible potions and one arrow stack still have object identity/color drift.
   3. Broaden monster inventory/equipment only from evidence; current implementation owns collector pickup and boot wear delay, not full `minvent`, armor preference, or all `m_search_items()` type predicates.
 
+### Iteration 19 - Swallowed Hero Position And Gas Region Lifetime
+
+- Implementation delta:
+  1. `advanceTurn()` now restores the C invariant that a swallowed hero's `u.ux/u.uy` are pinned to the engulfing `u.ustuck` monster before monster movement and pet goal logic observe the master square.
+  2. `m_move_basic()` keeps `u.ux/u.uy` synchronized when the swallowing monster moves and requests a vision recalculation.
+  3. Minimal fog gas regions now match the `run_regions()` lifetime shape more closely: zero-TTL regions remain visible until the next region pass, and region aging runs after the final monster movement pass for the turn rather than before `m_everyturn_effect()`.
+- Evidence:
+  1. `seed0383` moved from `S 0/219 R 10822/16915` at FR 10491 to `S 0/219 R 10907/16915` at FR 10608.
+  2. The FR 10491 dog-goal gap was caused by hero coordinate drift: C's pet sees the swallowed master at `u.ustuck`, scans six floor objects, the wanderer gate, and 16 inventory `obj_resists()` calls; JS had the hero one cell away and took the follow/candidate path early.
+  3. The FR 10531 fog mismatch was a region lifetime issue. C keeps a just-aged zero-TTL gas region visible until the next `run_regions()` pass, preventing a false fog-cloud vapor TTL roll during the same monster phase.
+  4. Discarded direction: a direct swallowed-hero attack front door in `domove()` matched the later C shape locally, but regressed to FR 10483 because JS is still misaligned around the `W` wear prompt selection. Do not reintroduce it until prompt/message state reaches the C boundary.
+- Regression stability:
+  1. `node scripts/triage-session.mjs sessions/seed0383-wizard-hallucinate.session.json` => `S 0/219 R 10907/16915 FS 0:char:map:init FR 10608:rn2(20)=12=>rn2(5)=2 C 0`.
+  2. `node scripts/triage-session.mjs sessions/seed0116-wizard-wear-shop.session.json` => `S 109/127 R 12562/12562 FS 109:attr:map:e FR - C 4`.
+  3. `node scripts/run-sentinel-suite.mjs` => total `S 143/1063 R 28343/64569`; no sentinel screen-count regressions.
+  4. `node frozen/ps_test_runner.mjs` => total `S 143/11406`, 0/44 passing. Non-target RNG shifts are classified as expected structural side effects of swallowed-position and region-lifetime ownership; matched screen counts stayed stable.
+- Current queue:
+  1. Classify `seed0383` FR 10608 by aligning the zero-RNG command/prompt sequence: `W` wear prompt, `n` selection, message-more screens, `#wizintrinsic` getlin/menu, and the later `h` key that should reach swallowed hero `uhitm()`.
+  2. Keep `seed0116` screen 109 as the secondary exact-RNG object identity target: two visible potions and one arrow stack still have object identity/color drift.
+  3. Broaden monster inventory/equipment only from evidence; current implementation owns collector pickup and boot wear delay, not full `minvent`, armor preference, or all `m_search_items()` type predicates.
+
 ## 2026-05-12 08:55 CEST Restart - Dehack, Deep Triage, Implementation Loop
 
 - Branch/baseline commit: `main` at `f4be79ac016690ec4a293cadad6427ed4d4715e3`.
