@@ -4,6 +4,8 @@ This document serves as a persistent memory for agents working on the Teleport C
 
 **Agents MUST read this document before beginning a new task and continuously ensure new lessons are consistent with past ones.**
 
+Context note: this file is long-term subsystem memory. In normal implementation loops, do not full-read it unless doing a broad audit. Use `rg` for the active subsystem, C function/file, JS module, session id, or FR number, then read the matching bullets and nearby context. Keep new lessons durable and subsystem-level, not iteration logs.
+
 ## Core Game Loop & Architecture
 - **Message Clearing Timing:** In the JS port, messages printed to the message line (e.g. "Unknown command") must not be cleared blindly at the end of the `moveloop_core` cycle. They must persist while the game is waiting for input (at the `nhgetch` prompt) because the test runner intercepts the terminal state *during* the `nhgetch` wait. Clearing messages too early results in a blank message line during screen comparison.
 - **Command-Start Message Clearing:** The matching place to clear transient messages is at the start of the next command dispatch (`rhack`), not at loop end. This preserves the prompt-time capture for the previous screen while preventing stale lines like the startup welcome message from leaking into the first post-input map screen.

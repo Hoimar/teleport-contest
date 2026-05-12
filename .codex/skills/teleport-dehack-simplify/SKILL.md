@@ -9,7 +9,7 @@ Use this skill when the codebase is accumulating special cases, replay tables, o
 
 Workflow:
 
-1. Read `AGENTS.md`, `lessons.md`, and `feature_map.md`.
+1. Read `AGENTS.md` as needed for policy, read compact `scratch/agent-loop.md` for current state, and use `rg` to pull only the relevant `lessons.md` bullets and `feature_map.md` rows for the cleanup target.
 2. Pick one cleanup target class:
    - per-seed branches
    - `_override_screen` scaffolding

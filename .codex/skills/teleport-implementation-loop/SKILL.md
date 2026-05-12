@@ -24,6 +24,7 @@ Follow `AGENTS.md` Step 2.7, then continue through Steps 3 and 4 for each queued
 ## Loop Reminders
 
 - Read `AGENTS.md`, `lessons.md`, and `feature_map.md` before starting.
+- Context hygiene for this repo: `scratch/agent-loop.md` is compact and should be read fully; `lessons.md` and `feature_map.md` are long-lived indexes and should normally be searched with `rg` for the active subsystem/session/function, then read selectively. Do not full-read historical scratch/generated session files unless the task explicitly requires it.
 - Keep `scratch/agent-loop.md` as the live checkpoint while the loop runs.
 - Apply the branch, commit, marathon-budget, and regression policy from `AGENTS.md` Step 2.7; do not invent a branch strategy or probe quota.
 - Use sessions as evidence for generalized NetHack parity, not as scoreboard targets.

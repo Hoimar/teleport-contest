@@ -21,6 +21,19 @@ Do NOT use `switch` statements or per-step logic (e.g., `apply_seed0002_hacks`) 
 | `feature_map.md` | Cross-reference of every subsystem: C source ↔ JS implementation ↔ status ↔ blocked screens |
 | `lessons.md` | Accumulated learnings — **read before every task, update after every breakthrough** |
 
+### Context Hygiene For Persistent Memory
+
+Some project-memory files are large enough that full reads waste agent context. Prefer this access pattern unless a user explicitly asks for an audit of the whole file:
+
+| File | Default access pattern |
+|---|---|
+| `AGENTS.md` | Should always be read fully, can otherwise use targeted `rg` for specific clauses. |
+| `scratch/agent-loop.md` | Intentionally compact and should be read fully, can use `rg` though, too. Should stay a live checkpoint, not a full history. |
+| `feature_map.md` | Start by using `rg` by session id, subsystem, JS file, or C source, then read the relevant rows/nearby section and read fully if necessary. |
+| `lessons.md` | Use `rg` by subsystem, C function/file, JS module, session id, or FR number; read matching bullets and nearby context rather than the full file. |
+| `scratch/divergence-inventory.md` | Treat as generated/index material; grep or regenerate with `scripts/triage-corpus.mjs`. |
+| `sessions/*.session.json` | Avoid reading in full. Use `scripts/triage-session.mjs`, `scripts/trace-dog-goal.mjs`, or narrow JSON searches. |
+
 ## Workflow & Verification Loop
 
 ### Step 1 — Read first

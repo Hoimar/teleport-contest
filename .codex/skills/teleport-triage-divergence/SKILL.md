@@ -9,7 +9,7 @@ Use this skill when the immediate task is understanding a failure, not implement
 
 Workflow:
 
-1. Read `AGENTS.md`, `lessons.md`, and the relevant `feature_map.md` rows.
+1. Read `AGENTS.md` as needed for policy, read compact `scratch/agent-loop.md` for current state, and use `rg` to pull only the relevant `lessons.md` bullets and `feature_map.md` rows for the active session/subsystem.
 2. Run:
    ```bash
    node scripts/triage-session.mjs sessions/<session>.session.json

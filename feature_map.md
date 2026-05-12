@@ -3,6 +3,8 @@
 Cross-reference of every major subsystem between the C reference and the JS port.
 Use this to choose your next implementation target. Update the **Status** and **Notes** columns after each session.
 
+Context note: this file is an index. Prefer `rg` by session id, subsystem, JS module, C source, or FR number, then read only the relevant row and nearby section. Avoid full-reading it during tight implementation loops unless refreshing global priorities.
+
 **Status legend:**
 - 🔴 Not started / fully stubbed
 - 🟡 Partially implemented / hardcoded for specific seeds
