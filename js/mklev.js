@@ -30,7 +30,8 @@ import {
     SPACE_POS, isok, W_NONDIGGABLE, FILL_NORMAL,
     ICE, MOAT, POOL, WATER, LAVAPOOL, LAVAWALL, DBWALL,
     A_LAWFUL, A_NONE, Align2amask,
-    LR_TELE, LR_UPTELE, LR_DOWNTELE, NO_MINVENT, MM_IGNOREWATER, MM_ANGRY, MM_ASLEEP, MM_NOGRP, GP_CHECKSCARY, GP_AVOID_MONPOS,
+    LR_TELE, LR_UPTELE, LR_DOWNTELE, NO_MINVENT, MM_IGNOREWATER, MM_IGNORELAVA, MM_ANGRY, MM_ASLEEP, MM_NOGRP, GP_CHECKSCARY, GP_AVOID_MONPOS,
+    MARK as ENGR_MARK, N_ENGRAVE,
     M_AP_OBJECT,
 } from './const.js';
 
@@ -180,6 +181,7 @@ const M2_STRONG = 0x04000000;
 const M2_GREEDY = 0x10000000;
 const M1_FLY = 0x00000001;
 const M1_SWIM = 0x00000002;
+const M1_NOEYES = 0x00001000;
 const M1_MINDLESS = 0x00010000;
 const M1_ANIMAL = 0x00040000;
 const M1_UNSOLID = 0x00100000;
@@ -410,19 +412,54 @@ function mon_likes_lava_for(ptr) {
     return !!ptr?.likes_lava;
 }
 
+function engr_at(x, y) {
+    return (game.level?.engravings || []).find(ep => ep.x === x && ep.y === y) || null;
+}
+
+function sengr_at(text, x, y, strict = false) {
+    const ep = engr_at(x, y);
+    if (!ep) return null;
+    const actual = String(ep.text || '');
+    const needle = String(text || '');
+    if (strict) {
+        return actual.toLowerCase() === needle.toLowerCase() ? ep : null;
+    }
+    return actual.toLowerCase().includes(needle.toLowerCase()) ? ep : null;
+}
+
+function goodpos_onscary(x, y, ptr) {
+    if (!ptr) return false;
+    // C ref: teleport.c:goodpos_onscary(), the fake-monster approximation
+    // used by enexto() and monster creation.
+    if (ptr.mlet === 'S_HUMAN' || ptr.mlet === 'S_ANGEL') return false;
+    if (ptr.name === 'MINOTAUR' || ((ptr.mflags1 ?? 0) & M1_NOEYES)) return false;
+    if (game.level?.at(x, y)?.typ === ALTAR && ptr.mlet === 'S_VAMPIRE') return true;
+    if (sobj_at(SCR_SCARE_MONSTER, x, y)) return true;
+    return !!sengr_at('Elbereth', x, y, true);
+}
+
 function goodpos(x, y, entflags = 0, ptr = null) {
     if (!isok(x, y)) return false;
     if (!(entflags & 0x00400000) && u_at(x, y)) return false; // GP_ALLOW_U
     if (m_at(x, y)) return false;
     const loc = game.level?.at(x, y);
-    if (!loc || !SPACE_POS(loc.typ)) return false;
-    if (!(entflags & MM_IGNOREWATER) && IS_POOL(loc.typ)
-        && !(ptr && (mon_swims_for(ptr) || mon_in_air_for(ptr)))) {
+    if (!loc) return false;
+    const isPool = IS_POOL(loc.typ);
+    const isLava = IS_LAVA(loc.typ);
+    if (isPool) {
+        if (!(entflags & MM_IGNOREWATER)
+            && !(ptr && (mon_swims_for(ptr) || mon_in_air_for(ptr)))) {
+            return false;
+        }
+    } else if (isLava) {
+        if (!(entflags & MM_IGNORELAVA)
+            && !(ptr && (mon_in_air_for(ptr) || mon_likes_lava_for(ptr)))) {
+            return false;
+        }
+    } else if (!SPACE_POS(loc.typ)) {
         return false;
     }
-    if (IS_LAVA(loc.typ) && !(ptr && (mon_in_air_for(ptr) || mon_likes_lava_for(ptr)))) {
-        return false;
-    }
+    if ((entflags & GP_CHECKSCARY) && goodpos_onscary(x, y, ptr)) return false;
     return true;
 }
 
@@ -1577,8 +1614,23 @@ function maketrap(x, y, typ) {
     return trap;
 }
 
-// engrave stubs
-function make_engr_at(x, y, text, pristine, epoch, engr_type) { /* stub */ }
+function make_engr_at(x, y, text, pristine, epoch, engr_type) {
+    if (!game.level) return null;
+    game.level.engravings = (game.level.engravings || [])
+        .filter(ep => ep.x !== x || ep.y !== y);
+    const actual = String(text || '');
+    const ep = {
+        x,
+        y,
+        text: actual,
+        pristine: pristine == null ? actual : String(pristine),
+        epoch: epoch || 0,
+        type: engr_type > 0 ? engr_type : rnd(N_ENGRAVE - 1),
+        guardobjects: game.in_mklev && actual.toLowerCase() === 'elbereth',
+    };
+    game.level.engravings.unshift(ep);
+    return ep;
+}
 function wipe_engr_at(x, y, cnt, perm) { /* stub */ }
 function make_grave(x, y, text) {
     const loc = game.level?.at(x, y);
@@ -4229,12 +4281,15 @@ async function fill_ordinary_room(croom, bonus_items) {
     // Graffiti
     const depth = g.u?.uz?.dlevel ?? 1;
     if (!rn2(27 + 3 * Math.abs(depth))) {
-        const { text: engrText } = randomEngraving();
+        const { text: engrText, pristine } = randomEngraving();
         if (engrText) {
             do {
                 somexyspace(croom, pos);
                 if (g.level?.at(pos.x, pos.y)?.typ === ROOM) break;
             } while (!rn2(40));
+            if (g.level?.at(pos.x, pos.y)?.typ === ROOM) {
+                make_engr_at(pos.x, pos.y, engrText, pristine, 0, ENGR_MARK);
+            }
         }
     }
     // Random objects
