@@ -295,6 +295,26 @@
   3. Keep `seed0116` screen 109 as a secondary object identity/description-state target: two visible potions, one arrow stack, and one ring still have exact-RNG color/state drift.
   4. Continue special-level object/monster parity and visible hack-debt cleanup when it unlocks active subsystem work.
 
+### Iteration 15 - Swallowed Movement And Repeat Engulf Timing
+
+- Implementation delta:
+  1. Added a minimal `set_apparxy()` owner before ordinary `distfleeck()`, targeting the real hero square in the current visibility model so swallowed monsters keep `mux/muy` aligned with `u.ux/u.uy`.
+  2. Added the `monmove.c:m_move()` swallowed-bystander early return: while the hero is swallowed, non-fleeing monsters other than `u.ustuck` spend their movement opportunity without ordinary path selection or `mtrack` backtracking.
+  3. Split initial and already-swallowed `AT_ENGL` handling so repeat engulf attacks skip the hit roll and swallow timer while still rolling `gulpmu()` damage and elemental gates.
+- Evidence:
+  1. `seed0383` moved from FR 10360 (`rn2(5)` expected vs JS tiger `rn2(32)` backtracking) to FR 10374 (`rnd(2)` expected from repeat ice-vortex `gulpmu()` damage vs JS gnome `distfleeck()` `rn2(5)`).
+  2. A temporary trace, removed before verification, showed creation/list order remains C-shaped around the ice vortex, gnome, and earth elemental. The next owner is the intervening gnome's prior movement/sleep/frozen/offmap/death state, not a species-order swap or an engulf RNG omission.
+  3. `seed0116` remains exact on RNG with only the four visible object-color attr cells at screen 109.
+- Regression stability:
+  1. Target triage: `seed0383-wizard-hallucinate` reports `S 0/219 R 10675/16915 FS 0:char:map:init FR 10374:rnd(2)=1=>rn2(5)=4 C 0`.
+  2. Target triage: `seed0116-wizard-wear-shop` reports `S 109/127 R 12562/12562 FS 109:attr:map:e FR - C 4`.
+  3. Sentinel suite: `seed8000` `S 23/23 R 3060/3130`, `seed0002` `S 11/595 R 1274/27158`, `seed0013` `S 0/99 R 540/4804`, `seed0116` `S 109/127 R 12562/12562`, `seed0383` `S 0/219 R 10675/16915`; total `S 143/1063 R 28111/64569`.
+  4. Full suite: `S 143/11406`, 0/44 passing. No matched-screen regressions; the score delta is lagging evidence while the structural gain is the later first mismatch and removal of false swallowed-bystander path RNG.
+- Current queue:
+  1. Continue user-priority `seed0383` at FR 10374 by tracing why the gnome at about `(46,3)` remains eligible for `distfleeck()` before the swallowed ice vortex repeats `gulpmu()`. Compare prior movement budget, `msleeping`/`mcanmove`, offmap/death state, and list membership; do not swap list order by hand.
+  2. Keep `seed0116` screen 109 as a secondary object identity/description-state target: two visible potions, one arrow stack, and one ring still have exact-RNG color/state drift.
+  3. Continue special-level object/monster parity and visible hack-debt cleanup when it unlocks active subsystem work.
+
 ## 2026-05-12 08:55 CEST Restart - Dehack, Deep Triage, Implementation Loop
 
 - Branch/baseline commit: `main` at `f4be79ac016690ec4a293cadad6427ed4d4715e3`.

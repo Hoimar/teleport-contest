@@ -75,6 +75,14 @@ function monnear_hero(mtmp) {
     return dist2(mtmp.mx, mtmp.my, game.u?.ux ?? mtmp.mx, game.u?.uy ?? mtmp.my) < 3;
 }
 
+function set_apparxy_basic(mtmp) {
+    // C ref: monmove.c:set_apparxy().  In the current visibility model the
+    // hero is neither invisible nor displaced, so monsters target the real
+    // hero square.  This is especially important for u.ustuck while swallowed.
+    mtmp.mux = game.u?.ux ?? mtmp.mx;
+    mtmp.muy = game.u?.uy ?? mtmp.my;
+}
+
 function is_hider(mtmp) {
     return !!(mtmp.data?.mflags1 & M1_HIDE);
 }
@@ -206,13 +214,18 @@ function apply_hero_damage(damage) {
 
 function engulf_attack(mtmp, attack, toHit) {
     const [, adtyp, damn, damd] = attack;
-    if (!(toHit > rnd(20))) return true;
+    const alreadySwallowed = game.u?.uswallow && game.u?.ustuck === mtmp;
+    if (!alreadySwallowed && !(toHit > rnd(20))) return true;
     let damage = d(damn, damd);
-    game.u.uswallow = true;
-    game.u.ustuck = mtmp;
-    mtmp.mx = game.u.ux;
-    mtmp.my = game.u.uy;
-    game.u.uswldtim = Math.max(2, rnd(monster_level(mtmp) + 5));
+    if (!alreadySwallowed) {
+        game.u.uswallow = true;
+        game.u.ustuck = mtmp;
+        mtmp.mx = game.u.ux;
+        mtmp.my = game.u.uy;
+        game.u.uswldtim = Math.max(2, rnd(monster_level(mtmp) + 5));
+    } else if ((game.u.uswldtim || 0) > 0) {
+        game.u.uswldtim--;
+    }
 
     switch (adtyp) {
     case 'AD_COLD':
@@ -272,6 +285,9 @@ function m_move_basic(mtmp) {
     const ggx = mtmp.mux ?? game.u?.ux ?? omx;
     const ggy = mtmp.muy ?? game.u?.uy ?? omy;
     let appr = mtmp.mflee ? -1 : 1;
+    // C ref: monmove.c:m_move().  While swallowed, bystander monsters
+    // spend their movement opportunity without ordinary path selection.
+    if (game.u?.uswallow && !mtmp.mflee && game.u?.ustuck !== mtmp) return 1;
     if (mtmp.mconf || (mtmp.mpeaceful && !mtmp.isshk)) appr = 0;
     if (appr === 1
         && (mtmp.data?.name === 'STALKER' || mtmp.data?.mlet === 'S_BAT' || mtmp.data?.mlet === 'S_LIGHT')
@@ -409,6 +425,7 @@ export async function movemon() {
         }
 
         // dochugw -> dochug
+        set_apparxy_basic(mtmp);
         const fleeState = distfleeck(mtmp); // consuming rn2(5)
         
         // C ref: monmove.c:dochug() delegates tame monsters to
