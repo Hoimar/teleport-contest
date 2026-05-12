@@ -256,7 +256,10 @@ export function mcalcdistress() {
 export async function movemon() {
     const g = game;
     let somebody_can_move = false;
-    age_gas_clouds();
+    if (g._gas_clouds_aged_turn !== g.moves) {
+        age_gas_clouds();
+        g._gas_clouds_aged_turn = g.moves;
+    }
 
     // In a real engine, we'd iterate over all monsters.
     // For now, let's just handle the monsters we have.
