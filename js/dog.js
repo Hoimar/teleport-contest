@@ -569,7 +569,9 @@ function pet_goal(mtmp, after, udist, whappr) {
     const maxX = Math.min(79, mtmp.mx + 5);
     const minY = Math.max(0, mtmp.my - 5);
     const maxY = Math.min(20, mtmp.my + 5);
-    const inMastersSight = true;
+    // C ref: dogmove.c uses couldsee(omx, omy).  While swallowed, C's
+    // gulpmu() disables ordinary hero vision before later pet goal scans.
+    const inMastersSight = !game.u?.uswallow;
     const dogHasMinvent = !!(mtmp.inventory?.length);
 
     for (const obj of game.level?.objects || []) {

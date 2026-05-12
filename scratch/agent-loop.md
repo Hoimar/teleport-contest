@@ -272,6 +272,29 @@
   3. Keep `seed0116` screen 109 as a secondary object identity/description-state target: two visible potions, one arrow stack, and one ring still have exact-RNG color/state drift.
   4. Continue special-level object/monster parity and visible hack-debt cleanup when it unlocks active subsystem work.
 
+### Iteration 14 - Ice Vortex Engulf, Regen HP, And Swallowed Pet Sight
+
+- Implementation delta:
+  1. Enabled the narrow generated-attack `AT_ENGL` front door in `monmove.js` for one real engulf attack row, including hit roll, `gulpmu()` damage dice, swallow placement/state, swallow timer, and current cold/fire/electric/physical/acid damage gates.
+  2. Preserved the C `dochug()` phase-three rule that standard attacks do not fire after `m_move()` returns `MMOVE_MOVED`; this keeps the ice vortex from attacking on the earlier adjacent-move pass.
+  3. Added damaged-hero `regen_hp()` ownership in the turn tail immediately after `maybe_generate_rnd_mon()`, matching the post-swallow `rn2(100)` before hunger and engraving-wipe RNG.
+  4. Added swallowed-master suppression for `dog_goal()` apport candidates, so the pet still scans `obj_resists()` for nearby floor objects but does not fire the `rn2(8)` apport gate while the hero is swallowed.
+- Evidence:
+  1. `seed0383` moved through the FR 10280 ice-vortex `AT_ENGL` sequence: `rnd(2)`, hit roll, `d(1,6)`, swallow timer, and cold gate now match C.
+  2. The new `regen_hp()` owner matched C's FR 10321 `rn2(100)` after engulf damage and before `gethungry()`/wipe checks.
+  3. The swallowed pet-sight gate matched the post-swallow `dog_goal()` floor-object and inventory scan through FR 10346, then candidate selection and pet ranged scoring through FR 10355.
+  4. Current blocker is `seed0383` FR 10360: C expects another `distfleeck()` `rn2(5)`, while JS enters a tiger `m_move()` `mtrack` `rn2(32)` backtracking roll. A guarded temporary trace identified the owner as the tiger at `(45,13)`; the trace was removed. The next owner is prior tiger spatial or `mtrack[0]` drift, not engulf combat.
+- Regression stability:
+  1. Target triage: `seed0383-wizard-hallucinate` reports `S 0/219 R 10597/16915 FS 0:char:map:init FR 10360:rn2(5)=4=>rn2(32)=30 C 0`.
+  2. `seed0116-wizard-wear-shop` stayed exact on RNG: `S 109/127 R 12562/12562 FS 109:attr:map:e FR - C 4`.
+  3. Sentinel suite: `seed8000` `S 23/23 R 3060/3130`, `seed0002` `S 11/595 R 1274/27158`, `seed0013` `S 0/99 R 540/4804`, `seed0116` `S 109/127 R 12562/12562`, `seed0383` `S 0/219 R 10597/16915`; total `S 143/1063 R 28033/64569`.
+  4. Full suite: `S 143/11406`, 0/44 passing. No matched-screen regressions; the seed0383 aggregate matched-call count is lower after later resync changes, but the first mismatch moved structurally later from FR 10280 to FR 10360.
+- Current queue:
+  1. Continue user-priority `seed0383` at FR 10360 by comparing tiger movement history, `mtrack[0]`, and candidate geometry before the post-swallow movement pass. Do not suppress `mtrack` generally; seed0116 depends on real backtracking rolls.
+  2. Keep message-interrupted occupation continuation as a known approximation; current implementation owns final-turn AC, stop-on-engulf, and attack timing better but not full `--More--` choreography.
+  3. Keep `seed0116` screen 109 as a secondary object identity/description-state target: two visible potions, one arrow stack, and one ring still have exact-RNG color/state drift.
+  4. Continue special-level object/monster parity and visible hack-debt cleanup when it unlocks active subsystem work.
+
 ## 2026-05-12 08:55 CEST Restart - Dehack, Deep Triage, Implementation Loop
 
 - Branch/baseline commit: `main` at `f4be79ac016690ec4a293cadad6427ed4d4715e3`.

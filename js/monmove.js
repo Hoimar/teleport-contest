@@ -159,6 +159,17 @@ function basic_physical_attacks(mtmp) {
     return attacks;
 }
 
+function basic_engulf_attack(mtmp) {
+    const attacks = mtmp.data?.mattk || [];
+    const realAttacks = attacks.filter(Boolean);
+    if (realAttacks.length !== 1) return null;
+    const attack = realAttacks[0];
+    const [aatyp, adtyp, damn, damd] = attack;
+    if (aatyp !== 'AT_ENGL' || damn <= 0 || damd <= 0) return null;
+    if (!['AD_COLD', 'AD_FIRE', 'AD_ELEC', 'AD_PHYS', 'AD_ACID'].includes(adtyp)) return null;
+    return attack;
+}
+
 function hero_ac_value() {
     const uac = game.u?.uac ?? 10;
     return uac >= 0 ? uac : -rnd(-uac);
@@ -193,6 +204,36 @@ function apply_hero_damage(damage) {
     if (damage > 0) game.u.uhp = Math.max(0, (game.u.uhp ?? 0) - damage);
 }
 
+function engulf_attack(mtmp, attack, toHit) {
+    const [, adtyp, damn, damd] = attack;
+    if (!(toHit > rnd(20))) return true;
+    let damage = d(damn, damd);
+    game.u.uswallow = true;
+    game.u.ustuck = mtmp;
+    mtmp.mx = game.u.ux;
+    mtmp.my = game.u.uy;
+    game.u.uswldtim = Math.max(2, rnd(monster_level(mtmp) + 5));
+
+    switch (adtyp) {
+    case 'AD_COLD':
+    case 'AD_FIRE':
+    case 'AD_ELEC':
+        if (mtmp.mcan || !rn2(2)) damage = 0;
+        break;
+    case 'AD_PHYS':
+        damage = reduce_damage_by_negative_ac(damage);
+        break;
+    case 'AD_ACID':
+        break;
+    default:
+        damage = 0;
+        break;
+    }
+    apply_hero_damage(damage);
+    if (damage > 0) game._occupation_turns_remaining = 0;
+    return true;
+}
+
 function physical_melee_attacks(mtmp, attacks, toHit) {
     for (let i = 0; i < attacks.length; i++) {
         const attack = attacks[i];
@@ -214,10 +255,11 @@ function mattacku_basic(mtmp, state) {
     if ((game._occupation_turns_remaining || 0) > 1 || game._occupation_finish_uac != null) return false;
     if ((game.u?.uhp ?? 1) <= 0) return false;
 
-    const physical = basic_physical_attacks(mtmp);
-    if (!physical) return false;
+    const engulf = basic_engulf_attack(mtmp);
+    const physical = engulf ? null : basic_physical_attacks(mtmp);
+    if (!engulf && !physical) return false;
     const toHit = mattacku_to_hit(mtmp);
-    return physical_melee_attacks(mtmp, physical, toHit);
+    return engulf ? engulf_attack(mtmp, engulf, toHit) : physical_melee_attacks(mtmp, physical, toHit);
 }
 
 function m_move_basic(mtmp) {
@@ -377,13 +419,14 @@ export async function movemon() {
             distfleeck(mtmp);
         } else {
             let postMoveState = fleeState;
+            let moveStatus = 0;
             if (non_tame_movement_opportunity(mtmp, fleeState)) {
-                m_move_basic(mtmp);
+                moveStatus = m_move_basic(mtmp);
                 // C calls distfleeck() again after m_move() returns for ordinary
                 // movement, even when the monster is off-screen.
                 postMoveState = distfleeck(mtmp);
             }
-            mattacku_basic(mtmp, postMoveState);
+            if (moveStatus !== 1) mattacku_basic(mtmp, postMoveState);
         }
     }
     

@@ -7,7 +7,7 @@
 import { game } from './gstate.js';
 import { rn2, rnd } from './rng.js';
 import {
-    maybe_generate_rnd_mon, gethungry, exerchk,
+    maybe_generate_rnd_mon, regen_hp, gethungry, exerchk,
     maybe_wipe_engraving, maybe_update_seer_turn, dosounds,
 } from './allmain_turns.js';
 import { mcalcdistress, mcalcmove, movemon } from './monmove.js';
@@ -301,6 +301,8 @@ export async function advanceTurn() {
     }
 
     maybe_generate_rnd_mon();
+
+    regen_hp();
 
     await dosounds();
 
