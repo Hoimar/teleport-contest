@@ -476,14 +476,18 @@ function pet_ranged_attk(mtmp, forced = false) {
     return 0;
 }
 
-function pet_can_step(mtmp, x, y) {
+function pet_can_enter_square(mtmp, x, y, { ignoreMonster = false } = {}) {
     if (!isok(x, y)) return false;
     if (x === game.u?.ux && y === game.u?.uy) return false;
-    if (mon_at(x, y, mtmp)) return false;
+    if (!ignoreMonster && mon_at(x, y, mtmp)) return false;
     if (is_boulder_at(x, y)) return false;
     const loc = game.level?.at(x, y);
     return !!loc && (SPACE_POS(loc.typ)
         || (IS_DOOR(loc.typ) && !(loc.doormask & (D_CLOSED | D_LOCKED))));
+}
+
+function pet_can_step(mtmp, x, y) {
+    return pet_can_enter_square(mtmp, x, y);
 }
 
 function pet_should_attack(mtmp, target) {
@@ -495,6 +499,27 @@ function pet_should_attack(mtmp, target) {
     const balk = petLevel + Math.trunc((5 * petHp) / petHpMax) - 2;
     if (monster_level(target) >= balk) return false;
     return true;
+}
+
+function grow_up_from_kill(mtmp, victim) {
+    const currentLevel = monster_level(mtmp);
+    const victimLevel = monster_level(victim);
+    let hpThreshold = currentLevel * 8;
+    if (!currentLevel) hpThreshold = 4;
+
+    let maxIncrease = rnd(victimLevel + 1);
+    const currentMax = mtmp.mhpmax ?? mtmp.mhp ?? Math.max(1, currentLevel);
+    if (currentMax + maxIncrease > hpThreshold + 1) {
+        maxIncrease = Math.max((hpThreshold + 1) - currentMax, 0);
+    }
+    const curIncrease = maxIncrease > 1 ? rn2(maxIncrease) : 0;
+    mtmp.mhpmax = currentMax + maxIncrease;
+    mtmp.mhp = (mtmp.mhp ?? currentMax) + curIncrease;
+
+    if (mtmp.mhpmax <= hpThreshold) return;
+    let levelLimit = Math.trunc(3 * (mtmp.data?.mlevel ?? currentLevel) / 2);
+    if (levelLimit < 5) levelLimit = 5;
+    if (currentLevel < levelLimit) mtmp.m_lev = currentLevel + 1;
 }
 
 function pet_melee_attack(mtmp, target) {
@@ -516,7 +541,7 @@ function pet_melee_attack(mtmp, target) {
     rn2(6); // mhitm_knockback distance/side gate
     if (target.mhp < 1) {
         rn2(3); // corpse_chance
-        rnd(2); // grow_up()
+        grow_up_from_kill(mtmp, target);
         const monsters = game.level?.monsters || [];
         const idx = monsters.indexOf(target);
         if (idx >= 0) monsters.splice(idx, 1);
@@ -620,11 +645,11 @@ export function dog_move(mtmp, after = true) {
         for (let ny = Math.max(0, mtmp.my - 1); ny <= maxy; ny++) {
             if (nx === mtmp.mx && ny === mtmp.my) continue;
             const target = mon_at(nx, ny, mtmp);
+            if (!pet_can_enter_square(mtmp, nx, ny, { ignoreMonster: !!target })) continue;
             if (target) {
                 if (pet_melee_attack(mtmp, target)) return 0;
                 continue;
             }
-            if (!pet_can_step(mtmp, nx, ny)) continue;
             if (avoid_soko_push_loc(mtmp, nx, ny)) continue;
 
             // NetHack lessens backtracking only for pets more than five

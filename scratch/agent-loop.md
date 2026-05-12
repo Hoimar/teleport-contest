@@ -231,6 +231,26 @@
   3. Keep `seed0116` screen 109 as a secondary object identity/description-state target: two visible potions, one arrow stack, and one ring still have exact-RNG color/state drift.
   4. Continue special-level object/monster parity and visible hack-debt cleanup when it unlocks active subsystem work.
 
+### Iteration 12 - Pet Kill Growth HP State
+
+- Implementation delta:
+  1. `pet_melee_attack()` now applies the C-shaped `grow_up(mtmp, victim)` max/current HP update after pet kills instead of only consuming the growth roll.
+  2. Pet melee candidates now pass a `mfndpos()`-style square reachability check before `ALLOW_M` attack handling, so monster-occupied squares are only attacked if the pet could otherwise enter that square.
+- Evidence:
+  1. A guarded trace showed the FR 10154 false iguana melee was caused by stale pet HP state, not an iguana movement-selector special case: after the prior gnome kill, C's `grow_up()` consumed `rnd(2)=1`, increased the kitten's `mhpmax`, and did not heal current HP because `max_increase` was 1.
+  2. JS had left the kitten at `4/4`; after the fix it reaches the C-like `4/5` state, lowers the later attack-balk threshold, skips the level-3 iguana melee, and follows C through the neutral `dog_move()` candidate RNG.
+  3. `seed0383` moved from FR 10154 to FR 10213. The new blocker is `mattacku()` monster-to-hero combat: C has an adjacent monster attack consume `rnd(2)`, hit rolls, damage, knockback, and status updates while JS falls through to ordinary movement `rn2(5)`.
+- Regression stability:
+  1. Target triage: `seed0383-wizard-hallucinate` reports `S 0/219 R 10573/16915 FS 0:char:map:init FR 10213:rnd(2)=2=>rn2(5)=0 C 0`.
+  2. `seed0116-wizard-wear-shop` stayed exact on RNG: `S 109/127 R 12562/12562 FS 109:attr:map:e FR - C 4`.
+  3. Sentinel suite: `seed8000` `S 23/23 R 3060/3130`, `seed0002` `S 11/595 R 1274/27158`, `seed0013` `S 0/99 R 540/4804`, `seed0116` `S 109/127 R 12562/12562`, `seed0383` `S 0/219 R 10573/16915`; total `S 143/1063 R 28009/64569`.
+  4. Full suite: `S 143/11406`, 0/44 passing. No matched-screen regressions; total public screens are unchanged because this remains behind seed0383's first visible hallucination/map mismatch.
+- Current queue:
+  1. Continue user-priority `seed0383` at FR 10213 by porting a narrow, general `dochug()` adjacent hero attack / `mattacku()` front door for ordinary monsters. Use `mhitu.c` for the current multiattack hit/damage/knockback RNG shape.
+  2. Keep message-interrupted occupation continuation as a known approximation; current implementation owns RNG timing better but not full `--More--` choreography.
+  3. Keep `seed0116` screen 109 as a secondary object identity/description-state target: two visible potions, one arrow stack, and one ring still have exact-RNG color/state drift.
+  4. Continue special-level object/monster parity and visible hack-debt cleanup when it unlocks active subsystem work.
+
 ## 2026-05-12 08:55 CEST Restart - Dehack, Deep Triage, Implementation Loop
 
 - Branch/baseline commit: `main` at `f4be79ac016690ec4a293cadad6427ed4d4715e3`.
