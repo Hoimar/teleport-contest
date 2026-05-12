@@ -128,6 +128,25 @@
   3. Broaden `#wizintrinsic` beyond hallucination only when evidence reaches additional intrinsic selections.
   4. Continue special-level object/monster parity and visible hack-debt cleanup when it unlocks active subsystem work.
 
+### Iteration 7 - Hero Occupied-Monster Movement Front Door
+
+- Implementation delta:
+  1. Added the `hack.c:domove()` occupied-monster front door: moving into a monster square now calls a basic attack path, consumes a turn, stops run mode, and leaves the hero in place instead of overlapping the monster.
+  2. Kept full `uhitm()` hit/damage/passive effects in the combat backlog; this slice only owns the position/turn boundary.
+- Evidence:
+  1. `seed0383` step 169 is a westward hero attack in C (`You hit ...`), while JS previously moved into the target square when no retained monster was present there. The new command path is ready for that state once the earlier monster-position drift is fixed.
+  2. Current `seed0383` first mismatch remains FR 9933. The useful classification changed: JS still has no monster on the westward `h` target before the hero attack screen, so the immediate owner is monster spatial state before the hero attack and second pet pass, not another dog-goal or ranged-scoring patch.
+  3. Discarded direction: a hero-track/gettrack probe was tried and removed because it did not move FR 9933 and regressed `seed0116` from exact RNG parity to FR 6278.
+- Regression stability:
+  1. Target triage after the command front door: `seed0383-wizard-hallucinate` reports `S 0/219 R 10177/16915 FS 0:char:map:init FR 9933:rnd(20)=5=>rnd(5)=5 C 0`.
+  2. Sentinel suite: `seed8000` `S 23/23 R 3060/3130`, `seed0002` `S 11/595 R 1249/27158`, `seed0013` `S 0/99 R 540/4804`, `seed0116` `S 109/127 R 12562/12562`, `seed0383` `S 0/219 R 10177/16915`; total `S 143/1063 R 27588/64569`.
+  3. Full suite: `S 143/11406`, 0/44 passing. No matched-screen regressions; several non-target RNG-only prefixes shifted because occupied-monster movement now changes later post-mismatch state.
+- Current queue:
+  1. Continue `seed0383` FR 9933 by finding why the C hero has a monster on the westward `h` target while JS has empty floor before that command. Focus on ordinary monster movement budgets/list order and live spatial state before step 169.
+  2. Classify seed0116 screen 109 attr-only map/object color drift as display/object-state debt now that RNG is exact.
+  3. Broaden `#wizintrinsic` beyond hallucination only when evidence reaches additional intrinsic selections.
+  4. Continue special-level object/monster parity and visible hack-debt cleanup when it unlocks active subsystem work.
+
 ## 2026-05-12 08:55 CEST Restart - Dehack, Deep Triage, Implementation Loop
 
 - Branch/baseline commit: `main` at `f4be79ac016690ec4a293cadad6427ed4d4715e3`.

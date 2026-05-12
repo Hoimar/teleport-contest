@@ -233,6 +233,23 @@ function blocksMove(x, y) {
     return false;
 }
 
+function mon_at(x, y) {
+    return (game.level?.monsters || []).find((mon) => mon.mx === x && mon.my === y);
+}
+
+function monsterName(mon) {
+    return String(mon?.data?.name || 'monster').toLowerCase().replaceAll('_', ' ');
+}
+
+async function attackMonster(mon) {
+    // C ref: hack.c:domove() enters uhitm() instead of moving onto
+    // occupied monster squares. Full hit/damage/passive effects remain in
+    // the combat backlog; this front door preserves position ownership.
+    await pline(`You hit the ${monsterName(mon)}.`);
+    game.context.run = null;
+    newsym(mon.mx, mon.my);
+}
+
 async function forceFightEmpty(dx, dy) {
     const x = game.u.ux + dx;
     const y = game.u.uy + dy;
@@ -1016,6 +1033,12 @@ export async function domove(dx, dy) {
         // Can't move there
         game.context.move = 0;
         return false;
+    }
+
+    const mon = mon_at(newx, newy);
+    if (mon) {
+        await attackMonster(mon);
+        return true;
     }
 
     const is_diag = dx !== 0 && dy !== 0;
