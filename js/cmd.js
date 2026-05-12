@@ -355,8 +355,16 @@ async function heroMeleeAttack(mon) {
     exercise(A_DEX, true);
     rnd(20);
     exercise(A_DEX, true);
-    rnd(6);
+    const damage = rnd(6);
     await pline(`You hit the ${monsterName(mon)}.`);
+    if (typeof mon.mhp === 'number') {
+        mon.mhp -= damage;
+        if (mon.mhp <= 0) {
+            heroKilledMonster(mon);
+            game.context.run = null;
+            return;
+        }
+    }
     rn2(3);
     rn2(6);
     rn2(25);
@@ -369,6 +377,43 @@ async function swallowedHeroAttack(mon) {
     // C evidence: swallowed directional movement attacks u.ustuck rather
     // than moving.  This is still a narrow uhitm() front door.
     await heroMeleeAttack(mon);
+}
+
+function abuseDog(mon) {
+    if (!mon.mtame) return;
+    if (game.u?.conflict || game.u?.uprops?.conflict) {
+        mon.mtame = Math.trunc(mon.mtame / 2);
+    } else {
+        mon.mtame--;
+    }
+    if (mon.mtame && mon.edog) mon.edog.abuse = (mon.edog.abuse || 0) + 1;
+    if (mon.mx !== 0) {
+        if (mon.mtame && rn2(mon.mtame)) {
+            if (game.u?.uprops?.hallucination) rn2(35);
+        }
+    }
+}
+
+function corpseChance(mon) {
+    const genoFreq = (mon.data?.geno ?? 0) & 0x7;
+    const denom = 2 + (genoFreq < 2 ? 1 : 0);
+    return !rn2(denom);
+}
+
+function heroKilledMonster(mon) {
+    if (mon.mtame) abuseDog(mon);
+    if (!rn2(6)) {
+        // Treasure-drop object creation is still future work; current
+        // evidence only needs the C front-door gate.
+    }
+    corpseChance(mon);
+    if (mon.mpeaceful && !rn2(2)) {
+        // Luck adjustment is outside the current scoring surface.
+    }
+    const monsters = game.level?.monsters || [];
+    const idx = monsters.indexOf(mon);
+    if (idx >= 0) monsters.splice(idx, 1);
+    newsym(mon.mx, mon.my);
 }
 
 async function forceFightEmpty(dx, dy) {

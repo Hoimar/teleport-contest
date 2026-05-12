@@ -935,3 +935,13 @@
 - Regression stability: target triage after the final edit reports `seed0383` `S 0/219 R 11419/16915 FR 11372`; `seed0116` remains exact on RNG at `S 109/127 R 12562/12562`; sentinel suite is stable at total `S 143/1063 R 28863/64569`; full suite is stable at `S 143/11406`.
 - Implementation delta: combat/monster movement owns more of `mhitu.c:gulpmu()`, `mon.c:unstuck()`, `mon.c:mnexto()`, and `hack.c:domove()` occupied attack behavior. No seed-specific branches or replay tables were added.
 - Current queue: implement enough `uhitm()` pet abuse/death handling for `seed0383` FR 11372 (`abuse_dog()`/`yelp()`/`xkilled()` after hitting the kitten), then continue `seed0116` screen 109 object identity/color drift.
+
+## Iteration 24 - Hero Pet Kill Side Effects
+
+- Change: `heroMeleeAttack()` now applies the current damage roll to retained monster HP. If the hit kills a tame monster, it runs the narrow current-evidence `abuse_dog()`/hallucination yelp/`xkilled()` front doors, removes the monster from the live monster list, redraws the square, and stops before the knockback/known-hit/passive rolls that C skips on a kill.
+- Evidence: `seed0383-wizard-hallucinate` moved from FR 11372 / `R 11419/16915` to FR 11387 / `R 11430/16915`. The pet-abuse blocker consumed `rn2(9)`, hallucination yelp `rn2(35)`, treasure gate `rn2(6)`, corpse chance `rn2(3)`, and peaceful cleanup `rn2(2)` before the trace returned to ordinary monster movement.
+- Score delta: full public suite remains `S 143/11406`, 0/44 passing; focused evidence session screens remain `0/219`, but the first RNG mismatch moved later by 15 calls.
+- Regression stability: target triage after the edit reports `seed0383` `S 0/219 R 11430/16915 FR 11387`; `seed0116` remains exact on RNG at `S 109/127 R 12562/12562`; sentinel suite is stable at total `S 143/1063 R 28848/64569`; full suite remains `S 143/11406`.
+- Regression classification: `seed0002` and several non-target RNG prefixes shifted with unchanged matched-screen counts. This is expected from shared hero-kill/death-side-effect ownership and is queued only if one of those sessions becomes active evidence.
+- Implementation delta: hero combat and pet interaction now own more of `uhitm.c`/`dog.c:abuse_dog()`/`mon.c:xkilled()` without seed-specific branches or replay tables. Full combat, corpses/treasure object creation, luck/accounting, and passive effects remain incomplete.
+- Current queue: classify `seed0383` FR 11387 ordinary `m_move()` candidate geometry (`rn2(20)` expected vs JS `rn2(16)`); then continue `seed0116` screen 109 object identity/color drift.
