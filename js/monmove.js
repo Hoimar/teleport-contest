@@ -1,7 +1,7 @@
 import { game } from './gstate.js';
 import { rn2 } from './rng.js';
 import { dog_move } from './dog.js';
-import { D_CLOSED, D_LOCKED, IS_DOOR, isok, SPACE_POS } from './const.js';
+import { D_CLOSED, D_LOCKED, IS_DOOR, M_AP_FURNITURE, M_AP_OBJECT, isok, SPACE_POS } from './const.js';
 import { newsym } from './display.js';
 
 const NORMAL_SPEED = 12;
@@ -9,6 +9,7 @@ const BOLT_LIM = 8;
 const M2_WERE = 0x00000004;
 const M2_HUMAN = 0x00000008;
 const M2_WANDER = 0x00800000;
+const M1_HIDE = 0x00000100;
 const MTSZ = 4;
 const MSLOW = 1;
 const MFAST = 2;
@@ -66,6 +67,10 @@ function monnear_hero(mtmp) {
     // C ref: mon.c:monnear().  dochug() short-circuits before the
     // is_wanderer() RNG gate when the pet is not near its target.
     return dist2(mtmp.mx, mtmp.my, game.u?.ux ?? mtmp.mx, game.u?.uy ?? mtmp.my) < 3;
+}
+
+function is_hider(mtmp) {
+    return !!(mtmp.data?.mflags1 & M1_HIDE);
 }
 
 function non_tame_movement_opportunity(mtmp, state) {
@@ -203,6 +208,18 @@ export async function movemon() {
 
         mtmp.movement -= NORMAL_SPEED;
         if (mtmp.movement >= NORMAL_SPEED) somebody_can_move = true;
+
+        // C ref: monmove.c:dochug() returns before distfleeck() for frozen,
+        // waiting, or still-sleeping monsters. Disturb/wake-up RNG is not
+        // modeled yet, so sleeping monsters spend movement without movement
+        // AI until that front door is ported.
+        if (mtmp.mcanmove === 0 || mtmp.msleeping) continue;
+        if (is_hider(mtmp)
+            && (mtmp.m_ap_type === M_AP_FURNITURE
+                || mtmp.m_ap_type === M_AP_OBJECT
+                || mtmp.mundetected)) {
+            continue;
+        }
 
         // dochugw -> dochug
         const fleeState = distfleeck(mtmp); // consuming rn2(5)

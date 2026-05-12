@@ -30,6 +30,7 @@ import {
     ICE, MOAT, POOL, WATER, LAVAPOOL, LAVAWALL, DBWALL,
     A_LAWFUL, A_NONE, Align2amask,
     LR_TELE, LR_UPTELE, LR_DOWNTELE, NO_MINVENT, MM_IGNOREWATER, MM_ANGRY, MM_ASLEEP, MM_NOGRP, GP_CHECKSCARY, GP_AVOID_MONPOS,
+    M_AP_OBJECT,
 } from './const.js';
 
 // Object/class constants (normally from objects.js, not in contest template)
@@ -1470,6 +1471,10 @@ export async function makemon(mdat, x, y, mmflags = 0) {
     // action order depend on this list order because each monster consumes
     // its own speed-rounding roll.
     if (game.level?.monsters) game.level.monsters.unshift(mon);
+    if (ptr.mlet === 'S_MIMIC' && isSokobanLevel()) {
+        mon.m_ap_type = M_AP_OBJECT;
+        mon.mappearance = BOULDER;
+    }
     if ((ptr.mlet === 'S_SPIDER' || ptr.mlet === 'S_SNAKE') && game.in_mklev && x && y) {
         mkobj_at(RANDOM_CLASS, x, y, true);
         mon.mundetected = 1;

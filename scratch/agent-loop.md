@@ -68,6 +68,23 @@
   3. Recheck Soko screen 109 attr-only map/object color state if it intersects object/monster ownership.
   4. Continue special-level object/monster parity and visible hack-debt cleanup when it unlocks active subsystem work.
 
+### Iteration 4 - Sleeping And Hidden Monster Movement Front Doors
+
+- Implementation delta:
+  1. `movemon()` now subtracts movement for frozen or still-sleeping monsters without entering `dochug()`/`distfleeck()`, matching the C ordering where `dochug()` returns before movement AI RNG.
+  2. Soko giant mimics now carry object-appearance state as boulders, and object/furniture-appearing hiders spend movement without entering `dochug()`.
+- Evidence:
+  1. Before this change, `seed0116` matched through the pet post-move `distfleeck()` at FR 12521 but JS consumed extra `distfleeck()` calls for sleeping zoo monsters and then Soko giant mimics before C reached turn-boundary `were_change()`.
+  2. After the change, `seed0116` target triage reports `S 109/127 R 12562/12562 FS 109:attr:map:e FR - C 4`; the evidence session now has complete RNG parity and only display attr/cursor mismatches remain.
+- Regression stability:
+  1. Sentinel suite: `seed8000` `S 23/23 R 3060/3130`, `seed0002` `S 11/595 R 1258/27158`, `seed0013` `S 0/99 R 536/4804`, `seed0116` `S 109/127 R 12562/12562`, `seed0383` `S 0/219 R 9926/16915`; total `S 143/1063 R 27342/64569`.
+  2. No sentinel screen-count regressions. `seed0383` remained at FR 9716, so the next queued dog-goal object-state work is not masked by this movement-front-door fix.
+- Current queue:
+  1. Resume user-priority `seed0383` FR 9716 `dog_goal()` floor-object/state parity. Use `scripts/trace-dog-goal.mjs --scan --rng` to compare the final scanned `fobj`/inventory entries before editing.
+  2. Classify seed0116 screen 109 attr-only map/object color drift as display/object-state debt now that RNG is exact.
+  3. Broaden sleeping `disturb()` and full mimic `set_mimic_sym()` only when C evidence reaches those predicates.
+  4. Continue special-level object/monster parity and visible hack-debt cleanup when it unlocks active subsystem work.
+
 ## 2026-05-12 08:55 CEST Restart - Dehack, Deep Triage, Implementation Loop
 
 - Branch/baseline commit: `main` at `f4be79ac016690ec4a293cadad6427ed4d4715e3`.
