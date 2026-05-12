@@ -147,6 +147,26 @@
   3. Broaden `#wizintrinsic` beyond hallucination only when evidence reaches additional intrinsic selections.
   4. Continue special-level object/monster parity and visible hack-debt cleanup when it unlocks active subsystem work.
 
+### Iteration 8 - Upstream Object Colors And TTY Gray Normalization
+
+- Implementation delta:
+  1. Added generated upstream `objects[otyp].oc_color` metadata to `js/object_data.js` and used it for placed object display colors instead of class/material defaults.
+  2. Normalized `CLR_GRAY` to `NO_COLOR` at display-cell storage time to match the tty backend, where both gray and default emit no foreground color.
+  3. Split ordinary stairs from branch stairs by recording `isbranch` on stairway records: ordinary up/down stairs render in default/gray color, while branch stairs remain yellow.
+- Evidence:
+  1. `seed0116` keeps exact RNG parity and screen 109 as the first visible mismatch, but the attr-only drift narrowed from 13 cells to 4 cells.
+  2. Remaining `seed0116` screen 109 cells are live object identity/color state, not class-default renderer debt: two potions, one arrow stack, and one ring are visible, cansee cells whose JS `otyp`/color differs from C.
+  3. A temporary all-stairs-gray version regressed `seed8000` to `S 6/23`; this was classified as missing branch-stair color state and fixed by marking branch stairs structurally.
+- Regression stability:
+  1. Target triage after the final branch-stair fix: `seed0116-wizard-wear-shop` reports `S 109/127 R 12562/12562 FS 109:attr:map:e FR - C 4`.
+  2. Sentinel suite: `seed8000` `S 23/23 R 3060/3130`, `seed0002` `S 11/595 R 1249/27158`, `seed0013` `S 0/99 R 540/4804`, `seed0116` `S 109/127 R 12562/12562`, `seed0383` `S 0/219 R 10177/16915`; total `S 143/1063 R 27588/64569`.
+  3. Full suite: `S 143/11406`, 0/44 passing. No screen-count regressions after the branch-stair refinement.
+- Current queue:
+  1. Return to user-priority `seed0383` FR 9933 by classifying ordinary monster movement/spatial state before the hero `h` attack and the pet's second movement pass.
+  2. Keep `seed0116` screen 109 as a secondary object identity/description-state target: two visible potions, one arrow stack, and one ring still have exact-RNG color/state drift.
+  3. Broaden `#wizintrinsic` beyond hallucination only when evidence reaches additional intrinsic selections.
+  4. Continue special-level object/monster parity and visible hack-debt cleanup when it unlocks active subsystem work.
+
 ## 2026-05-12 08:55 CEST Restart - Dehack, Deep Triage, Implementation Loop
 
 - Branch/baseline commit: `main` at `f4be79ac016690ec4a293cadad6427ed4d4715e3`.

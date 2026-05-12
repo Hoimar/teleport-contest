@@ -12,7 +12,7 @@ import { init_rect, rnd_rect, get_rect, split_rects } from './rect.js';
 import { depth as depth_of_level, distmin, dist2 } from './hacklib.js';
 import { randomEngraving } from './random_text.js';
 import {
-    OBJECT_CLASS, OBJECT_PROB, OBJECT_CHARGED, OBJECT_DIR, OBJECT_MATERIAL,
+    OBJECT_CLASS, OBJECT_PROB, OBJECT_CHARGED, OBJECT_DIR, OBJECT_MATERIAL, OBJECT_COLOR,
     CLASS_BASES, CLASS_TOTALS,
 } from './object_data.js';
 import { MONSTER_DATA } from './monster_data.js';
@@ -282,8 +282,8 @@ const MONSTER_SYMBOLS = {
 };
 
 // Stairway list management
-function stairway_add(x, y, up, isladder, dest) {
-    const node = { sx: x, sy: y, up, isladder, tolev: { ...dest }, next: game.stairs };
+function stairway_add(x, y, up, isladder, dest, isbranch = false) {
+    const node = { sx: x, sy: y, up, isladder, isbranch, tolev: { ...dest }, next: game.stairs };
     game.stairs = node;
 }
 
@@ -884,7 +884,9 @@ const OBJECT_CLASS_GLYPH = {
     [ROCK_CLASS]: { ch: '`', color: 7 },
 };
 
-const MATERIAL_WOOD = 8;
+function object_display_color(otmp) {
+    return OBJECT_COLOR[otmp?.otyp] ?? OBJECT_CLASS_GLYPH[otmp?.oclass]?.color ?? 7;
+}
 
 export function place_object(otmp, x, y) {
     if (!otmp || !game.level?.objects) return otmp;
@@ -892,7 +894,7 @@ export function place_object(otmp, x, y) {
     otmp.ox = x;
     otmp.oy = y;
     otmp.ch = glyph.ch;
-    otmp.color = OBJECT_MATERIAL[otmp.otyp] === MATERIAL_WOOD ? 3 : glyph.color;
+    otmp.color = object_display_color(otmp);
     game.level.objects.unshift(otmp);
     return otmp;
 }
@@ -3802,7 +3804,7 @@ function place_branch(branchp) {
             loc.typ = STAIRS;
             loc.ladder = goes_up ? 1 : 2;
         }
-        stairway_add(mp.x, mp.y, goes_up, false, dest || { dnum: 0, dlevel: 0 });
+        stairway_add(mp.x, mp.y, goes_up, false, dest || { dnum: 0, dlevel: 0 }, true);
         if (goes_up) g.level.upstair = { x: mp.x, y: mp.y };
         else g.level.dnstair = { x: mp.x, y: mp.y };
     }
