@@ -11,7 +11,7 @@ import { newsym, flush_screen, pline, clear_pending_message, docrt, serialize_te
 import { vision_recalc, vision_reset } from './vision.js';
 import { mklev, mksobj, place_lregion, place_object } from './mklev.js';
 import { pet_arrive_with_you } from './dog.js';
-import { pluslvl } from './u_init.js';
+import { merge_inventory_object, pluslvl } from './u_init.js';
 import { adjalign, exercise } from './allmain_turns.js';
 import { roleGod } from './roles.js';
 import { rn1, rn2, rnz } from './rng.js';
@@ -110,6 +110,8 @@ function make_wish_object(name) {
     otmp.wishedfor = true;
     if (spec.appearanceName) otmp.appearanceName = spec.appearanceName;
     rn2(100);
+    const merged = merge_inventory_object(otmp);
+    if (merged) return merged;
     assignInventoryLetter(otmp);
     game.inventory.push(otmp);
     return otmp;
@@ -189,6 +191,7 @@ function runDirectionForKey(ch) {
 const EXTENDED_AUTOCOMPLETE = [
     { name: 'levelchange', min: 2 },
     { name: 'pray', min: 2 },
+    { name: 'wizintrinsic', min: 4 },
 ];
 
 function completeExtendedCommand(input) {
@@ -603,6 +606,10 @@ export async function rhack(key) {
                 await pline('Are you sure you want to pray? [yn] (n) ');
                 game._awaiting_pray_confirm = true;
                 game.context.move = 0;
+            } else if (cmd === 'wizintrinsic') {
+                await showPromptLine('Which intrinsics?');
+                game._awaiting_wizintrinsic = true;
+                game.context.move = 0;
             } else {
                 await pline(`Unknown extended command: ${cmd || '#'}.`);
             }
@@ -622,6 +629,25 @@ export async function rhack(key) {
             game._extended_command_input = typed;
             game._extended_command = completeExtendedCommand(typed);
             await showPromptLine(`# ${game._extended_command}`);
+            game.context.move = 0;
+            return;
+        }
+        game.context.move = 0;
+        return;
+    }
+
+    if (game._awaiting_wizintrinsic) {
+        if (ch === 'h' || ch === 'H') {
+            game._awaiting_wizintrinsic = false;
+            game.u = game.u || {};
+            game.u.uprops = game.u.uprops || {};
+            game.u.uprops.hallucination = 30;
+            await pline('Timeout for hallucination set to 30.');
+            game.context.move = 1;
+            return;
+        }
+        if (ch === '\r' || ch === '\n' || ch === ' ' || ch === '\x1b') {
+            game._awaiting_wizintrinsic = false;
             game.context.move = 0;
             return;
         }

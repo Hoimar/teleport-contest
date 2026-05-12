@@ -85,6 +85,29 @@
   3. Broaden sleeping `disturb()` and full mimic `set_mimic_sym()` only when C evidence reaches those predicates.
   4. Continue special-level object/monster parity and visible hack-debt cleanup when it unlocks active subsystem work.
 
+### Iteration 5 - Wizard Intrinsic, Inventory Stacks, Pet Ranged Scoring, And Movement Front Doors
+
+- Implementation delta:
+  1. Added a narrow wizard/debug `#wizintrinsic` command state so `h` selects hallucination, prints the timeout message, and consumes a turn instead of moving west.
+  2. Added conservative `addinv()`-style carried stack merging for startup and wished stackable objects, including startup cursed-state clearing before role inventory adjustments.
+  3. Added the post-candidate `pet_ranged_attk(FALSE)` target scan with `score_targ()` `rnd(5)` fuzz rolls.
+  4. Retained and aged minimal fog gas regions so fog clouds only consume vapor TTL when no gas region is already visible at their square.
+  5. Added ordinary `m_move()` front doors for peaceful neutral movement, peaceful item-search gate RNG, and the stalker/bat/light approach `rn2(3)` gate.
+- Evidence:
+  1. `seed0383` first moved from FR 9716 to FR 9732 after `#wizintrinsic`, proving the previous dog-goal blocker was a command-state fallthrough where `h` moved the hero.
+  2. Inventory stack merging moved the dog-goal scan through the duplicate Wizard scroll stack and into pet candidate selection at FR 9739.
+  3. Pet ranged scoring, fog-region retention, peaceful movement, and light approach gates moved `seed0383` through FR 9739, FR 9756, FR 9757, and FR 9786 to the current FR 9806.
+  4. Current `seed0383` blocker: `rn2(28)` expected vs `rn2(16)` actual in `m_move()` backtracking/candidate geometry, pointing at `mfndpos()` terrain/flag candidate counts.
+- Regression stability:
+  1. Target triage: `seed0383-wizard-hallucinate` now reports `S 0/219 R 10290/16915 FS 0:char:map:init FR 9806:rn2(28)=10=>rn2(16)=6 C 0`.
+  2. Sentinel suite: `seed8000` `S 23/23 R 3060/3130`, `seed0002` `S 11/595 R 1259/27158`, `seed0013` `S 0/99 R 536/4804`, `seed0116` `S 109/127 R 12562/12562`, `seed0383` `S 0/219 R 10290/16915`; total `S 143/1063 R 27707/64569`.
+  3. Full suite: `S 143/11406`, 0/44 passing. No matched-screen regressions; the `seed0002` +1 RNG shift is classified as a structural effect of startup inventory cursed/stack state.
+- Current queue:
+  1. Continue user-priority `seed0383` at FR 9806 by porting enough `monmove.c:mfndpos()` terrain/flag candidate accounting to move the `rn2(28)` vs `rn2(16)` boundary without adding a denominator offset.
+  2. Classify seed0116 screen 109 attr-only map/object color drift as display/object-state debt now that RNG is exact.
+  3. Broaden `#wizintrinsic` beyond hallucination only when evidence reaches additional intrinsic selections.
+  4. Continue special-level object/monster parity and visible hack-debt cleanup when it unlocks active subsystem work.
+
 ## 2026-05-12 08:55 CEST Restart - Dehack, Deep Triage, Implementation Loop
 
 - Branch/baseline commit: `main` at `f4be79ac016690ec4a293cadad6427ed4d4715e3`.

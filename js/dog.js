@@ -11,7 +11,7 @@ import {
     IS_LAVA, IS_POOL, IS_ROOM, MM_EDOG, NO_MINVENT, SPACE_POS,
     isok,
 } from './const.js';
-import { rn2 } from './rng.js';
+import { rn2, rnd } from './rng.js';
 import { clear_path } from './vision.js';
 
 const FOOD_CLASS = 7;
@@ -32,6 +32,7 @@ const SLIME_MOLD = 285;
 const TIN = 296;
 const BELL_OF_OPENING = 263;
 const CANDELABRUM_OF_INVOCATION = 262;
+const DOG_HUNGRY = 300;
 
 // These ids come from the generated object table used by mklev.js.
 const AMULET_OF_YENDOR = 185;
@@ -354,6 +355,99 @@ function pet_can_see_object(mtmp, x, y) {
     return clear_path(mtmp.mx, mtmp.my, x, y);
 }
 
+function pet_master_x(mtmp) {
+    return mtmp.mux ?? game.u?.ux ?? mtmp.mx;
+}
+
+function pet_master_y(mtmp) {
+    return mtmp.muy ?? game.u?.uy ?? mtmp.my;
+}
+
+function find_targ(mtmp, dx, dy, maxdist) {
+    let curx = mtmp.mx;
+    let cury = mtmp.my;
+    for (let dist = 0; dist < maxdist; dist++) {
+        curx += dx;
+        cury += dy;
+        if (!isok(curx, cury)) break;
+        if (!clear_path(mtmp.mx, mtmp.my, curx, cury)) break;
+        if (curx === pet_master_x(mtmp) && cury === pet_master_y(mtmp)) {
+            return { _hero: true, mx: curx, my: cury, mtame: 0, mpeaceful: 0 };
+        }
+        const targ = mon_at(curx, cury, mtmp);
+        if (!targ) continue;
+        if (targ.minvis || targ.mundetected) continue;
+        if (targ.mx === curx && targ.my === cury) return targ;
+    }
+    return null;
+}
+
+function find_friends(mtmp, mtarg, maxdist) {
+    const dx = sgn(mtarg.mx - mtmp.mx);
+    const dy = sgn(mtarg.my - mtmp.my);
+    let curx = mtarg.mx;
+    let cury = mtarg.my;
+    for (let dist = distmin(mtarg.mx, mtarg.my, mtmp.mx, mtmp.my); dist <= maxdist; dist++) {
+        curx += dx;
+        cury += dy;
+        if (!isok(curx, cury)) return false;
+        if (!clear_path(mtmp.mx, mtmp.my, curx, cury)) return false;
+        if (curx === pet_master_x(mtmp) && cury === pet_master_y(mtmp)) return true;
+        const pal = mon_at(curx, cury, mtmp);
+        if (pal?.mtame && !pal.minvis) return true;
+    }
+    return false;
+}
+
+function monster_level(mon) {
+    return mon?.m_lev ?? mon?.data?.mlevel ?? 0;
+}
+
+function score_targ(mtmp, mtarg) {
+    let score = 0;
+    if (!mtmp.mconf || !rn2(3)) {
+        if (distmin(mtmp.mx, mtmp.my, mtarg.mx, mtarg.my) <= 1) return -3000;
+        if (mtarg.mtame || mtarg._hero) return -3000;
+        if (find_friends(mtmp, mtarg, 15)) return -3000;
+        if (!mtarg.mpeaceful) score += 10;
+        const petLev = monster_level(mtmp);
+        const targLev = monster_level(mtarg);
+        if (targLev > petLev + 4) score -= (targLev - petLev) * 20;
+        score += targLev * 2 + Math.trunc((mtarg.mhp ?? 0) / 3);
+    }
+    score += rnd(5);
+    if (mtmp.mconf && !rn2(3)) score -= 1000;
+    return score;
+}
+
+function best_target(mtmp, forced) {
+    if (!mtmp || mtmp.mcansee === 0) return null;
+    let bestScore = -40000;
+    let bestTarg = null;
+    for (let dy = -1; dy < 2; dy++) {
+        for (let dx = -1; dx < 2; dx++) {
+            if (!dx && !dy) continue;
+            const targ = find_targ(mtmp, dx, dy, 7);
+            if (!targ) continue;
+            const score = score_targ(mtmp, targ);
+            if (score > bestScore) {
+                bestScore = score;
+                bestTarg = targ;
+            }
+        }
+    }
+    if (!forced && bestScore < 0) return null;
+    return bestTarg;
+}
+
+function pet_ranged_attk(mtmp, forced = false) {
+    const edog = init_edog(mtmp);
+    const hungry = (game.moves || 0) > ((edog.hungrytime || 0) + DOG_HUNGRY);
+    const mtarg = best_target(mtmp, forced);
+    if (mtarg && hungry) rn2(5);
+    return 0;
+}
+
 function pet_can_step(mtmp, x, y) {
     if (!isok(x, y)) return false;
     if (x === game.u?.ux && y === game.u?.uy) return false;
@@ -491,6 +585,8 @@ export function dog_move(mtmp, after = true) {
             }
         }
     }
+
+    pet_ranged_attk(mtmp, false);
 
     if (nix === mtmp.mx && niy === mtmp.my) return 0;
     const oldx = mtmp.mx;

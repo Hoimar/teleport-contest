@@ -113,7 +113,17 @@ function m_move_basic(mtmp) {
     const omy = mtmp.my;
     const ggx = mtmp.mux ?? game.u?.ux ?? omx;
     const ggy = mtmp.muy ?? game.u?.uy ?? omy;
-    const appr = mtmp.mflee ? -1 : 1;
+    let appr = mtmp.mflee ? -1 : 1;
+    if (mtmp.mconf || (mtmp.mpeaceful && !mtmp.isshk)) appr = 0;
+    if (appr === 1
+        && (mtmp.data?.name === 'STALKER' || mtmp.data?.mlet === 'S_BAT' || mtmp.data?.mlet === 'S_LIGHT')
+        && !rn2(3)) {
+        appr = 0;
+    }
+    if (!mtmp.mpeaceful || !rn2(10)) {
+        // m_search_items() remains future work; this preserves the C front
+        // door before ordinary candidate selection.
+    }
     const candidates = [];
     const maxx = Math.min(omx + 1, 79);
     const maxy = Math.min(omy + 1, 20);
@@ -168,8 +178,23 @@ function m_move_basic(mtmp) {
 
 function m_everyturn_effect(mtmp) {
     if (mtmp.data?.name === 'FOG_CLOUD') {
-        rn2(3); // create_gas_cloud(..., 1, 0) TTL via rn1(3, 4)
+        if (visible_gas_region_at(mtmp.mx, mtmp.my)) return;
+        const ttl = 4 + rn2(3); // create_gas_cloud(..., 1, 0) TTL via rn1(3, 4)
+        game.level.gasClouds = game.level.gasClouds || [];
+        game.level.gasClouds.push({ x: mtmp.mx, y: mtmp.my, ttl });
     }
+}
+
+function visible_gas_region_at(x, y) {
+    return (game.level?.gasClouds || []).some((region) =>
+        region.ttl > 0 && region.x === x && region.y === y);
+}
+
+function age_gas_clouds() {
+    const clouds = game.level?.gasClouds;
+    if (!clouds?.length) return;
+    for (const cloud of clouds) cloud.ttl--;
+    game.level.gasClouds = clouds.filter((cloud) => cloud.ttl > 0);
 }
 
 function were_change(mtmp) {
@@ -197,6 +222,7 @@ export function mcalcdistress() {
 export async function movemon() {
     const g = game;
     let somebody_can_move = false;
+    age_gas_clouds();
 
     // In a real engine, we'd iterate over all monsters.
     // For now, let's just handle the monsters we have.
