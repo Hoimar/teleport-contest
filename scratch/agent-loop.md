@@ -352,6 +352,26 @@
   2. For `seed0116`, trace the remaining three object identities back to Soko/trap-victim/special-level object creation. Focus on why C has default-color potion/weapon glyphs where JS has `POT_RESTORE_ABILITY`, `POT_BLINDNESS`, and orcish arrows.
   3. Keep broader description/name identity wiring in the object backlog; this slice only owns runtime color/material appearance.
 
+### Iteration 18 - Monster Item Pickup And Wear Delay
+
+- Implementation delta:
+  1. Added a conservative `monmove.c:m_search_items()`/`mpickstuff()` front door for intelligent collector monsters: nearby desirable floor objects can retarget ordinary movement without adding RNG, the monster picks one reachable item from the landing square, and pickup sets an `I_SPECIAL` re-equip check for a later movement turn.
+  2. Added a minimal monster `m_dowear()` path for boots using `OBJECT_DELAY`, setting `mfrozen`/`mcanmove=0` and timing the cooldown through `mcalcdistress()`.
+  3. Added the swallowed-hero `mattacku()` guard so only `u.ustuck` can roll attacks while `u.uswallow` is true.
+- Evidence:
+  1. C trace showed monster `#144` was a gnome that moved onto levitation boots, picked them up, and then spent later ready movement turns wearing them before re-entering `distfleeck()`. JS had left the boots on the floor and the gnome awake, which caused the FR 10374 extra gnome `distfleeck()`.
+  2. `seed0383` moved from `S 0/219 R 10675/16915` at FR 10374 to `S 0/219 R 10822/16915` at FR 10491. The current blocker is no longer the gnome or repeat engulf; C continues a swallowed-pet `dog_goal()` floor-object scan (`obj_resists()`), while JS reaches `mcalcmove()`.
+  3. `seed0116` remained exact on RNG and unchanged on the three screen-109 object-color attr cells.
+- Regression stability:
+  1. `node scripts/triage-session.mjs sessions/seed0383-wizard-hallucinate.session.json` => `S 0/219 R 10822/16915 FS 0:char:map:init FR 10491:rn2(100)=2=>rn2(12)=10 C 0`.
+  2. `node scripts/triage-session.mjs sessions/seed0116-wizard-wear-shop.session.json` => `S 109/127 R 12562/12562 FS 109:attr:map:e FR - C 4`.
+  3. `node scripts/run-sentinel-suite.mjs` => total `S 143/1063 R 28258/64569`.
+  4. `node frozen/ps_test_runner.mjs` => total `S 143/11406`, 0/44 passing. No matched-screen regressions; non-target RNG-only shifts in object/monster-heavy sessions are classified as expected consequences of enabling monster item pickup and wear timing.
+- Current queue:
+  1. Continue `seed0383` at FR 10491 by comparing the swallowed pet's `dog_goal()` search rectangle and retained `fobj` entries after the second repeat-engulf turn. Count missing/extra object scans before changing candidate movement.
+  2. Keep `seed0116` screen 109 as the secondary exact-RNG object identity target: two visible potions and one arrow stack still have object identity/color drift.
+  3. Broaden monster inventory/equipment only from evidence; current implementation owns collector pickup and boot wear delay, not full `minvent`, armor preference, or all `m_search_items()` type predicates.
+
 ## 2026-05-12 08:55 CEST Restart - Dehack, Deep Triage, Implementation Loop
 
 - Branch/baseline commit: `main` at `f4be79ac016690ec4a293cadad6427ed4d4715e3`.
