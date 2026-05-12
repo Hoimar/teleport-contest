@@ -401,9 +401,12 @@ export async function movemon() {
         g._gas_clouds_aged_turn = g.moves;
     }
 
-    // In a real engine, we'd iterate over all monsters.
-    // For now, let's just handle the monsters we have.
-    for (const mtmp of g.level.monsters) {
+    // C ref: mon.c:iter_mons_safe() snapshots fmon before the movement
+    // pass so removals or insertions during combat do not shift ownership
+    // of later monsters' turns.
+    const monsters = [...(g.level.monsters || [])];
+    for (const mtmp of monsters) {
+        if (!g.level.monsters?.includes(mtmp)) continue;
         // C ref: mon.c:movemon_singlemon() runs this before the movement
         // budget check, so zero-budget fog clouds still leave vapor.
         m_everyturn_effect(mtmp);

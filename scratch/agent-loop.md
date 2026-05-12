@@ -315,6 +315,24 @@
   2. Keep `seed0116` screen 109 as a secondary object identity/description-state target: two visible potions, one arrow stack, and one ring still have exact-RNG color/state drift.
   3. Continue special-level object/monster parity and visible hack-debt cleanup when it unlocks active subsystem work.
 
+### Iteration 16 - Movement Pass Snapshot
+
+- Implementation delta:
+  1. `movemon()` now snapshots the live monster array before the movement pass, mirroring `mon.c:iter_mons_safe()` so removals or insertions during combat do not shift ownership of later monsters' turns.
+  2. The pass still checks that a snapshotted monster remains linked before processing it, preserving the C idea of a stable traversal without acting on monsters that have already been removed.
+- Evidence:
+  1. Current target behavior is neutral: `seed0383` remains at FR 10374 (`rnd(2)` expected from repeat ice-vortex `gulpmu()` vs JS gnome `distfleeck()`), so the active blocker is still the gnome's state/list membership before the swallowed-monster pass.
+  2. `seed0116` remains exact on RNG with only the four visible object-color attr cells at screen 109.
+- Regression stability:
+  1. `node scripts/triage-session.mjs sessions/seed0383-wizard-hallucinate.session.json` => `S 0/219 R 10675/16915 FS 0:char:map:init FR 10374:rnd(2)=1=>rn2(5)=4 C 0`.
+  2. `node scripts/triage-session.mjs sessions/seed0116-wizard-wear-shop.session.json` => `S 109/127 R 12562/12562 FS 109:attr:map:e FR - C 4`.
+  3. `node scripts/run-sentinel-suite.mjs` => total `S 143/1063 R 28111/64569`.
+  4. `node frozen/ps_test_runner.mjs` => total `S 143/11406`, 0/44 passing. No matched-screen regressions.
+- Current queue:
+  1. Continue `seed0383` FR 10374 by checking whether removed/dead-monster cleanup or prior gnome state differs before the repeat engulf turn; do not force order or skip the gnome by session.
+  2. Use the exact-RNG `seed0116` screen 109 attr mismatch as the next localized object-state target if the seed0383 live-state owner remains locally blocked.
+  3. Continue special-level object/monster parity and visible hack-debt cleanup when it unlocks active subsystem work.
+
 ## 2026-05-12 08:55 CEST Restart - Dehack, Deep Triage, Implementation Loop
 
 - Branch/baseline commit: `main` at `f4be79ac016690ec4a293cadad6427ed4d4715e3`.
