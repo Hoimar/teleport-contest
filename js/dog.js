@@ -11,7 +11,7 @@ import {
     IS_LAVA, IS_POOL, IS_ROOM, MM_EDOG, NO_MINVENT, SPACE_POS,
     isok,
 } from './const.js';
-import { rn2, rnd } from './rng.js';
+import { d, rn2, rnd } from './rng.js';
 import { clear_path } from './vision.js';
 
 const FOOD_CLASS = 7;
@@ -30,9 +30,15 @@ const CARROT = 282;
 const CLOVE_OF_GARLIC = 284;
 const SLIME_MOLD = 285;
 const TIN = 296;
+const TINNING_KIT = 238;
 const BELL_OF_OPENING = 263;
 const CANDELABRUM_OF_INVOCATION = 262;
 const DOG_HUNGRY = 300;
+const M2_STRONG = 0x04000000;
+
+const OBJECT_WEIGHT_OVERRIDES = new Map([
+    [TINNING_KIT, 100],
+]);
 
 // These ids come from the generated object table used by mklev.js.
 const AMULET_OF_YENDOR = 185;
@@ -303,7 +309,27 @@ function can_carry(mtmp, obj) {
     if (mtmp === game.u?.usteed) return 0;
     if (obj.cursed) return 0;
     if (object_class(obj.otyp) === ROCK_CLASS && obj.otyp === BOULDER && !mtmp.data?.throws_rocks) return 0;
+    if (current_mon_load(mtmp) + object_weight(obj) > max_mon_load(mtmp)) return 0;
     return Math.max(1, obj.quan || 1);
+}
+
+function object_weight(obj) {
+    if (!obj) return 0;
+    if (typeof obj.owt === 'number' && obj.owt > 1) return obj.owt;
+    return OBJECT_WEIGHT_OVERRIDES.get(obj.otyp) || obj.owt || 1;
+}
+
+function current_mon_load(mtmp) {
+    return (mtmp.inventory || []).reduce((sum, obj) => sum + object_weight(obj), 0);
+}
+
+function max_mon_load(mtmp) {
+    // C ref: mon.c:max_mon_load().  Monster cwt/msize are not generated
+    // yet; keep known small domestic pet capacity conservative so heavy
+    // tools are rejected by can_carry().
+    const name = mtmp.data?.name;
+    if (name === 'KITTEN' || name === 'LITTLE_DOG') return 50;
+    return ((mtmp.data?.mflags2 ?? 0) & M2_STRONG) ? 1000 : 500;
 }
 
 function object_name(obj) {
@@ -458,6 +484,42 @@ function pet_can_step(mtmp, x, y) {
         || (IS_DOOR(loc.typ) && !(loc.doormask & (D_CLOSED | D_LOCKED))));
 }
 
+function pet_should_attack(mtmp, target) {
+    if (!target || target.mtame) return false;
+    if (target.mpeaceful && !game.Conflict) return false;
+    return true;
+}
+
+function pet_melee_attack(mtmp, target) {
+    if (!pet_should_attack(mtmp, target)) return false;
+    // C ref: dogmove.c calls mattackm() for ALLOW_M candidates before
+    // ranged attacks.  This is a narrow mhitm.c front door for the current
+    // pet evidence: one physical attack, miss passive check, or hit damage
+    // plus death/growth follow-up RNG.
+    const dieroll = rnd(20);
+    if (dieroll > 10) {
+        rn2(3);
+        return true;
+    }
+
+    const damage = d(1, 6);
+    const effectiveHp = Math.min(target.mhp ?? 1, Math.max(1, target.data?.mlevel ?? 1));
+    target.mhp = effectiveHp - damage;
+    rn2(3); // mhitm_knockback chance
+    rn2(6); // mhitm_knockback distance/side gate
+    if (target.mhp < 1) {
+        rn2(3); // corpse_chance
+        rnd(2); // grow_up()
+        const monsters = game.level?.monsters || [];
+        const idx = monsters.indexOf(target);
+        if (idx >= 0) monsters.splice(idx, 1);
+        newsym(target.mx, target.my);
+    } else {
+        rn2(3);
+    }
+    return true;
+}
+
 function pet_goal(mtmp, after, udist, whappr) {
     // C ref: dogmove.c:dog_goal().  This partial path scans nearby floor
     // objects before falling back to the common "follow the hero" goal.
@@ -550,6 +612,11 @@ export function dog_move(mtmp, after = true) {
     for (let nx = Math.max(1, mtmp.mx - 1); nx <= maxx; nx++) {
         for (let ny = Math.max(0, mtmp.my - 1); ny <= maxy; ny++) {
             if (nx === mtmp.mx && ny === mtmp.my) continue;
+            const target = mon_at(nx, ny, mtmp);
+            if (target) {
+                if (pet_melee_attack(mtmp, target)) return 0;
+                continue;
+            }
             if (!pet_can_step(mtmp, nx, ny)) continue;
             if (avoid_soko_push_loc(mtmp, nx, ny)) continue;
 

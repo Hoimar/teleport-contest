@@ -108,6 +108,26 @@
   3. Broaden `#wizintrinsic` beyond hallucination only when evidence reaches additional intrinsic selections.
   4. Continue special-level object/monster parity and visible hack-debt cleanup when it unlocks active subsystem work.
 
+### Iteration 6 - Flying Terrain Candidates, Pet Carry Capacity, And Pet Melee Front Door
+
+- Implementation delta:
+  1. Ported more of `mon.c:mfndpos()` terrain eligibility for ordinary movement: flying/in-air monsters now keep pool/lava candidate squares, swimmers can use water walls, and obstructed terrain remains blocked until `ALLOW_WALL`/`ALLOW_DIG` are real.
+  2. Added a conservative `can_carry()` load check for pets so small domestic pets reject heavy tools such as the tinning kit after the upstream apport roll.
+  3. Added a narrow `dogmove.c` candidate-melee front door before `pet_ranged_attk(FALSE)`, including current evidence for miss/passive RNG and a partial hit/damage/death/growth shape.
+- Evidence:
+  1. `seed0383` moved through the FR 9806 `rn2(28)` vs `rn2(16)` candidate denominator; trace confirmed the ice-vortex backtracking call now matches `rn2(28)=10`.
+  2. The same evidence moved through the first pet `mattackm()` miss/passive path at FR 9857 and now blocks at FR 9933.
+  3. Short-lived guarded traces showed the FR 9933 state is not a ranged-scoring predicate bug: JS starts the pet's second movement pass at `(28,3)` with no adjacent target and enters `score_targ()` `rnd(5)`, while C enters `mattackm()`. The next owner is intervening ordinary monster/pet spatial state before the second pass.
+- Regression stability:
+  1. Target triage: `seed0383-wizard-hallucinate` now reports `S 0/219 R 10241/16915 FS 0:char:map:init FR 9933:rnd(20)=5=>rnd(5)=5 C 0`.
+  2. Sentinel suite: `seed8000` `S 23/23 R 3060/3130`, `seed0002` `S 11/595 R 1249/27158`, `seed0013` `S 0/99 R 536/4804`, `seed0116` `S 109/127 R 12562/12562`, `seed0383` `S 0/219 R 10241/16915`; total `S 143/1063 R 27648/64569`.
+  3. Full suite: `S 143/11406`, 0/44 passing. No matched-screen regressions; `seed0002` has a RNG-only shift classified as expected structural pet/monster movement side effect.
+- Current queue:
+  1. Continue user-priority `seed0383` at FR 9933 by classifying the live monster/pet spatial state between the first pet melee and the second pet pass; focus on ordinary `m_move()` positions and candidate blockers, not a ranged-score suppression.
+  2. Classify seed0116 screen 109 attr-only map/object color drift as display/object-state debt now that RNG is exact.
+  3. Broaden `#wizintrinsic` beyond hallucination only when evidence reaches additional intrinsic selections.
+  4. Continue special-level object/monster parity and visible hack-debt cleanup when it unlocks active subsystem work.
+
 ## 2026-05-12 08:55 CEST Restart - Dehack, Deep Triage, Implementation Loop
 
 - Branch/baseline commit: `main` at `f4be79ac016690ec4a293cadad6427ed4d4715e3`.

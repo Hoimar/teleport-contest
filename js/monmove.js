@@ -1,7 +1,10 @@
 import { game } from './gstate.js';
 import { rn2 } from './rng.js';
 import { dog_move } from './dog.js';
-import { D_CLOSED, D_LOCKED, IS_DOOR, M_AP_FURNITURE, M_AP_OBJECT, isok, SPACE_POS } from './const.js';
+import {
+    D_CLOSED, D_LOCKED, IS_DOOR, IS_LAVA, IS_OBSTRUCTED, IS_POOL,
+    IS_WATERWALL, M_AP_FURNITURE, M_AP_OBJECT, isok, SPACE_POS,
+} from './const.js';
 import { newsym } from './display.js';
 
 const NORMAL_SPEED = 12;
@@ -9,6 +12,8 @@ const BOLT_LIM = 8;
 const M2_WERE = 0x00000004;
 const M2_HUMAN = 0x00000008;
 const M2_WANDER = 0x00800000;
+const M1_FLY = 0x00000001;
+const M1_SWIM = 0x00000002;
 const M1_HIDE = 0x00000100;
 const MTSZ = 4;
 const MSLOW = 1;
@@ -89,13 +94,42 @@ function mon_at(x, y, self) {
     return (game.level?.monsters || []).find((mon) => mon !== self && mon.mx === x && mon.my === y);
 }
 
-function can_mon_step(mtmp, x, y) {
+function mon_in_air(mtmp) {
+    return !!((mtmp.data?.mflags1 ?? 0) & M1_FLY);
+}
+
+function mon_swims(mtmp) {
+    return !!((mtmp.data?.mflags1 ?? 0) & M1_SWIM) || !!mtmp.data?.swimmer;
+}
+
+function mon_likes_lava(mtmp) {
+    return !!mtmp.data?.likes_lava;
+}
+
+function mfndpos_terrain_ok(mtmp, x, y) {
     if (!isok(x, y)) return false;
+    const loc = game.level?.at(x, y);
+    if (!loc) return false;
+    const typ = loc.typ;
+
+    // C ref: mon.c:mfndpos().  Obstructed rock/walls are blocked here
+    // until ALLOW_WALL/ALLOW_DIG are ported.
+    if (IS_OBSTRUCTED(typ)) return false;
+    if (IS_WATERWALL(typ) && !mon_swims(mtmp)) return false;
+    if (IS_DOOR(typ)) return !(loc.doormask & (D_CLOSED | D_LOCKED));
+
+    const wantpool = mtmp.data?.mlet === 'S_EEL';
+    const poolok = mon_in_air(mtmp) || (mon_swims(mtmp) && !wantpool);
+    const lavaok = mon_in_air(mtmp) || mon_likes_lava(mtmp);
+    if (!poolok && (IS_POOL(typ) !== wantpool)) return false;
+    if (!lavaok && IS_LAVA(typ)) return false;
+    return SPACE_POS(typ) || IS_POOL(typ) || IS_LAVA(typ);
+}
+
+function can_mon_step(mtmp, x, y) {
     if (x === game.u?.ux && y === game.u?.uy) return false;
     if (mon_at(x, y, mtmp)) return false;
-    const loc = game.level?.at(x, y);
-    return !!loc && (SPACE_POS(loc.typ)
-        || (IS_DOOR(loc.typ) && !(loc.doormask & (D_CLOSED | D_LOCKED))));
+    return mfndpos_terrain_ok(mtmp, x, y);
 }
 
 function mon_track_add(mtmp, x, y) {
