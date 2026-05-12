@@ -162,7 +162,9 @@ export function pet_arrive_with_you() {
         ch: migrating?.ch || ch,
         color: migrating?.color ?? 15,
         data: { ...pet },
+        m_lev: migrating?.m_lev ?? pet.mlevel ?? 0,
         mhp: migrating?.mhp ?? 1,
+        mhpmax: migrating?.mhpmax ?? migrating?.mhp ?? 1,
         female: migrating?.female ?? false,
         msleeping: migrating?.msleeping ?? 0,
         mpeaceful: migrating?.mpeaceful ?? 1,
@@ -487,6 +489,11 @@ function pet_can_step(mtmp, x, y) {
 function pet_should_attack(mtmp, target) {
     if (!target || target.mtame) return false;
     if (target.mpeaceful && !game.Conflict) return false;
+    const petLevel = monster_level(mtmp);
+    const petHp = mtmp.mhp ?? petLevel;
+    const petHpMax = Math.max(1, mtmp.mhpmax ?? petHp);
+    const balk = petLevel + Math.trunc((5 * petHp) / petHpMax) - 2;
+    if (monster_level(target) >= balk) return false;
     return true;
 }
 

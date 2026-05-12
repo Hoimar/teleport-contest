@@ -190,6 +190,27 @@
   3. Keep `seed0116` screen 109 as a secondary object identity/description-state target: two visible potions, one arrow stack, and one ring still have exact-RNG color/state drift.
   4. Continue special-level object/monster parity and visible hack-debt cleanup when it unlocks active subsystem work.
 
+### Iteration 10 - Armor Occupation Continuation And Pet Attack Balking
+
+- Implementation delta:
+  1. `moveloop_core()` now advances remaining delayed armor occupation turns from `OBJECT_DELAY` and prints the finish message when the occupation completes.
+  2. `makemon()` now retains adjusted instance `m_lev` and `mhpmax` alongside `mhp`, and pet migration preserves those fields.
+  3. Pet melee now applies the C HP/level balk front door before `mattackm()`, so deep-level strong monsters do not get false pet attack RNG just because they are adjacent.
+- Evidence:
+  1. Minimal occupation continuation moved `seed0383` from FR 10079 to FR 10080 by matching the post-gnome `dog_move()` `rn2(1)` candidate choice.
+  2. Retaining adjusted `m_lev`/`mhpmax` and applying the pet balk gate moved through the false ape melee and pet ranged `score_targ()` at FR 10080.
+  3. Current `seed0383` target triage: `S 0/219 R 10527/16915 FS 0:char:map:init FR 10082:rn2(5)=3=>rn2(3)=1 C 0`.
+  4. Current blocker is no longer pet melee eligibility; it is the next ordinary-monster movement front door after the pet pass, where C enters another `distfleeck()` and JS consumes an extra `rn2(3)` approach/movement gate.
+- Regression stability:
+  1. `seed0116-wizard-wear-shop` stayed exact on RNG: `S 109/127 R 12562/12562 FS 109:attr:map:e FR - C 4`.
+  2. Sentinel suite: `seed8000` `S 23/23 R 3060/3130`, `seed0002` `S 11/595 R 1274/27158`, `seed0013` `S 0/99 R 540/4804`, `seed0116` `S 109/127 R 12562/12562`, `seed0383` `S 0/219 R 10527/16915`; total `S 143/1063 R 27963/64569`.
+  3. Full suite: `S 143/11406`, 0/44 passing. No matched-screen regressions; `seed0002` and `seed0361` RNG-only shifts are classified as expected structural side effects of retained adjusted monster level/HP and occupation timing.
+- Current queue:
+  1. Continue user-priority `seed0383` at FR 10082 by identifying the ordinary monster that enters JS's extra `rn2(3)` gate after the pet pass; inspect movement predicates and spatial/list state around C's `movemon_turn` immediately after `dog_move`.
+  2. Keep message-interrupted occupation continuation as a known approximation; current implementation owns RNG timing better but not full `--More--` choreography.
+  3. Keep `seed0116` screen 109 as a secondary object identity/description-state target: two visible potions, one arrow stack, and one ring still have exact-RNG color/state drift.
+  4. Continue special-level object/monster parity and visible hack-debt cleanup when it unlocks active subsystem work.
+
 ## 2026-05-12 08:55 CEST Restart - Dehack, Deep Triage, Implementation Loop
 
 - Branch/baseline commit: `main` at `f4be79ac016690ec4a293cadad6427ed4d4715e3`.

@@ -1037,9 +1037,9 @@ function adj_lev_for(ptr) {
     return tmp > limit ? limit : (tmp > 0 ? tmp : 0);
 }
 
-function newmonhp_for(ptr) {
+function newmonhp_for(ptr, monLevel = adj_lev_for(ptr)) {
     if (!ptr) return 0;
-    const lev = adj_lev_for(ptr);
+    const lev = monLevel;
     if (ptr.mlet === 'S_GOLEM') return lev;
     if (!lev) return rnd(4);
     let hp = d(lev, 8);
@@ -1449,7 +1449,8 @@ export async function makemon(mdat, x, y, mmflags = 0) {
         y = cc.y;
     }
     next_ident();
-    const hp = newmonhp_for(ptr);
+    const monLevel = adj_lev_for(ptr);
+    const hp = newmonhp_for(ptr, monLevel);
     const female = init_mon_gender_for(ptr);
     const peaceful = (mmflags & MM_ANGRY) ? false : peace_minded_for(ptr);
     const display = {
@@ -1462,7 +1463,9 @@ export async function makemon(mdat, x, y, mmflags = 0) {
         ch: display.ch,
         color: display.color,
         data: { ...ptr, mmove: ptr.mmove ?? display.mmove },
+        m_lev: monLevel,
         mhp: hp,
+        mhpmax: hp,
         female,
         msleeping: (mmflags & MM_ASLEEP) ? 1 : 0,
         mpeaceful: peaceful ? 1 : 0,

@@ -211,6 +211,8 @@ async function start_wearing_object(obj) {
     obj.worn = true;
     const delay = OBJECT_DELAY[obj.otyp] || 0;
     if (obj.oclass === ARMOR_CLASS && delay > 1) {
+        game._occupation_turns_remaining = Math.max(0, delay - 1);
+        game._occupation_finish_message = 'You finish your dressing maneuver.';
         await pline(`You start putting on ${inventoryObjectName(obj)}.`);
     } else {
         await pline(`${inventoryListing(obj)} (being worn).`);

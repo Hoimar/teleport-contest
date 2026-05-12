@@ -335,6 +335,14 @@ export async function moveloop_core() {
     // returning to the input boundary.
     if (g.context?.move) {
         await advanceTurn();
+        while ((g._occupation_turns_remaining || 0) > 0) {
+            g._occupation_turns_remaining--;
+            await advanceTurn();
+        }
+        if (g._occupation_finish_message) {
+            await pline(g._occupation_finish_message);
+            g._occupation_finish_message = null;
+        }
         while ((g._prayer_turns_remaining || 0) > 0) {
             g._prayer_turns_remaining--;
             await advanceTurn();
