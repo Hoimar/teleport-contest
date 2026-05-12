@@ -17,19 +17,19 @@ This file is the live handoff checkpoint, not a full history. It was compacted o
 
 - Branch: `main`.
 - Baseline requested by user: resume from commit `04d9360` and continue on the current branch without pushing.
-- Latest committed loop work: `fd917aa Tighten monster item search state`.
+- Latest committed loop work: current `HEAD` (`Advance monster weapon movement`).
 - Local divergence from remote: branch is ahead of `origin/main`; do not push unless explicitly asked.
 - Current target: `seed0383-wizard-hallucinate` after the Oracle special-level / turn-tail generation slice.
-- Active subsystem hypothesis: ordinary monster movement and weapon-attack ownership after Oracle loading. The gnome `rn2(24)` denominator drift was caused by JS treating a remove-curse scroll as a general item target; after tightening item search, the current first mismatch is FR `16755`, where C expects `rnd(2)` in `mattacku()` while JS enters the next monster's `distfleeck()`.
+- Active subsystem hypothesis: ordinary monster movement candidate geometry after Oracle loading. The FR `16755` moved-then-ranged `mattacku()` boundary is resolved; the current first mismatch is FR `16834`, where C expects `rn2(32)` in `m_move()` while JS reaches `rn2(20)`, so the next slice should compare live monster position, target, `mtrack`, and `mfndpos()` flags.
 
 ## Latest Verified Scores
 
-- Sentinel after the item-search/minvent slice: total `S 162/1063 R 34184/64569`.
+- Sentinel after the monster wear / weapon movement slice: total `S 162/1063 R 34291/64569`.
 - `seed8000-tourist-starter`: `S 23/23 R 3060/3130`, FR `3047`.
 - `seed0002-healer-reflection-drummer`: `S 11/595 R 1266/27158`, FR `1215`.
 - `seed0013-friday13-save-then-fullmoon-restore`: `S 0/99 R 535/4804`, FR `507`.
 - `seed0116-wizard-wear-shop`: `S 127/127 R 12562/12562`, PASS; remaining comparison notes are four cursor-only prompt positions.
-- `seed0383-wizard-hallucinate`: `S 1/219 R 16761/16915`, FR `16755`.
+- `seed0383-wizard-hallucinate`: `S 1/219 R 16868/16915`, FR `16834`.
 - Full suite after latest production slice: `S 162/11406`, 1/44 passing (`seed0116`).
 
 ## Recent Implementation Delta
@@ -70,13 +70,24 @@ Latest committed production slice:
 - Evidence: the original `seed0383` gnome blocker moved from FR `16750` (`rn2(24)` vs `rn2(32)`) to FR `16755` (`rnd(2)` in C `mattacku()` vs JS next-monster `distfleeck()`). Sentinel screens stayed `S 162/1063`; `seed0116` remains a full pass.
 - Classification: lagging `seed0383` RNG total decreased to `R 16761/16915` because retaining real monster inventory changes later divergent state, but this is structural minvent debt reduction, not score optimization.
 
+Latest verified production slice:
+
+- Monster wear / weapon movement slice:
+  - factored basic monster boot wear into `js/mon_wear.js`
+  - applied creation-time `m_dowear(mtmp, TRUE)` after monster initial inventory so startup boots are worn without later delay
+  - allowed moved `AT_WEAP` monsters to enter ranged `mattacku()` and consume `AC_VALUE()` before the still-unimplemented `thrwmu()` path
+  - modeled the failed ranged-selection `weapon_check = NEED_WEAPON` handoff and the later close HTH wield turn
+  - added `mfndpos()`'s no-diagonal-through-door rule for ordinary movement candidates
+- Evidence: `seed0383` moved from FR `16755` / `R 16761/16915` to FR `16834` / `R 16868/16915`. Sentinel screens stayed `S 162/1063`; sentinel RNG total moved to `R 34291/64569`; full public screens stayed `S 162/11406`.
+- Classification: the FR `16755` weapon/AC boundary is resolved structurally. Current blocker is a later ordinary `m_move()` denominator gap (`rn2(32)` expected vs `rn2(20)` actual), likely candidate geometry or movement-state drift.
+
 ## Current Queue
 
-1. Classify `seed0383` FR `16755` with compact tooling first:
+1. Classify `seed0383` FR `16834` with compact tooling first:
    - `node scripts/triage-session.mjs sessions/seed0383-wizard-hallucinate.session.json`
-   - inspect the monster phase around RNG `16749..16756`; temporary trace showed the gnome item-search denominator is resolved and the new boundary is a later ordinary monster/weapon attack slot
+   - inspect the monster phase around RNG `16826..16836`; current mismatch is `rn2(32)` expected vs `rn2(20)` actual in ordinary `m_move()`
    - If compact tooling is insufficient, add temporary guarded movement tracing and remove it before any commit.
-2. Identify why C reaches `mattacku()` `rnd(2)` while JS reaches the next monster's `distfleeck()`: compare monster order, movement budget, `I_SPECIAL` gear-delay handling, and ranged/weapon attack front doors before adding any attack RNG.
+2. Identify why C has a larger movement denominator than JS at FR `16834`: compare monster order, current actor, target square, `mtrack`, diagonal door/terrain filters, `NOTONL`/line flags, and ranged/approach state before changing candidate geometry.
 3. Replace the menu/discovery residual scaffolding with real `o_init` description storage, discovery persistence, and broader role inventory/menu text when it becomes the highest safe structural next step.
 4. Keep broader startup/display/save blockers secondary unless the active queue is blocked.
 

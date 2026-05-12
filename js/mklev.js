@@ -17,6 +17,7 @@ import {
 } from './object_data.js';
 import { getObjectColor, getObjectMaterial } from './o_init.js';
 import { MONSTER_DATA } from './monster_data.js';
+import { m_dowear_basic } from './mon_wear.js';
 import {
     COLNO, ROWNO, STONE, ROOM, CORR, DOOR, STAIRS,
     HWALL, VWALL, TLCORNER, TRCORNER, BLCORNER, BRCORNER,
@@ -1885,6 +1886,9 @@ export async function makemon(mdat, x, y, mmflags = 0) {
         try {
             m_initweap_for(ptr);
             m_initinv_for(ptr, mon);
+            // C ref: makemon.c:makemon() calls m_dowear(mtmp, TRUE) after
+            // initial monster inventory creation; creation wear has no delay.
+            m_dowear_basic(mon, true);
             rn2(100); // saddle chance gate; type predicates may short-circuit after it
         } finally {
             game._in_monster_init = false;
