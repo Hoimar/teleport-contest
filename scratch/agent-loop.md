@@ -906,3 +906,13 @@
 - Change: deleted `scratch/run_test.mjs`, an unfinished stub that imported game modules but had no runnable diagnostic and only recorded abandoned seed0002 key guesses.
 - Implementation delta: reduced stale tracked scratch/debug debt; no production JS changed and no seed-specific behavior added.
 - Verification: sentinel suite remained 50/1063 screens with no matched-screen regressions. Direct `seed0002-healer-reflection-drummer` triage remained 11/595 screens and FR 1215 (`rn2(6)=5=>rn2(4)=1`).
+
+## Iteration 21 - Fog Cloud Region Maintenance
+
+- Change: `age_gas_clouds()` now applies the `inside_gas_cloud()` maintenance rule for retained fog vapor regions: after positive TTL decrement, a fog cloud inside a region with TTL below 20 extends it by 5. This keeps retained gas regions alive across later monster phases instead of reopening false vapor creation RNG.
+- Evidence: `seed0383-wizard-hallucinate` moved from FR 10646 / `R 10903/16915` to FR 10843 / `R 10970/16915`. The old extra `rn2(3)` was traced to fog-cloud vapor recreation; after this fix the first mismatch is the next turn-tail `exercise()` cadence gap.
+- Score delta: public screens remain `143/11406`; focused evidence session screens remain `0/219`, but the first RNG mismatch moved later by 197 calls.
+- Regression stability: target triage after the edit reports `seed0383` `S 0/219 R 10970/16915 FR 10843`; `seed0116` remains exact on RNG at `S 109/127 R 12562/12562`; sentinel suite is stable at total `S 143/1063 R 28406/64569`.
+- Implementation delta: monster/region movement is closer to `region.c:run_regions()` plus `inside_gas_cloud()` behavior. No seed-specific branches, replay tables, or screen overrides were added.
+- Discarded direction: temporary RNG stack tracing in `js/rng.js` identified the vapor gate and was removed; no trace/debug I/O remains in production paths.
+- Current queue: classify `seed0383` FR 10843 by comparing C `attrib.c:exerchk()` / `exercise()` turn-tail calls with JS `allmain_turns.js`; then continue `seed0116` screen 109 object identity/color drift; keep `seed0383` dog-goal floor-object/state parity in view after the exercise cadence blocker.

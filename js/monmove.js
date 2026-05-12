@@ -551,10 +551,15 @@ function visible_gas_region_at(x, y) {
 function age_gas_clouds() {
     const clouds = game.level?.gasClouds;
     if (!clouds?.length) return;
+    const fogs = (game.level?.monsters || []).filter((mon) => mon.data?.name === 'FOG_CLOUD');
     const survivors = [];
     for (const cloud of clouds) {
         if (cloud.ttl === 0) continue;
         if (cloud.ttl > 0) cloud.ttl--;
+        if (cloud.ttl >= 0 && cloud.ttl < 20
+            && fogs.some((mon) => mon.mx === cloud.x && mon.my === cloud.y)) {
+            cloud.ttl += 5;
+        }
         survivors.push(cloud);
     }
     game.level.gasClouds = survivors;
