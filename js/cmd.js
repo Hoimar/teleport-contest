@@ -345,17 +345,12 @@ function monsterName(mon) {
 
 async function attackMonster(mon) {
     // C ref: hack.c:domove() enters uhitm() instead of moving onto
-    // occupied monster squares. Full hit/damage/passive effects remain in
-    // the combat backlog; this front door preserves position ownership.
-    await pline(`You hit the ${monsterName(mon)}.`);
-    game.context.run = null;
-    newsym(mon.mx, mon.my);
+    // occupied monster squares.  Reuse the current narrow uhitm() RNG front
+    // door; full weapon, passive, resist, and death handling remain backlog.
+    await heroMeleeAttack(mon);
 }
 
-async function swallowedHeroAttack(mon) {
-    // C evidence: swallowed directional movement attacks u.ustuck rather
-    // than moving.  This is still a narrow uhitm() front door; full weapon,
-    // passive, resist, and death handling remain combat backlog.
+async function heroMeleeAttack(mon) {
     gethungry();
     exercise(A_DEX, true);
     rnd(20);
@@ -368,6 +363,12 @@ async function swallowedHeroAttack(mon) {
     rn2(3);
     game.context.run = null;
     newsym(mon.mx, mon.my);
+}
+
+async function swallowedHeroAttack(mon) {
+    // C evidence: swallowed directional movement attacks u.ustuck rather
+    // than moving.  This is still a narrow uhitm() front door.
+    await heroMeleeAttack(mon);
 }
 
 async function forceFightEmpty(dx, dy) {

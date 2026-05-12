@@ -1,6 +1,7 @@
 import { game } from './gstate.js';
 import { d, rn2, rnd } from './rng.js';
 import { dog_move } from './dog.js';
+import { enexto_core } from './mklev.js';
 import { OBJECT_CLASS, OBJECT_DELAY } from './object_data.js';
 import {
     D_CLOSED, D_LOCKED, IS_DOOR, IS_LAVA, IS_OBSTRUCTED, IS_POOL,
@@ -375,6 +376,28 @@ function apply_hero_damage(damage) {
     if (damage > 0) game.u.uhp = Math.max(0, (game.u.uhp ?? 0) - damage);
 }
 
+function unstuck_swallowed_hero(mtmp) {
+    if (!game.u?.uswallow || game.u.ustuck !== mtmp) return;
+    game.u.uswallow = false;
+    game.u.ustuck = null;
+    game.u.uswldtim = 0;
+    game.u.ux = mtmp.mx;
+    game.u.uy = mtmp.my;
+    if (!mtmp.mspec_used && basic_engulf_attack(mtmp)) {
+        mtmp.mspec_used = rnd(2);
+    }
+    const spot = enexto_core(game.u.ux, game.u.uy, mtmp.data, 0);
+    if (spot) {
+        const omx = mtmp.mx;
+        const omy = mtmp.my;
+        mtmp.mx = spot.x;
+        mtmp.my = spot.y;
+        newsym(omx, omy);
+        newsym(mtmp.mx, mtmp.my);
+    }
+    game.vision_full_recalc = 1;
+}
+
 function engulf_attack(mtmp, attack, toHit) {
     const [, adtyp, damn, damd] = attack;
     const alreadySwallowed = game.u?.uswallow && game.u?.ustuck === mtmp;
@@ -386,7 +409,8 @@ function engulf_attack(mtmp, attack, toHit) {
         mtmp.mx = game.u.ux;
         mtmp.my = game.u.uy;
         game.u.uswldtim = Math.max(2, rnd(monster_level(mtmp) + 5));
-    } else if ((game.u.uswldtim || 0) > 0) {
+    }
+    if ((game.u.uswldtim || 0) > 0) {
         game.u.uswldtim--;
     }
 
@@ -407,6 +431,9 @@ function engulf_attack(mtmp, attack, toHit) {
     }
     apply_hero_damage(damage);
     if (damage > 0) game._occupation_turns_remaining = 0;
+    if (game.u?.uswallow && (game.u.uswldtim || 0) <= 0) {
+        unstuck_swallowed_hero(mtmp);
+    }
     return true;
 }
 
@@ -583,6 +610,7 @@ function were_change(mtmp) {
 
 export function mcalcdistress() {
     for (const mtmp of game.level?.monsters || []) {
+        if (mtmp.mspec_used) mtmp.mspec_used--;
         were_change(mtmp);
         if (mtmp.mfrozen && --mtmp.mfrozen <= 0) {
             mtmp.mfrozen = 0;

@@ -925,3 +925,13 @@
 - Regression stability: target triage after the edit reports `seed0383` `S 0/219 R 11035/16915 FR 10916`; `seed0116` remains exact on RNG at `S 109/127 R 12562/12562`; sentinel suite is stable at total `S 143/1063 R 28471/64569`; full suite is stable at `S 143/11406`.
 - Implementation delta: turn-tail attribute exercise is closer to `attrib.c:exerper()` for hallucination/confusion status without adding seed-specific branches.
 - Current queue: classify `seed0383` FR 10916, where C expects `rnd(2)` after status exercise while JS enters `distfleeck()` with `rn2(5)`; likely owner is remaining combat/adjacent-attack or movement phase state. Then continue `seed0116` screen 109 object identity/color drift.
+
+## Iteration 23 - Swallow Expulsion And Occupied Attack RNG
+
+- Change: `gulpmu()` evidence now decrements `u.uswldtim` on the initial engulf call, expels the swallowed hero when the timer reaches zero, clears `u.ustuck/u.uswallow`, assigns the engulfer `mspec_used = rnd(2)` when C would, and relocates the former swallower with `enexto_core()`/`mnexto()` coordinate shuffles. `mcalcdistress()` now decrements `mspec_used` once per turn.
+- Change: ordinary occupied-square movement now reuses the current narrow `uhitm()` RNG front door instead of only printing the hit message; swallowed attacks still use the same helper against `u.ustuck`.
+- Evidence: `seed0383-wizard-hallucinate` moved from FR 10916 / `R 11035/16915` through `unstuck()`/`mnexto()` and normal occupied-square attack evidence to FR 11372 / `R 11419/16915`.
+- Score delta: full public suite remains `S 143/11406`, 0/44 passing; focused evidence session screens remain `0/219`, but the first RNG mismatch moved later by 356 calls.
+- Regression stability: target triage after the final edit reports `seed0383` `S 0/219 R 11419/16915 FR 11372`; `seed0116` remains exact on RNG at `S 109/127 R 12562/12562`; sentinel suite is stable at total `S 143/1063 R 28863/64569`; full suite is stable at `S 143/11406`.
+- Implementation delta: combat/monster movement owns more of `mhitu.c:gulpmu()`, `mon.c:unstuck()`, `mon.c:mnexto()`, and `hack.c:domove()` occupied attack behavior. No seed-specific branches or replay tables were added.
+- Current queue: implement enough `uhitm()` pet abuse/death handling for `seed0383` FR 11372 (`abuse_dog()`/`yelp()`/`xkilled()` after hitting the kitten), then continue `seed0116` screen 109 object identity/color drift.
