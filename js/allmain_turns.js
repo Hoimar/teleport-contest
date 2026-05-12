@@ -10,6 +10,7 @@ export function maybe_generate_rnd_mon() {
 
 export function gethungry() {
     // C ref: eat.c:3191
+    if (game.u?.uinvulnerable || game.iflags?.debug_hunger) return;
     rn2(20);
 }
 
@@ -25,6 +26,22 @@ export function exercise(index, increase) {
         if (rn2(19) > currentAttr(index)) game.u.aexe[index]++;
     } else {
         game.u.aexe[index] -= rn2(2);
+    }
+}
+
+export function adjalign(n) {
+    const u = game.u || (game.u = {});
+    const align = u.ualign || (u.ualign = { type: 0, record: 0, abuse: 0 });
+    align.record = align.record || 0;
+    align.abuse = align.abuse || 0;
+    const newalign = align.record + n;
+    if (n < 0) {
+        const newabuse = align.abuse - n;
+        if (newalign < align.record) align.record = newalign;
+        if (newabuse > align.abuse) align.abuse = newabuse;
+    } else if (newalign > align.record) {
+        const alignlim = 10 + Math.trunc((game.moves || 0) / 200);
+        align.record = Math.min(newalign, alignlim);
     }
 }
 

@@ -6,6 +6,8 @@ import { newsym } from './display.js';
 
 const NORMAL_SPEED = 12;
 const BOLT_LIM = 8;
+const M2_WERE = 0x00000004;
+const M2_HUMAN = 0x00000008;
 const M2_WANDER = 0x00800000;
 const MTSZ = 4;
 const MSLOW = 1;
@@ -162,6 +164,28 @@ function m_move_basic(mtmp) {
 function m_everyturn_effect(mtmp) {
     if (mtmp.data?.name === 'FOG_CLOUD') {
         rn2(3); // create_gas_cloud(..., 1, 0) TTL via rn1(3, 4)
+    }
+}
+
+function were_change(mtmp) {
+    const flags = mtmp.data?.mflags2 ?? 0;
+    if (!(flags & M2_WERE)) return;
+    const fullMoon = game.flags?.moonphase === 4; // FULL_MOON
+    const atNight = !!game.iflags?.at_night;
+    if (flags & M2_HUMAN) {
+        const denom = atNight ? (fullMoon ? 3 : 30) : (fullMoon ? 10 : 50);
+        if (!rn2(denom)) {
+            // new_were() state transformation is still future work; this
+            // preserves the turn-boundary RNG ownership for unchanged rolls.
+        }
+    } else if (!rn2(30)) {
+        // See note above.
+    }
+}
+
+export function mcalcdistress() {
+    for (const mtmp of game.level?.monsters || []) {
+        were_change(mtmp);
     }
 }
 

@@ -10,7 +10,7 @@ import {
     maybe_generate_rnd_mon, gethungry, exerchk,
     maybe_wipe_engraving, maybe_update_seer_turn, dosounds,
 } from './allmain_turns.js';
-import { mcalcmove, movemon } from './monmove.js';
+import { mcalcdistress, mcalcmove, movemon } from './monmove.js';
 import { mklev, l_nhcore_init, u_on_upstairs } from './mklev.js';
 import { init_objects } from './o_init.js';
 import { init_dungeons } from './dungeon.js';
@@ -294,6 +294,8 @@ export async function advanceTurn() {
         // Keep moving monsters until all out of movement.
     }
 
+    mcalcdistress();
+
     for (const m of g.level.monsters) {
         m.movement += mcalcmove(m, true);
     }
@@ -333,6 +335,16 @@ export async function moveloop_core() {
     // returning to the input boundary.
     if (g.context?.move) {
         await advanceTurn();
+        while ((g._prayer_turns_remaining || 0) > 0) {
+            g._prayer_turns_remaining--;
+            await advanceTurn();
+        }
+        if (g.u?.uinvulnerable && g._pending_message === 'You are surrounded by a shimmering light.') {
+            g._pending_message = 'You are surrounded by a shimmering light.  You finish your prayer.';
+            g._more = true;
+            g._awaiting_prayer_done_more = true;
+            g.u.uinvulnerable = false;
+        }
         while (g.context?.run && await continueRunStep()) {
             await advanceTurn();
         }

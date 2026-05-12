@@ -2,9 +2,9 @@
 // C ref: dog.c:makedog(), makemon.c:makemon() near-hero placement.
 
 import { game } from './gstate.js';
-import { enexto_core, makemon } from './mklev.js';
+import { enexto_core, makemon, place_object } from './mklev.js';
 import { OBJECT_CLASS } from './object_data.js';
-import { newsym } from './display.js';
+import { newsym, pline } from './display.js';
 import {
     ACCFOOD, APPORT, CADAVER, DOGFOOD, MANFOOD, TABU, UNDEF,
     D_CLOSED, D_LOCKED, GP_AVOID_MONPOS, GP_CHECKSCARY, IS_DOOR, IS_OBSTRUCTED,
@@ -16,6 +16,7 @@ import { clear_path } from './vision.js';
 
 const FOOD_CLASS = 7;
 const ROCK_CLASS = 14;
+const QUARTERSTAFF = 79;
 const TRIPE_RATION = 264;
 const BOULDER = 475;
 const CORPSE = 265;
@@ -177,6 +178,10 @@ function distmin(x0, y0, x1, y1) {
     return Math.max(Math.abs(x0 - x1), Math.abs(y0 - y1));
 }
 
+function sgn(value) {
+    return value < 0 ? -1 : value > 0 ? 1 : 0;
+}
+
 function mon_at(x, y, self) {
     return game.level?.monsters?.find((mon) => mon !== self && mon.mx === x && mon.my === y);
 }
@@ -195,6 +200,21 @@ function cursed_object_at(x, y) {
 
 function is_boulder_at(x, y) {
     return objects_at(x, y).some((obj) => obj.otyp === BOULDER);
+}
+
+function is_sokoban_level() {
+    const dungeon = game.dungeons?.[game.u?.uz?.dnum ?? 0];
+    return !!game.level?.flags?.sokoban_rules || dungeon?.dname === 'Sokoban';
+}
+
+function avoid_soko_push_loc(mtmp, nx, ny) {
+    if (!is_sokoban_level()) return false;
+    if (!(mtmp.mpeaceful || mtmp.mtame)) return false;
+    if (mtmp.mconf || mtmp.mstun || game.u?.conflict) return false;
+    const ux = game.u?.ux ?? nx;
+    const uy = game.u?.uy ?? ny;
+    if (dist2(nx, ny, ux, uy) !== 4) return false;
+    return is_boulder_at(nx + sgn(ux - nx), ny + sgn(uy - ny));
 }
 
 function obj_resists(obj, ochance, achance) {
@@ -285,6 +305,51 @@ function can_carry(mtmp, obj) {
     return Math.max(1, obj.quan || 1);
 }
 
+function object_name(obj) {
+    if (obj?.otyp === QUARTERSTAFF) {
+        const buc = obj.blessed ? 'blessed ' : obj.cursed ? 'cursed ' : 'uncursed ';
+        const spe = typeof obj.spe === 'number' ? `${obj.spe >= 0 ? '+' : ''}${obj.spe} ` : '';
+        return `a ${buc}${spe}quarterstaff`;
+    }
+    return 'an object';
+}
+
+function dog_invent(mtmp, udist) {
+    if (mtmp.meating || !game.level?.objects) return 0;
+    const edog = init_edog(mtmp);
+    if (mtmp.inventory?.length) {
+        if ((!rn2(udist + 1) || !rn2(edog.apport)) && rn2(10) < edog.apport) {
+            const obj = mtmp.inventory.shift();
+            place_object(obj, mtmp.mx, mtmp.my);
+            pline(`The kitten drops ${object_name(obj)}.`);
+            if (edog.apport > 1) edog.apport--;
+            newsym(mtmp.mx, mtmp.my);
+        }
+        return 0;
+    }
+
+    const omx = mtmp.mx;
+    const omy = mtmp.my;
+    const obj = game.level.objects.find((item) => item.ox === omx && item.oy === omy);
+    if (!obj || typeof obj.otyp !== 'number') return 0;
+
+    dogfood(mtmp, obj);
+    const carryamt = can_carry(mtmp, obj);
+    if (carryamt > 0 && !obj.cursed && could_reach_item(mtmp, obj.ox, obj.oy)) {
+        if (rn2(20) < edog.apport + 3) {
+            if (rn2(Math.max(1, udist)) || !rn2(edog.apport)) {
+                const idx = game.level.objects.indexOf(obj);
+                if (idx >= 0) game.level.objects.splice(idx, 1);
+                mtmp.inventory = mtmp.inventory || [];
+                mtmp.inventory.unshift(obj);
+                pline(`The kitten picks up ${object_name(obj)}.`);
+                newsym(omx, omy);
+            }
+        }
+    }
+    return 0;
+}
+
 function pet_can_see_object(mtmp, x, y) {
     return clear_path(mtmp.mx, mtmp.my, x, y);
 }
@@ -293,6 +358,7 @@ function pet_can_step(mtmp, x, y) {
     if (!isok(x, y)) return false;
     if (x === game.u?.ux && y === game.u?.uy) return false;
     if (mon_at(x, y, mtmp)) return false;
+    if (is_boulder_at(x, y)) return false;
     const loc = game.level?.at(x, y);
     return !!loc && (SPACE_POS(loc.typ)
         || (IS_DOOR(loc.typ) && !(loc.doormask & (D_CLOSED | D_LOCKED))));
@@ -373,6 +439,7 @@ export function dog_move(mtmp, after = true) {
     if (!udist) return 0;
 
     const edog = init_edog(mtmp);
+    dog_invent(mtmp, udist);
     const whappr = (game.moves || 0) - (edog.whistletime || 0) < 5;
     const goal = pet_goal(mtmp, after, udist, whappr);
     if (goal.abort) return 0;
@@ -390,6 +457,7 @@ export function dog_move(mtmp, after = true) {
         for (let ny = Math.max(0, mtmp.my - 1); ny <= maxy; ny++) {
             if (nx === mtmp.mx && ny === mtmp.my) continue;
             if (!pet_can_step(mtmp, nx, ny)) continue;
+            if (avoid_soko_push_loc(mtmp, nx, ny)) continue;
 
             // NetHack lessens backtracking only for pets more than five
             // squares from the hero.  Track history is not modeled yet.

@@ -47,6 +47,27 @@
   3. Recheck special-level monster/list effects after dog-goal or phase-order state advances.
   4. Keep startup/windowing dehack work secondary unless it unlocks active subsystem parity.
 
+### Iteration 3 - Soko Zoo, Monster Init, And Turn-Tail Ownership
+
+- Implementation delta:
+  1. Ported the active Soko1 zoo slice far enough to create filled irregular zoo room metadata, attach doors in x-major order, flip room/door metadata with the map, run `fill_special_room()` after flip/fixup, and respect special-level alignment precedence.
+  2. Tightened object/monster init in the Soko path: `TIN` now starts with the spinach gate, leprechauns create minvent gold before misc/greedy gates, `rnd_misc_item()` covers the current polymorph/life-saving/speed/invisibility/gain-level evidence, corrected wand ids feed those items, spiders/snakes create hide-under floor objects during mklev, human werecreatures keep the shared offensive tail, and `MM_ASLEEP` is retained.
+  3. Tightened live pet movement around the zoo by rejecting boulder-occupied squares and applying Sokoban `m_avoid_soko_push_loc()` push-block avoidance.
+  4. Added current turn-tail owners for `mcalcdistress()`/human-form `were_change()` and the zoo room `dosounds()` `rn2(200)` gate.
+- Evidence:
+  1. `seed0116` advanced from the post-zap FR 5911 boundary through Soko special loading, zoo monster/object creation, dog movement, `were_change()`, and zoo sound gates to `S 109/127 R 12522/12562`.
+  2. Intermediate target triage checkpoints during this slice included FR 9457 after tin ordering, FR 9567 after special-level alignment precedence, FR 10415/10929 through Soko zoo fill and monster minvent/misc ownership, FR 12427 after deeper zoo/dog movement, FR 12461 after boulder candidate rejection, and FR 12522 after `were_change()`, zoo sound, and Sokoban push avoidance.
+  3. Current first visible mismatch is screen 109 attr-only map/object color drift. Current first RNG mismatch is FR 12522: C expects `rn2(50)` from `were_change(were.c:17)`, while JS begins another `distfleeck()` `rn2(5)` pass.
+- Regression stability:
+  1. Target triage: `node scripts/triage-session.mjs sessions/seed0116-wizard-wear-shop.session.json` => `S 109/127 R 12522/12562 FS 109:attr:map:e FR 12522:rn2(50)=0=>rn2(5)=0 C 4`.
+  2. Sentinel suite: `seed8000` `S 23/23 R 3060/3130`, `seed0002` `S 11/595 R 1258/27158`, `seed0013` `S 0/99 R 536/4804`, `seed0116` `S 109/127 R 12522/12562`, `seed0383` `S 0/219 R 9926/16915`; total `S 143/1063 R 27302/64569`.
+  3. Full suite: `S 143/11406`, 0/44 passing. No sentinel screen-count regressions; non-target RNG shifts are classified as expected structural effects of broader mklev, movement, and turn-tail ownership.
+- Current queue:
+  1. Classify `seed0116` FR 12522 movement budget/list state before the expected next `were_change()` gate. Inspect per-monster movement budgets, list order, sleeping/zero-speed handling, and `somebody_can_move`; do not add an offset.
+  2. Continue `seed0383` FR 9716 `dog_goal()` floor-object/state parity after the seed0116 movement-budget owner is classified or locally blocked.
+  3. Recheck Soko screen 109 attr-only map/object color state if it intersects object/monster ownership.
+  4. Continue special-level object/monster parity and visible hack-debt cleanup when it unlocks active subsystem work.
+
 ## 2026-05-12 08:55 CEST Restart - Dehack, Deep Triage, Implementation Loop
 
 - Branch/baseline commit: `main` at `f4be79ac016690ec4a293cadad6427ed4d4715e3`.

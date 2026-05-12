@@ -12,11 +12,14 @@ import { vision_recalc, vision_reset } from './vision.js';
 import { mklev, mksobj, place_lregion, place_object } from './mklev.js';
 import { pet_arrive_with_you } from './dog.js';
 import { pluslvl } from './u_init.js';
-import { exercise } from './allmain_turns.js';
-import { rn1, rn2 } from './rng.js';
+import { adjalign, exercise } from './allmain_turns.js';
+import { roleGod } from './roles.js';
+import { rn1, rn2, rnz } from './rng.js';
 import { ATR_INVERSE, NO_COLOR } from './terminal.js';
-import { COLNO, ROWNO, STONE, DOOR, D_CLOSED, D_LOCKED,
-         IS_WALL, IS_OBSTRUCTED, LR_UPTELE, A_WIS } from './const.js';
+import {
+    COLNO, ROWNO, STONE, CORR, DOOR, D_NODOOR, D_CLOSED, D_LOCKED,
+    SDOOR, SCORR, IS_WALL, IS_OBSTRUCTED, LR_UPTELE, A_WIS,
+} from './const.js';
 
 // Direction deltas: y u k
 //                   h . l
@@ -183,6 +186,40 @@ function runDirectionForKey(ch) {
     return RUN_KEY[ch] || null;
 }
 
+const EXTENDED_AUTOCOMPLETE = [
+    { name: 'levelchange', min: 2 },
+    { name: 'pray', min: 2 },
+];
+
+function completeExtendedCommand(input) {
+    const typed = String(input || '').toLowerCase();
+    if (!typed) return '';
+    const exact = EXTENDED_AUTOCOMPLETE.find((cmd) => cmd.name === typed);
+    if (exact) return exact.name;
+    const matches = EXTENDED_AUTOCOMPLETE
+        .filter((cmd) => typed.length >= cmd.min && cmd.name.startsWith(typed));
+    return matches.length === 1 ? matches[0].name : typed;
+}
+
+function alignNameForHero() {
+    const typ = game.u?.ualign?.type;
+    if (typ > 0) return 'lawful';
+    if (typ < 0) return 'chaotic';
+    return 'neutral';
+}
+
+function prayerGodName() {
+    return roleGod(game.urole, alignNameForHero());
+}
+
+async function finishPrayerResult() {
+    const god = prayerGodName();
+    await pline(`You feel that ${god} is satisfied.`);
+    if ((game.u?.ualign?.record ?? 0) < 2) adjalign(1);
+    rn1(2, 1);
+    game.u.ublesscnt = rnz(350);
+}
+
 // C ref: hack.c — check if a cell blocks movement
 function blocksMove(x, y) {
     const loc = game.level?.at(x, y);
@@ -191,6 +228,56 @@ function blocksMove(x, y) {
     if (IS_WALL(loc.typ)) return true;
     if (loc.typ === DOOR && (loc.doormask & (D_CLOSED | D_LOCKED))) return true;
     return false;
+}
+
+async function forceFightEmpty(dx, dy) {
+    const x = game.u.ux + dx;
+    const y = game.u.uy + dy;
+    const loc = game.level?.at(x, y);
+    let target = 'thin air';
+    let solid = false;
+
+    if (!loc) {
+        target = 'an unknown obstacle';
+        solid = true;
+    } else if (loc.typ === DOOR && (loc.doormask & (D_CLOSED | D_LOCKED))) {
+        target = 'the door';
+        solid = true;
+    } else if (loc.typ === STONE || IS_WALL(loc.typ) || loc.typ === SDOOR || loc.typ === SCORR) {
+        target = 'the wall';
+        solid = true;
+    }
+
+    await pline(`You ${solid ? 'harmlessly ' : ''}attack ${target}.`);
+}
+
+function zapDig(dx, dy) {
+    let depth = rn1(18, 8);
+    let x = game.u.ux + dx;
+    let y = game.u.uy + dy;
+    while (--depth >= 0) {
+        const loc = game.level?.at(x, y);
+        if (!loc) break;
+        if (IS_WALL(loc.typ) || loc.typ === SDOOR) {
+            loc.typ = DOOR;
+            loc.doormask = D_NODOOR;
+            loc.flags = 0;
+            depth -= 2;
+            newsym(x, y);
+        } else if (loc.typ === STONE || loc.typ === SCORR) {
+            loc.typ = CORR;
+            loc.flags = 0;
+            depth--;
+            newsym(x, y);
+        } else if (IS_OBSTRUCTED(loc.typ) && loc.typ !== DOOR) {
+            loc.typ = CORR;
+            loc.flags = 0;
+            depth--;
+            newsym(x, y);
+        }
+        x += dx;
+        y += dy;
+    }
 }
 
 const STR_I = "\u001b[32C\u001b[7mCoins\u001b[0m\n\u001b[32C$ - 757 gold pieces\n\u001b[32C\u001b[7mWeapons\u001b[0m\n\u001b[32Ca - 27 +2 darts (at the ready)\n\u001b[32C\u001b[7mArmor\u001b[0m\n\u001b[32Cj - an uncursed +0 Hawaiian shirt (being worn)\n\u001b[32C\u001b[7mComestibles\u001b[0m\n\u001b[32Cb - 6 uncursed food rations\n\u001b[32Cc - an uncursed apple\n\u001b[32Cd - 2 uncursed fortune cookies\n\u001b[32Ce - an uncursed clove of garlic\n\u001b[32Cf - an uncursed slime mold\n\u001b[32Cg - 2 uncursed tins of lichen\n\u001b[32C\u001b[7mScrolls\u001b[0m\n\u001b[32Ci - 4 uncursed scrolls of magic mapping\n\u001b[32C\u001b[7mPotions\u001b[0m\n\u001b[32Ch - 2 uncursed potions of extra healing\n\u001b[32C\u001b[7mTools\u001b[0m\n\u001b[32Ck - an expensive camera (0:34)\n\u001b[32Cl - an uncursed credit card\n\u001b[32C(end)\n\nContestant the Rambler\u001b[9CSt:9 Dx:14 Co:12 In:11 Wi:16 Ch:16 Neutral\nDlvl:1 $:757 HP:10(10) Pw:2(2) AC:10 Xp:1/0 T:11";
@@ -243,14 +330,31 @@ async function showPromptLine(text) {
 
 function dlevelOf(proto, fallback) {
     const lev = game.specialLevels?.find((l) => l.proto === proto);
-    return lev?.dlevel?.dlevel ?? fallback;
+    return lev?.dlevel ? displayDepth(lev.dlevel) : fallback;
+}
+
+function displayDepth(dlevel) {
+    const dun = game.dungeons?.[dlevel?.dnum ?? 0];
+    return (dun?.depth_start ?? 1) + (dlevel?.dlevel ?? 1) - 1;
 }
 
 function branchFromDoom(dname, fallback) {
     const dnum = game.dungeons?.findIndex((d) => d.dname === dname);
     if (dnum < 0) return fallback;
     const branch = game.branches?.find((br) => br.end1?.dnum === 0 && br.end2?.dnum === dnum);
-    return branch?.end1?.dlevel ?? fallback;
+    return branch?.end1 ? displayDepth(branch.end1) : fallback;
+}
+
+function branchEntranceDepth(dname, fallback) {
+    const dnum = game.dungeons?.findIndex((d) => d.dname === dname);
+    if (dnum < 0) return fallback;
+    const branch = game.branches?.find((br) => br.end2?.dnum === dnum);
+    return branch?.end1 ? displayDepth(branch.end1) : fallback;
+}
+
+function targetForProto(proto, fallback) {
+    const lev = game.specialLevels?.find((l) => l.proto === proto);
+    return lev?.dlevel ? { ...lev.dlevel } : fallback;
 }
 
 function buildLevelTeleportMenu() {
@@ -275,7 +379,7 @@ function buildLevelTeleportMenu() {
         ' \x1b[7mLevel teleport to where:\x1b[0m',
         '',
         ` \x1b[7mThe Dungeons of Doom: levels 1 to ${doomMax}\x1b[0m`,
-        ' a - * One way stair to The Elemental Planes: 1',
+        ' a -   One way stair to The Elemental Planes: 1',
         ` b -   Stair to The Gnomish Mines: ${choices.b}`,
         ` c -   oracle: ${choices.c}`,
         ` d -   Stair to Sokoban: ${choices.d}`,
@@ -290,12 +394,64 @@ function buildLevelTeleportMenu() {
         ` l -   juiblex: ${dlevelOf('juiblex', gehStart + 3)}`,
         ` m -   asmodeus: ${dlevelOf('asmodeus', gehStart + 5)}`,
         ` n -   baalz: ${dlevelOf('baalz', gehStart + 6)}`,
-        ` o -   Stair to Vlad's Tower: ${branchFromDoom("Vlad's Tower", gehStart + 9)}`,
+        ` o -   Stair to Vlad's Tower: ${branchEntranceDepth("Vlad's Tower", gehStart + 9)}`,
         ` p -   orcus: ${dlevelOf('orcus', gehStart + 9)}`,
         ` q -   wizard1: ${dlevelOf('wizard1', gehStart + 14)}`,
         ` r -   wizard2: ${dlevelOf('wizard2', gehStart + 15)}`,
         ` s -   wizard3: ${dlevelOf('wizard3', gehStart + 16)}`,
         ' (1 of 3)',
+    ];
+    return { screen: lines.join('\n'), choices };
+}
+
+function buildLevelTeleportMenuPage2() {
+    const mines = game.dungeons?.find((d) => d.dname === 'The Gnomish Mines');
+    const quest = game.dungeons?.find((d) => d.dname === 'The Quest');
+    const soko = game.dungeons?.find((d) => d.dname === 'Sokoban');
+    const ludios = game.dungeons?.find((d) => d.dname === 'Fort Ludios');
+    const vlad = game.dungeons?.find((d) => d.dname === "Vlad's Tower");
+    const planes = game.dungeons?.find((d) => d.dname === 'The Elemental Planes');
+    const roleCode = game.urole?.filecode || 'Wiz';
+    const choices = {
+        w: targetForProto('minetn', 6),
+        x: targetForProto('minend', 11),
+        y: targetForProto('x-strt', 11),
+        z: targetForProto('x-loca', 13),
+        A: targetForProto('x-goal', 15),
+        B: targetForProto('soko1', 2),
+        C: targetForProto('soko2', 3),
+        D: targetForProto('soko3', 4),
+        E: targetForProto('soko4', 5),
+        G: targetForProto('tower1', 35),
+        H: targetForProto('tower2', 36),
+        I: targetForProto('tower3', 37),
+        J: targetForProto('astral', -5),
+    };
+    const lines = [
+        ` t -   fakewiz2: ${dlevelOf('fakewiz2', 47)}`,
+        ` u -   fakewiz1: ${dlevelOf('fakewiz1', 48)}`,
+        ` v -   sanctum: ${dlevelOf('sanctum', 51)}`,
+        ` \x1b[7mThe Gnomish Mines: levels ${mines?.depth_start ?? 4} to ${(mines?.depth_start ?? 4) + (mines?.num_dunlevs ?? 8) - 1}\x1b[0m`,
+        ` w -   minetn: ${dlevelOf('minetn', 6)}`,
+        ` x -   minend: ${dlevelOf('minend', 11)}`,
+        ` \x1b[7mThe Quest: levels ${quest?.depth_start ?? 11} to ${(quest?.depth_start ?? 11) + (quest?.num_dunlevs ?? 5) - 1}\x1b[0m`,
+        ` y -   ${roleCode}-strt: ${dlevelOf('x-strt', 11)}`,
+        ` z -   ${roleCode}-loca: ${dlevelOf('x-loca', 13)}`,
+        ` A -   ${roleCode}-goal: ${dlevelOf('x-goal', 15)}`,
+        ` \x1b[7mSokoban: levels ${soko?.depth_start ?? 2} to ${(soko?.depth_start ?? 2) + (soko?.num_dunlevs ?? 4) - 1}, entrance from below\x1b[0m`,
+        ` B -   soko1: ${dlevelOf('soko1', 2)}`,
+        ` C -   soko2: ${dlevelOf('soko2', 3)}`,
+        ` D -   soko3: ${dlevelOf('soko3', 4)}`,
+        ` E -   soko4: ${dlevelOf('soko4', 5)}`,
+        ` \x1b[7mFort Ludios: depth ${ludios?.depth_start ?? 19}\x1b[0m`,
+        `       knox: ${dlevelOf('knox', 19)}`,
+        ` \x1b[7mVlad's Tower: levels ${vlad?.depth_start ?? 35} to ${(vlad?.depth_start ?? 35) + (vlad?.num_dunlevs ?? 3) - 1}, entrance from below\x1b[0m`,
+        ` G -   tower1: ${dlevelOf('tower1', 35)}`,
+        ` H -   tower2: ${dlevelOf('tower2', 36)}`,
+        ` I -   tower3: ${dlevelOf('tower3', 37)}`,
+        ` \x1b[7mThe Elemental Planes: levels -5 to 0, entrance on -1\x1b[0m`,
+        ` J -   astral: ${dlevelOf('astral', -5)}`,
+        ' (2 of 3)',
     ];
     return { screen: lines.join('\n'), choices };
 }
@@ -307,7 +463,9 @@ async function performLevelTeleport(target) {
         data: migratingPet.data ? { ...migratingPet.data } : migratingPet.data,
         edog: migratingPet.edog ? { ...migratingPet.edog } : migratingPet.edog,
     } : null;
-    game.u.uz = { ...(game.u.uz || { dnum: 0 }), dlevel: target };
+    game.u.uz = typeof target === 'object' && target
+        ? { ...target }
+        : { ...(game.u.uz || { dnum: 0 }), dlevel: target };
     await mklev();
     place_lregion(0, 0, 0, 0, 0, 0, 0, 0, LR_UPTELE, null);
     pet_arrive_with_you();
@@ -349,6 +507,54 @@ export async function rhack(key) {
 
     const ch = String.fromCharCode(key);
 
+    if (game._awaiting_pray_force_more && game._more && (ch === ' ' || ch === '\r' || ch === '\n')) {
+        clear_pending_message();
+        game._awaiting_pray_force_more = false;
+        game._awaiting_pray_force = true;
+        await showPromptLine('Force the gods to be pleased? [yn] (n) ');
+        game.context.move = 0;
+        return;
+    }
+
+    if (game._awaiting_prayer_done_more && game._more && (ch === ' ' || ch === '\r' || ch === '\n')) {
+        clear_pending_message();
+        game._awaiting_prayer_done_more = false;
+        await finishPrayerResult();
+        game.context.move = 0;
+        return;
+    }
+
+    if (game._awaiting_pray_confirm) {
+        clear_pending_message();
+        game._awaiting_pray_confirm = false;
+        if (ch === 'y' || ch === 'Y') {
+            await pline(`You begin praying to ${prayerGodName()}.`);
+            game._more = true;
+            game._awaiting_pray_force_more = !!(game.wizard || game.flags?.debug);
+        }
+        game.context.move = 0;
+        return;
+    }
+
+    if (game._awaiting_pray_force) {
+        clear_pending_message();
+        game._awaiting_pray_force = false;
+        if (ch === 'y' || ch === 'Y') {
+            game.u.ublesscnt = 0;
+            if ((game.u.ualign?.record ?? 0) <= 0) game.u.ualign.record = 1;
+            game.u.ugangr = 0;
+            if ((game.u.uluck ?? 0) < 0) game.u.uluck = 0;
+            game.u.uinvulnerable = true;
+            await pline('You are surrounded by a shimmering light.');
+            game._more = true;
+            game._prayer_turns_remaining = 2;
+            game.context.move = 1;
+        } else {
+            game.context.move = 1;
+        }
+        return;
+    }
+
     if (game._levelchange_target && game._more && (ch === ' ' || ch === '\r' || ch === '\n')) {
         clear_pending_message();
         await applyPendingLevelChange();
@@ -383,15 +589,20 @@ export async function rhack(key) {
 
     if (game._awaiting_extended_command) {
         if (ch === '\r' || ch === '\n') {
-            const cmd = game._extended_command || '';
+            const cmd = completeExtendedCommand(game._extended_command_input || game._extended_command || '');
             clear_pending_message();
             game._awaiting_extended_command = false;
+            game._extended_command_input = '';
             game._extended_command = '';
             if (cmd === 'levelchange') {
                 const prompt = 'To what experience level do you want to be set?';
                 await showPromptLine(prompt);
                 game._awaiting_levelchange_value = true;
                 game._levelchange_input = '';
+            } else if (cmd === 'pray') {
+                await pline('Are you sure you want to pray? [yn] (n) ');
+                game._awaiting_pray_confirm = true;
+                game.context.move = 0;
             } else {
                 await pline(`Unknown extended command: ${cmd || '#'}.`);
             }
@@ -401,16 +612,15 @@ export async function rhack(key) {
         if (ch === '\x1b') {
             clear_pending_message();
             game._awaiting_extended_command = false;
+            game._extended_command_input = '';
             game._extended_command = '';
             game.context.move = 0;
             return;
         }
         if (/^[A-Za-z]$/.test(ch)) {
-            const prev = game._extended_command || '';
-            const typed = prev === 'levelchange' ? prev : `${prev}${ch}`;
-            game._extended_command = 'levelchange'.startsWith(typed) && typed.length >= 2
-                ? 'levelchange'
-                : typed;
+            const typed = `${game._extended_command_input || ''}${ch}`.toLowerCase();
+            game._extended_command_input = typed;
+            game._extended_command = completeExtendedCommand(typed);
             await showPromptLine(`# ${game._extended_command}`);
             game.context.move = 0;
             return;
@@ -574,7 +784,8 @@ export async function rhack(key) {
         if (typeof obj.spe === 'number' && obj.spe > 0) obj.spe--;
         exercise(A_WIS, true);
         if (obj.otyp === WAN_DIGGING) {
-            rn1(18, 8);
+            zapDig(DIR_DX[ch] || 0, DIR_DY[ch] || 0);
+            exercise(A_WIS, true);
         }
         game.context.move = 1;
         return;
@@ -603,7 +814,21 @@ export async function rhack(key) {
             return;
         }
         if (prev === game._level_teleport_menu_screen) {
+            if (ch === ' ') {
+                const menu = buildLevelTeleportMenuPage2();
+                game._level_teleport_menu_page2_screen = menu.screen;
+                game._level_teleport_menu_page2_choices = menu.choices;
+                showOverride(menu.screen, [9, 23]);
+                game.context.move = 0;
+                return;
+            }
             const target = game._level_teleport_menu_choices?.[ch];
+            if (target) await performLevelTeleport(target);
+            game.context.move = 0;
+            return;
+        }
+        if (prev === game._level_teleport_menu_page2_screen) {
+            const target = game._level_teleport_menu_page2_choices?.[ch];
             if (target) await performLevelTeleport(target);
             game.context.move = 0;
             return;
@@ -631,13 +856,23 @@ export async function rhack(key) {
     // next command begins unless the command prints a replacement.
     clear_pending_message();
 
-    if (isMovementKey(ch)) {
+    if (game._forcefight_pending && isMovementKey(ch)) {
+        game._forcefight_pending = false;
+        await forceFightEmpty(DIR_DX[ch], DIR_DY[ch]);
+        game.context.move = 1;
+    } else if (game._forcefight_pending) {
+        game._forcefight_pending = false;
+        game.context.move = 0;
+    } else if (isMovementKey(ch)) {
         game.context.move = await domove(DIR_DX[ch], DIR_DY[ch]) ? 1 : 0;
     } else if (runDirectionForKey(ch)) {
         const dir = runDirectionForKey(ch);
         game.context.run = { dx: DIR_DX[dir], dy: DIR_DY[dir], mode: 1, steps: 0 };
         game.context.move = await domove(DIR_DX[dir], DIR_DY[dir]) ? 1 : 0;
         if (!game.context.move) game.context.run = null;
+    } else if (ch === 'F') {
+        game.context.move = 0;
+        game._forcefight_pending = true;
     } else if (ch === '.') {
         game.context.move = 1;
     } else if (ch === 's') {
@@ -645,6 +880,7 @@ export async function rhack(key) {
     } else if (ch === '#') {
         game.context.move = 0;
         game._awaiting_extended_command = true;
+        game._extended_command_input = '';
         game._extended_command = '';
         await showPromptLine('#');
     } else if (ch === 'i') {
