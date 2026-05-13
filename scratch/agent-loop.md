@@ -29,7 +29,7 @@ This file is the live handoff checkpoint, not a full history. It was compacted o
 - `seed8000-tourist-starter`: `S 23/23 R 3060/3130`, FR `3047`.
 - `seed0002-healer-reflection-drummer`: `S 11/595 R 1266/27158`, FR `1215`.
 - `seed0013-friday13-save-then-fullmoon-restore`: `S 0/99 R 535/4804`, FR `507`.
-- `seed0116-wizard-wear-shop`: `S 127/127 R 12562/12562`, PASS; remaining comparison notes are four cursor-only prompt positions.
+- `seed0116-wizard-wear-shop`: `S 127/127 R 12562/12562`, PASS; cursor-only prompt drift cleared.
 - `seed0383-wizard-hallucinate`: `S 163/219 R 16915/16915`, no RNG mismatch; remaining mismatch is screen 162 `#wizintrinsic` menu rendering/selection lifecycle.
 - Full suite after latest production slice: `S 326/11406`, 1/44 passing (`seed0116`).
 
