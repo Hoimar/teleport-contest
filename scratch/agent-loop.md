@@ -17,15 +17,15 @@ This file is the live handoff checkpoint, not a full history. It was compacted o
 
 - Branch: `main`.
 - Baseline for this loop turn: branch `main` at commit `65867f6`; `git status --short --branch` reported no local changes at startup.
-- Latest loop work: seed0002 now creates the starting pet through `makedog()` before the post-pet startup replay, removes the stale hardcoded seed0002 dog record, replaces the replayed startup turn-tail RNG with live movement/sound/hunger/wipe calls, and applies C's `NODIAG(PM_GRID_BUG)` candidate filter.
+- Latest loop work: seed0002 now creates the starting pet through `makedog()` before the post-pet startup replay, removes the stale hardcoded seed0002 dog record, replaces the replayed startup turn-tail RNG with live movement/sound/hunger/wipe calls, applies C's `NODIAG(PM_GRID_BUG)` candidate filter, and removes seed-specific display-only floor-object injections.
 - Current target: `seed0002-healer-reflection-drummer` later movement/pet-goal ordering boundary.
 - Active subsystem hypothesis: `mklev.c:mineralize()`, starting pet creation, live startup turn-tail, and the first grid-bug mtrack denominator are no longer the active seed0002 blockers. The next first RNG mismatch is `FR 2375`, expected `rn2(5)` while JS emits `rn2(100)`, indicating a later `distfleeck()`/`obj_resists()` ordering difference in movement or pet-goal scanning.
 
 ## Latest Verified Scores
 
-- Sentinel after seed0002 grid-bug NODIAG cleanup: total `S 326/1063 R 35816/64569`.
+- Sentinel after seed0002 display-object dehack: total `S 326/1063 R 35782/64569`.
 - `seed8000-tourist-starter`: `S 23/23 R 3060/3130`, FR `3047`.
-- `seed0002-healer-reflection-drummer`: `S 11/595 R 2706/27158`, FR `2375`.
+- `seed0002-healer-reflection-drummer`: `S 11/595 R 2672/27158`, FR `2375`.
 - `seed0013-friday13-save-then-fullmoon-restore`: `S 0/99 R 573/4804`, FR `540`.
 - `seed0116-wizard-wear-shop`: `S 127/127 R 12562/12562`, PASS; cursor-only prompt drift cleared.
 - `seed0383-wizard-hallucinate`: `S 165/219 R 16915/16915`, no core RNG mismatch; remaining mismatch is screen 164 swallow-color rendering after the `#wizintrinsic` commit.
@@ -205,7 +205,7 @@ Latest verified swallowed-combat/menu-triage/dehack slice:
    - Local recorder build is blocked by restricted network fetching Lua; use source-level reasoning or existing recorded display evidence until a recorder is available.
 2. Continue mklev/object generation from current evidence:
    - `seed5002` now reaches `R 1745/12167`; first local mismatch is the shared `mkcorpstat()` corpse timer boundary after trap-victim/mineral object generation.
-   - `seed0002` now reaches `R 2706/27158`; mineralize, starting-pet creation, startup turn-tail, early pet object-resistance scans, and grid-bug NODIAG mtrack gating match through the current evidence. The next safe step is tracing the later movement/pet-goal ordering boundary at `FR 2375` (`rn2(5)` expected vs `rn2(100)` actual).
+   - `seed0002` now reaches `R 2672/27158`; mineralize, starting-pet creation, startup turn-tail, early pet object-resistance scans, and grid-bug NODIAG mtrack gating match through the current evidence, and display-only floor placeholders are removed. The next safe step is tracing the later movement/pet-goal ordering boundary at `FR 2375` (`rn2(5)` expected vs `rn2(100)` actual), likely retained real object placement/order rather than fake display objects.
    - Prior corpse timer attempts, both global and scoped to `mkcorpstat()`, regressed seed8000/seed0116 and were reverted. Revisit only with a complete caller-aware timer mapping.
 3. Broaden remaining `o_init`/`objnam` data paths after live descriptors:
    - Replace limited discovery text tables with live discovery state.

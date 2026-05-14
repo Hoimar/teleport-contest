@@ -227,15 +227,6 @@ export async function newgame() {
     // Structural phase consumes RNG for rooms/corridors/doors/stairs
     await mklev();
 
-    if (g._seed === 2) {
-        g.level.objects.push({ ox: 51, oy: 8, ch: '!', color: 8 });
-        g.level.objects.push({ ox: 53, oy: 11, ch: '?', color: 15 });
-        g.level.objects.push({ ox: 55, oy: 12, ch: '/', color: 14 });
-        g.level.objects.push({ ox: 72, oy: 11, ch: '!', color: 1 });
-        g.level.objects.push({ ox: 75, oy: 12, ch: '%', color: 3 });
-        // Removed hardcoded x1,y1 dog and monster
-    }
-
     // Hardcoded player state for seed8000 Tourist.
     // Contestants: port u_init to compute these from game PRNG.
     g._goldCount = g._seed === 2 ? 1218 : 757;
