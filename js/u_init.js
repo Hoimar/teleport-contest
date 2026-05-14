@@ -315,8 +315,14 @@ function varyInitAttr(attrs, maxes) {
     for (let i = 0; i < attrs.length; i++) {
         if (!rn2(20)) {
             const xd = rn2(7) - 2;
-            attrs[i] = Math.max(3, Math.min(maxes[i], attrs[i] + xd));
-            if (attrs[i] < maxes[i]) maxes[i] = attrs[i];
+            attrs[i] += xd;
+            if (xd > 0 && attrs[i] > maxes[i]) {
+                maxes[i] = Math.min(HUMAN_ATTRMAX[i], attrs[i]);
+                attrs[i] = maxes[i];
+            } else if (xd < 0) {
+                attrs[i] = Math.max(3, attrs[i]);
+                if (attrs[i] < maxes[i]) maxes[i] = attrs[i];
+            }
         }
     }
 }
