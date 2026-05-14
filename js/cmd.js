@@ -9,7 +9,7 @@ import { game } from './gstate.js';
 import { nhgetch } from './input.js';
 import { newsym, flush_screen, pline, clear_pending_message, docrt, serialize_terminal_grid, queue_more_prompt, refresh_swallowed_overlay } from './display.js';
 import { vision_recalc, vision_reset } from './vision.js';
-import { mklev, mksobj, place_lregion, place_object } from './mklev.js';
+import { makemon, mklev, mksobj, monster_by_user_name, place_lregion, place_object } from './mklev.js';
 import { OBJECT_DELAY } from './object_data.js';
 import { pet_arrive_with_you } from './dog.js';
 import { merge_inventory_object, pluslvl } from './u_init.js';
@@ -318,6 +318,14 @@ function lastInventoryLetter() {
 
 function indefiniteArticle(name) {
     return /^[aeiou]/i.test(name) ? 'an' : 'a';
+}
+
+function sentenceStart(s) {
+    return s ? `${s[0].toUpperCase()}${s.slice(1)}` : s;
+}
+
+function monsterDisplayName(ptr) {
+    return String(ptr?.name || 'monster').toLowerCase().replace(/_/g, ' ');
 }
 
 function pluralizeObjectName(name) {
@@ -1780,6 +1788,39 @@ export async function rhack(key) {
         return;
     }
 
+    if (game._awaiting_create_monster) {
+        const prompt = 'Create what kind of monster?';
+        if (ch === '\r' || ch === '\n') {
+            const input = game._create_monster_input || '';
+            clear_pending_message();
+            game._awaiting_create_monster = false;
+            game._create_monster_input = '';
+            const ptr = monster_by_user_name(input);
+            if (ptr) {
+                const mon = await makemon(ptr, game.u?.ux || 0, game.u?.uy || 0, 0);
+                const name = monsterDisplayName(ptr);
+                if (mon) {
+                    newsym(mon.mx, mon.my);
+                    await pline(`${sentenceStart(indefiniteArticle(name))} ${name} appears next to you.`);
+                }
+            }
+            else await pline("I've never heard of such monsters.");
+            game.context.move = 0;
+            return;
+        }
+        if (ch === '\x1b') {
+            clear_pending_message();
+            game._awaiting_create_monster = false;
+            game._create_monster_input = '';
+            game.context.move = 0;
+            return;
+        }
+        game._create_monster_input = `${game._create_monster_input || ''}${ch}`;
+        await showPromptLine(`${prompt}${game._create_monster_input ? ` ${game._create_monster_input}` : ''}`);
+        game.context.move = 0;
+        return;
+    }
+
     if (game._awaiting_wear_item) {
         clear_pending_message();
         game._awaiting_wear_item = false;
@@ -2045,6 +2086,13 @@ export async function rhack(key) {
         game._prompt_cursor = [msg.length, 0];
         game._awaiting_wish = true;
         game._wish_input = '';
+    } else if (key === 7) { // ^G wizard create monster
+        game.context.move = 0;
+        const msg = 'Create what kind of monster?';
+        await pline(msg);
+        game._prompt_cursor = [msg.length, 0];
+        game._awaiting_create_monster = true;
+        game._create_monster_input = '';
     } else if (ch === 'W') {
         game.context.move = 0;
         const letters = wearLetters();

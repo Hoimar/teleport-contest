@@ -1182,6 +1182,11 @@ function monster_ptr(ref) {
     return ref?.name ? ref : null;
 }
 
+export function monster_by_user_name(name) {
+    const key = String(name || '').trim().toUpperCase().replace(/[\s-]+/g, '_');
+    return MONSTERS.find((mon) => mon.name === key) || null;
+}
+
 function is_rider_ref(ref) {
     const name = monster_ptr(ref)?.name;
     return name === 'DEATH' || name === 'FAMINE' || name === 'PESTILENCE';
