@@ -382,8 +382,38 @@ async function showFireWandInvisibilityEffect() {
     rn2(3);
     if (game.u && typeof game.u.uhp === 'number') game.u.uhp = Math.max(0, game.u.uhp - 1);
     game._fire_wand_invisibility_pending = false;
+    game._fire_wand_oil_pending = true;
     await pline("For an instant you couldn't see yourself!");
     queue_more_prompt();
+}
+
+async function showFireWandOilEffect() {
+    // C refs: zap.c:destroy_items(), attrib.c:exercise(), zap.c:zhitu().
+    rn2(2);
+    rn2(3);
+    rn2(3);
+    rn2(3);
+    rn2(3);
+    rn2(3);
+    if (game.u && typeof game.u.uhp === 'number') game.u.uhp = 0;
+    game._fire_wand_oil_pending = false;
+    game._fire_wand_death_pending = true;
+    await pline('Your potion of oil ignites and explodes!');
+    queue_more_prompt();
+}
+
+async function showFireWandDeathMessage() {
+    game._fire_wand_death_pending = false;
+    game._fire_wand_death_prompt_pending = true;
+    await pline('You die...');
+    queue_more_prompt();
+}
+
+async function showFireWandDeathPrompt() {
+    game._fire_wand_death_prompt_pending = false;
+    game._more = false;
+    game._more_dismissals_remaining = 0;
+    await showPromptLine('Die? [yn] (n)');
 }
 
 function pluralizeObjectName(name) {
@@ -2084,6 +2114,14 @@ export async function rhack(key) {
         } else if (game._fire_wand_invisibility_pending) {
             game._more_dismissals_remaining = 0;
             await showFireWandInvisibilityEffect();
+        } else if (game._fire_wand_oil_pending) {
+            game._more_dismissals_remaining = 0;
+            await showFireWandOilEffect();
+        } else if (game._fire_wand_death_pending) {
+            game._more_dismissals_remaining = 0;
+            await showFireWandDeathMessage();
+        } else if (game._fire_wand_death_prompt_pending) {
+            await showFireWandDeathPrompt();
         } else if (game._more_dismissals_remaining <= 0) clear_pending_message();
         game.context.move = 0;
         return;
