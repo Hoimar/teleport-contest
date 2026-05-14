@@ -1836,6 +1836,31 @@ function set_mimic_sym(mon) {
         }
         return;
     }
+    if (rt >= SHOPBASE) {
+        if (rn2(10) >= depth_of_level(game.u?.uz)) {
+            mon.m_ap_type = M_AP_OBJECT;
+            mon.mappearance = STRANGE_OBJECT;
+            return;
+        }
+        let s_sym = get_shop_item(rt - SHOPBASE);
+        if (s_sym < 0) {
+            mon.m_ap_type = M_AP_OBJECT;
+            mon.mappearance = -s_sym;
+            return;
+        }
+        if (s_sym === RANDOM_CLASS) {
+            const syms = [
+                RING_CLASS, WAND_CLASS, WEAPON_CLASS, FOOD_CLASS, COIN_CLASS,
+                SCROLL_CLASS, POTION_CLASS, ARMOR_CLASS, AMULET_CLASS,
+                TOOL_CLASS, ROCK_CLASS, GEM_CLASS, SPBOOK_CLASS,
+            ];
+            s_sym = syms[rn2(syms.length)];
+        }
+        mon.m_ap_type = M_AP_OBJECT;
+        if (s_sym === COIN_CLASS) mon.mappearance = GOLD_PIECE;
+        else mon.mappearance = mkobj(s_sym, false)?.otyp ?? STRANGE_OBJECT;
+        return;
+    }
 
     // C ref: makemon.c:set_mimic_sym(), default room symbol table.
     const syms = [
