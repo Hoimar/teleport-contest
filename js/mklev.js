@@ -64,6 +64,7 @@ const DWARVISH_SPEAR = 30;
 const DAGGER = 34;
 const ELVEN_DAGGER = 35;
 const ORCISH_DAGGER = 36;
+const ATHAME = 38;
 const KNIFE = 40;
 const WORM_TOOTH = 42;
 const AXE = 44;
@@ -74,15 +75,22 @@ const ELVEN_SHORT_SWORD = 47;
 const ORCISH_SHORT_SWORD = 48;
 const DWARVISH_SHORT_SWORD = 49;
 const SCIMITAR = 50;
+const SILVER_SABER = 51;
+const BROADSWORD = 52;
 const ELVEN_BROADSWORD = 53;
 const LONG_SWORD = 54;
 const TWO_HANDED_SWORD = 55;
+const KATANA = 56;
+const RUNESWORD = 58;
 const PARTISAN = 56;
 const RANSEUR = 57;
 const SPETUM = 58;
 const GLAIVE = 59;
 const LUCERN_HAMMER = 66;
 const DWARVISH_MATTOCK = 71;
+const SILVER_MACE = 74;
+const MORNING_STAR = 75;
+const WAR_HAMMER = 76;
 const CLUB = 77;
 const AKLYS = 80;
 const BOW = 83;
@@ -665,10 +673,28 @@ function nartifact_exist() {
     return game._nartifact_exist ?? 0;
 }
 
+const RANDOM_ARTIFACT_BASE_COUNTS = new Map([
+    [RUNESWORD, 1],
+    [WAR_HAMMER, 2],
+    [BATTLE_AXE, 1],
+    [ORCISH_DAGGER, 1],
+    [ELVEN_BROADSWORD, 1],
+    [ELVEN_DAGGER, 1],
+    [ATHAME, 1],
+    [LONG_SWORD, 5],
+    [BROADSWORD, 1],
+    [SILVER_MACE, 1],
+    [SILVER_SABER, 2],
+    [MORNING_STAR, 1],
+    [KATANA, 1],
+]);
+
 function maybe_artifact(otmp, chance) {
     if (!otmp || otmp.oartifact) return;
     if (!rn2(chance + (10 * nartifact_exist()))) {
-        // Full mk_artifact() selection/origin tracking is not ported yet.
+        const eligible = RANDOM_ARTIFACT_BASE_COUNTS.get(otmp.otyp) ?? 0;
+        if (!eligible) return;
+        rn2(eligible); // C ref: artifact.c:mk_artifact() eligible[] selection.
         game._nartifact_exist = nartifact_exist() + 1;
         otmp.oartifact = true;
     }
