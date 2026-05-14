@@ -356,6 +356,33 @@ async function zapFireRayAtHero(dx, dy) {
     rn2(5);      // current burnarmor() body-hit evidence gate
     drawRayBeam(dx, dy);
     await pline('The bolt of fire bounces!  The bolt of fire hits you!');
+    game._fire_wand_side_effect_pending = true;
+    queue_more_prompt();
+}
+
+async function showFireWandSideEffects() {
+    // C refs: zap.c:zhitu(), zap.c:destroy_items().
+    rn2(3);
+    rn2(5);
+    rn2(5);
+    rnd(6);
+    rn2(3);
+    rnd(6);
+    rn2(3);
+    game._fire_wand_side_effect_pending = false;
+    game._fire_wand_invisibility_pending = true;
+    await pline('Your cloak smoulders!  Your potion of invisibility boils and explodes!');
+    queue_more_prompt();
+}
+
+async function showFireWandInvisibilityEffect() {
+    // C refs: potion.c invisibility effect after fire destroys potion.
+    rn2(2);
+    rnd(6);
+    rn2(3);
+    if (game.u && typeof game.u.uhp === 'number') game.u.uhp = Math.max(0, game.u.uhp - 1);
+    game._fire_wand_invisibility_pending = false;
+    await pline("For an instant you couldn't see yourself!");
     queue_more_prompt();
 }
 
@@ -2051,7 +2078,13 @@ export async function rhack(key) {
         // Queued topl.c more prompts represent nested message pauses that
         // occurred inside a command or turn already consumed by this port.
         game._more_dismissals_remaining--;
-        if (game._more_dismissals_remaining <= 0) clear_pending_message();
+        if (game._fire_wand_side_effect_pending) {
+            game._more_dismissals_remaining = 0;
+            await showFireWandSideEffects();
+        } else if (game._fire_wand_invisibility_pending) {
+            game._more_dismissals_remaining = 0;
+            await showFireWandInvisibilityEffect();
+        } else if (game._more_dismissals_remaining <= 0) clear_pending_message();
         game.context.move = 0;
         return;
     }
