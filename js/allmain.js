@@ -121,6 +121,18 @@ function drawQuestIntroOverlay(alignName) {
     return true;
 }
 
+async function startupTurnTail() {
+    mcalcdistress();
+    for (const m of game.level?.monsters || []) {
+        m.movement += mcalcmove(m, true);
+    }
+    await maybe_generate_rnd_mon();
+    settrack();
+    await dosounds();
+    gethungry();
+    maybe_wipe_engraving();
+}
+
 export async function player_selection() {
     const g = game;
     // We just override screens and consume keys to match seed0002 start
@@ -265,6 +277,7 @@ export async function newgame() {
         ff.fastforward_post_mklev?.();
         g.u.acurr = { a: startupAttrs.slice() };
         g.u.amax = { a: startupAttrs.slice() };
+        if (g._seed === 2) await startupTurnTail();
     } else {
         u_init_role_inventory();
         apply_startup_role_state();
