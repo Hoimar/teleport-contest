@@ -189,6 +189,9 @@ const K_RATION = 294;
 const C_RATION = 295;
 const TIN = 296;
 const AMULET_OF_LIFE_SAVING = 202;
+const AMULET_OF_STRANGULATION = 203;
+const AMULET_OF_RESTFUL_SLEEP = 204;
+const AMULET_OF_CHANGE = 206;
 const AMULET_OF_REFLECTION = 208;
 const DUST = 3;
 const MARK = 6;
@@ -1039,8 +1042,12 @@ function mksobj_init(otmp, otyp, artif) {
         if (artif) maybe_artifact(otmp, 40);
         break;
     case AMULET_CLASS:
-        rn2(10); // cursed-amulet gate; only specific amulets use the result
-        blessorcurse(otmp, 10);
+        if (rn2(10) && (otyp === AMULET_OF_STRANGULATION
+            || otyp === AMULET_OF_CHANGE || otyp === AMULET_OF_RESTFUL_SLEEP)) {
+            curse(otmp);
+        } else {
+            blessorcurse(otmp, 10);
+        }
         break;
     default:
         break;
