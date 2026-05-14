@@ -16,23 +16,20 @@ This file is the live handoff checkpoint, not a full history. It was compacted o
 ## Current State
 
 - Branch: `main`.
-- Baseline requested by user: resume from commit `04d9360` and continue on the current branch without pushing.
-- Plan refresh on 2026-05-14 observed branch `main` at `2f44996`; `git status --short --branch` reported no local file changes before this documentation update.
-- Latest loop work: seed0383 swallowed `gulpmu()` cold plines, swallowed display, pre-finish delayed-occupation turn, `#wizintrinsic` menu triage/dehack, tty/status cleanup, and a hallucinated visible-monster display slice. The menu now opens and toggles correctly, the commit frame's `Hallu` status tail matches, and remaining drift is only in hallucinatory swallowed colors and the display-RNG context that feeds them.
-- Local commit note: committing is currently blocked by `.git/index.lock` creation failing with a read-only filesystem error; keep verified work in the worktree until git writes are available again.
-- Local divergence from remote: branch is ahead of `origin/main`; do not push unless explicitly asked.
-- Current target: `seed0383-wizard-hallucinate` hallucinatory swallowed display colors.
-- Active subsystem hypothesis: core RNG ownership for `seed0383` is complete (`R 16915/16915`). The `wizcmds.c:wiz_intrinsic()` paged `NHW_MENU` is now in place and the `h` toggle / Enter commit path matches the evidence screens. The current first mismatch is the swallowed hallucination color sequence on the commit screen: chars, status text, cursor, and core RNG match, but the 3x3 swallow glyph colors still drift. Treat this as display-RNG context ownership debt, not as a menu problem or a seed-specific color table.
+- Baseline for this loop turn: branch `main` at commit `65867f6`; `git status --short --branch` reported no local changes at startup.
+- Latest loop work: seed0002 now creates the starting pet through `makedog()` before the post-pet startup replay, removing the stale hardcoded seed0002 dog record. The pet path now consumes the upstream `pet_type()`, `collect_coords()`, `next_ident()`, `newmonhp()`, and `peace_minded()` RNG through `u_init_role()`.
+- Current target: `seed0002-healer-reflection-drummer` post-pet startup/inventory RNG boundary.
+- Active subsystem hypothesis: `mklev.c:mineralize()` is no longer the active seed0002 blocker; the local trace matched C through the final mineralize checks and the real starting-pet creation path. The next first RNG mismatch is later at `FR 2312`, expected `rn2(61)` while JS emits `rn2(12)`, inside the remaining post-pet startup replay/inventory/object-init boundary. Keep any follow-up tied to upstream `u_init.c`, `invent.c`, and `mkobj.c` consumers rather than seed-specific replay offsets.
 
 ## Latest Verified Scores
 
-- Sentinel after the seed0383 tty/status cleanup: total `S 326/1063 R 34338/64569`.
+- Sentinel after seed0002 starting-pet cleanup: total `S 326/1063 R 36448/64569`.
 - `seed8000-tourist-starter`: `S 23/23 R 3060/3130`, FR `3047`.
-- `seed0002-healer-reflection-drummer`: `S 11/595 R 1266/27158`, FR `1215`.
-- `seed0013-friday13-save-then-fullmoon-restore`: `S 0/99 R 535/4804`, FR `507`.
+- `seed0002-healer-reflection-drummer`: `S 11/595 R 3338/27158`, FR `2312`.
+- `seed0013-friday13-save-then-fullmoon-restore`: `S 0/99 R 573/4804`, FR `540`.
 - `seed0116-wizard-wear-shop`: `S 127/127 R 12562/12562`, PASS; cursor-only prompt drift cleared.
 - `seed0383-wizard-hallucinate`: `S 165/219 R 16915/16915`, no core RNG mismatch; remaining mismatch is screen 164 swallow-color rendering after the `#wizintrinsic` commit.
-- Full suite after 2026-05-14 descriptor/display slices: `S 326/11406`, 1/44 passing (`seed0116`). `seed0383` remains `S 164/219` exact-screen / `S 165/219` cells-only with exact core RNG; the apparent one-screen difference is cursor/message framing around the same swallowed color blocker.
+- Full suite after seed0002 starting-pet cleanup: `S 326/11406`, 1/44 passing (`seed0116`). `seed0002` improved from `R 2939/27158` to `R 3338/27158`; screen totals remain lagging unchanged.
 - Target triage refreshed 2026-05-14 with `node scripts/triage-session.mjs sessions/seed0383-wizard-hallucinate.session.json`: `S 165/219 R 16915/16915 FS 164:attr:map:Enter FR - C 1`. Evidence screens now show the intrinsic menu pages, `h` toggle, `Hallu` status tail, and cursor matching; the remaining diffs are swallowed-cell colors on the hallucinatory commit screen.
 - Triage note: adding `display.c:mon_to_glyph()`-shaped hallucinated visible-monster rendering is structural display debt reduction but does not affect the current first mismatch; the missing consumer is earlier than or inside `make_hallucinated()`/`swallowed(0)` display-context ownership, not ordinary visible-monster redraw after the commit screen.
 - Instrumentation blocker note: rebuilding the local C recorder to enable `NETHACK_RNGLOG_DISP` was attempted with `bash nethack-c/build-recorder.sh`, but the build script needs to fetch Lua and network access is unavailable (`curl: Could not resolve host`). Continue without adding seed-specific color offsets; a future environment with the recorder built can capture the display RNG stream directly.
@@ -208,7 +205,7 @@ Latest verified swallowed-combat/menu-triage/dehack slice:
    - Local recorder build is blocked by restricted network fetching Lua; use source-level reasoning or existing recorded display evidence until a recorder is available.
 2. Continue mklev/object generation from current evidence:
    - `seed5002` now reaches `R 1745/12167`; first local mismatch is the shared `mkcorpstat()` corpse timer boundary after trap-victim/mineral object generation.
-   - `seed0002` now reaches `R 2939/27158`; C finishes `mineralize()` and enters starting pet creation while JS still sees an extra mineralize-eligible rock location, so the next safe step is coordinate-level topology/mineralize tracing before editing.
+   - `seed0002` now reaches `R 3338/27158`; mineralize and starting-pet creation match through the current evidence. The next safe step is tracing the later post-pet startup replay/inventory boundary at `FR 2312` (`rn2(61)` expected vs `rn2(12)` actual).
    - Prior corpse timer attempts, both global and scoped to `mkcorpstat()`, regressed seed8000/seed0116 and were reverted. Revisit only with a complete caller-aware timer mapping.
 3. Broaden remaining `o_init`/`objnam` data paths after live descriptors:
    - Replace limited discovery text tables with live discovery state.

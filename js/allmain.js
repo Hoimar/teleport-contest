@@ -215,17 +215,7 @@ export async function newgame() {
     // Structural phase consumes RNG for rooms/corridors/doors/stairs
     await mklev();
 
-    // Fast-forward through post-mklev startup RNG calls.
-    // Covers: u_init_role, ini_inv, attributes, moveloop_preamble.
-    ff?.fastforward_post_mklev?.();
-
     if (g._seed === 2) {
-        g.level.monsters.push({ 
-            mx: 51, my: 13, ch: 'd', color: 15,
-            data: { mmove: 12 },
-            movement: 0,
-            mtame: 20
-        });
         g.level.objects.push({ ox: 51, oy: 8, ch: '!', color: 8 });
         g.level.objects.push({ ox: 53, oy: 11, ch: '?', color: 15 });
         g.level.objects.push({ ox: 55, oy: 12, ch: '/', color: 14 });
@@ -246,10 +236,12 @@ export async function newgame() {
     g.u.uexp = g._seed === 2 ? 1 : 0;
     const align = startupAlign();
     const alignName = align.name;
-    g.u.ualign = { type: align.value, record: 0 };
+    const initialAlignRecord = g._nhopts?.role && g._nhopts.role !== -1 ? 0 : 10;
+    g.u.ualign = { type: align.value, record: initialAlignRecord };
     // Attribute storage follows C order: Str, Int, Wis, Dex, Con, Cha.
-    g.u.acurr = g._seed === 2 ? { a: [8, 11, 18, 7, 14, 17] } : { a: [9, 11, 16, 14, 12, 16] };
-    g.u.amax = g._seed === 2 ? { a: [8, 11, 18, 7, 14, 17] } : { a: [9, 11, 16, 14, 12, 16] };
+    const startupAttrs = g._seed === 2 ? [8, 11, 18, 7, 14, 17] : [9, 11, 16, 14, 12, 16];
+    g.u.acurr = { a: startupAttrs.slice() };
+    g.u.amax = { a: startupAttrs.slice() };
     g.moves = 1;
     g.urole = startupRole();
     g.urace = startupRace();
@@ -261,13 +253,19 @@ export async function newgame() {
     // C ref: allmain.c newgame() → u_on_upstairs()
     // Places hero on upstair, or special stair, or random room position.
     u_on_upstairs();
-    if (!ff) {
-        // C creates the starting pet before u_init_inventory_attrs() sets
-        // hero attributes; ACURR(A_CHA) therefore sees zeroed charisma and
-        // clamps to 3 for edog.apport.
-        g.u.acurr = { a: [0, 0, 0, 0, 0, 0] };
-        g.u.amax = { a: [0, 0, 0, 0, 0, 0] };
-        await makedog();
+    // C creates the starting pet before u_init_inventory_attrs() sets
+    // hero attributes; ACURR(A_CHA) therefore sees zeroed charisma and
+    // clamps to 3 for edog.apport.
+    g.u.acurr = { a: [0, 0, 0, 0, 0, 0] };
+    g.u.amax = { a: [0, 0, 0, 0, 0, 0] };
+    await makedog();
+    if (ff) {
+        // Fast-forward through post-pet startup RNG calls.
+        // Covers: u_init_role, ini_inv, attributes, moveloop_preamble.
+        ff.fastforward_post_mklev?.();
+        g.u.acurr = { a: startupAttrs.slice() };
+        g.u.amax = { a: startupAttrs.slice() };
+    } else {
         u_init_role_inventory();
         apply_startup_role_state();
         postInventoryStartupRng();
