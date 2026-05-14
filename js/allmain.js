@@ -86,7 +86,8 @@ function drawQuestIntroOverlay(alignName) {
     const g = game;
     const display = g.nhDisplay;
     if (!display || g._seed === 2 || g.iflags?.wc_splash_screen === false
-        || !findRole(g._nhopts?.role)) return;
+        || g.flags?.legacy === false
+        || !findRole(g._nhopts?.role)) return false;
     const god = roleGod(g.urole, alignName);
     const rank = g.flags?.female
         ? (g.urole?.rank?.f || g.urole?.rank?.m || g.urole?.name?.f || g.urole?.name?.m)
@@ -117,6 +118,7 @@ function drawQuestIntroOverlay(alignName) {
     for (const [col, row, text] of lines) display.putstr(col, row, text, NO_COLOR, 0);
     g._override_screen = serialize_terminal_grid(display);
     g._override_cursor = [31, 17, 1];
+    return true;
 }
 
 export async function player_selection() {
@@ -280,7 +282,7 @@ export async function newgame() {
     await flush_screen(1);
     await bot();
     await flush_screen(1);
-    drawQuestIntroOverlay(alignName);
+    const showedQuestIntro = drawQuestIntroOverlay(alignName);
     if (!ff && g.urole?.name?.m === 'Wizard') {
         // C applies starting inventory wear/find_ac side effects after the
         // first startup status render but before the welcome prompt.
@@ -292,7 +294,10 @@ export async function newgame() {
     const roleName = g.flags?.female ? (g.urole.name.f || g.urole.name.m) : g.urole.name.m;
     const greetingName = g.flags?.debug ? String(g.plname).toLowerCase() : g.plname;
     await pline(`${roleGreeting(g.urole)} ${greetingName}, welcome to NetHack!  You are a ${alignName} ${genderAdj} ${g.urace.adj} ${roleName}.`);
-    if (!ff) g._more = true;
+    if (!ff) {
+        g._more = true;
+        g._more_next_message_row = !showedQuestIntro;
+    }
 }
 
 export async function advanceTurn() {

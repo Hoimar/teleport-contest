@@ -568,6 +568,7 @@ async function flush_pending_more_before_monster_message() {
         // screens show the blank engulfed map rather than the old room.
         game._swallowed_display_pending = false;
         game._swallowed_map_active = true;
+        game._swallowed_overlay = null;
     }
 }
 
@@ -762,6 +763,7 @@ function unstuck_swallowed_hero(mtmp) {
     game.u.uswldtim = 0;
     game._swallowed_display_pending = false;
     game._swallowed_map_active = false;
+    game._swallowed_overlay = null;
     game.u.ux = mtmp.mx;
     game.u.uy = mtmp.my;
     if (!mtmp.mspec_used && basic_engulf_attack(mtmp)) {

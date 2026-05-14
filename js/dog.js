@@ -42,8 +42,8 @@ const OBJECT_WEIGHT_OVERRIDES = new Map([
 ]);
 
 // These ids come from the generated object table used by mklev.js.
-const AMULET_OF_YENDOR = 185;
-const SPE_BOOK_OF_THE_DEAD = 373;
+const AMULET_OF_YENDOR = 213;
+const SPE_BOOK_OF_THE_DEAD = 409;
 
 const PM_LITTLE_DOG = {
     name: 'LITTLE_DOG',

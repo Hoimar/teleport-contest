@@ -17,21 +17,25 @@ This file is the live handoff checkpoint, not a full history. It was compacted o
 
 - Branch: `main`.
 - Baseline requested by user: resume from commit `04d9360` and continue on the current branch without pushing.
-- Latest loop work: seed0383 swallowed `gulpmu()` cold plines, swallowed display, pre-finish delayed-occupation turn, and a `#wizintrinsic` menu triage/dehack pass.
+- Plan refresh on 2026-05-14 observed branch `main` at `2f44996`; `git status --short --branch` reported no local file changes before this documentation update.
+- Latest loop work: seed0383 swallowed `gulpmu()` cold plines, swallowed display, pre-finish delayed-occupation turn, `#wizintrinsic` menu triage/dehack, tty/status cleanup, and a hallucinated visible-monster display slice. The menu now opens and toggles correctly, the commit frame's `Hallu` status tail matches, and remaining drift is only in hallucinatory swallowed colors and the display-RNG context that feeds them.
 - Local commit note: committing is currently blocked by `.git/index.lock` creation failing with a read-only filesystem error; keep verified work in the worktree until git writes are available again.
 - Local divergence from remote: branch is ahead of `origin/main`; do not push unless explicitly asked.
-- Current target: `seed0383-wizard-hallucinate` `#wizintrinsic` menu lifecycle.
-- Active subsystem hypothesis: core RNG ownership for `seed0383` is complete (`R 16915/16915`). The swallowed cold-damage and delayed-occupation boundary is resolved for current evidence. The new first mismatch is screen 162: C shows the `wizcmds.c:wiz_intrinsic()` paged `NHW_MENU` headed `Which intrinsics?`, with property rows and footer, while JS still uses a one-line prompt and applies hallucination immediately on `h`. Next work should replace that fallback with a real menu state where `h` toggles the row and Enter confirms before the timeout pline.
+- Current target: `seed0383-wizard-hallucinate` hallucinatory swallowed display colors.
+- Active subsystem hypothesis: core RNG ownership for `seed0383` is complete (`R 16915/16915`). The `wizcmds.c:wiz_intrinsic()` paged `NHW_MENU` is now in place and the `h` toggle / Enter commit path matches the evidence screens. The current first mismatch is the swallowed hallucination color sequence on the commit screen: chars, status text, cursor, and core RNG match, but the 3x3 swallow glyph colors still drift. Treat this as display-RNG context ownership debt, not as a menu problem or a seed-specific color table.
 
 ## Latest Verified Scores
 
-- Sentinel after the seed0383 swallowed `gulpmu()`/display slice and dehack cleanup: total `S 324/1063 R 34338/64569`.
+- Sentinel after the seed0383 tty/status cleanup: total `S 326/1063 R 34338/64569`.
 - `seed8000-tourist-starter`: `S 23/23 R 3060/3130`, FR `3047`.
 - `seed0002-healer-reflection-drummer`: `S 11/595 R 1266/27158`, FR `1215`.
 - `seed0013-friday13-save-then-fullmoon-restore`: `S 0/99 R 535/4804`, FR `507`.
 - `seed0116-wizard-wear-shop`: `S 127/127 R 12562/12562`, PASS; cursor-only prompt drift cleared.
-- `seed0383-wizard-hallucinate`: `S 163/219 R 16915/16915`, no RNG mismatch; remaining mismatch is screen 162 `#wizintrinsic` menu rendering/selection lifecycle.
-- Full suite after latest production slice: `S 326/11406`, 1/44 passing (`seed0116`).
+- `seed0383-wizard-hallucinate`: `S 165/219 R 16915/16915`, no core RNG mismatch; remaining mismatch is screen 164 swallow-color rendering after the `#wizintrinsic` commit.
+- Full suite after 2026-05-14 descriptor/display slices: `S 326/11406`, 1/44 passing (`seed0116`). `seed0383` remains `S 164/219` exact-screen / `S 165/219` cells-only with exact core RNG; the apparent one-screen difference is cursor/message framing around the same swallowed color blocker.
+- Target triage refreshed 2026-05-14 with `node scripts/triage-session.mjs sessions/seed0383-wizard-hallucinate.session.json`: `S 165/219 R 16915/16915 FS 164:attr:map:Enter FR - C 1`. Evidence screens now show the intrinsic menu pages, `h` toggle, `Hallu` status tail, and cursor matching; the remaining diffs are swallowed-cell colors on the hallucinatory commit screen.
+- Triage note: adding `display.c:mon_to_glyph()`-shaped hallucinated visible-monster rendering is structural display debt reduction but does not affect the current first mismatch; the missing consumer is earlier than or inside `make_hallucinated()`/`swallowed(0)` display-context ownership, not ordinary visible-monster redraw after the commit screen.
+- Instrumentation blocker note: rebuilding the local C recorder to enable `NETHACK_RNGLOG_DISP` was attempted with `bash nethack-c/build-recorder.sh`, but the build script needs to fetch Lua and network access is unavailable (`curl: Could not resolve host`). Continue without adding seed-specific color offsets; a future environment with the recorder built can capture the display RNG stream directly.
 
 ## Recent Implementation Delta
 
@@ -134,6 +138,25 @@ Latest verified maintenance slice:
   - retained upstream `objects.h` descriptor rows for rings, potions, scroll labels, and fixed scroll labels in addition to existing amulet/wand rows
   - unknown carried ring/potion/scroll names now come from live shuffled description state (`C ref: objnam.c:xname()`, `o_init.c:shuffle_all()`) and suppress BUC/enchantment text while unknown
   - pluralized `scroll labeled ...` inventory names without adding evidence strings
+- 2026-05-14 follow-up: ordinary spellbook descriptors from `objects.h:SPELL()` are now retained for IDs `366..407`, shuffled with the existing `[366,406]` range, and unknown ordinary spellbooks render from live appearance state as `${desc} spellbook`. Novel and Book of the Dead remain special-book naming debt.
+- Verification after spellbook descriptor slice: `seed0383` unchanged at `S 165/219 R 16915/16915 FS 164:attr:map:Enter FR -`; sentinel unchanged at `S 326/1063 R 34338/64569`.
+- 2026-05-14 follow-up: venom descriptors from `objects.h` are now retained for IDs `479..480` so the existing venom shuffle range no longer swaps empty description slots.
+- Verification after venom descriptor slice: `seed0383` unchanged at `S 165/219 R 16915/16915 FS 164:attr:map:Enter FR -`; sentinel unchanged at `S 326/1063 R 34338/64569`.
+- 2026-05-14 follow-up: armor appearance descriptors for the C shuffled subranges (helms, gloves, cloaks, boots) are now retained and unknown carried armor can display the shuffled descriptor directly.
+- Verification after armor descriptor slice: sentinel unchanged at `S 326/1063 R 34338/64569`; `seed0116` remains `S 127/127 R 12562/12562`; `seed0383` remains `S 165/219 R 16915/16915 FS 164:attr:map:Enter FR -`.
+- 2026-05-14 follow-up: `dog.js:obj_resists()` stale unique IDs were corrected to the current generated object table (`AMULET_OF_YENDOR=213`, `SPE_BOOK_OF_THE_DEAD=409`) instead of ring/spellbook slots.
+- Verification after unique-ID cleanup: sentinel unchanged at `S 326/1063 R 34338/64569`; `seed0116` remains `S 127/127 R 12562/12562`; `seed0383` remains `S 165/219 R 16915/16915 FS 164:attr:map:Enter FR -`.
+- 2026-05-14 follow-up: novel and Book of the Dead fixed descriptors/names are now modeled outside the ordinary spellbook shuffle range (`408=paperback`, `409=papyrus`; known names `novel` and `Book of the Dead`).
+- Verification after special-book naming cleanup: sentinel unchanged at `S 326/1063 R 34338/64569`; `seed0116` remains `S 127/127 R 12562/12562`; `seed0383` remains `S 165/219 R 16915/16915 FS 164:attr:map:Enter FR -`.
+- 2026-05-14 follow-up: startup now honors `OPTIONS=!legacy` by skipping the quest-intro pager, while no-legacy welcome `--More--` renders on the next tty message row. `seed5002` moved from the stale Book of Thoth overlay to a map/placement first-screen diff with cursor matching and RNG prefix `R 641/12167`.
+- Verification after `!legacy` startup cleanup: sentinel unchanged at `S 326/1063 R 34338/64569`; `seed5002` triage is `S 0/410 R 641/12167 FS 0:char:map:init FR 415:rn2(70)=21=>rn2(100)=11`.
+- 2026-05-14 themed-map slice: added the `themerms.lua` `Circular, medium` static map to the generic themed `des.map()` table and preserved `lspo_map()` origin rolls followed by `filler_region()`'s percent gate and `litstate_rnd(-1)`. `seed5002` startup RNG prefix moved to `R 699/12167`, with first mismatch now at the next expected `lspo_map()` (`FR 417: rn2(70)=11 => rn2(100)=71`), indicating remaining themed-room selection/content coverage rather than pet placement.
+- Verification after `Circular, medium` themed-map slice: sentinel unchanged at `S 326/1063 R 34338/64569`; full suite unchanged on screens at `S 326/11406`, `1/44 passing`, with `seed4500` RNG prefix now `1797/108275` and `seed5002` `699/12167`.
+- 2026-05-14 follow-up: added the C `lspo_map()` themed-origin collision retry loop and the separate `themeroom_fill()` reservoir front door, including low-difficulty `Buried zombies` shuffle/corpse creation. This moved `seed5002` to `R 1765/12167` and `seed0013` sentinel to `R 573/4804`; sentinel screens remain unchanged and `seed0116` remains a full pass. A broad attempt to change all corpse timeout RNG to `start_corpse_timeout()` shape was reverted because it regressed seed8000/seed0116 startup; keep corpse timer work scoped until a safe shared mapping is ready.
+- Full-suite verification after themed retry/fill slice: `S 326/11406`, `1/44 passing`; notable RNG movements include `seed0013-friday13` `573/4804`, `seed0013-rogue` `571/4838`, `seed0200` `1477/3822`, `seed0360` `2838/120639`, `seed4500` `1774/108275`, and `seed5002` `1765/12167`.
+- 2026-05-14 trap-victim cleanup: replaced stale mktrap-victim ammo IDs (`349/353`) with generated `ARROW=18` and `DART=23`. Sentinel remains screen-stable with total `S 326/1063 R 35987/64569`; `seed0002` RNG prefix improved to `2877/27158`, `seed0116` remains a full pass, and `seed5002` now reaches the trap-victim random-possession/gem-selection boundary (`R 1738/12167`, first local mismatch `rn2(5)` vs `rn2(6)`). A narrower mkcorpstat corpse-timer override also improved seed5002 screen drift but regressed seed8000/seed0116 and was reverted.
+- 2026-05-14 gem-class init cleanup: ported C's luckstone/loadstone/rock exceptions inside the `GEM_CLASS` `mksobj_init()` branch. Sentinel remains screen-stable with total `S 326/1063 R 36049/64569`; `seed0002` moved to `R 2939/27158`, and `seed5002` moved to the shared `mkcorpstat()` corpse timeout boundary at `R 1745/12167`.
+- Full-suite verification after gem-class cleanup: `S 326/11406`, `1/44 passing`; notable RNG movements include `seed0002` `2939/27158`, `seed0030` `6361/105529`, `seed0398` `1570/3026`, `seed2200` `2702/3018`, and `seed5002` `1745/12167`. Screen totals remain stable; object-generation RNG prefixes are the main movement.
 - Evidence: target `seed0383` unchanged at `S 140/219 R 16915/16915`; sentinel unchanged at `S 301/1063 R 34338/64569`; full public suite unchanged at `S 303/11406` with 1/44 passing; `seed0116` remains `S 127/127 R 12562/12562`.
 - Classification: structural object identity debt reduction, not a screen-count optimization. The active `seed0383` first mismatch remains warning/spatial map drift at screen 139.
 - Blocker analysis note: direct boundary sampling shows the map mismatch exposes earlier hidden ordinary-monster spatial drift (expected/actual positions differ for warning-visible hostile markers and a centaur) rather than a simple message text or RNG ownership issue. Avoid coordinate patches; compare `monmove.c:m_move()` deterministic targeting/candidate phases before changing RNG-bearing movement.
@@ -178,17 +201,19 @@ Latest verified swallowed-combat/menu-triage/dehack slice:
 
 ## Current Queue
 
-1. Replace the `#wizintrinsic` one-line prompt fallback with a real menu:
-   - `node scripts/triage-session.mjs sessions/seed0383-wizard-hallucinate.session.json`
-   - inspect `wizcmds.c:wiz_intrinsic()` and tty `NHW_MENU` rendering/selection (`win/tty/wintty.c`)
-   - current screen 162 expects `Which intrinsics?`, a subtitle, property rows, and `(1 of 4)` footer; `h` should toggle the hallucination row, not immediately print the timeout message
-   - preserve exact `seed0383` flat RNG; menu selection is zero-time and should not disturb the already-complete core RNG.
-2. Broaden remaining `o_init`/`objnam` data paths after ring/potion/scroll support:
-   - add spellbook, venom, and armor-description descriptor groups when evidence reaches them
-   - replace limited discovery text tables with live discovery state
-   - preserve seed0116's passed inventory/menu evidence by using real object state rather than evidence strings.
-3. Broaden sleeping/hider front doors only from C evidence if a session reaches them.
-4. Keep save/restore and broader startup/display blockers secondary unless the active queue is blocked.
+1. Resolve `seed0383` display-RNG context ownership:
+   - Current triage: `S 165/219 R 16915/16915 FS 164:attr:Enter FR -`.
+   - Chars, cursor, status, and core RNG match on the hallucinatory commit screen; only swallowed map cell colors differ.
+   - Stay on `display.c:swallowed()`, `display.h:what_mon()`, `potion.c:make_hallucinated()`, and display RNG seed/ownership. Do not add seed-specific color sequences.
+   - Local recorder build is blocked by restricted network fetching Lua; use source-level reasoning or existing recorded display evidence until a recorder is available.
+2. Continue mklev/object generation from current evidence:
+   - `seed5002` now reaches `R 1745/12167`; first local mismatch is the shared `mkcorpstat()` corpse timer boundary after trap-victim/mineral object generation.
+   - `seed0002` now reaches `R 2939/27158`; C finishes `mineralize()` and enters starting pet creation while JS still sees an extra mineralize-eligible rock location, so the next safe step is coordinate-level topology/mineralize tracing before editing.
+   - Prior corpse timer attempts, both global and scoped to `mkcorpstat()`, regressed seed8000/seed0116 and were reverted. Revisit only with a complete caller-aware timer mapping.
+3. Broaden remaining `o_init`/`objnam` data paths after live descriptors:
+   - Replace limited discovery text tables with live discovery state.
+   - Preserve seed0116's passed inventory/menu evidence by using real object state rather than evidence strings.
+4. Broaden sleeping/hider front doors only from C evidence if a session reaches them.
 
 ## Regression Notes
 
