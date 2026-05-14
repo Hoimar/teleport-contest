@@ -662,7 +662,11 @@ function pet_goal(mtmp, after, udist, whappr) {
         }
     }
 
-    if (goalType !== UNDEF) {
+    // C ref: dogmove.c:dog_goal(). Non-apport/non-dogfood goals are ignored
+    // while the pet is not hungry enough, so the pet falls through to the
+    // ordinary follow-the-hero logic.
+    if (goalType !== UNDEF && (goalType === DOGFOOD || goalType === APPORT
+        || (game.moves || 0) >= (edog.hungrytime || 0))) {
         return { abort: false, gx: goalX, gy: goalY, appr: 1 };
     }
 

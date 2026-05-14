@@ -17,9 +17,9 @@ This file is the live handoff checkpoint, not a full history. It was compacted o
 
 - Branch: `main`.
 - Baseline for this loop turn: branch `main` at commit `65867f6`; `git status --short --branch` reported no local changes at startup.
-- Latest loop work: seed0002 now creates the starting pet through `makedog()` before the post-pet startup replay, removes the stale hardcoded seed0002 dog record, replaces the replayed startup turn-tail RNG with live movement/sound/hunger/wipe calls, applies C's `NODIAG(PM_GRID_BUG)` candidate filter, and removes seed-specific display-only floor-object injections.
+- Latest loop work: seed0002 now creates the starting pet through `makedog()` before the post-pet startup replay, removes the stale hardcoded seed0002 dog record, replaces the replayed startup turn-tail RNG with live movement/sound/hunger/wipe calls, applies C's `NODIAG(PM_GRID_BUG)` candidate filter, removes seed-specific display-only floor-object injections, and aligns `dog_goal()`'s non-hungry fallback so only `DOGFOOD`/`APPORT` goals lock the pet out of following the hero.
 - Current target: `seed0002-healer-reflection-drummer` later movement/pet-goal ordering boundary.
-- Active subsystem hypothesis: `mklev.c:mineralize()`, starting pet creation, live startup turn-tail, and the first grid-bug mtrack denominator are no longer the active seed0002 blockers. The next first RNG mismatch is `FR 2375`, expected `rn2(5)` while JS emits `rn2(100)`, indicating a later `distfleeck()`/`obj_resists()` ordering difference in movement or pet-goal scanning.
+- Active subsystem hypothesis: `mklev.c:mineralize()`, starting pet creation, live startup turn-tail, the first grid-bug mtrack denominator, and the `dog_goal()` lesser-food fallback are no longer the active seed0002 blockers. The next first RNG mismatch is still `FR 2375`, expected `rn2(5)` while JS emits `rn2(100)`, indicating a later candidate-square `dogfood()`/`obj_resists()` ordering difference in `dog_move()` after an apport goal is selected.
 
 ## Latest Verified Scores
 
