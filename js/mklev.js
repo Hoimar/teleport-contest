@@ -3640,7 +3640,7 @@ function apply_themeroom_fill(croom) {
             } else {
                 rn2(3); // C ref: dungeon.c:induced_align() before mkclass().
                 const ptr = mkclass_aligned('S_MIMIC', 0);
-                if (ptr) makemon(ptr, somex(croom), somey(croom), 0);
+                if (ptr) makemon(ptr, somex(croom), somey(croom), NO_MINVENT);
             }
         }
         return;
