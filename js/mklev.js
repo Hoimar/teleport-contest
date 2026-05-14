@@ -28,7 +28,7 @@ import {
     SDOOR, SCORR, IRONBARS, FOUNTAIN, SINK, ALTAR, GRAVE,
     DIR_N, DIR_S, DIR_E, DIR_W, DIR_180,
     IS_WALL, IS_STWALL, IS_DOOR, IS_OBSTRUCTED, IS_FURNITURE, IS_POOL, IS_LAVA, IS_ROOM,
-    SPACE_POS, isok, W_NONDIGGABLE, FILL_NORMAL,
+    SPACE_POS, isok, W_NONDIGGABLE, FILL_NORMAL, FILL_NONE,
     ICE, MOAT, POOL, WATER, LAVAPOOL, LAVAWALL, DBWALL,
     A_LAWFUL, A_NONE, Align2amask,
     LR_TELE, LR_UPTELE, LR_DOWNTELE, NO_MINVENT, MM_IGNOREWATER, MM_IGNORELAVA, MM_ANGRY, MM_ASLEEP, MM_NOGRP, GP_CHECKSCARY, GP_AVOID_MONPOS,
@@ -3535,6 +3535,10 @@ async function themerooms_generate(difficulty) {
     if (!pick) return false;
     const themedMap = THEMED_MAPS.get(pick.name);
     if (themedMap) return create_themed_map_room(themedMap);
+    const wantsThemedFill = pick.name === 'Default room with themed fill'
+        || pick.name === 'Unlit room with themed fill'
+        || pick.name === 'Room with both normal contents and themed fill';
+    const normalAndThemedFill = pick.name === 'Room with both normal contents and themed fill';
     // For 'ordinary' rooms, create a standard room
     // For themed rooms with dynamic dimensions, consume those rn2 calls first
     const chance = 100;
@@ -3543,13 +3547,16 @@ async function themerooms_generate(difficulty) {
         rn2(100); // chance check (build_room)
     }
     // All themed rooms go through create_room for placement
-    const ok = create_room(-1, -1, -1, -1, -1, -1, OROOM, -1);
+    const ok = create_room(-1, -1, -1, -1, -1, -1,
+        wantsThemedFill ? THEMEROOM : OROOM,
+        pick.name === 'Unlit room with themed fill' ? 0 : -1);
     if (ok) {
         // C ref: sp_lev.c:2824 — build_room calls topologize after create_room
         const aroom = game.level.rooms[game.level.nroom - 1];
         if (aroom) {
             topologize(aroom);
-            aroom.needfill = FILL_NORMAL;
+            aroom.needfill = (!wantsThemedFill || normalAndThemedFill) ? FILL_NORMAL : FILL_NONE;
+            if (wantsThemedFill) apply_themeroom_fill(aroom);
         }
     }
     return ok;
@@ -3622,6 +3629,22 @@ function choose_themeroom_fill(croom) {
 
 function apply_themeroom_fill(croom) {
     const fill = choose_themeroom_fill(croom);
+    if (fill === 'Storeroom') {
+        const locs = [];
+        for (let y = croom.ly; y <= croom.hy; y++)
+            for (let x = croom.lx; x <= croom.hx; x++)
+                if (rn2(100) < 30) locs.push([x, y]);
+        for (const _loc of locs) {
+            if (rn2(100) < 25) {
+                mksobj_at(CHEST, somex(croom), somey(croom), true, false);
+            } else {
+                rn2(3); // C ref: dungeon.c:induced_align() before mkclass().
+                const ptr = mkclass_aligned('S_MIMIC', 0);
+                if (ptr) makemon(ptr, somex(croom), somey(croom), 0);
+            }
+        }
+        return;
+    }
     if (fill !== 'Buried zombies') return;
 
     const diff = level_difficulty();

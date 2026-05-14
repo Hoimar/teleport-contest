@@ -2,9 +2,10 @@
 // C ref: u_init.c:u_init_misc(), exper.c:newpw().
 
 import { game } from './gstate.js';
-import { rnd, rn2, rn1 } from './rng.js';
+import { rnd, rn2, rn1, rne } from './rng.js';
 import { findRole } from './roles.js';
 import { mkobj, mksobj } from './mklev.js';
+import { OBJECT_CHARGED } from './object_data.js';
 
 const ROLE_INIT = new Map([
     ['Healer', {
@@ -215,6 +216,8 @@ function ini_inv_adjust_obj(trop, obj) {
     if (trop.spe !== UNDEF_SPE) {
         obj.spe = trop.spe;
         if (trop.typ === MAGIC_MARKER && obj.spe < 96) obj.spe += rn2(4);
+    } else if (obj.oclass === RING_CLASS && OBJECT_CHARGED[obj.otyp] && (obj.spe || 0) <= 0) {
+        obj.spe = rne(3);
     }
     if (trop.bless !== UNDEF_BLESS) obj.blessed = !!trop.bless;
     return stop;
