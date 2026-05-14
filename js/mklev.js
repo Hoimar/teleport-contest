@@ -761,19 +761,18 @@ function mkobj_erosions(otmp) {
 
     if (!rn2(100)) {
         otmp.oerodeproof = true;
-        return;
-    }
+    } else {
+        if (!rn2(80) && (is_flammable(otmp) || is_rustprone(otmp) || is_crackable(otmp))) {
+            do {
+                otmp.oeroded = (otmp.oeroded ?? 0) + 1;
+            } while (otmp.oeroded < 3 && !rn2(9));
+        }
 
-    if (!rn2(80) && (is_flammable(otmp) || is_rustprone(otmp) || is_crackable(otmp))) {
-        do {
-            otmp.oeroded = (otmp.oeroded ?? 0) + 1;
-        } while (otmp.oeroded < 3 && !rn2(9));
-    }
-
-    if (!rn2(80) && (is_rottable(otmp) || is_corrodeable(otmp))) {
-        do {
-            otmp.oeroded2 = (otmp.oeroded2 ?? 0) + 1;
-        } while (otmp.oeroded2 < 3 && !rn2(9));
+        if (!rn2(80) && (is_rottable(otmp) || is_corrodeable(otmp))) {
+            do {
+                otmp.oeroded2 = (otmp.oeroded2 ?? 0) + 1;
+            } while (otmp.oeroded2 < 3 && !rn2(9));
+        }
     }
 
     if (!rn2(1000)) otmp.greased = true;
