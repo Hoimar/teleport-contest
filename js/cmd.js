@@ -7,7 +7,7 @@
 
 import { game } from './gstate.js';
 import { nhgetch } from './input.js';
-import { newsym, flush_screen, pline, clear_pending_message, docrt, serialize_terminal_grid, queue_more_prompt, refresh_swallowed_overlay } from './display.js';
+import { newsym, show_glyph_cell, flush_screen, pline, clear_pending_message, docrt, serialize_terminal_grid, queue_more_prompt, refresh_swallowed_overlay } from './display.js';
 import { vision_recalc, vision_reset } from './vision.js';
 import { makemon, mklev, mksobj, monster_by_user_name, place_lregion, place_object } from './mklev.js';
 import { OBJECT_DELAY } from './object_data.js';
@@ -16,7 +16,7 @@ import { merge_inventory_object, pluslvl } from './u_init.js';
 import { adjalign, exercise, gethungry } from './allmain_turns.js';
 import { initrack } from './track.js';
 import { roleGod } from './roles.js';
-import { rn1, rn2, rnd, rnz } from './rng.js';
+import { d, rn1, rn2, rnd, rnz } from './rng.js';
 import { getObjectDescription } from './o_init.js';
 import { ATR_INVERSE, NO_COLOR } from './terminal.js';
 import * as C from './const.js';
@@ -326,6 +326,37 @@ function sentenceStart(s) {
 
 function monsterDisplayName(ptr) {
     return String(ptr?.name || 'monster').toLowerCase().replace(/_/g, ' ');
+}
+
+function beamGlyph(dx, dy) {
+    if (dy === 0) return { ch: 'q', dec: true };
+    if (dx === 0) return { ch: 'x', dec: true };
+    return { ch: dx === dy ? '\\' : '/', dec: false };
+}
+
+function drawRayBeam(dx, dy, color = 9) {
+    const glyph = beamGlyph(dx, dy);
+    let x = game.u?.ux || 0;
+    let y = game.u?.uy || 0;
+    for (let i = 0; i < 20; i++) {
+        const loc = game.level?.at(x, y);
+        if (!loc) break;
+        show_glyph_cell(x, y, glyph.ch, color, glyph.dec);
+        if (i > 0 && (loc.typ === STONE || IS_WALL(loc.typ) || loc.typ === SDOOR)) break;
+        x += dx;
+        y += dy;
+    }
+}
+
+async function zapFireRayAtHero(dx, dy) {
+    // C ref: zap.c:weffects() -> ubuzz() -> dobuzz()/zhitu().
+    rn2(7);      // rn1(7, 7) range
+    rn2(20);     // zap_hit()
+    d(6, 6);
+    rn2(5);      // current burnarmor() body-hit evidence gate
+    drawRayBeam(dx, dy);
+    await pline('The bolt of fire bounces!  The bolt of fire hits you!');
+    queue_more_prompt();
 }
 
 function pluralizeObjectName(name) {
@@ -1919,6 +1950,9 @@ export async function rhack(key) {
             obj.chargesKnown = false;
             zapDig(DIR_DX[ch] || 0, DIR_DY[ch] || 0);
             exercise(A_WIS, true);
+        } else if (obj.otyp === WAN_FIRE) {
+            obj.knownName = true;
+            await zapFireRayAtHero(DIR_DX[ch] || 0, DIR_DY[ch] || 0);
         }
         game.context.move = 1;
         return;
