@@ -35,9 +35,12 @@ const RUN_KEY = { H: 'h', L: 'l', J: 'j', K: 'k', Y: 'y', U: 'u', B: 'b', N: 'n'
 const AMULET_OF_LIFE_SAVING = 202;
 const GRAY_DRAGON_SCALE_MAIL = 101;
 const WAN_FIRE = 430;
+const WAN_COLD = 431;
 const WAN_DEATH = 433;
+const WAN_LIGHTNING = 434;
 const WAN_MAKE_INVISIBLE = 418;
 const WAN_DIGGING = 428;
+const WAN_MAGIC_MISSILE = 429;
 const QUARTERSTAFF = 79;
 const CLOAK_OF_MAGIC_RESISTANCE = 139;
 const RIN_TELEPORT_CONTROL = 195;
@@ -87,8 +90,11 @@ const OBJECT_BASE_NAMES = new Map([
     [SPE_BOOK_OF_THE_DEAD, 'Book of the Dead'],
     [WAN_MAKE_INVISIBLE, 'wand of make invisible'],
     [WAN_DIGGING, 'wand of digging'],
+    [WAN_MAGIC_MISSILE, 'wand of magic missile'],
     [WAN_FIRE, 'wand of fire'],
+    [WAN_COLD, 'wand of cold'],
     [WAN_DEATH, 'wand of death'],
+    [WAN_LIGHTNING, 'wand of lightning'],
     [421, 'wand of undead turning'],
 ]);
 
@@ -211,6 +217,18 @@ function wishedObjectSpec(name) {
     if (wish.includes('wand of fire')) {
         rn2(41);
         return { ...spec, otyp: WAN_FIRE };
+    }
+    if (wish.includes('wand of cold')) {
+        rn2(41);
+        return { ...spec, otyp: WAN_COLD };
+    }
+    if (wish.includes('wand of lightning')) {
+        rn2(41);
+        return { ...spec, otyp: WAN_LIGHTNING };
+    }
+    if (wish.includes('wand of magic missile')) {
+        rn2(41);
+        return { ...spec, otyp: WAN_MAGIC_MISSILE };
     }
     if (wish.includes('wand of death')) {
         rn2(41);
