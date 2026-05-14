@@ -1135,6 +1135,32 @@ function set_corpsenm(otmp, pm) {
     if (otmp) otmp.corpsenm = pm;
 }
 
+function monster_ptr(ref) {
+    if (typeof ref === 'number') return MONSTERS[ref] || null;
+    if (typeof ref === 'string') return MONSTERS.find((mon) => mon.name === ref) || null;
+    return ref?.name ? ref : null;
+}
+
+function is_rider_ref(ref) {
+    const name = monster_ptr(ref)?.name;
+    return name === 'DEATH' || name === 'FAMINE' || name === 'PESTILENCE';
+}
+
+function special_corpse(ref) {
+    const ptr = monster_ptr(ref);
+    if (!ptr) return false;
+    return ptr.name === 'LIZARD' || ptr.name === 'LICHEN'
+        || ptr.mlet === 'S_TROLL' || is_rider_ref(ptr);
+}
+
+function start_corpse_timeout(body) {
+    // C ref: mkobj.c:start_corpse_timeout(). Timer storage is still future
+    // work; this preserves the RNG shape for ordinary rotting corpses.
+    const ptr = monster_ptr(body?.corpsenm);
+    if (!ptr || ptr.name === 'LIZARD' || ptr.name === 'LICHEN') return;
+    rnz(game.in_mklev ? 25 : 10);
+}
+
 // mkcorpstat stub
 function mkcorpstat(objtyp, mtmp, pm, x, y, flags) {
     // C ref: mkcorpstat calls mksobj(objtyp) then set_corpsenm.
@@ -1142,8 +1168,12 @@ function mkcorpstat(objtyp, mtmp, pm, x, y, flags) {
     // corpsenm before mkcorpstat's caller-supplied type overrides it.
     // RNG: next_ident from mksobj
     const otmp = mksobj(objtyp, !!(flags & 8), false);
+    const oldCorpsenm = otmp.corpsenm;
     if (pm !== null && pm !== undefined) {
         otmp.corpsenm = pm;
+        if (otmp.otyp === CORPSE && (special_corpse(oldCorpsenm) || special_corpse(otmp.corpsenm))) {
+            start_corpse_timeout(otmp);
+        }
     } else if (!otmp.corpsenm) {
         // rndmonnum — pick random monster
         otmp.corpsenm = rndmonnum();
