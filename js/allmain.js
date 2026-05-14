@@ -23,6 +23,7 @@ import { docrt, cls, bot, flush_screen, pline, newsym, serialize_terminal_grid, 
 import { vision_recalc, vision_reset, init_vision_globals } from './vision.js';
 import { findAlign, findRace, findRole, roleGod, roleGreeting, roleWithStartingRank } from './roles.js';
 import { NO_COLOR } from './terminal.js';
+import { COLNO } from './const.js';
 import * as ff8000 from './fastforward.js';
 import * as ff0002 from './fastforward0002.js';
 
@@ -314,8 +315,9 @@ export async function newgame() {
     const genderAdj = g.flags?.female ? 'female' : 'male';
     const roleName = g.flags?.female ? (g.urole.name.f || g.urole.name.m) : g.urole.name.m;
     const greetingName = g.flags?.debug ? String(g.plname).toLowerCase() : g.plname;
-    await pline(`${roleGreeting(g.urole)} ${greetingName}, welcome to NetHack!  You are a ${alignName} ${genderAdj} ${g.urace.adj} ${roleName}.`);
-    if (!ff) {
+    const welcome = `${roleGreeting(g.urole)} ${greetingName}, welcome to NetHack!  You are a ${alignName} ${genderAdj} ${g.urace.adj} ${roleName}.`;
+    await pline(welcome);
+    if (!ff && (showedQuestIntro || welcome.length + '--More--'.length > COLNO)) {
         g._more = true;
         g._more_next_message_row = !showedQuestIntro;
     }
