@@ -1928,6 +1928,20 @@ export async function rhack(key) {
         && game._pending_message.includes('welcome to NetHack')
         && (ch === ' ' || ch === '\r' || ch === '\n');
 
+    if (!showStartupTutorial
+        && game._more
+        && typeof game._pending_message === 'string'
+        && game._pending_message.includes('welcome to NetHack')
+        && Array.isArray(game._startup_preamble_messages)
+        && game._startup_preamble_messages.length
+        && (ch === ' ' || ch === '\r' || ch === '\n')) {
+        const msg = game._startup_preamble_messages.shift();
+        await pline(msg);
+        game._more = game._startup_preamble_messages.length > 0;
+        game.context.move = 0;
+        return;
+    }
+
     const occupationMore = ch === ' '
         && game._occupation_paused_for_more
         && game._more;
