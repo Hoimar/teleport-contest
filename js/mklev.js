@@ -1151,13 +1151,15 @@ function mkgold(amount, x, y) {
     // mksobj_at(GOLD_PIECE) calls next_ident
     next_ident();
     if (game.level?.objects) {
-        game.level.objects.unshift({
+        const gold = {
             otyp: GOLD_PIECE,
+            oclass: COIN_CLASS,
             ox: x, oy: y,
             quan: amount,
             ch: '$',
-            color: 14,
-        });
+        };
+        gold.color = object_display_color(gold);
+        game.level.objects.unshift(gold);
     }
 }
 
