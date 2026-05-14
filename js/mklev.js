@@ -341,7 +341,9 @@ function monsterPtr(mon) {
 }
 
 function verysmall_monster(mon) {
-    return VERY_SMALL_MONSTERS.has(monsterName(mon));
+    const ptr = monsterPtr(mon);
+    if (ptr && ptr.mlet === 'S_HUMAN') return false;
+    return VERY_SMALL_MONSTERS.has(monsterName(ptr || mon));
 }
 
 // Stairway list management
