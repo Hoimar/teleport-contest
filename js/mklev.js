@@ -129,6 +129,7 @@ const LEATHER_CLOAK = 144;
 const ELVEN_SHIELD = 153;
 const ELVEN_BOOTS = 169;
 const TIN_WHISTLE = 215;
+const SKELETON_KEY = 221;
 const MIRROR = 230;
 const CRYSTAL_BALL = 231;
 const PICK_AXE = 259;
@@ -137,9 +138,11 @@ const UNICORN_HORN = 261;
 const GOLD_PIECE = 438;
 const LUCKSTONE = 470;
 const LOADSTONE = 471;
+const TOUCHSTONE = 472;
 const ROCK = 474;
 const KELP_FROND = 275;
 const SCR_TELEPORTATION = 333;
+const SCR_CHARGING = 342;
 const BELL = 263;
 const CORPSE = 265;
 const EGG = 266;
@@ -168,11 +171,13 @@ const SCR_CONFUSE_MONSTER = 325;
 const SCR_SCARE_MONSTER = 326;
 const SCR_CREATE_MONSTER = 329;
 const WAN_CREATE_MONSTER = 413;
+const WAN_STRIKING = 417;
 const WAN_MAKE_INVISIBLE = 418;
 const WAN_SPEED_MONSTER = 420;
 const WAN_POLYMORPH = 422;
 const WAN_TELEPORTATION = 424;
 const WAN_DIGGING = 428;
+const WAN_MAGIC_MISSILE = 429;
 const SPE_HEALING = 374;
 const LARGE_BOX = 214;
 const CHEST = 215;
@@ -1419,6 +1424,19 @@ function m_initinv_for(ptr, mon = null) {
             if (!rn2(2)) mksobj(C_RATION, true, false);
         }
     }
+    if (ptr.name === 'SHOPKEEPER') {
+        mksobj(SKELETON_KEY, true, false);
+        switch (rn2(4)) {
+        case 0:
+            mksobj(WAN_MAGIC_MISSILE, true, false);
+        case 1:
+            mksobj(POT_EXTRA_HEALING, true, false);
+        case 2:
+            mksobj(POT_HEALING, true, false);
+        case 3:
+            mksobj(WAN_STRIKING, true, false);
+        }
+    }
     if (ptr.name === 'SOLDIER' && rn2(13)) return;
     if (monLevel > rn2(50)) {
         const defensive = rnd_defensive_item_for(ptr);
@@ -1557,6 +1575,10 @@ function m_initweap_general_for(ptr) {
 
 function m_initweap_for(ptr) {
     if (!ptr) return;
+    if (ptr.name === 'SHOPKEEPER') {
+        maybe_init_offensive_item_for(ptr);
+        return;
+    }
     if (ptr.mlet === 'S_GIANT') {
         if (rn2(2)) mksobj(ptr.name !== 'ETTIN' ? BOULDER : CLUB, true, false);
         if (ptr.name !== 'ETTIN' && !rn2(5)) {
@@ -4567,6 +4589,18 @@ async function make_niches() {
 }
 
 const SHOP_TYPE_PROBS = [42, 14, 10, 10, 5, 5, 3, 3, 3, 2];
+const SHOP_ITEM_PROBS = [
+    [{ iprob: 100, itype: RANDOM_CLASS }],
+    [{ iprob: 90, itype: ARMOR_CLASS }, { iprob: 10, itype: WEAPON_CLASS }],
+    [{ iprob: 90, itype: SCROLL_CLASS }, { iprob: 10, itype: SPBOOK_CLASS }],
+    [{ iprob: 100, itype: POTION_CLASS }],
+    [{ iprob: 90, itype: WEAPON_CLASS }, { iprob: 10, itype: ARMOR_CLASS }],
+    [{ iprob: 83, itype: FOOD_CLASS }],
+    [{ iprob: 85, itype: RING_CLASS }, { iprob: 10, itype: GEM_CLASS }, { iprob: 5, itype: AMULET_CLASS }],
+    [{ iprob: 90, itype: WAND_CLASS }, { iprob: 5, itype: -LEATHER_GLOVES }, { iprob: 5, itype: -ELVEN_CLOAK }],
+    [{ iprob: 100, itype: TOOL_CLASS }],
+    [{ iprob: 90, itype: SPBOOK_CLASS }, { iprob: 10, itype: SCROLL_CLASS }],
+];
 
 function inside_room(croom, x, y) {
     if (croom.irregular) {
@@ -4634,7 +4668,7 @@ function mkshop() {
     let i = 0;
     while (i < SHOP_TYPE_PROBS.length && (j -= SHOP_TYPE_PROBS[i]) > 0) i++;
     if ((sroom.hx - sroom.lx + 1) * (sroom.hy - sroom.ly + 1) > 20
-        && (i === 6 || i === 8)) {
+        && (i === 7 || i === 9)) {
         i = 0;
     }
     sroom.rtype = SHOPBASE + i;
@@ -4646,6 +4680,88 @@ function do_mkroom(roomtype) {
     if (roomtype >= SHOPBASE) {
         mkshop();
     }
+}
+
+function shopkeeper_pos(sroom) {
+    const door = sroom?.doorct ? game.level?.doors?.[sroom.fdoor] : null;
+    if (!door) return null;
+    if (door.x < sroom.lx) return { x: sroom.lx, y: door.y };
+    if (door.x > sroom.hx) return { x: sroom.hx, y: door.y };
+    if (door.y < sroom.ly) return { x: door.x, y: sroom.ly };
+    if (door.y > sroom.hy) return { x: door.x, y: sroom.hy };
+    return { x: door.x, y: door.y };
+}
+
+function shkinit(shopIndex, sroom) {
+    const pos = shopkeeper_pos(sroom);
+    const shopkeeper = MONSTERS.find(m => m.name === 'SHOPKEEPER');
+    if (!pos || !shopkeeper) return -1;
+    makemon(shopkeeper, pos.x, pos.y, 0);
+    const shk = game.level?.monsters?.[0];
+    if (shk) {
+        shk.isshk = 1;
+        shk.mpeaceful = 1;
+        shk.msleeping = 0;
+    }
+    rnd(100); // C ref: shknam.c:mkmonmoney() initial capital amount.
+    next_ident();
+    if (shopIndex === 6) mksobj(TOUCHSTONE, true, false);
+    if (shopIndex === 7 || shopIndex === 8 || (shopIndex === 6 && rn2(2))
+        || (shopIndex === 0 && rn2(5))) {
+        mksobj(SCR_CHARGING, true, false);
+    }
+    return sroom.fdoor ?? 0;
+}
+
+function stock_room_goodpos(sroom, sh, sx, sy) {
+    const door = sroom?.doorct ? game.level?.doors?.[sh] : null;
+    const loc = game.level?.at(sx, sy);
+    if (!loc || !IS_ROOM(loc.typ)) return false;
+    if (sroom.irregular) {
+        const rmno = game.level.rooms.indexOf(sroom) + ROOMOFFSET;
+        return !loc.edge && loc.roomno === rmno
+            && (!door || distmin(sx, sy, door.x, door.y) > 1);
+    }
+    return !(door && ((sx === sroom.lx && door.x === sx - 1)
+        || (sx === sroom.hx && door.x === sx + 1)
+        || (sy === sroom.ly && door.y === sy - 1)
+        || (sy === sroom.hy && door.y === sy + 1)));
+}
+
+function get_shop_item(shopIndex) {
+    const probs = SHOP_ITEM_PROBS[shopIndex] || SHOP_ITEM_PROBS[0];
+    let j = rnd(100);
+    for (const entry of probs) {
+        j -= entry.iprob;
+        if (j <= 0) return entry.itype;
+    }
+    return probs[probs.length - 1].itype;
+}
+
+function mkshobj_at(shopIndex, sx, sy) {
+    if (rn2(100) < depth_of_level(game.u?.uz) && !m_at(sx, sy)) {
+        const ptr = mkclass_aligned('S_MIMIC', 0);
+        if (ptr && makemon(ptr, sx, sy, 0)) return;
+    }
+    const atype = get_shop_item(shopIndex);
+    if (atype < 0) mksobj_at(-atype, sx, sy, true, true);
+    else mkobj_at(atype, sx, sy, true);
+}
+
+function stock_room(croom) {
+    const shopIndex = croom.rtype - SHOPBASE;
+    const sh = shkinit(shopIndex, croom);
+    if (sh < 0) return;
+    let stockcount = 0;
+    for (let sx = croom.lx; sx <= croom.hx; sx++)
+        for (let sy = croom.ly; sy <= croom.hy; sy++)
+            if (stock_room_goodpos(croom, sh, sx, sy)) stockcount++;
+    if (stockcount) rnd(stockcount);
+    for (let sx = croom.lx; sx <= croom.hx; sx++)
+        for (let sy = croom.ly; sy <= croom.hy; sy++)
+            if (stock_room_goodpos(croom, sh, sx, sy))
+                mkshobj_at(shopIndex, sx, sy);
+    game.level.flags.has_shop = true;
 }
 
 function fill_zoo(croom) {
@@ -4698,6 +4814,8 @@ function fill_special_room(croom) {
     } else if (croom.rtype === ZOO || croom.rtype === LEPREHALL) {
         fill_zoo(croom);
         if (croom.rtype === ZOO) game.level.flags.has_zoo = true;
+    } else if (croom.rtype >= SHOPBASE) {
+        stock_room(croom);
     }
 }
 
