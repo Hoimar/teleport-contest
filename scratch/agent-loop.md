@@ -18,10 +18,12 @@ and `feature_map.md`.
   `feature_map.md`, `js/cmd.js`, `js/display.js`, this checkpoint.
 - Active target: `seed5002-wizard-coverage-pair`.
 - Active hypothesis: the first segment is now past the wizard wish namedesc
-  denominator and the fire-wand destruction/death RNG chain. The remaining
-  visible blocker is still the segment-two level-teleport map/cursor at screen
-  128, while the new first RNG boundary is later post-restart/object-state
-  evidence at `FR 8812` (`rn2(2)` expected vs `rn2(100)` actual).
+  denominator, the fire-wand destruction/death RNG chain, and the first
+  Storeroom/mimic/niche generation debts on the level-teleport destination.
+  The remaining visible blocker is still the segment-two level-teleport
+  map/cursor at screen 128, while the new first RNG boundary is the level-5
+  human-class selection edge at `FR 10382` (`rn2(9)` expected vs `rn2(2)`
+  actual).
 
 ## Latest Verification
 
@@ -33,8 +35,8 @@ npm run verify -- --target seed5002-wizard-coverage-pair
 
 Result:
 
-- Target: `seed5002-wizard-coverage-pair` `S 128/410 R 8932/12167`,
-  first screen `128:char:map:Enter`, first RNG `8812:rn2(2)=1=>rn2(100)=55`,
+- Target: `seed5002-wizard-coverage-pair` `S 128/410 R 11530/12167`,
+  first screen `128:char:map:Enter`, first RNG `10382:rn2(9)=4=>rn2(2)=0`,
   cursor-only `2`.
 - Sentinel total: `S 336/1063 R 35782/64569`.
 - Sentinel details:
@@ -52,12 +54,16 @@ Result:
    - Use `npm run triage -- seed5002-wizard-coverage-pair` and
      `node scratch/trace-rng-window.mjs seed5002-wizard-coverage-pair --moves 123 --rng 8796:8830`
      or the second segment equivalent after checking the flattened index.
-   - Current state: `S 128/410 R 8932/12167`.
+   - Current state: `S 128/410 R 11530/12167`.
    - First visible mismatch is still screen 128 after `#levelteleport`, with
      the expected map/cursor lower-left and actual map/cursor right-side.
-   - First RNG mismatch moved from the wish/fire region to `FR 8812`
-     (`rn2(2)` expected vs `rn2(100)` actual), after fire-wand destruction,
-     nested `--More--` messages, and wizard-mode death prompt handling match.
+   - First RNG mismatch moved from the wish/fire region to `FR 10382`
+     (`rn2(9)` expected vs `rn2(2)` actual), after fire-wand destruction,
+     nested `--More--` messages, wizard-mode death prompt handling, Storeroom
+     mimic shape/default inventory, and niche `mkclass(S_HUMAN)` match.
+   - The immediate hypothesis is a remaining level-state or monster eligibility
+     difference inside the human-class `mkclass()` walk; do not hardcode the
+     level-teleport room, map, or mimic coordinates.
    - Implement general restart/object/level-generation truth; do not pin the
      level-teleport room or cursor.
 2. Continue `seed0383` post-expulsion visible-map hallucination redraw ownership.

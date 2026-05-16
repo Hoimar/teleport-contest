@@ -130,6 +130,7 @@ const ELVEN_SHIELD = 153;
 const ELVEN_BOOTS = 169;
 const TIN_WHISTLE = 215;
 const SKELETON_KEY = 221;
+const FIGURINE = 241;
 const MIRROR = 230;
 const CRYSTAL_BALL = 231;
 const PICK_AXE = 259;
@@ -1308,15 +1309,15 @@ function mkclass_aligned(mlet, spc = 0, atyp = A_NONE) {
 
     let num = 0;
     const weights = new Map();
-    let lastConsidered = null;
-    for (const ptr of classMons) {
+    for (let i = 0; i < classMons.length; i++) {
+        const ptr = classMons[i];
         if (atyp !== A_NONE && Math.sign(ptr.maligntyp || 0) !== Math.sign(atyp)) continue;
         let gnMask = G_NOGEN | G_UNIQ;
         if (rn2(9) || mlet === 'S_LICH') gnMask |= G_HELL;
         gnMask &= ~spc;
         if (!mk_gen_ok(ptr, mvMask, gnMask)) continue;
         if (num && montoostrong(ptr, maxmlev)
-            && lastConsidered && ptr.difficulty > lastConsidered.difficulty
+            && i > 0 && ptr.difficulty > classMons[i - 1].difficulty
             && rn2(2)) {
             break;
         }
@@ -1327,7 +1328,6 @@ function mkclass_aligned(mlet, spc = 0, atyp = A_NONE) {
             weights.set(ptr, weight);
             num += weight;
         }
-        lastConsidered = ptr;
     }
     if (!num) return null;
 
@@ -1810,12 +1810,35 @@ function room_type_at(x, y) {
 
 function set_mimic_sym(mon) {
     if (!mon) return;
+
+    function can_be_hatched(ptr) {
+        return !!ptr && !(ptr.geno & G_NOCORPSE);
+    }
+
+    function assignMonsterBasedObjectShape() {
+        if (mon.m_ap_type !== M_AP_OBJECT
+            || ![STATUE, FIGURINE, CORPSE, EGG, TIN].includes(mon.mappearance)) return;
+        let mndx = rndmonnum();
+        const ptr = monsterPtr(mndx);
+        const nocorpse = !!(ptr?.geno & G_NOCORPSE);
+        if (mon.mappearance === CORPSE && nocorpse) {
+            // C ref: makemon.c:set_mimic_sym() falls back to a role monster
+            // shape when a corpse appearance selected a no-corpse monster.
+            mndx = rn1(13, 0);
+        } else if ((mon.mappearance === EGG && !can_be_hatched(ptr))
+            || (mon.mappearance === TIN && nocorpse)) {
+            mndx = null;
+        }
+        mon.mcorpsenm = mndx;
+    }
+
     const x = mon.mx, y = mon.my;
     const loc = game.level?.at(x, y);
     const obj = (game.level?.objects || []).find(o => o.ox === x && o.oy === y);
     if (obj) {
         mon.m_ap_type = M_AP_OBJECT;
         mon.mappearance = obj.otyp;
+        assignMonsterBasedObjectShape();
         return;
     }
     if (loc && (IS_DOOR(loc.typ) || IS_WALL(loc.typ) || loc.typ === SDOOR || loc.typ === SCORR)) {
@@ -1826,6 +1849,7 @@ function set_mimic_sym(mon) {
     if (game.level?.flags?.is_maze_lev && !isSokobanLevel() && rn2(2)) {
         mon.m_ap_type = M_AP_OBJECT;
         mon.mappearance = STATUE;
+        assignMonsterBasedObjectShape();
         return;
     }
     if (((loc?.roomno ?? 0) - ROOMOFFSET) < 0 && !(game.level?.traps || []).some(t => t.tx === x && t.ty === y)) {
@@ -1859,6 +1883,7 @@ function set_mimic_sym(mon) {
         if (s_sym < 0) {
             mon.m_ap_type = M_AP_OBJECT;
             mon.mappearance = -s_sym;
+            assignMonsterBasedObjectShape();
             return;
         }
         if (s_sym === RANDOM_CLASS) {
@@ -1872,6 +1897,7 @@ function set_mimic_sym(mon) {
         mon.m_ap_type = M_AP_OBJECT;
         if (s_sym === COIN_CLASS) mon.mappearance = GOLD_PIECE;
         else mon.mappearance = mkobj(s_sym, false)?.otyp ?? STRANGE_OBJECT;
+        assignMonsterBasedObjectShape();
         return;
     }
 
@@ -1898,6 +1924,7 @@ function set_mimic_sym(mon) {
             mon.mappearance = otmp?.otyp ?? STRANGE_OBJECT;
         }
     }
+    assignMonsterBasedObjectShape();
 }
 
 function m_initgrp(mon, x, y, n, mmflags) {
@@ -3640,7 +3667,7 @@ function apply_themeroom_fill(croom) {
             } else {
                 rn2(3); // C ref: dungeon.c:induced_align() before mkclass().
                 const ptr = mkclass_aligned('S_MIMIC', 0);
-                if (ptr) makemon(ptr, somex(croom), somey(croom), NO_MINVENT);
+                if (ptr) makemon(ptr, somex(croom), somey(croom), 0);
             }
         }
         return;
@@ -4614,9 +4641,8 @@ async function makeniche(trap_type) {
                 if (!rn2(5) && loc && IS_WALL(loc.typ)) {
                     loc.typ = IRONBARS;
                     if (rn2(3)) {
-                        // human corpse — consume rn2 for mkclass + mkcorpstat
-                        rn2(398); // mkclass(S_HUMAN)
-                        mkcorpstat(CORPSE, null, 0, xx, yy + dy, 1);
+                        const ptr = mkclass_aligned('S_HUMAN', 0);
+                        mkcorpstat(CORPSE, null, ptr, xx, yy + dy, 8);
                     }
                 }
                 if (!g.level.flags.noteleport) {
