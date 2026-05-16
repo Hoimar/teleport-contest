@@ -19,7 +19,11 @@ import { apply_startup_role_state, u_init_misc_rng, u_init_role_inventory } from
 import { makedog } from './dog.js';
 import { continueRunStep, rhack } from './cmd.js';
 import { nhgetch } from './input.js';
-import { docrt, cls, bot, flush_screen, pline, newsym, serialize_terminal_grid, refresh_warning_monsters, clear_pending_message, queue_more_prompt } from './display.js';
+import {
+    docrt, cls, bot, flush_screen, pline, newsym, serialize_terminal_grid,
+    refresh_warning_monsters, refresh_swallowed_overlay, clear_pending_message,
+    queue_more_prompt,
+} from './display.js';
 import { vision_recalc, vision_reset, init_vision_globals } from './vision.js';
 import { findAlign, findRace, findRole, roleGod, roleGreeting, roleWithStartingRank } from './roles.js';
 import { NO_COLOR } from './terminal.js';
@@ -413,6 +417,19 @@ async function continueOccupationTurns(g) {
     return true;
 }
 
+function refreshHallucinationDisplayAtInputBoundary(g) {
+    if (g.context?.move) return;
+    // C topl.c captures a blocking --More-- before moveloop_core resumes its
+    // once-per-player-input Hallucination refresh.
+    if (g._more) return;
+    if (!(g.u?.uhallucination || g.u?.uprops?.hallucination)) return;
+    if (g.u?.uswallow && g.u?.ustuck && g._swallowed_map_active) {
+        // C ref: allmain.c:moveloop_core() once-per-player-input Hallucination
+        // refresh calls swallowed(0) after non-moving commands.
+        refresh_swallowed_overlay();
+    }
+}
+
 // C ref: allmain.c moveloop_core()
 export async function moveloop_core() {
     const g = game;
@@ -422,6 +439,7 @@ export async function moveloop_core() {
         vision_recalc(0);
         g.vision_full_recalc = 0;
     }
+    refreshHallucinationDisplayAtInputBoundary(g);
     if (g.u?.uprops?.warning) refresh_warning_monsters();
     await bot();
     await flush_screen(1);

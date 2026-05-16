@@ -288,7 +288,8 @@ function collectMonsters(text) {
 }
 
 const source = readFileSync(MONSTERS_H, 'utf8')
-    .replace(/^#if 0[\s\S]*?^#endif/gm, '');
+    .replace(/^#if 0[\s\S]*?^#endif/gm, '')
+    .replace(/^#ifdef CHARON[\s\S]*?^#endif/gm, '');
 const rows = collectMonsters(source);
 const lines = [
     '// Generated from nethack-c/upstream/include/monsters.h (NetHack 5.0).',

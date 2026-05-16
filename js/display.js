@@ -310,7 +310,7 @@ function build_swallowed_overlay() {
                 continue;
             }
             let color = game.u.ustuck.data?.color ?? CLR_GREEN;
-            if (game.u?.uprops?.hallucination) {
+            if (game.u?.uhallucination || game.u?.uprops?.hallucination) {
                 const mdat = MONSTER_DATA[rn2Display(MONSTER_DATA.length)] || null;
                 color = mdat ? (mdat[7] ?? NO_COLOR) : color;
             }
@@ -327,6 +327,19 @@ export function refresh_swallowed_overlay() {
     return build_swallowed_overlay();
 }
 
+export function apply_hallucination_display_transition(wasHallucinating, isHallucinating) {
+    if (wasHallucinating === isHallucinating) return;
+    if (!game.u?.uswallow || !game._swallowed_map_active || !game.u?.ustuck) {
+        game._swallowed_overlay = null;
+        return;
+    }
+    // C ref: potion.c:make_hallucinated() -> swallowed(0).
+    // Use a fresh swallowed overlay so swallowed display RNG is consumed on
+    // the same visual edge as the C path.
+    game._swallowed_overlay = null;
+    build_swallowed_overlay();
+}
+
 function swallowed_glyph_at(x, y) {
     const overlay = build_swallowed_overlay();
     if (!overlay) return null;
@@ -337,6 +350,15 @@ function swallowed_glyph_at(x, y) {
 export function newsym(x, y) {
     const loc = game.level?.at(x, y);
     if (!loc) return;
+
+    // C ref: display.c:newsym(). While swallowed, ordinary map newsym()
+    // calls do not redraw external monsters/objects/traps; swallowed()
+    // owns the visible 3x3 stomach display.
+    if (game.u?.uswallow) {
+        if (game.u?.ux === x && game.u?.uy === y)
+            show_glyph_cell(x, y, '@', CLR_WHITE, false);
+        return;
+    }
 
     if (game.u?.ux === x && game.u?.uy === y) {
         // Hero
@@ -663,7 +685,7 @@ function _buildScreenOutput() {
                 for (let x = 1; x < COLNO; x++) {
                     const sg = swallowed_glyph_at(x, y);
                     if (!sg) continue;
-                    display.setCell(x - 1, y + 1, sg.ch, sg.color, 0);
+                    display.setCell(x - 1, y + 1, sg.ch, tty_color(sg.color), 0);
                 }
             }
         }
