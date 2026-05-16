@@ -901,7 +901,10 @@ function physical_melee_attacks(mtmp, attacks, toHit) {
             mhitm_knockback_frontdoor();
             damage = reduce_damage_by_negative_ac(damage);
             apply_hero_damage(damage);
-            if ((game.u?.uhp ?? 0) <= 0) break;
+            if ((game.u?.uhp ?? 0) <= 0) {
+                game._monster_death_pending = true;
+                break;
+            }
         }
     }
     return hitMessages;

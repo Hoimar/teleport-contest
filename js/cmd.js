@@ -486,13 +486,14 @@ async function showFireWandOilEffect() {
 
 async function showFireWandDeathMessage() {
     game._fire_wand_death_pending = false;
-    game._fire_wand_death_prompt_pending = true;
+    game._death_prompt_pending = true;
     await pline('You die...');
     queue_more_prompt();
 }
 
-async function showFireWandDeathPrompt() {
-    game._fire_wand_death_prompt_pending = false;
+async function showDeathPrompt() {
+    game._death_prompt_pending = false;
+    game._death_prompt_active = true;
     game._more = false;
     game._more_dismissals_remaining = 0;
     await showPromptLine('Die? [yn] (n)');
@@ -1249,8 +1250,14 @@ async function handleQueuedMore(ch) {
     } else if (game._fire_wand_death_pending) {
         game._more_dismissals_remaining = 0;
         await showFireWandDeathMessage();
-    } else if (game._fire_wand_death_prompt_pending) {
-        await showFireWandDeathPrompt();
+    } else if (game._monster_death_pending) {
+        game._more_dismissals_remaining = 0;
+        game._monster_death_pending = false;
+        game._death_prompt_pending = true;
+        await pline('You die...');
+        queue_more_prompt();
+    } else if (game._death_prompt_pending) {
+        await showDeathPrompt();
     } else if (game._more_dismissals_remaining <= 0) {
         clear_pending_message();
         if (game._direction_help_screen) {
@@ -1277,7 +1284,7 @@ async function handleQueuedMore(ch) {
         if (!await finish_pending_swallowed_expulsion())
             refreshSwallowedHallucinationAfterMore();
     }
-    if (pausedMonsterTurn && !game._more) {
+    if (pausedMonsterTurn && !game._more && !game._death_prompt_active) {
         game._monster_turn_paused_for_more = false;
         game._resume_monster_turn = true;
         game.context.move = 1;
@@ -1830,6 +1837,34 @@ export async function rhack(key) {
     }
 
     if (await handleQueuedMore(ch)) return;
+
+    if (game._death_prompt_active) {
+        if (ch === 'y' || ch === 'Y') {
+            game._death_prompt_active = false;
+            game.program_state = game.program_state || {};
+            game.program_state.gameover = true;
+            game.context.move = 0;
+            return;
+        }
+        if (ch === 'n' || ch === 'N' || ch === ' ' || ch === '\r' || ch === '\n') {
+            game._death_prompt_active = false;
+            game._prompt_cursor = null;
+            if (game.u && typeof game.u.uhp === 'number')
+                game.u.uhp = Math.max(1, game.u.uhpmax || game.u.uhp);
+            await pline("OK, so you don't die.");
+            if (game._monster_turn_paused_for_more) {
+                game._monster_turn_paused_for_more = false;
+                game._resume_monster_turn = true;
+                game.context.move = 1;
+            } else {
+                game.context.move = 0;
+            }
+            return;
+        }
+        await showPromptLine('Die? [yn] (n)');
+        game.context.move = 0;
+        return;
+    }
 
     if (game._awaiting_pray_confirm) {
         clear_pending_message();

@@ -21,9 +21,10 @@ and `feature_map.md`.
   denominator, the fire-wand destruction/death RNG chain, the first
   Storeroom/mimic/niche generation debts on the level-teleport destination,
   command-layer apply/stethoscope/search/close/magic-marker evidence, and the
-  first pet-combat `mattackm()` return-attack `--More--` split. The remaining
-  visible blocker is wizard-mode death handling after the later pet-combat
-  prompt at screen 256, while the first RNG boundary is `FR 11725`
+  first pet-combat `mattackm()` return-attack `--More--` split, and the
+  wizard-mode death confirmation/default `savelife()` prompt. The remaining
+  visible blocker is map state after `OK, so you don't die.` at screen 264,
+  while the first RNG boundary is `FR 11725`
   (`rn2(7)` expected vs `rn2(5)` actual), pointing at ordinary-monster
   candidate geometry/state after the combat split.
 
@@ -37,8 +38,8 @@ npm run verify -- --target seed5002-wizard-coverage-pair
 
 Result:
 
-- Target: `seed5002-wizard-coverage-pair` `S 256/410 R 11737/12167`,
-  first screen `256:char:mixed:Space`, first RNG
+- Target: `seed5002-wizard-coverage-pair` `S 264/410 R 11763/12167`,
+  first screen `264:char:map:Enter`, first RNG
   `11725:rn2(7)=3=>rn2(5)=4`, cursor-only `2`.
 - Sentinel total: `S 336/1063 R 35762/64569`.
 - Sentinel details:
@@ -57,23 +58,26 @@ Result:
    - Use `npm run triage -- seed5002-wizard-coverage-pair` and
      `node scratch/trace-rng-window.mjs seed5002-wizard-coverage-pair --moves 123 --rng 8796:8830`
      or the second segment equivalent after checking the flattened index.
-   - Current state: `S 256/410 R 11737/12167`.
+   - Current state: `S 264/410 R 11763/12167`.
    - Search safety now prints the expected `You already found a monster...`
      zero-time warning, close uses `In what direction?` plus cmdassist
      invalid-direction `--More--`, and applying the magic marker enters the
      write-on target prompt, re-prompting after `You don't have that object.`
    - Pet-combat `mattackm()` now covers the giant bat return attack and the
      tty `--More--` interruption/resume through the following bat hit without
-     moving sentinels.
-   - First visible mismatch is screen 256: expected `You die...--More--`, JS
-     shows the later kitten/bat combat line with HP/map drift.
+     moving sentinels. Monster-hit death now enters `You die...--More--`,
+     blocks invalid `Die? [yn] (n)` keys, and default-Enter resumes with
+     `OK, so you don't die.` plus the queued kitten hit.
+   - First visible mismatch is screen 264: message/cursor/status match, but
+     bat/kitten map cells at row 18 are shifted (`B`/`(` expected, dot/`B`
+     actual).
    - First RNG mismatch is `FR 11725` (`rn2(7)` expected vs `rn2(5)` actual),
      after fire-wand destruction, nested `--More--` messages, wizard-mode death
      prompt handling, Storeroom mimic shape/default inventory/explicit chest
      appearance, niche `mkclass(S_HUMAN)`, sorted `mongen_order`, post-teleport
      tool wishes, apply prompt, stethoscope self/adjacent use, mimic
-     reveal/status, search safety, close prompt, magic-marker write prompt, and
-     the first pet-combat More split.
+     reveal/status, search safety, close prompt, magic-marker write prompt, the
+     first pet-combat More split, and wizard-mode death confirmation.
    - Immediate hypothesis: inspect ordinary-monster `m_move()` candidate
      geometry/state around the giant bat after the combat split; avoid
      broadening monster-turn pauses beyond evidence-backed boundaries because
