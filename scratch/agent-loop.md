@@ -20,14 +20,14 @@ and `feature_map.md`.
 - Active hypothesis: the first segment is now past the wizard wish namedesc
   denominator, the fire-wand destruction/death RNG chain, the first
   Storeroom/mimic/niche generation debts on the level-teleport destination,
-  command-layer apply/stethoscope/search/close/magic-marker evidence, and the
-  first pet-combat `mattackm()` return-attack `--More--` split, and the
-  wizard-mode death confirmation/default `savelife()` prompt, the following
-  `nomovemsg`, open-command direction prompting, and the hostile `ALLOW_U`
-  movement candidate denominator. The remaining visible blocker is the
-  inventory menu at screen 276, while the first RNG boundary is `FR 11768`
-  (`rn2(4)` expected vs `rn2(100)` actual), pointing at the next
-  monster-turn/pet-goal ordering gap after the savelife resume.
+  command-layer apply/stethoscope/search/close/open/magic-marker evidence, the
+  first pet-combat `mattackm()` return-attack `--More--` split, wizard-mode
+  death confirmation/default `savelife()` prompt, the following `nomovemsg`,
+  hostile `ALLOW_U` movement candidate denominator, generated inventory menu,
+  item-action menu, read-prompt invalid-object loop, and `m` search prefix.
+  The remaining visible blocker is pet-combat More placement at screen 323,
+  while the first RNG boundary is `FR 11838` (`rn2(3)` expected vs
+  `d(1,6)` actual), pointing at the next `mattackm()`/pet-combat timing gap.
 
 ## Latest Verification
 
@@ -39,19 +39,19 @@ npm run verify -- --target seed5002-wizard-coverage-pair
 
 Result:
 
-- Target: `seed5002-wizard-coverage-pair` `S 276/410 R 11812/12167`,
-  first screen `276:char:mixed:i`, first RNG
-  `11768:rn2(4)=2=>rn2(100)=82`, cursor-only `7`.
-- Sentinel total: `S 336/1063 R 35762/64569`.
+- Target: `seed5002-wizard-coverage-pair` `S 326/410 R 11857/12167`,
+  first screen `323:message:message:s`, first RNG
+  `11838:rn2(3)=1=>d(1,6)=2`, cursor-only `7`.
+- Sentinel total: `S 336/1063 R 35775/64569`.
 - Sentinel details:
   - `seed8000-tourist-starter`: `S 23/23 R 3060/3130`, first RNG `3047`.
-  - `seed0002-healer-reflection-drummer`: `S 11/595 R 2652/27158`, first RNG `2375`.
+  - `seed0002-healer-reflection-drummer`: `S 11/595 R 2665/27158`, first RNG `2375`.
   - `seed0013-friday13-save-then-fullmoon-restore`: `S 0/99 R 573/4804`, first RNG `540`.
   - `seed0116-wizard-wear-shop`: `S 127/127 R 12562/12562`, pass.
   - `seed0383-wizard-hallucinate`: `S 175/219 R 16915/16915`.
 - Hack-debt audit: hard `0`, suspicious `37` existing replay/override/seed findings.
 - Memory lint: clean after this compaction target.
-- Full suite after this shared turn/message change: `S 723/11405 R 102300/792838`.
+- Full suite after the earlier shared turn/message change: `S 723/11405 R 102300/792838`.
 
 ## Current Queue
 
@@ -59,11 +59,13 @@ Result:
    - Use `npm run triage -- seed5002-wizard-coverage-pair` and
      `node scratch/trace-rng-window.mjs seed5002-wizard-coverage-pair --moves 123 --rng 8796:8830`
      or the second segment equivalent after checking the flattened index.
-   - Current state: `S 276/410 R 11812/12167`.
+   - Current state: `S 326/410 R 11857/12167`.
    - Search safety now prints the expected `You already found a monster...`
-     zero-time warning, close uses `In what direction?` plus cmdassist
-     invalid-direction `--More--`, and applying the magic marker enters the
-     write-on target prompt, re-prompting after `You don't have that object.`
+     zero-time warning, `m` prefixes force the following search, close/open and
+     inventory-action throw use `In what direction?` plus cmdassist
+     invalid-direction `--More--`, applying the magic marker enters the
+     write-on target prompt, and `r` enters the read prompt, re-prompting after
+     `You don't have that object.` until Space cancels with `Never mind.`
    - Pet-combat `mattackm()` now covers the giant bat return attack and the
      tty `--More--` interruption/resume through the following bat hit without
      moving sentinels. Monster-hit death now enters `You die...--More--`,
@@ -72,19 +74,21 @@ Result:
      `nomovemsg` prints after More dismissal. `o` now uses the shared
      direction prompt and open-specific invalid-direction `Never mind.` tail.
      Hostile `m_move()` now counts the hero square as an `ALLOW_U` candidate.
-   - First visible mismatch is screen 276 in the inventory menu: object display
-     order/known-name text differs from C.
-   - First RNG mismatch is `FR 11768` (`rn2(4)` expected vs `rn2(100)` actual),
+   - First visible mismatch is screen 323: JS appends `--More--` to
+     `The kitten misses the giant bat.  The giant bat bites!` but C leaves the
+     topline unblocked.
+   - First RNG mismatch is `FR 11838` (`rn2(3)` expected vs `d(1,6)` actual),
      after fire-wand destruction, nested `--More--` messages, wizard-mode death
      prompt handling, Storeroom mimic shape/default inventory/explicit chest
      appearance, niche `mkclass(S_HUMAN)`, sorted `mongen_order`, post-teleport
      tool wishes, apply prompt, stethoscope self/adjacent use, mimic
-     reveal/status, search safety, close/open prompts, magic-marker write
-     prompt, the first pet-combat More split, wizard-mode death confirmation,
-     and the first savelife resume.
-   - Immediate hypothesis: inspect the post-savelife monster-turn ordering at
-     `FR 11768`; C expects another `dochug()` wanderer/nearby gate before JS
-     enters the pet `dog_goal()` object scan.
+     reveal/status, search safety, close/open/throw prompts, magic-marker write
+     prompt, inventory/action/read menus, `m` search prefix, the first
+     pet-combat More split, wizard-mode death confirmation, and savelife resume.
+   - Immediate hypothesis: inspect pet-combat More latching around
+     `mattackm()`/`hitmm()` after forced search; the first kitten-miss/bat-bite
+     topline should not block, while the later screen 328/329 chained pet
+     combat messages should.
    - Implement general restart/object/level-generation truth; do not pin the
      level-teleport room or cursor.
 2. Continue `seed0383` post-expulsion visible-map hallucination redraw ownership.

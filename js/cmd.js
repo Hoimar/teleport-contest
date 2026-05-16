@@ -80,6 +80,7 @@ const OBJECT_BASE_NAMES = new Map([
     [AMULET_OF_LIFE_SAVING, 'amulet of life saving'],
     [178, 'ring of protection'],
     [RIN_INCREASE_ACCURACY, 'ring of increase accuracy'],
+    [199, 'ring of see invisible'],
     [RIN_STEALTH, 'ring of stealth'],
     [RIN_TELEPORT_CONTROL, 'ring of teleport control'],
     [200, 'ring of protection from shape changers'],
@@ -92,13 +93,16 @@ const OBJECT_BASE_NAMES = new Map([
     [308, 'potion of extra healing'],
     [309, 'potion of gain level'],
     [317, 'potion of booze'],
+    [323, 'scroll of enchant armor'],
     [325, 'scroll of confuse monster'],
     [328, 'scroll of enchant weapon'],
     [332, 'scroll of light'],
     [335, 'scroll of food detection'],
+    [336, 'scroll of identify'],
     [380, 'spellbook of slow monster'],
     [383, 'spellbook of force bolt'],
     [397, 'spellbook of identify'],
+    [403, 'spellbook of protection'],
     [SPE_NOVEL, 'novel'],
     [SPE_BOOK_OF_THE_DEAD, 'Book of the Dead'],
     [WAN_MAKE_INVISIBLE, 'wand of make invisible'],
@@ -106,6 +110,7 @@ const OBJECT_BASE_NAMES = new Map([
     [WAN_MAGIC_MISSILE, 'wand of magic missile'],
     [WAN_FIRE, 'wand of fire'],
     [WAN_COLD, 'wand of cold'],
+    [432, 'wand of sleep'],
     [WAN_DEATH, 'wand of death'],
     [WAN_LIGHTNING, 'wand of lightning'],
     [421, 'wand of undead turning'],
@@ -367,6 +372,14 @@ function applyLetters() {
         .map(obj => obj.invlet));
 }
 
+function readLetters() {
+    ensureInventoryLetters();
+    return (game.inventory || [])
+        .filter((obj) => obj?.oclass === SCROLL_CLASS || obj?.oclass === SPBOOK_CLASS)
+        .map((obj) => obj.invlet)
+        .join('');
+}
+
 function stethoscopeSelfStatusLine() {
     const role = String(game.urole?.name?.m || game.u?.role || 'character').toLowerCase();
     const align = game.u?.ualign?.type === 1 ? 'lawful'
@@ -553,7 +566,8 @@ function shouldShowBuc(obj) {
     if (!obj) return false;
     if (unknownAppearanceName(obj)) return false;
     if (!obj.bknown) return false;
-    return obj.oclass === ARMOR_CLASS
+    return obj.oclass === WEAPON_CLASS
+        || obj.oclass === ARMOR_CLASS
         || obj.oclass === RING_CLASS
         || obj.oclass === POTION_CLASS
         || obj.oclass === SCROLL_CLASS
@@ -580,7 +594,7 @@ function enchantmentPrefix(obj) {
 function chargeSuffix(obj, opts = {}) {
     if (opts.includeCharges === false) return '';
     if (typeof obj?.spe !== 'number') return '';
-    if (obj.otyp === MAGIC_MARKER) return ` (0:${obj.spe})`;
+    if (obj.otyp === MAGIC_MARKER) return obj.known || obj.knownName ? ` (0:${obj.spe})` : '';
     if (obj.oclass !== WAND_CLASS) return '';
     if (unknownAppearanceName(obj)) return '';
     if (obj.otyp === WAN_DIGGING && obj.knownName && !obj.chargesKnown) return '';
@@ -589,6 +603,7 @@ function chargeSuffix(obj, opts = {}) {
 
 function wornSuffix(obj) {
     if (obj?.wornSide) return ` (on ${obj.wornSide} hand)`;
+    if (obj?.wielded || ((obj?.owornmask || 0) & C.W_WEP)) return ' (weapon in hands)';
     if (obj?.worn || obj?.owornmask) return ' (being worn)';
     return '';
 }
@@ -1277,6 +1292,12 @@ async function handleQueuedMore(ch) {
             game.context.move = 0;
             return true;
         }
+        if (game._resume_read_prompt_after_more) {
+            game._resume_read_prompt_after_more = false;
+            await showPromptLine(`What do you want to read? [${readLetters()} or ?*] `);
+            game.context.move = 0;
+            return true;
+        }
         if (game._after_more_message) {
             const msg = game._after_more_message;
             const needsPrompt = !!game._after_more_needs_prompt;
@@ -1367,6 +1388,56 @@ async function showInventoryMenu() {
     const screen = serialize_terminal_grid(display);
     game._inventory_menu_screen = screen;
     showOverride(screen, [Math.min(cursorCol, COLNO - 1), lastRow]);
+}
+
+function actionMenuItemType(obj) {
+    if (obj?.oclass === RING_CLASS) return 'ring';
+    if (obj?.oclass === ARMOR_CLASS) return 'armor';
+    if (obj?.oclass === WEAPON_CLASS) return 'item';
+    if (obj?.oclass === WAND_CLASS) return 'wand';
+    if (obj?.oclass === TOOL_CLASS) return 'tool';
+    return 'item';
+}
+
+async function showInventoryActionMenu(obj) {
+    clear_pending_message();
+    await flush_screen(1);
+    const display = game.nhDisplay;
+    if (!display?.putstr) return;
+
+    const menuCol = 34;
+    const label = baseObjectName(obj);
+    const itemType = actionMenuItemType(obj);
+    const rows = [
+        { text: `Do what with the ${label}?`, attr: ATR_INVERSE },
+        null,
+        { text: `c - Name this specific ${label}` },
+        { text: 'd - Drop this item' },
+        { text: 'E - Write on the floor with this item' },
+        { text: 'i - Adjust inventory by assigning new letter' },
+        { text: `P - Put this ${itemType} on` },
+        { text: 't - Throw this item' },
+        { text: 'w - Wield this item in your hands' },
+        { text: '/ - Look up information about this' },
+        { text: '(end)' },
+    ];
+
+    for (let row = 0; row <= 15; row++) {
+        display.putstr(0, row, ' '.repeat(COLNO), NO_COLOR, 0);
+    }
+    for (let row = 21; row < C.TERMINAL_ROWS; row++) {
+        display.putstr(0, row, ' '.repeat(COLNO), NO_COLOR, 0);
+    }
+    for (let row = 0; row < rows.length; row++) {
+        const entry = rows[row];
+        if (!entry) continue;
+        display.putstr(menuCol, row, entry.text, NO_COLOR, entry.attr || 0);
+    }
+
+    const screen = serialize_terminal_grid(display);
+    game._inventory_action_menu_screen = screen;
+    game._inventory_action_menu_obj = obj;
+    showOverride(screen, [menuCol + '(end)'.length + 1, 10]);
 }
 
 function cursorForward(count) {
@@ -2221,6 +2292,33 @@ export async function rhack(key) {
         return;
     }
 
+    if (game._awaiting_read_item) {
+        clear_pending_message();
+        if (ch === ' ' || ch === '\x1b') {
+            game._awaiting_read_item = false;
+            game.context.move = 0;
+            await pline('Never mind.');
+            return;
+        }
+        const idx = inventoryIndexForLetter(ch);
+        const obj = idx >= 0 ? game.inventory?.[idx] : null;
+        if (!obj) {
+            game.context.move = 0;
+            game._resume_read_prompt_after_more = true;
+            await pline("You don't have that object.");
+            queue_more_prompt();
+            return;
+        }
+        game._awaiting_read_item = false;
+        if (obj.oclass !== SCROLL_CLASS && obj.oclass !== SPBOOK_CLASS) {
+            game.context.move = 0;
+            await pline('That is a silly thing to read.');
+            return;
+        }
+        game.context.move = 0;
+        return;
+    }
+
     if (game._awaiting_ring_finger) {
         clear_pending_message();
         const obj = game._awaiting_ring_finger;
@@ -2249,6 +2347,25 @@ export async function rhack(key) {
         game._awaiting_zap_direction = obj;
         game.context.move = 0;
         await showPromptLine('In what direction? ');
+        return;
+    }
+
+    if (game._awaiting_throw_direction) {
+        clear_pending_message();
+        game._awaiting_throw_direction = null;
+        if (!'hykulnjb<>.'.includes(ch)) {
+            game.context.move = 0;
+            if (game.iflags?.cmdassist !== false) {
+                game._direction_help_screen = INVALID_DIRECTION_HELP_SCREEN;
+                game._direction_help_after_more_message = '';
+                showSerializedOverride(INVALID_DIRECTION_HELP_SCREEN, [8, 23]);
+                queue_more_prompt();
+            } else {
+                await pline('What a strange direction!');
+            }
+            return;
+        }
+        game.context.move = 1;
         return;
     }
 
@@ -2465,6 +2582,28 @@ export async function rhack(key) {
             game.context.move = 0;
             return;
         }
+        if (prev === game._inventory_menu_screen) {
+            const idx = inventoryIndexForLetter(ch);
+            const obj = idx >= 0 ? game.inventory?.[idx] : null;
+            if (obj) await showInventoryActionMenu(obj);
+            game.context.move = 0;
+            return;
+        }
+        if (prev === game._inventory_action_menu_screen) {
+            const obj = game._inventory_action_menu_obj;
+            if (ch === 't' && obj) {
+                clear_pending_message();
+                game._inventory_action_menu_obj = null;
+                game._inventory_action_menu_screen = null;
+                game._awaiting_throw_direction = obj;
+                game.context.move = 0;
+                await showPromptLine('In what direction? ');
+                return;
+            }
+            if (obj) await showInventoryActionMenu(obj);
+            game.context.move = 0;
+            return;
+        }
         if (prev === game._attributes_page1_screen && (key === 32 || key === 13)) {
             // Space/Enter pages to second attributes page.
             const row = Math.max(0, (game._attributes_page2_screen || '').split('\n').length - 1);
@@ -2528,6 +2667,8 @@ export async function rhack(key) {
     // Message lines persist while waiting for input, then clear when the
     // next command begins unless the command prints a replacement.
     clear_pending_message();
+    const forceCommandPrefix = !!game._force_command_prefix;
+    game._force_command_prefix = false;
 
     if (game._forcefight_pending && isMovementKey(ch)) {
         game._forcefight_pending = false;
@@ -2550,12 +2691,15 @@ export async function rhack(key) {
     } else if (ch === '.') {
         game.context.move = 1;
     } else if (ch === 's') {
-        if (await cmdSafetyPrevention('Searching', 'another search',
+        if (!forceCommandPrefix && await cmdSafetyPrevention('Searching', 'another search',
             'You already found a monster.', '_already_found_flag')) {
             game.context.move = 0;
         } else {
             game.context.move = 1;
         }
+    } else if (ch === 'm') {
+        game._force_command_prefix = true;
+        game.context.move = 0;
     } else if (ch === 'c') {
         game._awaiting_close_direction = true;
         game.context.move = 0;
@@ -2638,6 +2782,10 @@ export async function rhack(key) {
         } else {
             await pline('You are not carrying anything to put on.');
         }
+    } else if (ch === 'r') {
+        game.context.move = 0;
+        await showPromptLine(`What do you want to read? [${readLetters()} or ?*] `);
+        game._awaiting_read_item = true;
     } else if (ch === 'z') {
         game.context.move = 0;
         const letters = zapLetters();

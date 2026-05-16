@@ -103,8 +103,8 @@ const SPELLBOOK_LEVEL = new Map([
 ]);
 
 const WIZARD_INVENTORY = [
-    { typ: QUARTERSTAFF, spe: 1, cls: WEAPON_CLASS, min: 1, max: 1, bless: 1 },
-    { typ: CLOAK_OF_MAGIC_RESISTANCE, spe: 0, cls: ARMOR_CLASS, min: 1, max: 1, bless: UNDEF_BLESS },
+    { typ: QUARTERSTAFF, spe: 1, cls: WEAPON_CLASS, min: 1, max: 1, bless: 1, wielded: true },
+    { typ: CLOAK_OF_MAGIC_RESISTANCE, spe: 0, cls: ARMOR_CLASS, min: 1, max: 1, bless: UNDEF_BLESS, worn: true },
     { typ: UNDEF_TYP, spe: UNDEF_SPE, cls: WAND_CLASS, min: 1, max: 1, bless: UNDEF_BLESS },
     { typ: UNDEF_TYP, spe: UNDEF_SPE, cls: RING_CLASS, min: 2, max: 2, bless: UNDEF_BLESS },
     { typ: UNDEF_TYP, spe: UNDEF_SPE, cls: POTION_CLASS, min: 3, max: 3, bless: UNDEF_BLESS },
@@ -254,6 +254,8 @@ function ini_inv(trobs, noCreate, roleName) {
         }
         if (ini_inv_adjust_obj(trop, obj)) quan = 1;
         const invObj = add_inventory_object(obj);
+        if (trop.wielded) invObj.wielded = true;
+        if (trop.worn) invObj.worn = true;
         if (invObj.oclass === SPBOOK_CLASS && starting_spell_level(invObj.otyp) === 1) {
             gotLevel1Spellbook = true;
         }
