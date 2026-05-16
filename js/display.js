@@ -840,5 +840,6 @@ export function clear_pending_message() {
     game._more_next_message_row = false;
     game._more_dismissals_remaining = 0;
     game._hero_melee_message_pending = false;
+    game._pet_combat_more_latched = false;
     game._prompt_cursor = null;
 }

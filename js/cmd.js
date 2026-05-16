@@ -1226,6 +1226,7 @@ function refreshSwallowedHallucinationAfterMore() {
 async function handleQueuedMore(ch) {
     if (!game._more || (game._more_dismissals_remaining || 0) <= 0) return false;
     const moreDismissKey = ch === ' ' || ch === '\r' || ch === '\n' || ch === '\x1b';
+    const pausedMonsterTurn = !!game._monster_turn_paused_for_more;
     if (!moreDismissKey) {
         if (game._direction_help_screen) {
             showSerializedOverride(game._direction_help_screen, [8, 23]);
@@ -1264,8 +1265,11 @@ async function handleQueuedMore(ch) {
         }
         if (game._after_more_message) {
             const msg = game._after_more_message;
+            const needsPrompt = !!game._after_more_needs_prompt;
             game._after_more_message = '';
+            game._after_more_needs_prompt = false;
             await pline(msg);
+            if (needsPrompt) queue_more_prompt();
         }
         // C ref: topl.c:more() returns to the interrupted command before
         // allmain.c's next input prompt; swallowed Hallucination redraws
@@ -1273,7 +1277,13 @@ async function handleQueuedMore(ch) {
         if (!await finish_pending_swallowed_expulsion())
             refreshSwallowedHallucinationAfterMore();
     }
-    game.context.move = 0;
+    if (pausedMonsterTurn && !game._more) {
+        game._monster_turn_paused_for_more = false;
+        game._resume_monster_turn = true;
+        game.context.move = 1;
+    } else {
+        game.context.move = 0;
+    }
     return true;
 }
 

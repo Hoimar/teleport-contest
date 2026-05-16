@@ -365,6 +365,14 @@ function pet_name(mtmp) {
     return String(mtmp?.data?.name || 'pet').toLowerCase().replace(/_/g, ' ');
 }
 
+function monster_article_name(mon) {
+    return `the ${monster_name(mon)}`;
+}
+
+function hallucinating() {
+    return !!(game.u?.uhallucination || game.u?.uprops?.hallucination);
+}
+
 function occupation_message_boundary_active() {
     return (game._occupation_turns_remaining || 0) > 0 || !!game._occupation_finish_message;
 }
@@ -372,8 +380,16 @@ function occupation_message_boundary_active() {
 async function append_topline_message(line) {
     if (game._pending_message?.startsWith('You start putting on ')) game._pending_message = '';
     if (game._pending_message) {
+        if (game._more && !hallucinating()) {
+            game._after_more_message = game._after_more_message
+                ? `${game._after_more_message}  ${line}`
+                : line;
+            game._after_more_needs_prompt = true;
+            return;
+        }
         game._pending_message = `${game._pending_message}  ${line}`;
         queue_more_prompt();
+        game._pet_combat_more_latched = true;
         if (occupation_message_boundary_active()) {
             // C ref: tty topline handling via pline()/--More--.  A second
             // visible pet-combat pline can block inside the monster turn,
@@ -593,7 +609,7 @@ function grow_up_from_kill(mtmp, victim) {
 }
 
 async function pet_melee_attack(mtmp, target) {
-    if (!pet_should_attack(mtmp, target)) return false;
+    if (!pet_should_attack(mtmp, target)) return { attacked: false };
     // C ref: dogmove.c calls mattackm() for ALLOW_M candidates before
     // ranged attacks.  This is a narrow mhitm.c front door for the current
     // pet evidence: one physical attack, miss passive check, or hit damage
@@ -603,14 +619,14 @@ async function pet_melee_attack(mtmp, target) {
         refresh_pet_attack_symbols(mtmp, target);
         await pet_combat_message(mtmp, `misses the ${monster_name(target)}.`);
         rn2(3);
-        return true;
+        return { attacked: true, hit: false, defenderDied: false };
     }
 
     const damage = d(1, 6);
     refresh_pet_attack_symbols(mtmp, target);
     await pet_combat_message(mtmp, `bites the ${monster_name(target)}.`);
-    const effectiveHp = Math.min(target.mhp ?? 1, Math.max(1, target.data?.mlevel ?? 1));
-    target.mhp = effectiveHp - damage;
+    const currentHp = target.mhp ?? Math.max(1, target.data?.mlevel ?? 1);
+    target.mhp = currentHp - damage;
     rn2(3); // mhitm_knockback chance
     rn2(6); // mhitm_knockback distance/side gate
     if (target.mhp < 1) {
@@ -618,7 +634,24 @@ async function pet_melee_attack(mtmp, target) {
     } else {
         rn2(3);
     }
-    return true;
+    return { attacked: true, hit: true, defenderDied: target.mhp < 1 };
+}
+
+async function monster_melee_attack(mtmp, target) {
+    const dieroll = rnd(20);
+    if (dieroll > 10) {
+        refresh_pet_attack_symbols(mtmp, target);
+        await append_topline_message(`The ${monster_name(mtmp)} misses ${monster_article_name(target)}.`);
+        rn2(3);
+        return { attacked: true, hit: false, defenderDied: false };
+    }
+    const damage = d(1, 6);
+    refresh_pet_attack_symbols(mtmp, target);
+    await append_topline_message(`The ${monster_name(mtmp)} bites ${monster_article_name(target)}.`);
+    target.mhp = (target.mhp ?? 1) - damage;
+    rn2(3);
+    rn2(6);
+    return { attacked: true, hit: true, defenderDied: target.mhp < 1 };
 }
 
 function pet_goal(mtmp, after, udist, whappr) {
@@ -722,7 +755,14 @@ export async function dog_move(mtmp, after = true) {
             const target = mon_at(nx, ny, mtmp);
             if (!pet_can_enter_square(mtmp, nx, ny, { ignoreMonster: !!target })) continue;
             if (target) {
-                if (await pet_melee_attack(mtmp, target)) return 0;
+                const attack = await pet_melee_attack(mtmp, target);
+                if (attack.attacked) {
+                    if (attack.hit && !attack.defenderDied && rn2(4)
+                        && target.mlstmv !== (game.moves || 0)) {
+                        await monster_melee_attack(target, mtmp);
+                    }
+                    return 0;
+                }
                 continue;
             }
             if (avoid_soko_push_loc(mtmp, nx, ny)) continue;

@@ -18,13 +18,14 @@ and `feature_map.md`.
   `feature_map.md`, `js/cmd.js`, `js/display.js`, this checkpoint.
 - Active target: `seed5002-wizard-coverage-pair`.
 - Active hypothesis: the first segment is now past the wizard wish namedesc
-  denominator, the fire-wand destruction/death RNG chain, and the first
-  Storeroom/mimic/niche generation debts on the level-teleport destination.
-  The command-layer boundary after post-teleport apply/stethoscope evidence is
-  now through safe search, close-direction help, and magic-marker write-target
-  prompting. The remaining visible blocker is the next pet-combat `--More--`
-  split at screen 243, while the first RNG boundary is `FR 11678` (`rn2(4)`
-  expected vs `rn2(5)` actual).
+  denominator, the fire-wand destruction/death RNG chain, the first
+  Storeroom/mimic/niche generation debts on the level-teleport destination,
+  command-layer apply/stethoscope/search/close/magic-marker evidence, and the
+  first pet-combat `mattackm()` return-attack `--More--` split. The remaining
+  visible blocker is wizard-mode death handling after the later pet-combat
+  prompt at screen 256, while the first RNG boundary is `FR 11725`
+  (`rn2(7)` expected vs `rn2(5)` actual), pointing at ordinary-monster
+  candidate geometry/state after the combat split.
 
 ## Latest Verification
 
@@ -36,9 +37,9 @@ npm run verify -- --target seed5002-wizard-coverage-pair
 
 Result:
 
-- Target: `seed5002-wizard-coverage-pair` `S 243/410 R 11697/12167`,
-  first screen `243:char:mixed:o`, first RNG `11678:rn2(4)=3=>rn2(5)=0`,
-  cursor-only `2`.
+- Target: `seed5002-wizard-coverage-pair` `S 256/410 R 11737/12167`,
+  first screen `256:char:mixed:Space`, first RNG
+  `11725:rn2(7)=3=>rn2(5)=4`, cursor-only `2`.
 - Sentinel total: `S 336/1063 R 35762/64569`.
 - Sentinel details:
   - `seed8000-tourist-starter`: `S 23/23 R 3060/3130`, first RNG `3047`.
@@ -48,6 +49,7 @@ Result:
   - `seed0383-wizard-hallucinate`: `S 175/219 R 16915/16915`.
 - Hack-debt audit: hard `0`, suspicious `37` existing replay/override/seed findings.
 - Memory lint: clean after this compaction target.
+- Full suite after this shared turn/message change: `S 723/11405 R 102300/792838`.
 
 ## Current Queue
 
@@ -55,24 +57,27 @@ Result:
    - Use `npm run triage -- seed5002-wizard-coverage-pair` and
      `node scratch/trace-rng-window.mjs seed5002-wizard-coverage-pair --moves 123 --rng 8796:8830`
      or the second segment equivalent after checking the flattened index.
-   - Current state: `S 243/410 R 11697/12167`.
+   - Current state: `S 256/410 R 11737/12167`.
    - Search safety now prints the expected `You already found a monster...`
      zero-time warning, close uses `In what direction?` plus cmdassist
      invalid-direction `--More--`, and applying the magic marker enters the
      write-on target prompt, re-prompting after `You don't have that object.`
-   - First visible mismatch is screen 243 at the pet-combat `--More--` split:
-     expected `You hit the small mimic.  The kitten bites the giant bat.--More--`
-     to remain pending while JS has already advanced to the later giant-bat
-     combat line.
-   - First RNG mismatch is `FR 11678` (`rn2(4)` expected vs `rn2(5)` actual),
+   - Pet-combat `mattackm()` now covers the giant bat return attack and the
+     tty `--More--` interruption/resume through the following bat hit without
+     moving sentinels.
+   - First visible mismatch is screen 256: expected `You die...--More--`, JS
+     shows the later kitten/bat combat line with HP/map drift.
+   - First RNG mismatch is `FR 11725` (`rn2(7)` expected vs `rn2(5)` actual),
      after fire-wand destruction, nested `--More--` messages, wizard-mode death
      prompt handling, Storeroom mimic shape/default inventory/explicit chest
      appearance, niche `mkclass(S_HUMAN)`, sorted `mongen_order`, post-teleport
      tool wishes, apply prompt, stethoscope self/adjacent use, mimic
-     reveal/status, search safety, close prompt, and magic-marker write prompt.
-   - Immediate hypothesis: resolve dog/monster combat `--More--` pause/resume
-     structurally. A broad dog-turn pause regressed `seed0383`; keep the next
-     attempt narrower than a global `movemon()` pause.
+     reveal/status, search safety, close prompt, magic-marker write prompt, and
+     the first pet-combat More split.
+   - Immediate hypothesis: inspect ordinary-monster `m_move()` candidate
+     geometry/state around the giant bat after the combat split; avoid
+     broadening monster-turn pauses beyond evidence-backed boundaries because
+     a global pause regressed `seed0383`.
    - Implement general restart/object/level-generation truth; do not pin the
      level-teleport room or cursor.
 2. Continue `seed0383` post-expulsion visible-map hallucination redraw ownership.

@@ -558,8 +558,13 @@ function occupation_message_boundary_active() {
     return (game._occupation_turns_remaining || 0) > 0 || !!game._occupation_finish_message;
 }
 
+function hallucinating() {
+    return !!(game.u?.uhallucination || game.u?.uprops?.hallucination);
+}
+
 async function flush_pending_more_before_monster_message() {
     if (!game._more || !game._pending_message) return;
+    if (game._pet_combat_more_latched && !hallucinating()) return;
     // C ref: tty topline `--More--` is often serviced when the next pline()
     // wants to print. This lets intervening map updates become visible before
     // the prior message is dismissed, without applying the next message's
@@ -582,6 +587,18 @@ async function show_blocking_monster_message(line) {
     if (game._pending_message?.startsWith('You hear nothing special.') && !game._more
         && `${game._pending_message}  ${line}`.length < 80) {
         game._pending_message = `${game._pending_message}  ${line}`;
+        return;
+    }
+    if (game._pending_message && !game._more && `${game._pending_message}  ${line}`.length < 80) {
+        game._pending_message = `${game._pending_message}  ${line}`;
+        queue_more_prompt();
+        return;
+    }
+    if (game._more && game._pending_message && game._pet_combat_more_latched && !hallucinating()) {
+        game._after_more_message = game._after_more_message
+            ? `${game._after_more_message}  ${line}`
+            : line;
+        game._after_more_needs_prompt = true;
         return;
     }
     await pline(line);
@@ -937,6 +954,7 @@ async function mattacku_basic(mtmp, state) {
     if (engulf) return engulf_attack(mtmp, engulf, toHit);
     await flush_pending_more_before_monster_message();
     const messages = physical_melee_attacks(mtmp, physical, toHit);
+    if (messages.length) mtmp.mlstmv = game.moves || 0;
     if (messages.length) await show_blocking_monster_message(messages.join('  '));
     return true;
 }
@@ -1134,13 +1152,26 @@ export function mcalcdistress() {
 
 export async function movemon() {
     const g = game;
-    let somebody_can_move = false;
+    let somebody_can_move = !!g._resume_somebody_can_move;
+    g._resume_somebody_can_move = false;
+
+    if (g._resume_tame_post_distfleeck) {
+        distfleeck(g._resume_tame_post_distfleeck);
+        g._resume_tame_post_distfleeck = null;
+    }
+    const resumeAfter = g._resume_movemon_after_mon || null;
+    let skippingResumedPrefix = !!resumeAfter;
+    g._resume_movemon_after_mon = null;
 
     // C ref: mon.c:iter_mons_safe() snapshots fmon before the movement
     // pass so removals or insertions during combat do not shift ownership
     // of later monsters' turns.
     const monsters = [...(g.level.monsters || [])];
     for (const mtmp of monsters) {
+        if (skippingResumedPrefix) {
+            if (mtmp === resumeAfter) skippingResumedPrefix = false;
+            continue;
+        }
         if (!g.level.monsters?.includes(mtmp)) continue;
         // C ref: mon.c:movemon_singlemon() runs this before the movement
         // budget check, so zero-budget fog clouds still leave vapor.
@@ -1188,6 +1219,15 @@ export async function movemon() {
         if (mtmp.mtame) {
             if (is_wanderer(mtmp) && monnear_hero(mtmp)) rn2(4);
             await dog_move(mtmp, false);
+            if (g._more && g._pet_combat_more_latched && !hallucinating()) {
+                g._after_more_needs_prompt = false;
+                g._resume_tame_post_distfleeck = mtmp;
+                g._resume_movemon_after_mon = mtmp;
+                g._resume_somebody_can_move = mtmp.movement >= NORMAL_SPEED;
+                g._pet_combat_resume_active = true;
+                g._monster_turn_paused_for_more = true;
+                return false;
+            }
             distfleeck(mtmp);
         } else {
             let postMoveState = fleeState;
@@ -1202,6 +1242,13 @@ export async function movemon() {
             if ((moveStatus !== MMOVE_MOVED && moveStatus !== MMOVE_DONE)
                 || (moveStatus === MMOVE_MOVED && can_attack_after_move_basic(mtmp, postMoveState))) {
                 await mattacku_basic(mtmp, postMoveState);
+                if (g._pet_combat_resume_active && g._more && !hallucinating()) {
+                    g._pet_combat_resume_active = false;
+                    g._resume_movemon_after_mon = mtmp;
+                    g._resume_somebody_can_move = mtmp.movement >= NORMAL_SPEED;
+                    g._monster_turn_paused_for_more = true;
+                    return false;
+                }
             }
         }
     }

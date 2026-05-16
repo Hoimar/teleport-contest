@@ -342,6 +342,7 @@ export async function advanceTurn() {
     while (await movemon()) {
         // Keep moving monsters until all out of movement.
     }
+    if (g._monster_turn_paused_for_more) return;
 
     mcalcdistress();
 
@@ -361,6 +362,7 @@ export async function advanceTurn() {
     maybe_wipe_engraving();
     maybe_update_seer_turn();
 
+    g._pet_combat_resume_active = false;
     g.moves = (g.moves || 1) + 1;
 }
 
@@ -461,7 +463,10 @@ export async function moveloop_core() {
     // Advance turn; run/rush movement may consume multiple turns before
     // returning to the input boundary.
     if (g.context?.move) {
-        if (g._occupation_resume) {
+        if (g._resume_monster_turn) {
+            g._resume_monster_turn = false;
+            await advanceTurn();
+        } else if (g._occupation_resume) {
             g._occupation_resume = false;
             if (!await continueOccupationTurns(g)) return;
         } else {
