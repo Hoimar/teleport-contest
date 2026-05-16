@@ -1264,6 +1264,13 @@ async function handleQueuedMore(ch) {
             game._direction_help_screen = '';
             game._override_prev = null;
         }
+        if (game._direction_help_after_more_message) {
+            const msg = game._direction_help_after_more_message;
+            game._direction_help_after_more_message = '';
+            await pline(msg);
+            game.context.move = 0;
+            return true;
+        }
         if (game._resume_write_prompt_after_more) {
             game._resume_write_prompt_after_more = false;
             await showPromptLine('What do you want to write on? [*] ');
@@ -1277,6 +1284,10 @@ async function handleQueuedMore(ch) {
             game._after_more_needs_prompt = false;
             await pline(msg);
             if (needsPrompt) queue_more_prompt();
+        } else if (game._nomovemsg) {
+            const msg = game._nomovemsg;
+            game._nomovemsg = '';
+            await pline(msg);
         }
         // C ref: topl.c:more() returns to the interrupted command before
         // allmain.c's next input prompt; swallowed Hallucination redraws
@@ -1851,10 +1862,12 @@ export async function rhack(key) {
             game._prompt_cursor = null;
             if (game.u && typeof game.u.uhp === 'number')
                 game.u.uhp = Math.max(1, game.u.uhpmax || game.u.uhp);
+            game._nomovemsg = 'You survived that attempt on your life.';
             await pline("OK, so you don't die.");
             if (game._monster_turn_paused_for_more) {
                 game._monster_turn_paused_for_more = false;
                 game._resume_monster_turn = true;
+                game._savelife_resume_active = true;
                 game.context.move = 1;
             } else {
                 game.context.move = 0;
@@ -2239,13 +2252,16 @@ export async function rhack(key) {
         return;
     }
 
-    if (game._awaiting_close_direction) {
+    if (game._awaiting_close_direction || game._awaiting_open_direction) {
         clear_pending_message();
+        const opening = !!game._awaiting_open_direction;
         game._awaiting_close_direction = false;
+        game._awaiting_open_direction = false;
         if (!'hykulnjb<>.'.includes(ch)) {
             game.context.move = 0;
             if (game.iflags?.cmdassist !== false) {
                 game._direction_help_screen = INVALID_DIRECTION_HELP_SCREEN;
+                game._direction_help_after_more_message = opening ? 'Never mind.' : '';
                 showSerializedOverride(INVALID_DIRECTION_HELP_SCREEN, [8, 23]);
                 queue_more_prompt();
             } else {
@@ -2256,6 +2272,12 @@ export async function rhack(key) {
         const x = (game.u?.ux ?? 0) + (DIR_DX[ch] || 0);
         const y = (game.u?.uy ?? 0) + (DIR_DY[ch] || 0);
         const loc = game.level?.at(x, y);
+        if (opening) {
+            game.context.move = 0;
+            if (!loc || !C.IS_DOOR(loc.typ)) await pline('You see no door there.');
+            else await pline('This door is already open.');
+            return;
+        }
         if (!loc || !C.IS_DOOR(loc.typ)) {
             game.context.move = 0;
             await pline('You see no door there.');
@@ -2536,6 +2558,10 @@ export async function rhack(key) {
         }
     } else if (ch === 'c') {
         game._awaiting_close_direction = true;
+        game.context.move = 0;
+        await showPromptLine('In what direction? ');
+    } else if (ch === 'o') {
+        game._awaiting_open_direction = true;
         game.context.move = 0;
         await showPromptLine('In what direction? ');
     } else if (ch === '#') {

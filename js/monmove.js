@@ -250,7 +250,7 @@ function mfndpos_terrain_ok(mtmp, x, y) {
 }
 
 function can_mon_step(mtmp, x, y) {
-    if (x === game.u?.ux && y === game.u?.uy) return false;
+    if (x === game.u?.ux && y === game.u?.uy) return !mtmp.mpeaceful && !mtmp.mtame;
     if (mon_at(x, y, mtmp)) return false;
     return mfndpos_terrain_ok(mtmp, x, y);
 }
@@ -1076,6 +1076,11 @@ async function m_move_basic(mtmp) {
     }
 
     if (!moved || (nix === omx && niy === omy)) return MMOVE_NOTHING;
+    if (nix === game.u?.ux && niy === game.u?.uy) {
+        mtmp.mux = game.u.ux;
+        mtmp.muy = game.u.uy;
+        return MMOVE_NOTHING;
+    }
     const engulfingHero = game.u?.uswallow && game.u?.ustuck === mtmp;
     mtmp.mx = nix;
     mtmp.my = niy;
@@ -1222,7 +1227,7 @@ export async function movemon() {
         if (mtmp.mtame) {
             if (is_wanderer(mtmp) && monnear_hero(mtmp)) rn2(4);
             await dog_move(mtmp, false);
-            if (g._more && g._pet_combat_more_latched && !hallucinating()) {
+            if (g._more && g._pet_combat_more_latched && !g._savelife_resume_active && !hallucinating()) {
                 g._after_more_needs_prompt = false;
                 g._resume_tame_post_distfleeck = mtmp;
                 g._resume_movemon_after_mon = mtmp;

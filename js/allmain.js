@@ -363,6 +363,7 @@ export async function advanceTurn() {
     maybe_update_seer_turn();
 
     g._pet_combat_resume_active = false;
+    g._savelife_resume_active = false;
     g.moves = (g.moves || 1) + 1;
 }
 

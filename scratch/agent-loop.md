@@ -22,11 +22,12 @@ and `feature_map.md`.
   Storeroom/mimic/niche generation debts on the level-teleport destination,
   command-layer apply/stethoscope/search/close/magic-marker evidence, and the
   first pet-combat `mattackm()` return-attack `--More--` split, and the
-  wizard-mode death confirmation/default `savelife()` prompt. The remaining
-  visible blocker is map state after `OK, so you don't die.` at screen 264,
-  while the first RNG boundary is `FR 11725`
-  (`rn2(7)` expected vs `rn2(5)` actual), pointing at ordinary-monster
-  candidate geometry/state after the combat split.
+  wizard-mode death confirmation/default `savelife()` prompt, the following
+  `nomovemsg`, open-command direction prompting, and the hostile `ALLOW_U`
+  movement candidate denominator. The remaining visible blocker is the
+  inventory menu at screen 276, while the first RNG boundary is `FR 11768`
+  (`rn2(4)` expected vs `rn2(100)` actual), pointing at the next
+  monster-turn/pet-goal ordering gap after the savelife resume.
 
 ## Latest Verification
 
@@ -38,9 +39,9 @@ npm run verify -- --target seed5002-wizard-coverage-pair
 
 Result:
 
-- Target: `seed5002-wizard-coverage-pair` `S 264/410 R 11763/12167`,
-  first screen `264:char:map:Enter`, first RNG
-  `11725:rn2(7)=3=>rn2(5)=4`, cursor-only `2`.
+- Target: `seed5002-wizard-coverage-pair` `S 276/410 R 11812/12167`,
+  first screen `276:char:mixed:i`, first RNG
+  `11768:rn2(4)=2=>rn2(100)=82`, cursor-only `7`.
 - Sentinel total: `S 336/1063 R 35762/64569`.
 - Sentinel details:
   - `seed8000-tourist-starter`: `S 23/23 R 3060/3130`, first RNG `3047`.
@@ -58,7 +59,7 @@ Result:
    - Use `npm run triage -- seed5002-wizard-coverage-pair` and
      `node scratch/trace-rng-window.mjs seed5002-wizard-coverage-pair --moves 123 --rng 8796:8830`
      or the second segment equivalent after checking the flattened index.
-   - Current state: `S 264/410 R 11763/12167`.
+   - Current state: `S 276/410 R 11812/12167`.
    - Search safety now prints the expected `You already found a monster...`
      zero-time warning, close uses `In what direction?` plus cmdassist
      invalid-direction `--More--`, and applying the magic marker enters the
@@ -66,22 +67,24 @@ Result:
    - Pet-combat `mattackm()` now covers the giant bat return attack and the
      tty `--More--` interruption/resume through the following bat hit without
      moving sentinels. Monster-hit death now enters `You die...--More--`,
-     blocks invalid `Die? [yn] (n)` keys, and default-Enter resumes with
-     `OK, so you don't die.` plus the queued kitten hit.
-   - First visible mismatch is screen 264: message/cursor/status match, but
-     bat/kitten map cells at row 18 are shifted (`B`/`(` expected, dot/`B`
-     actual).
-   - First RNG mismatch is `FR 11725` (`rn2(7)` expected vs `rn2(5)` actual),
+     blocks invalid `Die? [yn] (n)` keys, default-Enter resumes with
+     `OK, so you don't die.` plus the queued kitten hit, and the follow-up
+     `nomovemsg` prints after More dismissal. `o` now uses the shared
+     direction prompt and open-specific invalid-direction `Never mind.` tail.
+     Hostile `m_move()` now counts the hero square as an `ALLOW_U` candidate.
+   - First visible mismatch is screen 276 in the inventory menu: object display
+     order/known-name text differs from C.
+   - First RNG mismatch is `FR 11768` (`rn2(4)` expected vs `rn2(100)` actual),
      after fire-wand destruction, nested `--More--` messages, wizard-mode death
      prompt handling, Storeroom mimic shape/default inventory/explicit chest
      appearance, niche `mkclass(S_HUMAN)`, sorted `mongen_order`, post-teleport
      tool wishes, apply prompt, stethoscope self/adjacent use, mimic
-     reveal/status, search safety, close prompt, magic-marker write prompt, the
-     first pet-combat More split, and wizard-mode death confirmation.
-   - Immediate hypothesis: inspect ordinary-monster `m_move()` candidate
-     geometry/state around the giant bat after the combat split; avoid
-     broadening monster-turn pauses beyond evidence-backed boundaries because
-     a global pause regressed `seed0383`.
+     reveal/status, search safety, close/open prompts, magic-marker write
+     prompt, the first pet-combat More split, wizard-mode death confirmation,
+     and the first savelife resume.
+   - Immediate hypothesis: inspect the post-savelife monster-turn ordering at
+     `FR 11768`; C expects another `dochug()` wanderer/nearby gate before JS
+     enters the pet `dog_goal()` object scan.
    - Implement general restart/object/level-generation truth; do not pin the
      level-teleport room or cursor.
 2. Continue `seed0383` post-expulsion visible-map hallucination redraw ownership.
