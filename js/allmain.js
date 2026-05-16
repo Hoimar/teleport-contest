@@ -22,7 +22,7 @@ import { nhgetch } from './input.js';
 import {
     docrt, cls, bot, flush_screen, pline, newsym, serialize_terminal_grid,
     refresh_warning_monsters, refresh_swallowed_overlay, clear_pending_message,
-    queue_more_prompt,
+    queue_more_prompt, see_monsters, see_objects, see_traps,
 } from './display.js';
 import { vision_recalc, vision_reset, init_vision_globals } from './vision.js';
 import { findAlign, findRace, findRole, roleGod, roleGreeting, roleWithStartingRank } from './roles.js';
@@ -428,7 +428,10 @@ async function refreshHallucinationDisplayAtInputBoundary(g) {
         // refresh calls swallowed(0) after non-moving commands.
         refresh_swallowed_overlay();
     } else {
-        await docrt();
+        // C ref: allmain.c:moveloop_core() Hallucination branch.
+        see_monsters();
+        see_objects();
+        see_traps();
     }
 }
 
@@ -441,8 +444,9 @@ export async function moveloop_core() {
         vision_recalc(0);
         g.vision_full_recalc = 0;
     }
+    const hallucinating = !!(g.u?.uhallucination || g.u?.uprops?.hallucination);
     await refreshHallucinationDisplayAtInputBoundary(g);
-    if (g.u?.uprops?.warning) refresh_warning_monsters();
+    if (!hallucinating && g.u?.uprops?.warning) refresh_warning_monsters();
     await bot();
     await flush_screen(1);
 

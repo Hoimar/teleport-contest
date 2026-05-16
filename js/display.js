@@ -5,6 +5,7 @@ import { game } from './gstate.js';
 import { cansee } from './vision.js';
 import { rn2Display } from './rng.js';
 import { MONSTER_DATA } from './monster_data.js';
+import { OBJECT_CLASS, OBJECT_COLOR } from './object_data.js';
 import {
     COLNO, ROWNO, STONE, ROOM, CORR, DOOR, SDOOR, STAIRS,
     HWALL, VWALL, TLCORNER, TRCORNER, BLCORNER, BRCORNER,
@@ -50,16 +51,39 @@ const COLOR_BY_ANSI = new Map(ANSI_COLOR.map((ansi, color) => [ansi, color]));
 const POTION_CLASS = 8;
 const SPBOOK_CLASS = 10;
 const GEM_CLASS = 13;
+const FIRST_OBJECT = 18;
 const FIRST_REAL_GEM = 439;
 const LAST_GLASS_GEM = 469;
 const FIRST_SPELL = 366;
 const LAST_SPELL = 407;
+const CORPSE = 265;
 const BOULDER = 475;
+const STATUE = 476;
 
 const GENERIC_OBJECT_GLYPH = {
     [POTION_CLASS]: { ch: '!', color: CLR_GRAY },
     [SPBOOK_CLASS]: { ch: '+', color: CLR_GRAY },
     [GEM_CLASS]: { ch: '*', color: CLR_GRAY },
+};
+
+const OBJECT_CLASS_CHARS = {
+    1: ']',
+    2: ')',
+    3: '[',
+    4: '=',
+    5: '"',
+    6: '(',
+    7: '%',
+    8: '!',
+    9: '?',
+    10: '+',
+    11: '/',
+    12: '$',
+    13: '*',
+    14: '`',
+    15: '0',
+    16: '_',
+    17: '.',
 };
 
 const MONSTER_SYMBOLS = {
@@ -96,7 +120,37 @@ function observe_object(obj) {
     if (obj) obj.dknown = true;
 }
 
+function hallucinated_statue_glyph() {
+    // C ref: display.h:statue_to_glyph() consumes random_monster() and rng(2).
+    const mdat = MONSTER_DATA[rn2Display(MONSTER_DATA.length)] || null;
+    rn2Display(2);
+    if (!mdat) return { ch: '?', color: NO_COLOR };
+    return {
+        ch: MONSTER_SYMBOLS[mdat[1]] ?? 'm',
+        color: mdat[7] ?? NO_COLOR,
+    };
+}
+
+function random_object_glyph_for_display() {
+    // C ref: display.h:random_obj_to_glyph().
+    const otyp = rn2Display(OBJECT_CLASS.length - FIRST_OBJECT) + FIRST_OBJECT;
+    if (otyp === CORPSE) {
+        const mdat = MONSTER_DATA[rn2Display(MONSTER_DATA.length)] || null;
+        return { ch: '%', color: mdat?.[7] ?? NO_COLOR };
+    }
+    const oclass = OBJECT_CLASS[otyp];
+    return {
+        ch: OBJECT_CLASS_CHARS[oclass] || '?',
+        color: OBJECT_COLOR[otyp] ?? NO_COLOR,
+    };
+}
+
 function object_glyph_for_display(obj, x, y, visible) {
+    if (game.u?.uprops?.hallucination || game.u?.uhallucination) {
+        if (obj?.otyp === STATUE) return hallucinated_statue_glyph();
+        return random_object_glyph_for_display();
+    }
+
     let generic = obj_is_generic(obj);
     if (generic && visible && !game.u?.uhallucination) {
         const r = Math.max(game.u?.xray_range || 0, 2);
@@ -249,6 +303,31 @@ export function refresh_warning_monsters() {
     for (const mon of game.level?.monsters || []) newsym(mon.mx, mon.my);
 }
 
+export function see_monsters() {
+    for (const mon of game.level?.monsters || []) {
+        if (mon.dead || mon.mhp <= 0) continue;
+        newsym(mon.mx, mon.my);
+    }
+    if (game.u?.ux > 0) newsym(game.u.ux, game.u.uy);
+}
+
+export function see_objects() {
+    const seen = new Set();
+    for (const obj of game.level?.objects || []) {
+        const key = `${obj.ox},${obj.oy}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        newsym(obj.ox, obj.oy);
+    }
+}
+
+export function see_traps() {
+    for (const trap of game.level?.traps || []) {
+        if (!trap.tseen) continue;
+        newsym(trap.tx, trap.ty);
+    }
+}
+
 function show_premapped_mimics() {
     if (!game.level?.flags?.premapped) return;
     for (const mon of game.level.monsters || []) {
@@ -372,13 +451,28 @@ export function newsym(x, y) {
         return;
     }
 
+    const mon = game.level?.monsters?.find(m => m.mx === x && m.my === y);
+    const visible = cansee(x, y);
+
+    if (!visible) {
+        if (mon) {
+            const wg = warning_glyph(mon);
+            if (wg) show_glyph_cell(x, y, wg.ch, wg.color, false);
+        } else if (loc.remembered_glyph) {
+            // Out of sight but remembered - show remembered glyph.
+            show_glyph_cell(x, y, loc.remembered_glyph.ch,
+                loc.remembered_glyph.color, loc.remembered_glyph.decgfx);
+        } else {
+            show_glyph_cell(x, y, ' ', NO_COLOR, false);
+        }
+        return;
+    }
+
     // Contestants: add monster, object, and trap display here.
     let tg = terrain_glyph(loc, x, y);
 
     const trap = game.level?.traps?.find(t => t.tx === x && t.ty === y);
     const obj = game.level?.objects?.find(o => o.ox === x && o.oy === y);
-    const mon = game.level?.monsters?.find(m => m.mx === x && m.my === y);
-    const visible = cansee(x, y);
     const covered = terrain_covers_objects(loc);
 
     let draw_ch = tg.ch;
@@ -398,20 +492,9 @@ export function newsym(x, y) {
     }
 
     // Only update display/memory if cell is IN_SIGHT (lit and visible)
-    if (visible) {
-        show_glyph_cell(x, y, draw_ch, draw_color, draw_dec);
-        if (game.level?.flags?.hero_memory) {
-            loc.remembered_glyph = { ch: draw_ch, color: draw_color, decgfx: draw_dec };
-        }
-    } else if (mon) {
-        const wg = warning_glyph(mon);
-        if (wg) show_glyph_cell(x, y, wg.ch, wg.color, false);
-    } else if (loc.remembered_glyph) {
-        // Out of sight but remembered — show remembered glyph
-        show_glyph_cell(x, y, loc.remembered_glyph.ch,
-            loc.remembered_glyph.color, loc.remembered_glyph.decgfx);
-    } else {
-        show_glyph_cell(x, y, ' ', NO_COLOR, false);
+    show_glyph_cell(x, y, draw_ch, draw_color, draw_dec);
+    if (game.level?.flags?.hero_memory) {
+        loc.remembered_glyph = { ch: draw_ch, color: draw_color, decgfx: draw_dec };
     }
 }
 

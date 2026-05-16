@@ -12,7 +12,7 @@ and `feature_map.md`.
 
 ## Current State
 
-- Current branch in this workspace: `codex-spark-test`.
+- Current branch in this workspace: `main`.
 - Baseline commit at harness cleanup: `f0fdc38`.
 - Pre-existing dirty gameplay/docs from prior Spark work:
   `feature_map.md`, `js/cmd.js`, `js/display.js`, this checkpoint.
@@ -20,8 +20,11 @@ and `feature_map.md`.
 - Active hypothesis: `seed0383` is now past swallowed Hallucination transition,
   non-moving redraw, active-`NUMMONS`, and hallucinated monster-name ownership.
   Core RNG remains exact through swallowed attack redraws and expulsion More
-  latching. Remaining drift is post-expulsion visible-map hallucination display
-  RNG ownership on screen 172.
+  latching. The latest pass moved the post-expulsion visible-map redraw to
+  C-like `see_monsters()`/`see_objects()`/`see_traps()` ownership, added
+  hallucinated object glyphs, stopped offscreen `newsym()` display-RNG burns,
+  and prevented the Warning branch from running after the Hallucination branch.
+  Remaining drift is still the visible hallucinated glyph stream on screen 172.
 
 ## Latest Verification
 
@@ -33,15 +36,15 @@ npm run verify -- --target seed0383-wizard-hallucinate
 
 Result:
 
-- Target: `seed0383-wizard-hallucinate` `S 173/219 R 16915/16915`,
+- Target: `seed0383-wizard-hallucinate` `S 174/219 R 16915/16915`,
   first screen `172:char+attr:map:Space`, no first RNG mismatch, cursor-only `1`.
-- Sentinel total: `S 334/1063 R 35782/64569`.
+- Sentinel total: `S 335/1063 R 35782/64569`.
 - Sentinel details:
   - `seed8000-tourist-starter`: `S 23/23 R 3060/3130`, first RNG `3047`.
   - `seed0002-healer-reflection-drummer`: `S 11/595 R 2672/27158`, first RNG `2375`.
   - `seed0013-friday13-save-then-fullmoon-restore`: `S 0/99 R 573/4804`, first RNG `540`.
   - `seed0116-wizard-wear-shop`: `S 127/127 R 12562/12562`, pass.
-  - `seed0383-wizard-hallucinate`: `S 173/219 R 16915/16915`.
+  - `seed0383-wizard-hallucinate`: `S 174/219 R 16915/16915`.
 - Hack-debt audit: hard `0`, suspicious `37` existing replay/override/seed findings.
 - Memory lint: clean after this compaction target.
 
@@ -52,8 +55,10 @@ Result:
    - Current diff is hallucinated visible-map glyphs on screen 172 (`Space`)
      after expulsion More is dismissed; screen 171 message/cursor/status now
      match `You get expelled!--More--`, and core RNG remains exact.
-   - Stay on `allmain.c:moveloop_core()` `see_monsters()`/`see_objects()`/
-     `see_traps()` ordering versus JS `docrt()`/`newsym()` redraw ownership.
+   - Stay on the remaining display-RNG ownership inside the post-expulsion
+     visible-map refresh. The duplicate Warning refresh is gone; remaining
+     evidence points at earlier `docrt()`/`newsym()` display-RNG state and
+     retained glyph timing rather than core RNG or per-screen forcing.
    - Do not add seed-specific color sequences.
 2. Continue `seed5002-wizard-coverage-pair` mklev/object generation when display
    work is exhausted.
