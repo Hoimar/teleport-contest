@@ -58,7 +58,6 @@ const LAST_GLASS_GEM = 469;
 const FIRST_SPELL = 366;
 const LAST_SPELL = 407;
 const CORPSE = 265;
-const BOULDER = 475;
 const STATUE = 476;
 
 const GENERIC_OBJECT_GLYPH = {
@@ -272,9 +271,6 @@ function trap_glyph(trap) {
 }
 
 function monster_glyph(mon) {
-    if (mon?.m_ap_type === M_AP_OBJECT && mon.mappearance === BOULDER) {
-        return { ch: '`', color: CLR_GRAY, dec: false };
-    }
     if (game.u?.uprops?.hallucination || game.u?.uhallucination) {
         // C ref: display.h:mon_to_glyph() -> what_mon(..., rn2_on_display_rng).
         const mdat = MONSTER_DATA[rn2Display(MONSTER_DATA.length)] || null;
@@ -285,6 +281,15 @@ function monster_glyph(mon) {
                 dec: false,
             };
         }
+    }
+    if (mon?.m_ap_type === M_AP_OBJECT) {
+        const otyp = mon.mappearance;
+        const oclass = OBJECT_CLASS[otyp];
+        return {
+            ch: OBJECT_CLASS_CHARS[oclass] || '?',
+            color: OBJECT_COLOR[otyp] ?? NO_COLOR,
+            dec: false,
+        };
     }
     return { ch: mon.ch, color: mon.color, dec: false };
 }

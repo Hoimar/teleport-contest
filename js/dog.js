@@ -32,13 +32,25 @@ const CLOVE_OF_GARLIC = 284;
 const SLIME_MOLD = 285;
 const TIN = 296;
 const TINNING_KIT = 238;
+const EXPENSIVE_CAMERA = 229;
+const LARGE_BOX = 214;
+const CHEST = 215;
+const MIRROR = 230;
+const STETHOSCOPE = 237;
+const MAGIC_MARKER = 242;
 const BELL_OF_OPENING = 263;
 const CANDELABRUM_OF_INVOCATION = 262;
 const DOG_HUNGRY = 300;
 const M2_STRONG = 0x04000000;
 
 const OBJECT_WEIGHT_OVERRIDES = new Map([
+    [LARGE_BOX, 350],
+    [CHEST, 600],
+    [EXPENSIVE_CAMERA, 200],
+    [MIRROR, 10],
+    [STETHOSCOPE, 75],
     [TINNING_KIT, 100],
+    [MAGIC_MARKER, 2],
 ]);
 
 // These ids come from the generated object table used by mklev.js.

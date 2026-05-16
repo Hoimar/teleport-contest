@@ -579,6 +579,11 @@ async function flush_pending_more_before_monster_message() {
 
 async function show_blocking_monster_message(line) {
     if (!line) return;
+    if (game._pending_message?.startsWith('You hear nothing special.') && !game._more
+        && `${game._pending_message}  ${line}`.length < 80) {
+        game._pending_message = `${game._pending_message}  ${line}`;
+        return;
+    }
     await pline(line);
     queue_more_prompt();
 }

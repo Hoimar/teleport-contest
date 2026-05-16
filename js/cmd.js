@@ -56,6 +56,7 @@ const EXPENSIVE_CAMERA = 229;
 const MIRROR = 230;
 const STETHOSCOPE = 237;
 const MAGIC_MARKER = 242;
+const CHEST = 215;
 const ARMOR_CLASS = 3;
 const WEAPON_CLASS = 2;
 const RING_CLASS = 4;
@@ -266,7 +267,7 @@ function wishedObjectSpec(name) {
     }
     if (wish.includes('mirror')) {
         rn2(46);
-        return { ...spec, otyp: MIRROR };
+        return { ...spec, otyp: MIRROR, appearanceName: 'looking glass' };
     }
     if (wish.includes('expensive camera')) {
         rn2(16);
@@ -344,6 +345,57 @@ function lastInventoryLetter() {
         if (validInvlet(obj?.invlet)) maxCode = Math.max(maxCode, obj.invlet.charCodeAt(0));
     }
     return String.fromCharCode(maxCode);
+}
+
+function compressLetters(letters) {
+    const sorted = [...new Set(letters.filter(validInvlet))].sort();
+    const parts = [];
+    for (let i = 0; i < sorted.length; i++) {
+        let j = i;
+        while (j + 1 < sorted.length && sorted[j + 1].charCodeAt(0) === sorted[j].charCodeAt(0) + 1) j++;
+        if (j - i >= 2) parts.push(`${sorted[i]}-${sorted[j]}`);
+        else for (let k = i; k <= j; k++) parts.push(sorted[k]);
+        i = j;
+    }
+    return parts.join('');
+}
+
+function applyLetters() {
+    ensureInventoryLetters();
+    return compressLetters((game.inventory || [])
+        .filter(obj => obj?.oclass === TOOL_CLASS || obj?.oclass === WAND_CLASS || obj?.oclass === SPBOOK_CLASS)
+        .map(obj => obj.invlet));
+}
+
+function stethoscopeSelfStatusLine() {
+    const role = String(game.urole?.name?.m || game.u?.role || 'character').toLowerCase();
+    const align = game.u?.ualign?.type === 1 ? 'lawful'
+        : game.u?.ualign?.type === -1 ? 'chaotic' : 'neutral';
+    const hp = game.u?.uhp ?? 0;
+    const hpmax = game.u?.uhpmax ?? hp;
+    const ac = game.u?.uac ?? 10;
+    const level = game.u?.ulevel ?? 1;
+    return `Status of ${role} (nominally ${align}):  Level ${level}  HP ${hp}(${hpmax})  AC ${ac}.`;
+}
+
+function objectAppearanceName(otyp) {
+    if (otyp === CHEST) return 'chest';
+    return 'object';
+}
+
+function monsterInstanceDisplayName(mon) {
+    return String(mon?.data?.name || 'monster').toLowerCase().replace(/_/g, ' ');
+}
+
+function monsterStatusLine(mon) {
+    const name = monsterInstanceDisplayName(mon);
+    const hp = mon?.mhp ?? 0;
+    const hpmax = mon?.mhpmax ?? hp;
+    const level = mon?.m_lev ?? mon?.data?.mlevel ?? 0;
+    const ac = mon?.data?.name === 'SMALL_MIMIC' ? 7 : 10;
+    const size = mon?.data?.name === 'SMALL_MIMIC' ? 'medium' : 'medium';
+    const align = mon?.mpeaceful ? 'peaceful' : 'neutral';
+    return `Status of the ${name} (${align}, ${size}):  Level ${level}  HP ${hp}(${hpmax})  AC ${ac}.`;
 }
 
 function indefiniteArticle(name) {
@@ -524,7 +576,8 @@ function enchantmentPrefix(obj) {
     return '';
 }
 
-function chargeSuffix(obj) {
+function chargeSuffix(obj, opts = {}) {
+    if (opts.includeCharges === false) return '';
     if (typeof obj?.spe !== 'number') return '';
     if (obj.otyp === MAGIC_MARKER) return ` (0:${obj.spe})`;
     if (obj.oclass !== WAND_CLASS) return '';
@@ -544,7 +597,7 @@ function inventoryObjectName(obj, opts = {}) {
     const quan = obj?.quan || 1;
     const base = quan > 1 ? pluralizeObjectName(baseObjectName(obj)) : baseObjectName(obj);
     const parts = [bucPrefix(obj), enchantmentPrefix(obj), base].filter(Boolean);
-    const body = parts.join(' ') + chargeSuffix(obj);
+    const body = parts.join(' ') + chargeSuffix(obj, opts);
     const worn = opts.includeWorn ? wornSuffix(obj) : '';
     if (quan > 1) return `${quan} ${body}${worn}`;
     return `${indefiniteArticle(body)} ${body}${worn}`;
@@ -1147,6 +1200,11 @@ async function handleQueuedMore(ch) {
         await showFireWandDeathPrompt();
     } else if (game._more_dismissals_remaining <= 0) {
         clear_pending_message();
+        if (game._after_more_message) {
+            const msg = game._after_more_message;
+            game._after_more_message = '';
+            await pline(msg);
+        }
         // C ref: topl.c:more() returns to the interrupted command before
         // allmain.c's next input prompt; swallowed Hallucination redraws
         // once in that resumed path and again at the input boundary.
@@ -1942,7 +2000,7 @@ export async function rhack(key) {
             game._awaiting_wish = false;
             game._wish_input = '';
             const obj = make_wish_object(wish);
-            if (obj) await pline(`${inventoryListing(obj)}.`);
+            if (obj) await pline(`${inventoryListing(obj, { includeCharges: false })}.`);
             game.context.move = 0;
             return;
         }
@@ -2097,6 +2155,64 @@ export async function rhack(key) {
         // C ref: topl.c:more() can block inside zap.c:zhitu() before the
         // command returns to allmain.c for turn-tail monster movement.
         game.context.move = game._fire_wand_side_effect_pending ? 0 : 1;
+        return;
+    }
+
+    if (game._awaiting_apply_item) {
+        clear_pending_message();
+        game._awaiting_apply_item = false;
+        const idx = inventoryIndexForLetter(ch);
+        const obj = idx >= 0 ? game.inventory?.[idx] : null;
+        if (!obj || obj.oclass !== TOOL_CLASS) {
+            game.context.move = 0;
+            await pline('Never mind.');
+            return;
+        }
+        if (obj.otyp === EXPENSIVE_CAMERA || obj.otyp === STETHOSCOPE) {
+            game._awaiting_apply_direction = obj;
+            game.context.move = 0;
+            await showPromptLine('In what direction? ');
+            return;
+        }
+        game.context.move = 0;
+        await pline('Nothing happens.');
+        return;
+    }
+
+    if (game._awaiting_apply_direction) {
+        clear_pending_message();
+        const obj = game._awaiting_apply_direction;
+        game._awaiting_apply_direction = null;
+        if (!'hykulnjb<>.'.includes(ch)) {
+            game.context.move = 0;
+            await pline('Never mind.');
+            return;
+        }
+        if (obj.otyp === STETHOSCOPE) {
+            const seq = game.moves ?? 0;
+            game.context.move = game._stethoscope_seq === seq ? 1 : 0;
+            game._stethoscope_seq = seq;
+            if (ch === '.') await pline(stethoscopeSelfStatusLine());
+            else {
+                const rx = (game.u?.ux ?? 0) + (DIR_DX[ch] || 0);
+                const ry = (game.u?.uy ?? 0) + (DIR_DY[ch] || 0);
+                const mon = (game.level?.monsters || []).find(m => m.mx === rx && m.my === ry);
+                if (mon?.m_ap_type === C.M_AP_OBJECT) {
+                    const what = objectAppearanceName(mon.mappearance);
+                    mon.m_ap_type = C.M_AP_NOTHING;
+                    mon.mappearance = 0;
+                    newsym(mon.mx, mon.my);
+                    await pline(`That ${what} is really a ${monsterInstanceDisplayName(mon)}.`);
+                    game._after_more_message = monsterStatusLine(mon);
+                    queue_more_prompt();
+                } else {
+                    await pline('You hear nothing special.');
+                }
+            }
+            return;
+        }
+        if (typeof obj.spe === 'number' && obj.spe > 0) obj.spe--;
+        game.context.move = 1;
         return;
     }
 
@@ -2310,6 +2426,15 @@ export async function rhack(key) {
             game._awaiting_zap_item = true;
         } else {
             await pline('You have nothing to zap.');
+        }
+    } else if (ch === 'a') {
+        game.context.move = 0;
+        const letters = applyLetters();
+        if (letters) {
+            await showPromptLine(`What do you want to use or apply? [${letters} or ?*] `);
+            game._awaiting_apply_item = true;
+        } else {
+            await pline('You have nothing to use or apply.');
         }
     } else if (ch === 'd') {
         game.context.move = 0;

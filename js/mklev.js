@@ -3682,7 +3682,16 @@ function apply_themeroom_fill(croom) {
             } else {
                 rn2(3); // C ref: dungeon.c:induced_align() before mkclass().
                 const ptr = mkclass_aligned('S_MIMIC', 0);
-                if (ptr) makemon(ptr, somex(croom), somey(croom), 0);
+                if (ptr) {
+                    const mx = somex(croom);
+                    const my = somey(croom);
+                    makemon(ptr, mx, my, 0);
+                    const mon = game.level?.monsters?.find(m => m.mx === mx && m.my === my);
+                    if (mon) {
+                        mon.m_ap_type = M_AP_OBJECT;
+                        mon.mappearance = CHEST;
+                    }
+                }
             }
         }
         return;
