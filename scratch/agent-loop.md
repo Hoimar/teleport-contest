@@ -20,10 +20,11 @@ and `feature_map.md`.
 - Active hypothesis: the first segment is now past the wizard wish namedesc
   denominator, the fire-wand destruction/death RNG chain, and the first
   Storeroom/mimic/niche generation debts on the level-teleport destination.
-  The remaining visible blocker is now after post-teleport apply/stethoscope
-  evidence: screen 222 reaches the next search/pet-combat boundary, while the
-  new first RNG boundary is `FR 11643` (`rn2(20)` expected vs `rn2(5)`
-  actual).
+  The command-layer boundary after post-teleport apply/stethoscope evidence is
+  now through safe search, close-direction help, and magic-marker write-target
+  prompting. The remaining visible blocker is the next pet-combat `--More--`
+  split at screen 243, while the first RNG boundary is `FR 11678` (`rn2(4)`
+  expected vs `rn2(5)` actual).
 
 ## Latest Verification
 
@@ -35,13 +36,13 @@ npm run verify -- --target seed5002-wizard-coverage-pair
 
 Result:
 
-- Target: `seed5002-wizard-coverage-pair` `S 222/410 R 11673/12167`,
-  first screen `222:char:mixed:s`, first RNG `11643:rn2(20)=3=>rn2(5)=3`,
+- Target: `seed5002-wizard-coverage-pair` `S 243/410 R 11697/12167`,
+  first screen `243:char:mixed:o`, first RNG `11678:rn2(4)=3=>rn2(5)=0`,
   cursor-only `2`.
-- Sentinel total: `S 336/1063 R 35782/64569`.
+- Sentinel total: `S 336/1063 R 35762/64569`.
 - Sentinel details:
   - `seed8000-tourist-starter`: `S 23/23 R 3060/3130`, first RNG `3047`.
-  - `seed0002-healer-reflection-drummer`: `S 11/595 R 2672/27158`, first RNG `2375`.
+  - `seed0002-healer-reflection-drummer`: `S 11/595 R 2652/27158`, first RNG `2375`.
   - `seed0013-friday13-save-then-fullmoon-restore`: `S 0/99 R 573/4804`, first RNG `540`.
   - `seed0116-wizard-wear-shop`: `S 127/127 R 12562/12562`, pass.
   - `seed0383-wizard-hallucinate`: `S 175/219 R 16915/16915`.
@@ -54,20 +55,24 @@ Result:
    - Use `npm run triage -- seed5002-wizard-coverage-pair` and
      `node scratch/trace-rng-window.mjs seed5002-wizard-coverage-pair --moves 123 --rng 8796:8830`
      or the second segment equivalent after checking the flattened index.
-   - Current state: `S 222/410 R 11673/12167`.
-   - First visible mismatch is screen 222 on `s`: expected the search warning
-     `You already found a monster...`; actual still has a pet-combat
-     `--More--` from `The kitten bites the giant bat...`.
-   - First RNG mismatch moved from the wish/fire/mimic region to `FR 11643`
-     (`rn2(20)` expected vs `rn2(5)` actual), after fire-wand destruction,
-     nested `--More--` messages, wizard-mode death prompt handling, Storeroom
-     mimic shape/default inventory/explicit chest appearance, niche
-     `mkclass(S_HUMAN)`, sorted `mongen_order`, post-teleport tool wishes,
-     apply prompt, stethoscope self/adjacent use, mimic reveal, and mimic
-     status line match.
-   - Immediate hypothesis: resolve the next pet-combat/search message timing
-     and RNG ownership; do not revert the stethoscope or mimic appearance
-     subsystem fixes.
+   - Current state: `S 243/410 R 11697/12167`.
+   - Search safety now prints the expected `You already found a monster...`
+     zero-time warning, close uses `In what direction?` plus cmdassist
+     invalid-direction `--More--`, and applying the magic marker enters the
+     write-on target prompt, re-prompting after `You don't have that object.`
+   - First visible mismatch is screen 243 at the pet-combat `--More--` split:
+     expected `You hit the small mimic.  The kitten bites the giant bat.--More--`
+     to remain pending while JS has already advanced to the later giant-bat
+     combat line.
+   - First RNG mismatch is `FR 11678` (`rn2(4)` expected vs `rn2(5)` actual),
+     after fire-wand destruction, nested `--More--` messages, wizard-mode death
+     prompt handling, Storeroom mimic shape/default inventory/explicit chest
+     appearance, niche `mkclass(S_HUMAN)`, sorted `mongen_order`, post-teleport
+     tool wishes, apply prompt, stethoscope self/adjacent use, mimic
+     reveal/status, search safety, close prompt, and magic-marker write prompt.
+   - Immediate hypothesis: resolve dog/monster combat `--More--` pause/resume
+     structurally. A broad dog-turn pause regressed `seed0383`; keep the next
+     attempt narrower than a global `movemon()` pause.
    - Implement general restart/object/level-generation truth; do not pin the
      level-teleport room or cursor.
 2. Continue `seed0383` post-expulsion visible-map hallucination redraw ownership.

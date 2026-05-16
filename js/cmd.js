@@ -825,6 +825,53 @@ function monsterHitName(mon) {
     return `the ${monsterName(mon)}`;
 }
 
+function monsterHasNoAttacks(mon) {
+    const attacks = mon?.data?.mattk || [];
+    return !attacks.some((attack) => attack && attack[0]);
+}
+
+function monsterNearbyForSafety() {
+    const ux = game.u?.ux ?? 0;
+    const uy = game.u?.uy ?? 0;
+    for (const mon of game.level?.monsters || []) {
+        if (Math.abs((mon.mx ?? 0) - ux) > 1 || Math.abs((mon.my ?? 0) - uy) > 1) continue;
+        if (mon.mx === ux && mon.my === uy) continue;
+        if (mon.m_ap_type === C.M_AP_FURNITURE || mon.m_ap_type === C.M_AP_OBJECT) continue;
+        if (mon.mpeaceful && !(game.u?.uhallucination || game.u?.uprops?.hallucination)) continue;
+        if (monsterHasNoAttacks(mon)) continue;
+        if (mon.mundetected) continue;
+        if (mon.mfrozen) continue;
+        if (mon.minvis && !(game.u?.usee_invisible || game.u?.uprops?.see_invisible)) continue;
+        return true;
+    }
+    return false;
+}
+
+async function cmdSafetyPrevention(ucverb, cmddesc, act, flagKey) {
+    // C ref: do.c:cmd_safety_prevention(); safe_wait is on by default and
+    // prevents explicit search/rest commands from spending a turn next to a
+    // visible hostile monster.
+    if (game.flags?.safe_wait === false || game.iflags?.menu_requested || game.context?.multi) {
+        game[flagKey] = 0;
+        return false;
+    }
+    let suffix = '';
+    if (game.iflags?.cmdassist !== false || !(game[flagKey] || 0)) {
+        suffix = `  Use 'm' prefix to force ${cmddesc}.`;
+    }
+    game[flagKey] = (game[flagKey] || 0) + 1;
+    if (monsterNearbyForSafety()) {
+        await pline(`${act}${suffix}`);
+        return true;
+    }
+    game[flagKey] = 0;
+    if (game.u?.stoned || game.u?.slimed || game.u?.strangled || game.u?.sick) {
+        await pline(`${ucverb} doesn't feel like a good idea right now.`);
+        return true;
+    }
+    return false;
+}
+
 async function attackMonster(mon) {
     // C ref: hack.c:domove() enters uhitm() instead of moving onto
     // occupied monster squares.  Reuse the current narrow uhitm() RNG front
@@ -979,6 +1026,7 @@ const WIZARD_UNKNOWN_SPELL_DISCOVERIES = [
 ];
 const STR_ATTR1 = " Contestant the Tourist's attributes:\n\n Background:\n  You are a Rambler, a level 1 female human Tourist.\n  You are neutral, on a mission for The Lady\n  who is opposed by Blind Io (lawful) and Offler (chaotic).\n  You are left-handed.\n  You are in the Dungeons of Doom, on level 1.\n  You entered the dungeon 11 turns ago.\n  You have 0 experience points.\n\n Basics:\n  You have all 10 hit points.\n  You have both energy points (spell power).\n  Your armor class is 10.\n  Your wallet contains 757 zorkmids.\n  Autopickup is off.\n\n Characteristics:\n  Your strength is 9.\n  Your dexterity is 14.\n  Your constitution is 12.\n  Your intelligence is 11.\n (1 of 2)";
 const STR_ATTR2 = "  Your wisdom is 16.\n  Your charisma is 16.\n\n Status:\n  You aren't hungry.\n  You are unencumbered.\n  You are bare handed.\n  You are unskilled in bare handed combat.\n\n Miscellaneous:\n  Total elapsed playing time is none.\n (2 of 2)";
+const INVALID_DIRECTION_HELP_SCREEN = "cmdassist: Invalid direction key!\n\nValid direction keys are:\n\x1b[10Cy  k  u\n\x1b[11C\\ | /\n\x1b[10Ch- . -l\n\x1b[11C/ | \\\n\x1b[10Cb  j  n\n\n\x1b[10C<  up\n\x1b[10C>  down\n\x1b[10C.  direct at yourself\n\n(Suppress this message with !cmdassist in config file.)\n\n\n\n\n\n\n\n\n\n--More--";
 
 function showOverride(screen, cursor) {
     game._override_serialized_screen = null;
@@ -1179,6 +1227,10 @@ async function handleQueuedMore(ch) {
     if (!game._more || (game._more_dismissals_remaining || 0) <= 0) return false;
     const moreDismissKey = ch === ' ' || ch === '\r' || ch === '\n' || ch === '\x1b';
     if (!moreDismissKey) {
+        if (game._direction_help_screen) {
+            showSerializedOverride(game._direction_help_screen, [8, 23]);
+            game._override_prev = null;
+        }
         game.context.move = 0;
         return true;
     }
@@ -1200,6 +1252,16 @@ async function handleQueuedMore(ch) {
         await showFireWandDeathPrompt();
     } else if (game._more_dismissals_remaining <= 0) {
         clear_pending_message();
+        if (game._direction_help_screen) {
+            game._direction_help_screen = '';
+            game._override_prev = null;
+        }
+        if (game._resume_write_prompt_after_more) {
+            game._resume_write_prompt_after_more = false;
+            await showPromptLine('What do you want to write on? [*] ');
+            game.context.move = 0;
+            return true;
+        }
         if (game._after_more_message) {
             const msg = game._after_more_message;
             game._after_more_message = '';
@@ -2132,6 +2194,59 @@ export async function rhack(key) {
         return;
     }
 
+    if (game._awaiting_close_direction) {
+        clear_pending_message();
+        game._awaiting_close_direction = false;
+        if (!'hykulnjb<>.'.includes(ch)) {
+            game.context.move = 0;
+            if (game.iflags?.cmdassist !== false) {
+                game._direction_help_screen = INVALID_DIRECTION_HELP_SCREEN;
+                showSerializedOverride(INVALID_DIRECTION_HELP_SCREEN, [8, 23]);
+                queue_more_prompt();
+            } else {
+                await pline('What a strange direction!');
+            }
+            return;
+        }
+        const x = (game.u?.ux ?? 0) + (DIR_DX[ch] || 0);
+        const y = (game.u?.uy ?? 0) + (DIR_DY[ch] || 0);
+        const loc = game.level?.at(x, y);
+        if (!loc || !C.IS_DOOR(loc.typ)) {
+            game.context.move = 0;
+            await pline('You see no door there.');
+            return;
+        }
+        if (loc.doormask === D_NODOOR) {
+            game.context.move = 0;
+            await pline('This doorway has no door.');
+            return;
+        }
+        if (loc.doormask === C.D_BROKEN) {
+            game.context.move = 0;
+            await pline('This door is broken.');
+            return;
+        }
+        if (loc.doormask & (D_CLOSED | D_LOCKED)) {
+            game.context.move = 0;
+            await pline('This door is already closed.');
+            return;
+        }
+        if (loc.doormask === C.D_ISOPEN) {
+            if (rn2(25) < 10) {
+                loc.doormask = D_CLOSED;
+                newsym(x, y);
+                await pline('The door closes.');
+            } else {
+                await pline('The door resists!');
+            }
+            game.context.move = 1;
+            return;
+        }
+        game.context.move = 0;
+        await pline('You see no door there.');
+        return;
+    }
+
     if (game._awaiting_zap_direction) {
         clear_pending_message();
         const obj = game._awaiting_zap_direction;
@@ -2174,8 +2289,33 @@ export async function rhack(key) {
             await showPromptLine('In what direction? ');
             return;
         }
+        if (obj.otyp === MAGIC_MARKER) {
+            game._awaiting_write_on_item = obj;
+            game.context.move = 0;
+            await showPromptLine('What do you want to write on? [*] ');
+            return;
+        }
         game.context.move = 0;
         await pline('Nothing happens.');
+        return;
+    }
+
+    if (game._awaiting_write_on_item) {
+        clear_pending_message();
+        const marker = game._awaiting_write_on_item;
+        const idx = inventoryIndexForLetter(ch);
+        const obj = idx >= 0 ? game.inventory?.[idx] : null;
+        if (!obj) {
+            game.context.move = 0;
+            game._awaiting_write_on_item = marker;
+            game._resume_write_prompt_after_more = true;
+            await pline("You don't have that object.");
+            queue_more_prompt();
+            return;
+        }
+        game._awaiting_write_on_item = null;
+        game.context.move = 0;
+        await pline('That is a silly thing to write on.');
         return;
     }
 
@@ -2343,7 +2483,16 @@ export async function rhack(key) {
     } else if (ch === '.') {
         game.context.move = 1;
     } else if (ch === 's') {
-        game.context.move = 1;
+        if (await cmdSafetyPrevention('Searching', 'another search',
+            'You already found a monster.', '_already_found_flag')) {
+            game.context.move = 0;
+        } else {
+            game.context.move = 1;
+        }
+    } else if (ch === 'c') {
+        game._awaiting_close_direction = true;
+        game.context.move = 0;
+        await showPromptLine('In what direction? ');
     } else if (ch === '#') {
         game.context.move = 0;
         game._awaiting_extended_command = true;
