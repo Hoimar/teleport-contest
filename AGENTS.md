@@ -37,8 +37,7 @@ npm run agent:brief -- --target <session-or-subsystem>
 ```
 
 Then open only the files it points to. `npm run` entries are short aliases for
-the `node scripts/*.mjs` commands listed in `package.json`; no MCP or plugin
-setup is required.
+the `node scripts/*.mjs` commands listed in `package.json`.
 
 | File | Role | Default access |
 |---|---|---|
@@ -112,9 +111,8 @@ classified regressions are not stop conditions.
 
 ## Role Modes
 
-Roles are behavioral modes, not installed plugins: loop driver, triage analyst,
-C porter, dehacker, memory curator, verifier, and safety reviewer. Guide:
-`docs/agent/roles.md`.
+Roles are behavioral modes: loop driver, triage analyst, C porter, dehacker,
+memory curator, verifier, and safety reviewer. Guide: `docs/agent/roles.md`.
 
 ## Human Feedback
 
@@ -130,17 +128,9 @@ scripts, or hack-debt removal. Stage only related files and leave unrelated
 dirty worktree changes alone. Do not commit checkpoint-only churn unless it is
 the handoff artifact.
 
-## C References
+## C References And Handoff
 
-Prefer compact breadcrumbs:
-
-`C ref: path:function()`
-
-Use line numbers only when stable and useful. Do not paste large upstream
-excerpts.
-
-## Final Handoff
-
-For implementation loops, report active time, iteration count, implementation
-delta, lagging score delta, sentinel stability, classified regressions,
-current queue, exact stop condition, and the global-next-step check.
+Use compact C breadcrumbs: `C ref: path:function()`. Avoid long upstream
+excerpts. Final loop reports need active time, iteration count, implementation
+delta, score delta, sentinel stability, regressions, queue, stop condition, and
+global-next-step check.

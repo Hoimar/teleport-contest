@@ -1,7 +1,6 @@
 # Agent Roles
 
-Roles are promptable work modes inside the same repo harness. They are not a
-plugin or MCP dependency.
+Roles are promptable work modes inside the same repo harness.
 
 | Role | Use when | Owns |
 |---|---|---|

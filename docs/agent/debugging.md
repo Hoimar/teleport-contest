@@ -2,9 +2,6 @@
 
 Prefer compact tools before ad hoc scripts.
 
-There is no required MCP server or plugin layer. The supported harness surface
-is `AGENTS.md`, these runbooks, and the repo scripts.
-
 ## Triage
 
 ```bash
