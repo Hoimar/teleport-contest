@@ -52,6 +52,7 @@ const POTION_CLASS = 8;
 const SPBOOK_CLASS = 10;
 const GEM_CLASS = 13;
 const FIRST_OBJECT = 18;
+const NUM_OBJECTS = OBJECT_CLASS.length - 1;
 const FIRST_REAL_GEM = 439;
 const LAST_GLASS_GEM = 469;
 const FIRST_SPELL = 366;
@@ -133,7 +134,7 @@ function hallucinated_statue_glyph() {
 
 function random_object_glyph_for_display() {
     // C ref: display.h:random_obj_to_glyph().
-    const otyp = rn2Display(OBJECT_CLASS.length - FIRST_OBJECT) + FIRST_OBJECT;
+    const otyp = rn2Display(NUM_OBJECTS - FIRST_OBJECT) + FIRST_OBJECT;
     if (otyp === CORPSE) {
         const mdat = MONSTER_DATA[rn2Display(MONSTER_DATA.length)] || null;
         return { ch: '%', color: mdat?.[7] ?? NO_COLOR };

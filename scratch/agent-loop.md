@@ -24,7 +24,9 @@ and `feature_map.md`.
   C-like `see_monsters()`/`see_objects()`/`see_traps()` ownership, added
   hallucinated object glyphs, stopped offscreen `newsym()` display-RNG burns,
   and prevented the Warning branch from running after the Hallucination branch.
-  Remaining drift is still the visible hallucinated glyph stream on screen 172.
+  The next pass fixed `random_object()` to exclude the generated
+  `objects[NUM_OBJECTS]` sentinel. Remaining drift is still the visible
+  hallucinated glyph stream on screen 172.
 
 ## Latest Verification
 
@@ -36,15 +38,15 @@ npm run verify -- --target seed0383-wizard-hallucinate
 
 Result:
 
-- Target: `seed0383-wizard-hallucinate` `S 174/219 R 16915/16915`,
+- Target: `seed0383-wizard-hallucinate` `S 175/219 R 16915/16915`,
   first screen `172:char+attr:map:Space`, no first RNG mismatch, cursor-only `1`.
-- Sentinel total: `S 335/1063 R 35782/64569`.
+- Sentinel total: `S 336/1063 R 35782/64569`.
 - Sentinel details:
   - `seed8000-tourist-starter`: `S 23/23 R 3060/3130`, first RNG `3047`.
   - `seed0002-healer-reflection-drummer`: `S 11/595 R 2672/27158`, first RNG `2375`.
   - `seed0013-friday13-save-then-fullmoon-restore`: `S 0/99 R 573/4804`, first RNG `540`.
   - `seed0116-wizard-wear-shop`: `S 127/127 R 12562/12562`, pass.
-  - `seed0383-wizard-hallucinate`: `S 174/219 R 16915/16915`.
+  - `seed0383-wizard-hallucinate`: `S 175/219 R 16915/16915`.
 - Hack-debt audit: hard `0`, suspicious `37` existing replay/override/seed findings.
 - Memory lint: clean after this compaction target.
 
