@@ -25,9 +25,9 @@ and `feature_map.md`.
   death confirmation/default `savelife()` prompt, the following `nomovemsg`,
   hostile `ALLOW_U` movement candidate denominator, generated inventory menu,
   item-action menu, read-prompt invalid-object loop, and `m` search prefix.
-  The remaining visible blocker is the later death-prompt status latch at
-  screen 346, while the first RNG boundary is `FR 11970` (`rn2(20)` expected
-  vs `rn2(100)` actual), pointing at the next post-pet-death
+  The remaining visible blocker is hero melee kill handling at screen 356,
+  while the first RNG boundary is `FR 11970` (`rn2(20)` expected vs
+  `rn2(100)` actual), pointing at the next post-pet-death
   monster-pass/turn-tail ordering gap.
 
 ## Latest Verification
@@ -40,8 +40,8 @@ npm run verify -- --target seed5002-wizard-coverage-pair
 
 Result:
 
-- Target: `seed5002-wizard-coverage-pair` `S 359/410 R 12039/12167`,
-  first screen `346:char:status:Space`, first RNG
+- Target: `seed5002-wizard-coverage-pair` `S 368/410 R 12039/12167`,
+  first screen `356:message:message:y`, first RNG
   `11970:rn2(20)=6=>rn2(100)=6`, cursor-only `7`.
 - Sentinel total: `S 336/1063 R 35775/64569`.
 - Sentinel details:
@@ -52,7 +52,7 @@ Result:
   - `seed0383-wizard-hallucinate`: `S 175/219 R 16915/16915`.
 - Hack-debt audit: hard `0`, suspicious `37` existing replay/override/seed findings.
 - Memory lint: clean after this compaction target.
-- Full suite after the earlier shared turn/message change: `S 723/11405 R 102300/792838`.
+- Full suite after the latest pet-combat/death timing change: `S 826/11405 R 102576/792838`.
 
 ## Current Queue
 
@@ -60,7 +60,7 @@ Result:
    - Use `npm run triage -- seed5002-wizard-coverage-pair` and
      `node scratch/trace-rng-window.mjs seed5002-wizard-coverage-pair --moves 123 --rng 8796:8830`
      or the second segment equivalent after checking the flattened index.
-   - Current state: `S 359/410 R 12039/12167`.
+   - Current state: `S 368/410 R 12039/12167`.
    - Search safety now prints the expected `You already found a monster...`
      zero-time warning, `m` prefixes force the following search, close/open and
      inventory-action throw use `In what direction?` plus cmdassist
@@ -81,9 +81,11 @@ Result:
      attacks outside the savelife resume, delays defender-kills-attacker death
      side effects until after the hit-message More, and clears the dead pet
      resume marker so the live defender can continue the pass.
-   - First visible mismatch is screen 346: the death prompt text matches
-     `Die? [yn] (n)`, but C's status line still has HP 0 and cursor column 14
-     while JS has HP 1 and cursor column 13.
+   - Death prompts now latch HP 0/cursor and non-paused savelife packs the
+     `You survived...` message onto the OK line. `e` with no food now prints
+     `You don't have anything to eat.`.
+   - First visible mismatch is screen 356: C kills the giant bat, while JS
+     leaves it alive with `You hit the giant bat.--More--`.
    - First RNG mismatch is `FR 11970` (`rn2(20)` expected vs `rn2(100)` actual),
      after fire-wand destruction, nested `--More--` messages, wizard-mode death
      prompt handling, Storeroom mimic shape/default inventory/explicit chest

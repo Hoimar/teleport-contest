@@ -635,7 +635,7 @@ function _statusLine2() {
     const conditions = [];
     if (u.uprops?.hallucination || u.uhallucination) conditions.push('Hallu');
     const conditionText = conditions.length ? ` ${conditions.join(' ')}` : '';
-    const hp = game._latched_status_uhp != null && game._more
+    const hp = game._latched_status_uhp != null && (game._more || game._death_prompt_active)
         ? game._latched_status_uhp
         : (u.uhp || 0);
     return `Dlvl:${depth(u.uz)} $:${game._goldCount || 0} HP:${hp}(${u.uhpmax || 0}) Pw:${u.uen || 0}(${u.uenmax || 0}) AC:${u.uac ?? 10} ${xp}${turn}${conditionText}`;

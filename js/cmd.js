@@ -380,6 +380,14 @@ function readLetters() {
         .join('');
 }
 
+function eatLetters() {
+    ensureInventoryLetters();
+    return (game.inventory || [])
+        .filter((obj) => obj?.oclass === FOOD_CLASS)
+        .map((obj) => obj.invlet)
+        .join('');
+}
+
 function stethoscopeSelfStatusLine() {
     const role = String(game.urole?.name?.m || game.u?.role || 'character').toLowerCase();
     const align = game.u?.ualign?.type === 1 ? 'lawful'
@@ -509,7 +517,10 @@ async function showDeathPrompt() {
     game._death_prompt_active = true;
     game._more = false;
     game._more_dismissals_remaining = 0;
-    await showPromptLine('Die? [yn] (n)');
+    game._latched_status_uhp = 0;
+    const msg = 'Die? [yn] (n)';
+    await showPromptLine(msg);
+    game._prompt_cursor = [msg.length + 1, 0];
 }
 
 function pluralizeObjectName(name) {
@@ -1931,6 +1942,7 @@ export async function rhack(key) {
     if (game._death_prompt_active) {
         if (ch === 'y' || ch === 'Y') {
             game._death_prompt_active = false;
+            game._latched_status_uhp = null;
             game.program_state = game.program_state || {};
             game.program_state.gameover = true;
             game.context.move = 0;
@@ -1941,19 +1953,23 @@ export async function rhack(key) {
             game._prompt_cursor = null;
             if (game.u && typeof game.u.uhp === 'number')
                 game.u.uhp = Math.max(1, game.u.uhpmax || game.u.uhp);
-            game._nomovemsg = 'You survived that attempt on your life.';
-            await pline("OK, so you don't die.");
+            game._latched_status_uhp = null;
             if (game._monster_turn_paused_for_more) {
+                game._nomovemsg = 'You survived that attempt on your life.';
+                await pline("OK, so you don't die.");
                 game._monster_turn_paused_for_more = false;
                 game._resume_monster_turn = true;
                 game._savelife_resume_active = true;
                 game.context.move = 1;
             } else {
+                await pline("OK, so you don't die.  You survived that attempt on your life.");
                 game.context.move = 0;
             }
             return;
         }
-        await showPromptLine('Die? [yn] (n)');
+        const msg = 'Die? [yn] (n)';
+        await showPromptLine(msg);
+        game._prompt_cursor = [msg.length + 1, 0];
         game.context.move = 0;
         return;
     }
@@ -2794,6 +2810,11 @@ export async function rhack(key) {
         game.context.move = 0;
         await showPromptLine(`What do you want to read? [${readLetters()} or ?*] `);
         game._awaiting_read_item = true;
+    } else if (ch === 'e') {
+        game.context.move = 0;
+        const letters = eatLetters();
+        if (letters) await showPromptLine(`What do you want to eat? [${letters} or ?*] `);
+        else await pline("You don't have anything to eat.");
     } else if (ch === 'z') {
         game.context.move = 0;
         const letters = zapLetters();
