@@ -25,9 +25,10 @@ and `feature_map.md`.
   death confirmation/default `savelife()` prompt, the following `nomovemsg`,
   hostile `ALLOW_U` movement candidate denominator, generated inventory menu,
   item-action menu, read-prompt invalid-object loop, and `m` search prefix.
-  The remaining visible blocker is pet-combat More placement at screen 323,
-  while the first RNG boundary is `FR 11838` (`rn2(3)` expected vs
-  `d(1,6)` actual), pointing at the next `mattackm()`/pet-combat timing gap.
+  The remaining visible blocker is deferred pet-combat More display at screen
+  329, while the first RNG boundary is `FR 11884` (`rn2(3)` expected vs
+  `rn2(5)` actual), pointing at the next post-return pet-combat/monster-pass
+  ordering gap.
 
 ## Latest Verification
 
@@ -39,9 +40,9 @@ npm run verify -- --target seed5002-wizard-coverage-pair
 
 Result:
 
-- Target: `seed5002-wizard-coverage-pair` `S 326/410 R 11857/12167`,
-  first screen `323:message:message:s`, first RNG
-  `11838:rn2(3)=1=>d(1,6)=2`, cursor-only `7`.
+- Target: `seed5002-wizard-coverage-pair` `S 352/410 R 11892/12167`,
+  first screen `329:char:mixed:Space`, first RNG
+  `11884:rn2(3)=1=>rn2(5)=4`, cursor-only `7`.
 - Sentinel total: `S 336/1063 R 35775/64569`.
 - Sentinel details:
   - `seed8000-tourist-starter`: `S 23/23 R 3060/3130`, first RNG `3047`.
@@ -59,7 +60,7 @@ Result:
    - Use `npm run triage -- seed5002-wizard-coverage-pair` and
      `node scratch/trace-rng-window.mjs seed5002-wizard-coverage-pair --moves 123 --rng 8796:8830`
      or the second segment equivalent after checking the flattened index.
-   - Current state: `S 326/410 R 11857/12167`.
+   - Current state: `S 352/410 R 11892/12167`.
    - Search safety now prints the expected `You already found a monster...`
      zero-time warning, `m` prefixes force the following search, close/open and
      inventory-action throw use `In what direction?` plus cmdassist
@@ -74,10 +75,15 @@ Result:
      `nomovemsg` prints after More dismissal. `o` now uses the shared
      direction prompt and open-specific invalid-direction `Never mind.` tail.
      Hostile `m_move()` now counts the hero square as an `ALLOW_U` candidate.
-   - First visible mismatch is screen 323: JS appends `--More--` to
-     `The kitten misses the giant bat.  The giant bat bites!` but C leaves the
-     topline unblocked.
-   - First RNG mismatch is `FR 11838` (`rn2(3)` expected vs `d(1,6)` actual),
+   - Pet combat now uses C's `find_mac(defender) + attacker level > dieroll`
+     hit comparison for current kitten/rat/bat evidence, suppresses a fitting
+     packed monster More only on the final movement pass, and allows defender
+     return attacks outside the savelife resume.
+   - First visible mismatch is screen 329: after dismissing
+     `The kitten misses the giant bat.  The giant bat bites!--More--`, C shows
+     `The kitten bites the giant bat.  The giant bat bites the kitten.--More--`
+     but JS still captures the resumed `The giant bat bites!--More--` frame.
+   - First RNG mismatch is `FR 11884` (`rn2(3)` expected vs `rn2(5)` actual),
      after fire-wand destruction, nested `--More--` messages, wizard-mode death
      prompt handling, Storeroom mimic shape/default inventory/explicit chest
      appearance, niche `mkclass(S_HUMAN)`, sorted `mongen_order`, post-teleport
@@ -85,10 +91,10 @@ Result:
      reveal/status, search safety, close/open/throw prompts, magic-marker write
      prompt, inventory/action/read menus, `m` search prefix, the first
      pet-combat More split, wizard-mode death confirmation, and savelife resume.
-   - Immediate hypothesis: inspect pet-combat More latching around
-     `mattackm()`/`hitmm()` after forced search; the first kitten-miss/bat-bite
-     topline should not block, while the later screen 328/329 chained pet
-     combat messages should.
+   - Immediate hypothesis: the after-More pet-combat message is generated but
+     not held as its own blocking frame before monster-turn resume; fix the
+     deferred-message prompt/latch without regressing the earlier screen 246
+     `The giant bat misses the kitten.  The giant bat bites!--More--` packing.
    - Implement general restart/object/level-generation truth; do not pin the
      level-teleport room or cursor.
 2. Continue `seed0383` post-expulsion visible-map hallucination redraw ownership.

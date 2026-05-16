@@ -361,6 +361,23 @@ function monster_name(mon) {
     return String(mon?.data?.name || 'monster').toLowerCase().replace(/_/g, ' ');
 }
 
+const MONSTER_AC = new Map([
+    ['kitten', 6],
+    ['fox', 7],
+    ['sewer rat', 7],
+    ['giant bat', 7],
+]);
+
+function monster_ac(mon) {
+    const name = monster_name(mon);
+    return mon?.mac ?? mon?.ac ?? mon?.data?.ac ?? MONSTER_AC.get(name) ?? 10;
+}
+
+function mattackm_hits(magr, mdef, dieroll) {
+    const level = magr?.m_lev ?? magr?.data?.mlevel ?? 0;
+    return monster_ac(mdef) + level > dieroll;
+}
+
 function pet_name(mtmp) {
     return String(mtmp?.data?.name || 'pet').toLowerCase().replace(/_/g, ' ');
 }
@@ -385,6 +402,7 @@ async function append_topline_message(line) {
                 ? `${game._after_more_message}  ${line}`
                 : line;
             game._after_more_needs_prompt = true;
+            game._pet_combat_more_latched = true;
             return;
         }
         game._pending_message = `${game._pending_message}  ${line}`;
@@ -615,7 +633,7 @@ async function pet_melee_attack(mtmp, target) {
     // pet evidence: one physical attack, miss passive check, or hit damage
     // plus death/growth follow-up RNG.
     const dieroll = rnd(20);
-    if (dieroll > 10) {
+    if (!mattackm_hits(mtmp, target, dieroll)) {
         refresh_pet_attack_symbols(mtmp, target);
         await pet_combat_message(mtmp, `misses the ${monster_name(target)}.`);
         rn2(3);
@@ -639,7 +657,7 @@ async function pet_melee_attack(mtmp, target) {
 
 async function monster_melee_attack(mtmp, target) {
     const dieroll = rnd(20);
-    if (dieroll > 10) {
+    if (!mattackm_hits(mtmp, target, dieroll)) {
         refresh_pet_attack_symbols(mtmp, target);
         await append_topline_message(`The ${monster_name(mtmp)} misses ${monster_article_name(target)}.`);
         rn2(3);
@@ -758,7 +776,7 @@ export async function dog_move(mtmp, after = true) {
                 const attack = await pet_melee_attack(mtmp, target);
                 if (attack.attacked) {
                     if (attack.hit && !attack.defenderDied && rn2(4)
-                        && target.mlstmv !== (game.moves || 0)) {
+                        && !game._savelife_resume_active) {
                         await monster_melee_attack(target, mtmp);
                     }
                     return 0;

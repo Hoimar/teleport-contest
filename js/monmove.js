@@ -592,6 +592,7 @@ async function show_blocking_monster_message(line) {
     if (game._pending_message && !game._more && `${game._pending_message}  ${line}`.length < 80) {
         game._pending_message = `${game._pending_message}  ${line}`;
         queue_more_prompt();
+        game._packed_monster_more_candidate = true;
         return;
     }
     if (game._more && game._pending_message && game._pet_combat_more_latched && !hallucinating()) {
@@ -1268,6 +1269,13 @@ export async function movemon() {
         age_gas_clouds();
         g._gas_clouds_aged_turn = g.moves;
     }
+
+    if (!somebody_can_move && g._packed_monster_more_candidate
+        && g._more && !g._pet_combat_more_latched && !hallucinating()) {
+        g._more = false;
+        g._more_dismissals_remaining = 0;
+    }
+    g._packed_monster_more_candidate = false;
 
     return somebody_can_move;
 }
