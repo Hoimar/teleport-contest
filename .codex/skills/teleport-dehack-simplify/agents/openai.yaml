@@ -1,7 +1,0 @@
-interface:
-  display_name: "Teleport Dehack And Simplify"
-  short_description: "Remove seed-specific teleport scaffolding"
-  default_prompt: "Use $teleport-dehack-simplify to remove reward-hacking scaffolding from this teleport-contest repo, verify sentinels, and document any expected regression impact."
-
-policy:
-  allow_implicit_invocation: true

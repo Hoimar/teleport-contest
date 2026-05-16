@@ -1,7 +1,0 @@
-interface:
-  display_name: "Teleport Implementation Loop"
-  short_description: "Run a sustained parity implementation loop in teleport-contest"
-  default_prompt: "Use $teleport-implementation-loop to keep iterating on generalized parity for the AGENTS.md marathon budget. Treat status/progress questions as brief interrupts, refresh the queue after every checkpoint, and stop only when the user explicitly asks to stop or after proving an AGENTS.md valid global stop condition."
-
-policy:
-  allow_implicit_invocation: true

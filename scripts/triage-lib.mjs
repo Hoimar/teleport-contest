@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { normalizeSession } from '../frozen/session_loader.mjs';
 import { decodeScreen, diffCell, renderCell, ROWS_24, COLS_80 } from '../frozen/screen-decode.mjs';
 
+// Shared analysis library for the human-facing harness scripts. Keep CLI
+// formatting in the callers; this module should return compact structured facts.
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(SCRIPT_DIR, '..');
 const SESSIONS_DIR = path.join(PROJECT_ROOT, 'sessions');
@@ -91,7 +93,7 @@ function gridRowText(grid, row) {
     return out.trimEnd();
 }
 
-function compareScreen(actual, expected, sampleLimit = 5) {
+export function compareScreen(actual, expected, sampleLimit = 5) {
     const ga = decodeComparable(actual);
     const gb = decodeComparable(expected);
     let charDiffs = 0;

@@ -8,6 +8,11 @@
     "score:live-public": "node scripts/fetch-live-public-sessions.mjs && bash frozen/score.sh .cache/live-sessions",
     "sentinel": "node scripts/run-sentinel-suite.mjs",
     "triage": "node scripts/triage-session.mjs",
+    "agent:brief": "node scripts/agent-brief.mjs",
+    "verify": "node scripts/verify-change.mjs",
+    "hack:audit": "node scripts/hack-debt-audit.mjs",
+    "memory:lint": "node scripts/memory-lint.mjs",
+    "screen:diff": "node scripts/screen-diff.mjs",
     "play": "echo 'Open index.html in a browser to play'"
   },
   "engines": {
