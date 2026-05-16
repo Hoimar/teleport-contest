@@ -320,6 +320,9 @@ const MONSTERS = MONSTER_DATA.map(([name, mlet, mlevel, mmove, maligntyp, geno, 
     neuter: !!neuter, male: !!male, female: !!female,
 }));
 
+const SPECIAL_PM = MONSTERS.findIndex(mon => mon.name === 'LONG_WORM_TAIL');
+const MONGEN_ORDER_LIMIT = SPECIAL_PM >= 0 ? SPECIAL_PM : MONSTERS.length;
+
 const MONSTER_SYMBOLS = {
     S_ANT: 'a', S_BLOB: 'b', S_COCKATRICE: 'c', S_DOG: 'd',
     S_EYE: 'e', S_FELINE: 'f', S_GREMLIN: 'g', S_HUMANOID: 'h',
@@ -337,6 +340,17 @@ const MONSTER_SYMBOLS = {
     S_HUMAN: '@', S_GHOST: ' ', S_DEMON: '&', S_EEL: ';',
     S_LIZARD: ':', S_WORM_TAIL: '~',
 };
+
+function monster_mlet_sort_value(ptr) {
+    return (ptr?.difficulty ?? 0) | ((MONSTER_SYMBOLS[ptr?.mlet]?.charCodeAt(0) ?? 0) << 8);
+}
+
+const MONGEN_ORDER = (() => {
+    const order = MONSTERS.map((_, i) => i);
+    const sorted = order.slice(0, MONGEN_ORDER_LIMIT)
+        .sort((a, b) => monster_mlet_sort_value(MONSTERS[a]) - monster_mlet_sort_value(MONSTERS[b]));
+    return sorted.concat(order.slice(MONGEN_ORDER_LIMIT));
+})();
 
 const VERY_SMALL_MONSTERS = new Set([
     'GIANT_ANT', 'KILLER_BEE', 'SOLDIER_ANT', 'FIRE_ANT', 'QUEEN_BEE',
@@ -1292,15 +1306,16 @@ function mk_gen_ok(ptr, _mv_mask, gn_mask) {
 }
 
 function mkclass_aligned(mlet, spc = 0, atyp = A_NONE) {
-    const first = MONSTERS.findIndex(ptr => ptr.mlet === mlet);
-    if (first < 0) return null;
     const classMons = [];
-    for (let i = first; i < MONSTERS.length && MONSTERS[i].mlet === mlet; i++)
-        classMons.push(MONSTERS[i]);
+    for (let i = 0; i < MONGEN_ORDER_LIMIT; i++) {
+        const ptr = MONSTERS[MONGEN_ORDER[i]];
+        if (ptr.mlet === mlet) classMons.push(ptr);
+        else if (classMons.length) break;
+    }
     if (!classMons.length) return null;
 
     const maxmlev = level_difficulty() >> 1;
-    const zeroFreqForClass = classMons.every(ptr => !(ptr.geno & G_FREQ));
+    const zeroFreqForClass = MONSTERS.every(ptr => ptr.mlet !== mlet || !(ptr.geno & G_FREQ));
     let mvMask = 0x03; // G_GONE; mvitals are not modeled yet.
     if (spc & G_IGNORE) {
         mvMask = 0;

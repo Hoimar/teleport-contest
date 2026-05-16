@@ -52,7 +52,10 @@ const CLOAK_OF_MAGIC_RESISTANCE = 139;
 const RIN_TELEPORT_CONTROL = 195;
 const RIN_INCREASE_ACCURACY = 176;
 const RIN_STEALTH = 181;
-const MAGIC_MARKER = 229;
+const EXPENSIVE_CAMERA = 229;
+const MIRROR = 230;
+const STETHOSCOPE = 237;
+const MAGIC_MARKER = 242;
 const ARMOR_CLASS = 3;
 const WEAPON_CLASS = 2;
 const RING_CLASS = 4;
@@ -79,6 +82,9 @@ const OBJECT_BASE_NAMES = new Map([
     [RIN_STEALTH, 'ring of stealth'],
     [RIN_TELEPORT_CONTROL, 'ring of teleport control'],
     [200, 'ring of protection from shape changers'],
+    [EXPENSIVE_CAMERA, 'expensive camera'],
+    [MIRROR, 'mirror'],
+    [STETHOSCOPE, 'stethoscope'],
     [MAGIC_MARKER, 'magic marker'],
     [306, 'potion of see invisible'],
     [307, 'potion of healing'],
@@ -249,6 +255,22 @@ function wishedObjectSpec(name) {
     if (wish.includes('ring of teleport control')) {
         rn2(2);
         return { ...spec, otyp: RIN_TELEPORT_CONTROL, appearanceName: 'ivory ring' };
+    }
+    if (wish.includes('stethoscope')) {
+        rn2(26);
+        return { ...spec, otyp: STETHOSCOPE };
+    }
+    if (wish.includes('magic marker')) {
+        rn2(16);
+        return { ...spec, otyp: MAGIC_MARKER };
+    }
+    if (wish.includes('mirror')) {
+        rn2(46);
+        return { ...spec, otyp: MIRROR };
+    }
+    if (wish.includes('expensive camera')) {
+        rn2(16);
+        return { ...spec, otyp: EXPENSIVE_CAMERA };
     }
     return null;
 }

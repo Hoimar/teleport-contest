@@ -21,9 +21,9 @@ and `feature_map.md`.
   denominator, the fire-wand destruction/death RNG chain, and the first
   Storeroom/mimic/niche generation debts on the level-teleport destination.
   The remaining visible blocker is still the segment-two level-teleport
-  map/cursor at screen 128, while the new first RNG boundary is the level-5
-  human-class selection edge at `FR 10382` (`rn2(9)` expected vs `rn2(2)`
-  actual).
+  map/cursor at screen 128, while the new first RNG boundary is downstream
+  monster movement at `FR 11602` (`rn2(28)` expected vs `rn2(16)` actual)
+  after post-teleport tool wishes match.
 
 ## Latest Verification
 
@@ -35,8 +35,8 @@ npm run verify -- --target seed5002-wizard-coverage-pair
 
 Result:
 
-- Target: `seed5002-wizard-coverage-pair` `S 128/410 R 11530/12167`,
-  first screen `128:char:map:Enter`, first RNG `10382:rn2(9)=4=>rn2(2)=0`,
+- Target: `seed5002-wizard-coverage-pair` `S 128/410 R 11643/12167`,
+  first screen `128:char:map:Enter`, first RNG `11602:rn2(28)=16=>rn2(16)=4`,
   cursor-only `2`.
 - Sentinel total: `S 336/1063 R 35782/64569`.
 - Sentinel details:
@@ -54,16 +54,19 @@ Result:
    - Use `npm run triage -- seed5002-wizard-coverage-pair` and
      `node scratch/trace-rng-window.mjs seed5002-wizard-coverage-pair --moves 123 --rng 8796:8830`
      or the second segment equivalent after checking the flattened index.
-   - Current state: `S 128/410 R 11530/12167`.
+   - Current state: `S 128/410 R 11643/12167`.
    - First visible mismatch is still screen 128 after `#levelteleport`, with
      the expected map/cursor lower-left and actual map/cursor right-side.
-   - First RNG mismatch moved from the wish/fire region to `FR 10382`
-     (`rn2(9)` expected vs `rn2(2)` actual), after fire-wand destruction,
+   - First RNG mismatch moved from the wish/fire region to `FR 11602`
+     (`rn2(28)` expected vs `rn2(16)` actual), after fire-wand destruction,
      nested `--More--` messages, wizard-mode death prompt handling, Storeroom
-     mimic shape/default inventory, and niche `mkclass(S_HUMAN)` match.
-   - The immediate hypothesis is a remaining level-state or monster eligibility
-     difference inside the human-class `mkclass()` walk; do not hardcode the
-     level-teleport room, map, or mimic coordinates.
+     mimic shape/default inventory, niche `mkclass(S_HUMAN)`, sorted
+     `mongen_order`, and post-teleport tool wishes match.
+   - Immediate hypothesis: downstream giant-bat `m_move()` candidate count is
+     exposing the same visible map/spatial drift. A temporary trace showed the
+     actual bat at `(39,18)` had candidates `38,18 39,17 40,17 40,18` and
+     southern cells were horizontal walls; expected `rn2(28)` implies seven
+     candidates. Do not "fix" this by letting monsters move into walls.
    - Implement general restart/object/level-generation truth; do not pin the
      level-teleport room or cursor.
 2. Continue `seed0383` post-expulsion visible-map hallucination redraw ownership.
