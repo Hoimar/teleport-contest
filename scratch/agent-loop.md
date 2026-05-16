@@ -25,9 +25,9 @@ and `feature_map.md`.
   death confirmation/default `savelife()` prompt, the following `nomovemsg`,
   hostile `ALLOW_U` movement candidate denominator, generated inventory menu,
   item-action menu, read-prompt invalid-object loop, and `m` search prefix.
-  The remaining visible blocker is hero melee kill handling at screen 356,
-  while the first RNG boundary is `FR 11970` (`rn2(20)` expected vs
-  `rn2(100)` actual), pointing at the next post-pet-death
+  The remaining visible blocker is the small mimic being one map square off at
+  screen 363, while the first RNG boundary is `FR 11970` (`rn2(20)` expected
+  vs `rn2(100)` actual), pointing at the next post-pet-death
   monster-pass/turn-tail ordering gap.
 
 ## Latest Verification
@@ -40,16 +40,16 @@ npm run verify -- --target seed5002-wizard-coverage-pair
 
 Result:
 
-- Target: `seed5002-wizard-coverage-pair` `S 368/410 R 12039/12167`,
-  first screen `356:message:message:y`, first RNG
-  `11970:rn2(20)=6=>rn2(100)=6`, cursor-only `7`.
-- Sentinel total: `S 336/1063 R 35775/64569`.
+- Target: `seed5002-wizard-coverage-pair` `S 370/410 R 12039/12167`,
+  first screen `363:char:map:y`, first RNG
+  `11970:rn2(20)=6=>rn2(100)=6`, cursor-only `1`.
+- Sentinel total: `S 338/1063 R 35995/64569`.
 - Sentinel details:
   - `seed8000-tourist-starter`: `S 23/23 R 3060/3130`, first RNG `3047`.
-  - `seed0002-healer-reflection-drummer`: `S 11/595 R 2665/27158`, first RNG `2375`.
-  - `seed0013-friday13-save-then-fullmoon-restore`: `S 0/99 R 573/4804`, first RNG `540`.
+  - `seed0002-healer-reflection-drummer`: `S 11/595 R 2880/27158`, first RNG `2375`.
+  - `seed0013-friday13-save-then-fullmoon-restore`: `S 0/99 R 578/4804`, first RNG `540`.
   - `seed0116-wizard-wear-shop`: `S 127/127 R 12562/12562`, pass.
-  - `seed0383-wizard-hallucinate`: `S 175/219 R 16915/16915`.
+  - `seed0383-wizard-hallucinate`: `S 177/219 R 16915/16915`.
 - Hack-debt audit: hard `0`, suspicious `37` existing replay/override/seed findings.
 - Memory lint: clean after this compaction target.
 - Full suite after the latest pet-combat/death timing change: `S 826/11405 R 102576/792838`.
@@ -60,7 +60,7 @@ Result:
    - Use `npm run triage -- seed5002-wizard-coverage-pair` and
      `node scratch/trace-rng-window.mjs seed5002-wizard-coverage-pair --moves 123 --rng 8796:8830`
      or the second segment equivalent after checking the flattened index.
-   - Current state: `S 368/410 R 12039/12167`.
+   - Current state: `S 370/410 R 12039/12167`.
    - Search safety now prints the expected `You already found a monster...`
      zero-time warning, `m` prefixes force the following search, close/open and
      inventory-action throw use `In what direction?` plus cmdassist
@@ -83,9 +83,10 @@ Result:
      resume marker so the live defender can continue the pass.
    - Death prompts now latch HP 0/cursor and non-paused savelife packs the
      `You survived...` message onto the OK line. `e` with no food now prints
-     `You don't have anything to eat.`.
-   - First visible mismatch is screen 356: C kills the giant bat, while JS
-     leaves it alive with `You hit the giant bat.--More--`.
+     `You don't have anything to eat.`. Hero melee now prints the kill line
+     before `xkilled()` side effects for the current lethal giant-bat hit.
+   - First visible mismatch is screen 363: a small mimic is one square off
+     (`m` at `[17,40]` in JS vs `[18,41]` in C).
    - First RNG mismatch is `FR 11970` (`rn2(20)` expected vs `rn2(100)` actual),
      after fire-wand destruction, nested `--More--` messages, wizard-mode death
      prompt handling, Storeroom mimic shape/default inventory/explicit chest

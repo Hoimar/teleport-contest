@@ -912,17 +912,16 @@ async function heroMeleeAttack(mon) {
     rnd(20);
     exercise(A_DEX, true);
     const damage = rnd(6);
-    await pline(`You hit ${monsterHitName(mon)}.`);
     if (typeof mon.mhp === 'number') {
         mon.mhp -= damage;
         if (mon.mhp <= 0) {
-            game._hero_melee_message_pending = true;
-            queue_more_prompt();
+            await pline(`You kill ${monsterHitName(mon)}!`);
             heroKilledMonster(mon);
             game.context.run = null;
             return;
         }
     }
+    await pline(`You hit ${monsterHitName(mon)}.`);
     rn2(3);
     rn2(6);
     rn2(25);
