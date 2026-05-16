@@ -16,30 +16,26 @@ and `feature_map.md`.
 - Baseline commit at harness cleanup: `f0fdc38`.
 - Pre-existing dirty gameplay/docs from prior Spark work:
   `feature_map.md`, `js/cmd.js`, `js/display.js`, this checkpoint.
-- Active target: `seed0383-wizard-hallucinate`.
-- Active hypothesis: `seed0383` is now past swallowed Hallucination transition,
-  non-moving redraw, active-`NUMMONS`, and hallucinated monster-name ownership.
-  Core RNG remains exact through swallowed attack redraws and expulsion More
-  latching. The latest pass moved the post-expulsion visible-map redraw to
-  C-like `see_monsters()`/`see_objects()`/`see_traps()` ownership, added
-  hallucinated object glyphs, stopped offscreen `newsym()` display-RNG burns,
-  and prevented the Warning branch from running after the Hallucination branch.
-  The next pass fixed `random_object()` to exclude the generated
-  `objects[NUM_OBJECTS]` sentinel. Remaining drift is still the visible
-  hallucinated glyph stream on screen 172.
+- Active target: `seed5002-wizard-coverage-pair`.
+- Active hypothesis: the first segment is now past the wizard wish namedesc
+  denominator and the fire-wand destruction/death RNG chain. The remaining
+  visible blocker is still the segment-two level-teleport map/cursor at screen
+  128, while the new first RNG boundary is later post-restart/object-state
+  evidence at `FR 8812` (`rn2(2)` expected vs `rn2(100)` actual).
 
 ## Latest Verification
 
 Run:
 
 ```bash
-npm run verify -- --target seed0383-wizard-hallucinate
+npm run verify -- --target seed5002-wizard-coverage-pair
 ```
 
 Result:
 
-- Target: `seed0383-wizard-hallucinate` `S 175/219 R 16915/16915`,
-  first screen `172:char+attr:map:Space`, no first RNG mismatch, cursor-only `1`.
+- Target: `seed5002-wizard-coverage-pair` `S 128/410 R 8932/12167`,
+  first screen `128:char:map:Enter`, first RNG `8812:rn2(2)=1=>rn2(100)=55`,
+  cursor-only `2`.
 - Sentinel total: `S 336/1063 R 35782/64569`.
 - Sentinel details:
   - `seed8000-tourist-starter`: `S 23/23 R 3060/3130`, first RNG `3047`.
@@ -52,7 +48,19 @@ Result:
 
 ## Current Queue
 
-1. Continue `seed0383` post-expulsion visible-map hallucination redraw ownership.
+1. Continue `seed5002-wizard-coverage-pair` post-fire/restart boundary.
+   - Use `npm run triage -- seed5002-wizard-coverage-pair` and
+     `node scratch/trace-rng-window.mjs seed5002-wizard-coverage-pair --moves 123 --rng 8796:8830`
+     or the second segment equivalent after checking the flattened index.
+   - Current state: `S 128/410 R 8932/12167`.
+   - First visible mismatch is still screen 128 after `#levelteleport`, with
+     the expected map/cursor lower-left and actual map/cursor right-side.
+   - First RNG mismatch moved from the wish/fire region to `FR 8812`
+     (`rn2(2)` expected vs `rn2(100)` actual), after fire-wand destruction,
+     nested `--More--` messages, and wizard-mode death prompt handling match.
+   - Implement general restart/object/level-generation truth; do not pin the
+     level-teleport room or cursor.
+2. Continue `seed0383` post-expulsion visible-map hallucination redraw ownership.
    - Use `npm run screen:diff -- seed0383-wizard-hallucinate --first`.
    - Current diff is hallucinated visible-map glyphs on screen 172 (`Space`)
      after expulsion More is dismissed; screen 171 message/cursor/status now
@@ -62,13 +70,6 @@ Result:
      evidence points at earlier `docrt()`/`newsym()` display-RNG state and
      retained glyph timing rather than core RNG or per-screen forcing.
    - Do not add seed-specific color sequences.
-2. Continue `seed5002-wizard-coverage-pair` mklev/object generation when display
-   work is exhausted.
-   - Current remembered state: `S 128/410 R 6044/12167`.
-   - First local RNG mismatch remains around `FR 5827`
-     (`rn2(51)` expected vs `rn2(41)` actual).
-   - Evidence points at map/layout, themed room, shop/object, and startup object
-     placement rather than prompt lifecycle.
 3. Continue `seed0002-healer-reflection-drummer` movement/pet-goal ordering.
    - Current remembered state: `R 2672/27158`.
    - Next boundary: `FR 2375` (`rn2(5)` expected vs `rn2(100)` actual).

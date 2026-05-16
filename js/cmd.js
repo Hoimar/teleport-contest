@@ -233,7 +233,9 @@ function wishedObjectSpec(name) {
         return { ...spec, otyp: WAN_LIGHTNING };
     }
     if (wish.includes('wand of magic missile')) {
-        rn2(41);
+        // C ref: objnam.c:rnd_otyp_by_namedesc() check_of also matches
+        // "spellbook of magic missile", so the probability pool is 41+10.
+        rn2(51);
         return { ...spec, otyp: WAN_MAGIC_MISSILE };
     }
     if (wish.includes('wand of death')) {
@@ -1098,6 +1100,41 @@ function refreshSwallowedHallucinationAfterMore() {
         refresh_swallowed_overlay();
 }
 
+async function handleQueuedMore(ch) {
+    if (!game._more || (game._more_dismissals_remaining || 0) <= 0) return false;
+    const moreDismissKey = ch === ' ' || ch === '\r' || ch === '\n' || ch === '\x1b';
+    if (!moreDismissKey) {
+        game.context.move = 0;
+        return true;
+    }
+
+    game._more_dismissals_remaining--;
+    if (game._fire_wand_side_effect_pending) {
+        game._more_dismissals_remaining = 0;
+        await showFireWandSideEffects();
+    } else if (game._fire_wand_invisibility_pending) {
+        game._more_dismissals_remaining = 0;
+        await showFireWandInvisibilityEffect();
+    } else if (game._fire_wand_oil_pending) {
+        game._more_dismissals_remaining = 0;
+        await showFireWandOilEffect();
+    } else if (game._fire_wand_death_pending) {
+        game._more_dismissals_remaining = 0;
+        await showFireWandDeathMessage();
+    } else if (game._fire_wand_death_prompt_pending) {
+        await showFireWandDeathPrompt();
+    } else if (game._more_dismissals_remaining <= 0) {
+        clear_pending_message();
+        // C ref: topl.c:more() returns to the interrupted command before
+        // allmain.c's next input prompt; swallowed Hallucination redraws
+        // once in that resumed path and again at the input boundary.
+        if (!await finish_pending_swallowed_expulsion())
+            refreshSwallowedHallucinationAfterMore();
+    }
+    game.context.move = 0;
+    return true;
+}
+
 async function commitIntrinsicMenuSelection(menu) {
     const selected = menu.rows.filter((row) => row.kind === 'selectable' && row.selected);
     const wasHallucinating = !!(game.u?.uprops?.hallucination || game.u?.uhallucination);
@@ -1640,6 +1677,8 @@ export async function rhack(key) {
         return;
     }
 
+    if (await handleQueuedMore(ch)) return;
+
     if (game._awaiting_pray_confirm) {
         clear_pending_message();
         game._awaiting_pray_confirm = false;
@@ -2033,7 +2072,9 @@ export async function rhack(key) {
             obj.knownName = true;
             await zapFireRayAtHero(DIR_DX[ch] || 0, DIR_DY[ch] || 0);
         }
-        game.context.move = 1;
+        // C ref: topl.c:more() can block inside zap.c:zhitu() before the
+        // command returns to allmain.c for turn-tail monster movement.
+        game.context.move = game._fire_wand_side_effect_pending ? 0 : 1;
         return;
     }
 
@@ -2125,36 +2166,6 @@ export async function rhack(key) {
         return;
     }
 
-    if (game._more && (game._more_dismissals_remaining || 0) > 0
-        && (ch === ' ' || ch === '\r' || ch === '\n' || ch === '\x1b')) {
-        // Queued topl.c more prompts represent nested message pauses that
-        // occurred inside a command or turn already consumed by this port.
-        game._more_dismissals_remaining--;
-        if (game._fire_wand_side_effect_pending) {
-            game._more_dismissals_remaining = 0;
-            await showFireWandSideEffects();
-        } else if (game._fire_wand_invisibility_pending) {
-            game._more_dismissals_remaining = 0;
-            await showFireWandInvisibilityEffect();
-        } else if (game._fire_wand_oil_pending) {
-            game._more_dismissals_remaining = 0;
-            await showFireWandOilEffect();
-        } else if (game._fire_wand_death_pending) {
-            game._more_dismissals_remaining = 0;
-            await showFireWandDeathMessage();
-        } else if (game._fire_wand_death_prompt_pending) {
-            await showFireWandDeathPrompt();
-        } else if (game._more_dismissals_remaining <= 0) {
-            clear_pending_message();
-            // C ref: topl.c:more() returns to the interrupted command before
-            // allmain.c's next input prompt; swallowed Hallucination redraws
-            // once in that resumed path and again at the input boundary.
-            if (!await finish_pending_swallowed_expulsion())
-                refreshSwallowedHallucinationAfterMore();
-        }
-        game.context.move = 0;
-        return;
-    }
     if (game._avoid_pool_tip_pending && game._more
         && (ch === ' ' || ch === '\r' || ch === '\n' || ch === '\x1b')) {
         game._avoid_pool_tip_pending = false;
