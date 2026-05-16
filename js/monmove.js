@@ -590,9 +590,12 @@ async function show_blocking_monster_message(line) {
         return;
     }
     if (game._pending_message && !game._more && `${game._pending_message}  ${line}`.length < 80) {
+        const appendToKillMessage = /^The .+ is killed!$/.test(game._pending_message);
         game._pending_message = `${game._pending_message}  ${line}`;
-        queue_more_prompt();
-        game._packed_monster_more_candidate = true;
+        if (!appendToKillMessage) {
+            queue_more_prompt();
+            game._packed_monster_more_candidate = true;
+        }
         return;
     }
     if (game._more && game._pending_message && game._pet_combat_more_latched && !hallucinating()) {
@@ -1229,7 +1232,8 @@ export async function movemon() {
             if (is_wanderer(mtmp) && monnear_hero(mtmp)) rn2(4);
             await dog_move(mtmp, false);
             if (g._more && g._pet_combat_more_latched && !g._savelife_resume_active && !hallucinating()) {
-                g._after_more_needs_prompt = false;
+                if (!g._after_more_message || !g._after_more_message.includes('  '))
+                    g._after_more_needs_prompt = false;
                 g._resume_tame_post_distfleeck = mtmp;
                 g._resume_movemon_after_mon = mtmp;
                 g._resume_somebody_can_move = mtmp.movement >= NORMAL_SPEED;
@@ -1270,7 +1274,8 @@ export async function movemon() {
         g._gas_clouds_aged_turn = g.moves;
     }
 
-    if (!somebody_can_move && g._packed_monster_more_candidate
+    const packedDeathAndHit = /^The .+ is killed!  The .+ .+!$/.test(g._pending_message || '');
+    if ((!somebody_can_move || packedDeathAndHit) && g._packed_monster_more_candidate
         && g._more && !g._pet_combat_more_latched && !hallucinating()) {
         g._more = false;
         g._more_dismissals_remaining = 0;

@@ -435,7 +435,7 @@ function refresh_pet_attack_symbols(mtmp, target) {
     newsym(target.mx, target.my);
 }
 
-async function finish_pet_kill(mtmp, target) {
+export async function finish_pet_kill(mtmp, target) {
     // C ref: mon.c:monkilled(). Monster-vs-monster death announces the
     // visible defender before corpse/death side effects run.
     await append_topline_message(`The ${monster_name(target)} is killed!`);
@@ -669,6 +669,13 @@ async function monster_melee_attack(mtmp, target) {
     target.mhp = (target.mhp ?? 1) - damage;
     rn2(3);
     rn2(6);
+    if (target.mhp < 1) {
+        if (game._more && !hallucinating()) {
+            game._pet_defender_death_pending = { killer: mtmp, target };
+        } else {
+            await finish_pet_kill(mtmp, target);
+        }
+    }
     return { attacked: true, hit: true, defenderDied: target.mhp < 1 };
 }
 

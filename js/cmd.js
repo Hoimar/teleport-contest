@@ -15,7 +15,7 @@ import {
 import { vision_recalc, vision_reset } from './vision.js';
 import { makemon, mklev, mksobj, monster_by_user_name, place_lregion, place_object } from './mklev.js';
 import { OBJECT_DELAY } from './object_data.js';
-import { pet_arrive_with_you } from './dog.js';
+import { finish_pet_kill, pet_arrive_with_you } from './dog.js';
 import { merge_inventory_object, pluslvl } from './u_init.js';
 import { adjalign, exercise, gethungry } from './allmain_turns.js';
 import { initrack } from './track.js';
@@ -1305,6 +1305,14 @@ async function handleQueuedMore(ch) {
             game._after_more_needs_prompt = false;
             await pline(msg);
             if (needsPrompt) queue_more_prompt();
+        } else if (game._pet_defender_death_pending) {
+            const pending = game._pet_defender_death_pending;
+            game._pet_defender_death_pending = null;
+            await finish_pet_kill(pending.killer, pending.target);
+            if (game._resume_movemon_after_mon === pending.target)
+                game._resume_movemon_after_mon = null;
+            if (game._resume_tame_post_distfleeck === pending.target)
+                game._resume_tame_post_distfleeck = null;
         } else if (game._nomovemsg) {
             const msg = game._nomovemsg;
             game._nomovemsg = '';
