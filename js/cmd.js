@@ -23,6 +23,7 @@ import { roleGod } from './roles.js';
 import { d, rn1, rn2, rnd, rnz } from './rng.js';
 import { getObjectDescription } from './o_init.js';
 import { randomHallucinatedMonsterName } from './random_text.js';
+import { finish_pending_swallowed_expulsion } from './monmove.js';
 import { ATR_INVERSE, NO_COLOR } from './terminal.js';
 import * as C from './const.js';
 import {
@@ -2148,7 +2149,8 @@ export async function rhack(key) {
             // C ref: topl.c:more() returns to the interrupted command before
             // allmain.c's next input prompt; swallowed Hallucination redraws
             // once in that resumed path and again at the input boundary.
-            refreshSwallowedHallucinationAfterMore();
+            if (!await finish_pending_swallowed_expulsion())
+                refreshSwallowedHallucinationAfterMore();
         }
         game.context.move = 0;
         return;
@@ -2183,6 +2185,7 @@ export async function rhack(key) {
     } else if (runDirectionForKey(ch)) {
         const dir = runDirectionForKey(ch);
         game.context.run = { dx: DIR_DX[dir], dy: DIR_DY[dir], mode: 1, steps: 0 };
+        game.context.mv = 1;
         game.context.move = await domove(DIR_DX[dir], DIR_DY[dir]) ? 1 : 0;
         if (!game.context.move) game.context.run = null;
     } else if (ch === 'F') {
@@ -2302,6 +2305,7 @@ export async function continueRunStep() {
         return false;
     }
     game.context.move = 0;
+    game.context.mv = 1;
     const moved = await domove(run.dx, run.dy);
     game.context.move = moved ? 1 : 0;
     if (!moved) game.context.run = null;

@@ -417,8 +417,8 @@ async function continueOccupationTurns(g) {
     return true;
 }
 
-function refreshHallucinationDisplayAtInputBoundary(g) {
-    if (g.context?.move) return;
+async function refreshHallucinationDisplayAtInputBoundary(g) {
+    if (g.context?.mv) return;
     // C topl.c captures a blocking --More-- before moveloop_core resumes its
     // once-per-player-input Hallucination refresh.
     if (g._more) return;
@@ -427,6 +427,8 @@ function refreshHallucinationDisplayAtInputBoundary(g) {
         // C ref: allmain.c:moveloop_core() once-per-player-input Hallucination
         // refresh calls swallowed(0) after non-moving commands.
         refresh_swallowed_overlay();
+    } else {
+        await docrt();
     }
 }
 
@@ -439,13 +441,14 @@ export async function moveloop_core() {
         vision_recalc(0);
         g.vision_full_recalc = 0;
     }
-    refreshHallucinationDisplayAtInputBoundary(g);
+    await refreshHallucinationDisplayAtInputBoundary(g);
     if (g.u?.uprops?.warning) refresh_warning_monsters();
     await bot();
     await flush_screen(1);
 
     g.context = g.context || {};
     g.context.move = 0; // Reset before rhack
+    g.context.mv = 0;
 
     const key = await nhgetch();
     // Read and execute one command
