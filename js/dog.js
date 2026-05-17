@@ -9,7 +9,7 @@ import { nhgetch } from './input.js';
 import {
     ACCFOOD, APPORT, CADAVER, DOGFOOD, MANFOOD, TABU, UNDEF,
     D_CLOSED, D_LOCKED, GP_AVOID_MONPOS, GP_CHECKSCARY, IS_DOOR, IS_OBSTRUCTED,
-    IS_LAVA, IS_POOL, IS_ROOM, MM_EDOG, MTSZ, NO_MINVENT, SPACE_POS,
+    IS_LAVA, IS_POOL, IS_ROOM, LADDER, MM_EDOG, MTSZ, NO_MINVENT, SPACE_POS, STAIRS,
     isok,
 } from './const.js';
 import { d, rn2, rnd } from './rng.js';
@@ -752,11 +752,15 @@ function pet_goal(mtmp, after, udist, whappr) {
     if (udist > 1 && (!loc || !IS_ROOM(loc.typ) || !rn2(4) || whappr
         || (dogHasMinvent && rn2(edog.apport)))) appr = 1;
     if (appr === 0) {
-        for (const obj of game.inventory || []) {
-            if (typeof obj.otyp !== 'number') continue;
-            if (dogfood(mtmp, obj) === DOGFOOD) {
-                appr = 1;
-                break;
+        if (loc?.typ === STAIRS || loc?.typ === LADDER) {
+            appr = 1;
+        } else {
+            for (const obj of game.inventory || []) {
+                if (typeof obj.otyp !== 'number') continue;
+                if (dogfood(mtmp, obj) === DOGFOOD) {
+                    appr = 1;
+                    break;
+                }
             }
         }
     }

@@ -50,7 +50,7 @@ export function randomEpitaph() {
     return '';
 }
 
-function getRumor(truth, excludeCookie) {
+export function getRumor(truth, excludeCookie) {
     const data = loadRumors();
     let rumor = '';
     let count = 0;

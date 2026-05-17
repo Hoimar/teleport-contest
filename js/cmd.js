@@ -14,7 +14,7 @@ import {
     see_monsters, see_objects, see_traps,
 } from './display.js';
 import { cansee, vision_recalc, vision_reset } from './vision.js';
-import { makemon, mklev, mksobj, monster_by_user_name, place_lregion, place_object } from './mklev.js';
+import { makemon, mklev, mksobj, monster_by_user_name, next_ident, place_lregion, place_object } from './mklev.js';
 import { OBJECT_DELAY } from './object_data.js';
 import { finish_pet_kill, pet_arrive_with_you } from './dog.js';
 import { merge_inventory_object, pluslvl } from './u_init.js';
@@ -23,7 +23,7 @@ import { initrack } from './track.js';
 import { roleGod } from './roles.js';
 import { d, rn1, rn2, rnd, rnz } from './rng.js';
 import { getObjectDescription } from './o_init.js';
-import { hallucinatedLiquidName, randomHallucinatedMonsterName } from './random_text.js';
+import { getRumor, hallucinatedLiquidName, randomHallucinatedMonsterName } from './random_text.js';
 import { finish_pending_swallowed_expulsion } from './monmove.js';
 import { ATR_INVERSE, NO_COLOR } from './terminal.js';
 import * as C from './const.js';
@@ -62,6 +62,7 @@ const GOLD_PIECE = 438;
 const SCALPEL = 39;
 const DART = 23;
 const CORPSE = 265;
+const FORTUNE_COOKIE = 289;
 const LEATHER_GLOVES = 159;
 const ARMOR_CLASS = 3;
 const WEAPON_CLASS = 2;
@@ -368,6 +369,71 @@ function inventoryIndexForLetter(ch) {
     return code - 97;
 }
 
+function consumeInventoryObject(obj) {
+    if (!obj) return;
+    if ((obj.quan || 1) > 1) {
+        obj.quan--;
+        return;
+    }
+    const idx = game.inventory?.indexOf(obj) ?? -1;
+    if (idx >= 0) game.inventory.splice(idx, 1);
+}
+
+function thrownObjectFromInventory(obj) {
+    if (!obj) return null;
+    if ((obj.quan || 1) > 1) {
+        next_ident();
+        const thrown = { ...obj, quan: 1, invlet: undefined, ox: 0, oy: 0 };
+        obj.quan--;
+        return thrown;
+    }
+    const idx = game.inventory?.indexOf(obj) ?? -1;
+    if (idx >= 0) game.inventory.splice(idx, 1);
+    obj.invlet = undefined;
+    return obj;
+}
+
+function thrownLanding(dx, dy) {
+    let x = game.u?.ux ?? 0;
+    let y = game.u?.uy ?? 0;
+    let last = { x, y };
+    let hitHard = false;
+    for (let range = 0; range < 8; range++) {
+        const nx = x + dx;
+        const ny = y + dy;
+        const loc = game.level?.at(nx, ny);
+        if (!loc || IS_OBSTRUCTED(loc.typ)) {
+            hitHard = true;
+            break;
+        }
+        last = { x: nx, y: ny };
+        x = nx;
+        y = ny;
+    }
+    return { ...last, hitHard };
+}
+
+function throwInventoryObject(obj, dirKey) {
+    if (!obj || obj.oclass !== WEAPON_CLASS) return;
+    if ((obj.quan || 1) > 1) {
+        // C ref: dothrow.c:throw_obj(); even a one-shot volley uses rnd(1)
+        // for stackable thrown weapons.
+        rnd(1);
+    }
+    const thrown = thrownObjectFromInventory(obj);
+    const dx = DIR_DX[dirKey] || 0;
+    const dy = DIR_DY[dirKey] || 0;
+    if (!thrown || (!dx && !dy)) return;
+    const landing = thrownLanding(dx, dy);
+    if (landing.hitHard) {
+        // C ref: dothrow.c:breaktest() -> zap.c:obj_resists().
+        rn2(100);
+    }
+    if (landing.x === (game.u?.ux ?? 0) && landing.y === (game.u?.uy ?? 0) && !landing.hitHard) return;
+    place_object(thrown, landing.x, landing.y);
+    see_objects();
+}
+
 function lastInventoryLetter() {
     ensureInventoryLetters();
     let maxCode = 97;
@@ -418,6 +484,23 @@ function drinkLetters() {
     return compressLetters((game.inventory || [])
         .filter((obj) => obj?.oclass === POTION_CLASS)
         .map((obj) => obj.invlet));
+}
+
+function throwLetters() {
+    ensureInventoryLetters();
+    const letters = [];
+    if ((game._goldCount || 0) > 0) letters.push('$');
+    for (const obj of game.inventory || []) {
+        if (obj?.oclass === WEAPON_CLASS) letters.push(obj.invlet);
+    }
+    return letters.join('');
+}
+
+function stairAtHero() {
+    for (let st = game.stairs; st; st = st.next) {
+        if (st.sx === game.u?.ux && st.sy === game.u?.uy) return st;
+    }
+    return null;
 }
 
 function stethoscopeSelfStatusLine() {
@@ -1015,6 +1098,61 @@ async function handleFloorCorpseEatKey(ch) {
     game._occupation_finish_removes_eaten_corpse = true;
     await pline('You feel sick.');
     game.context.move = 1;
+    return true;
+}
+
+async function continueQueuedCookieMessage(ch) {
+    if (!game._cookie_message_queue?.length || !game._more
+        || (ch !== ' ' && ch !== '\r' && ch !== '\n')) {
+        return false;
+    }
+    const next = game._cookie_message_queue.shift();
+    await pline(next.text);
+    game._more_next_message_row = false;
+    if (next.more) {
+        queue_more_prompt();
+        game.context.move = 0;
+    } else {
+        game._more = false;
+        game.context.move = next.move ? 1 : 0;
+    }
+    return true;
+}
+
+async function handleEatItemKey(ch) {
+    game._awaiting_eat_item = false;
+    game._prompt_cursor = null;
+    if (ch === '\x1b' || ch === ' ') {
+        game.context.move = 0;
+        await pline('Never mind.');
+        return true;
+    }
+    const idx = inventoryIndexForLetter(ch);
+    const obj = idx >= 0 ? game.inventory?.[idx] : null;
+    if (!obj || obj.oclass !== FOOD_CLASS) {
+        game.context.move = 0;
+        await pline("You don't have that object.");
+        queue_more_prompt();
+        return true;
+    }
+
+    consumeInventoryObject(obj);
+    if (obj.otyp === FORTUNE_COOKIE) {
+        const rumor = getRumor(0, false);
+        exercise(A_WIS, true);
+        game._cookie_message_queue = [
+            { text: 'This cookie has a scrap of paper inside.  It reads:', more: true },
+            { text: rumor, move: true },
+        ];
+        game.context.move = 0;
+        await pline('This fortune cookie is delicious!');
+        game._more_next_message_row = false;
+        queue_more_prompt();
+        return true;
+    }
+
+    game.context.move = 1;
+    await pline(`${inventoryObjectName(obj)} is delicious!`);
     return true;
 }
 
@@ -1684,6 +1822,15 @@ async function handleQueuedMore(ch) {
     } else if (game._death_prompt_pending) {
         await showDeathPrompt();
     } else if (game._more_dismissals_remaining <= 0) {
+        if (game._cookie_message_queue?.length) {
+            const next = game._cookie_message_queue.shift();
+            await pline(next.text);
+            game._more_next_message_row = false;
+            if (next.more) queue_more_prompt();
+            else game._more = false;
+            game.context.move = next.move ? 1 : 0;
+            return true;
+        }
         clear_pending_message();
         game._hallucination_warning_rng_active = false;
         if (game._direction_help_screen) {
@@ -2398,6 +2545,17 @@ export async function rhack(key) {
         return;
     }
 
+    if (game._apply_invalid_more && game._more) {
+        game._apply_invalid_more = false;
+        clear_pending_message();
+        if (ch === ' ' || ch === '\r' || ch === '\n' || ch === '\x1b') {
+            game._awaiting_apply_item = true;
+            await showPromptLine(`What do you want to use or apply? [${applyLetters()} or ?*] `);
+            game.context.move = 0;
+            return;
+        }
+    }
+
     if (await handleQueuedMore(ch)) return;
 
     if (game._death_prompt_active) {
@@ -2852,6 +3010,28 @@ export async function rhack(key) {
         return;
     }
 
+    if (game._awaiting_throw_item) {
+        clear_pending_message();
+        game._awaiting_throw_item = false;
+        if (ch === '$') {
+            game._awaiting_throw_direction = { otyp: GOLD_PIECE, oclass: COIN_CLASS, quan: game._goldCount || 0 };
+            game.context.move = 0;
+            await showPromptLine('In what direction? ');
+            return;
+        }
+        const idx = inventoryIndexForLetter(ch);
+        const obj = idx >= 0 ? game.inventory?.[idx] : null;
+        if (!obj || obj.oclass !== WEAPON_CLASS) {
+            game.context.move = 0;
+            await pline('Never mind.');
+            return;
+        }
+        game._awaiting_throw_direction = obj;
+        game.context.move = 0;
+        await showPromptLine('In what direction? ');
+        return;
+    }
+
     if (game._awaiting_ring_finger) {
         clear_pending_message();
         const obj = game._awaiting_ring_finger;
@@ -2885,6 +3065,7 @@ export async function rhack(key) {
 
     if (game._awaiting_throw_direction) {
         clear_pending_message();
+        const throwObj = game._awaiting_throw_direction;
         game._awaiting_throw_direction = null;
         if (!'hykulnjb<>.'.includes(ch)) {
             game.context.move = 0;
@@ -2898,6 +3079,12 @@ export async function rhack(key) {
             }
             return;
         }
+        if (ch === '<' || ch === '>' || ch === '.') {
+            game.context.move = 0;
+            await pline('You cannot throw an object at yourself.');
+            return;
+        }
+        throwInventoryObject(throwObj, ch);
         game.context.move = 1;
         return;
     }
@@ -2993,11 +3180,19 @@ export async function rhack(key) {
     if (game._awaiting_apply_item) {
         clear_pending_message();
         game._awaiting_apply_item = false;
+        if (ch === '\x1b' || ch === ' ') {
+            game.context.move = 0;
+            await pline('Never mind.');
+            return;
+        }
         const idx = inventoryIndexForLetter(ch);
         const obj = idx >= 0 ? game.inventory?.[idx] : null;
         if (!obj || obj.oclass !== TOOL_CLASS) {
             game.context.move = 0;
-            await pline('Never mind.');
+            game._awaiting_apply_item = true;
+            game._apply_invalid_more = true;
+            await pline("You don't have that object.");
+            queue_more_prompt();
             return;
         }
         if (obj.otyp === EXPENSIVE_CAMERA || obj.otyp === STETHOSCOPE) {
@@ -3215,8 +3410,13 @@ export async function rhack(key) {
         await handlePickupMenuKey(ch);
         return;
     }
+    if (await continueQueuedCookieMessage(ch)) return;
     if (game._awaiting_floor_corpse_eat) {
         await handleFloorCorpseEatKey(ch);
+        return;
+    }
+    if (game._awaiting_eat_item) {
+        await handleEatItemKey(ch);
         return;
     }
 
@@ -3323,7 +3523,15 @@ export async function rhack(key) {
         showOverride(screens.page1, [9, 23]);
     } else if (ch === ':') {
         game.context.move = 0;
-        await pline("You see no objects here.");
+        const st = stairAtHero();
+        if (st?.up) {
+            await pline('There is a staircase up out of the dungeon here.');
+            queue_more_prompt();
+        } else if (st) {
+            await pline('There is a staircase down here.');
+        } else {
+            await pline("You see no objects here.");
+        }
     } else if (ch === ',') {
         await pickupHere();
     } else if (ch === 'p') {
@@ -3361,7 +3569,10 @@ export async function rhack(key) {
         } else {
             game.context.move = 0;
             const letters = eatLetters();
-            if (letters) await showPromptLine(`What do you want to eat? [${letters} or ?*] `);
+            if (letters) {
+                game._awaiting_eat_item = true;
+                await showPromptLine(`What do you want to eat? [${letters} or ?*] `);
+            }
             else await pline("You don't have anything to eat.");
         }
     } else if (ch === 'z') {
@@ -3372,6 +3583,15 @@ export async function rhack(key) {
             game._awaiting_zap_item = true;
         } else {
             await pline('You have nothing to zap.');
+        }
+    } else if (ch === 't') {
+        game.context.move = 0;
+        const letters = throwLetters();
+        if (letters) {
+            game._awaiting_throw_item = true;
+            await showPromptLine(`What do you want to throw? [${letters} or ?*] `);
+        } else {
+            await pline("You don't have anything to throw.");
         }
     } else if (ch === 'a') {
         game.context.move = 0;

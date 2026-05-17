@@ -28,35 +28,34 @@ and `feature_map.md`.
 Run:
 
 ```bash
-npm run verify -- --target seed1800-tourist-eat-throw
+npm run verify -- --target seed1800-tourist-eat-throw --full
 ```
 
 Result:
 
-- Target: `seed1800-tourist-eat-throw` `S 0/26 R 2204/2458`,
-  first screen `0:char:mixed:init`, first RNG `1045`, cursor-only `0`.
-- Sentinel total: `S 428/1063 R 38622/64569`.
+- Target: `seed1800-tourist-eat-throw` `S 26/26 R 2458/2458`,
+  full screen/RNG parity.
+- Sentinel total: `S 428/1063 R 38633/64569`.
 - Sentinel details:
-  - `seed8000-tourist-starter`: `S 23/23 R 3060/3130`, first RNG `3047`.
-  - `seed0002-healer-reflection-drummer`: `S 83/595 R 5502/27158`, first RNG `4518`.
-  - `seed0013-friday13-save-then-fullmoon-restore`: `S 0/99 R 583/4804`, first RNG `540`.
+  - `seed8000-tourist-starter`: `S 23/23 R 3130/3130`, pass.
+  - `seed0002-healer-reflection-drummer`: `S 83/595 R 5446/27158`, first RNG `4518`; first mismatch unchanged, lagging re-alignment decreased after the C-like stair-follow pet front door.
+  - `seed0013-friday13-save-then-fullmoon-restore`: `S 0/99 R 580/4804`, first RNG `540`.
   - `seed0116-wizard-wear-shop`: `S 127/127 R 12562/12562`, pass.
   - `seed0383-wizard-hallucinate`: `S 195/219 R 16915/16915`, first screen 195.
+- Full public suite: `S 996/11405 R 106293/792838`.
 - Hack-debt audit: hard `0`, suspicious `37` existing replay/override/seed findings.
-- Memory lint: clean after this compaction target.
+- Memory lint: clean.
 
 ## Current Queue
 
-1. Continue `seed1800-tourist-eat-throw` configured Tourist startup.
-   - Use `npm run screen:diff -- seed1800-tourist-eat-throw --index 0 --all-cells`.
-   - Current diff is screen 0, 10 cells: pet glyph one column off in the
-     right-side map and status cells shifted because live Tourist inventory now
-     consumes downstream RNG from a still-diverged `mklev()` prefix.
-   - First RNG mismatch remains `FR 1045:rnd(882)=573=>rnd(100)=5`, before
-     `u_init_role()`. Inspect C/JS object generation around ordinary room
-     contents and `objnam.c:rnd_class()` rather than adding startup-status
-     overrides.
-2. Continue `seed0383` hallucinated monster-turn display timing.
+1. Commit the coherent `seed1800-tourist-eat-throw` parity unit if not already
+   committed.
+   - Subsystems changed: container contents (`mkbox_cnts()` rock/gold
+     post-processing), Tourist command front doors (`e` fortune cookie, `t`
+     dart throw, `a` invalid apply, `:` look), `dosounds()` special-room gates,
+     pet stair-follow front door, seed8000 replay seer-turn state.
+   - No new per-seed forcing or replay screens were added.
+2. Continue `seed0383` hallucinated level-arrival display timing.
    - Use `npm run screen:diff -- seed0383-wizard-hallucinate --first`.
    - Current diff is screen 195 (`c`): C and JS both show the materialize
      message and cursor exactly, but the hallucinated arrival-level soldier and

@@ -291,9 +291,12 @@ export async function newgame() {
     g.urace = startupRace();
     g.flags.female = startupFemale();
     const startupRoleName = g.flags?.female ? (g.urole.name.f || g.urole.name.m) : g.urole.name.m;
+    const configuredPlayerName = g.plname;
     g.plname = g._seed === 2 ? 'David'
         : g.flags?.debug ? startupRoleName
         : startupPlayerName(g.plname);
+    g._startupGreetingName = g.flags?.debug ? String(g.plname).toLowerCase()
+        : configuredPlayerName || g.plname;
     // C ref: allmain.c newgame() → u_on_upstairs()
     // Places hero on upstair, or special stair, or random room position.
     u_on_upstairs();
@@ -337,17 +340,19 @@ export async function newgame() {
         // C applies starting inventory wear/find_ac side effects after the
         // first startup status render but before the welcome prompt.
         g._deferred_startup_uac = 9;
+    } else if (!ff && g.flags?.legacy !== false && g.urole?.name?.m === 'Tourist') {
+        g._deferred_startup_uac = 10;
     }
 
     // Welcome message
     const genderAdj = g.flags?.female ? 'female' : 'male';
     const roleName = g.flags?.female ? (g.urole.name.f || g.urole.name.m) : g.urole.name.m;
-    const greetingName = g.flags?.debug ? String(g.plname).toLowerCase() : g.plname;
+    const greetingName = g._startupGreetingName || g.plname;
     const welcome = `${roleGreeting(g.urole)} ${greetingName}, welcome to NetHack!  You are a ${alignName} ${genderAdj} ${g.urace.adj} ${roleName}.`;
     await pline(welcome);
     if (!ff && (showedQuestIntro || welcome.length + '--More--'.length > COLNO)) {
         g._more = true;
-        g._more_next_message_row = !showedQuestIntro;
+        g._more_next_message_row = !showedQuestIntro || g.urole?.name?.m === 'Tourist';
     }
 }
 

@@ -137,6 +137,7 @@ const PICK_AXE = 259;
 const GRAPPLING_HOOK = 260;
 const UNICORN_HORN = 261;
 const GOLD_PIECE = 438;
+const DILITHIUM_CRYSTAL = 439;
 const LUCKSTONE = 470;
 const LOADSTONE = 471;
 const TOUCHSTONE = 472;
@@ -670,7 +671,7 @@ function level_difficulty() {
 let _nextObjId = 1;
 
 // C ref: mkobj.c next_ident — rnd(2) for item identification
-function next_ident() { rnd(2); }
+export function next_ident() { rnd(2); }
 
 function bless(otmp) {
     if (otmp) {
@@ -863,7 +864,16 @@ function mkbox_cnts(box) {
 
     for (n = rn2(n + 1); n > 0; n--) {
         const chosen = pick_prob_entry(boxiprobs);
-        mkobj(chosen.iclass, false);
+        const otmp = mkobj(chosen.iclass, false);
+        if (otmp?.oclass === COIN_CLASS) {
+            otmp.quan = rnd(level_difficulty() + 2) * rnd(75);
+        } else {
+            while (otmp?.otyp === ROCK) {
+                otmp.otyp = rnd_class(DILITHIUM_CRYSTAL, LOADSTONE);
+                otmp.oclass = object_class(otmp.otyp);
+                if ((otmp.quan || 1) > 2) otmp.quan = 1;
+            }
+        }
     }
 }
 
