@@ -35,6 +35,15 @@ export async function dosounds() {
     if (lvl.flags.has_vault && !rn2(200)) {
         return;
     }
+    if (lvl.flags.has_beehive && !rn2(200)) {
+        return;
+    }
+    if (lvl.flags.has_morgue && !rn2(200)) {
+        return;
+    }
+    if (lvl.flags.has_barracks && !rn2(200)) {
+        return;
+    }
     if (lvl.flags.has_zoo && !rn2(200)) {
         return;
     }
