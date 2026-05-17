@@ -192,7 +192,9 @@ function is_branch_stair(x, y) {
 // ── Terrain to display character + color + DEC flag ──
 function terrain_glyph(loc, x, y) {
     const typ = display_wall_type(loc);
-    const wallColor = game.level?.flags?.sokoban_rules ? CLR_BLUE : NO_COLOR;
+    const wallColor = game.level?.flags?.red_walls
+        ? CLR_RED
+        : game.level?.flags?.sokoban_rules ? CLR_BLUE : NO_COLOR;
     switch (typ) {
     case STONE:     return { ch: ' ', color: NO_COLOR, dec: false };
     case ROOM:      return { ch: '~', color: NO_COLOR, dec: true };  // DEC middle dot

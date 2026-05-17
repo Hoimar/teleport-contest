@@ -44,6 +44,7 @@ const WEAPON_CLASS = 2;
 const ARMOR_CLASS = 3;
 const RING_CLASS = 4;
 const AMULET_CLASS = 5;
+const AMULET_OF_YENDOR = 213;
 const TOOL_CLASS = 6;
 const FOOD_CLASS = 7;
 const POTION_CLASS = 8;
@@ -272,6 +273,9 @@ const M1_OVIPAROUS = 0x00400000;
 const MS_LEADER = 36;
 const MS_NEMESIS = 37;
 const MS_GUARDIAN = 38;
+const MS_PRIEST = 41;
+const MM_EMIN = 0x00000400;
+const MM_NOMSG = 0x00020000;
 
 const LIQUID = 1;
 const WOOD = 8;
@@ -1721,7 +1725,7 @@ function rndghostname() {
 function m_initinv_for(ptr, mon = null) {
     if (!ptr) return;
     const monLevel = adj_lev_for(ptr);
-    if (ptr.name === 'PRIEST' && ptr.difficulty >= 15) {
+    if (ptr.msound === MS_PRIEST) {
         if (rn2(7)) mksobj(ROBE, true, false);
         mksobj(SMALL_SHIELD, true, false);
         const amount = rn1(10, 20);
@@ -2036,7 +2040,7 @@ function m_initweap_for(ptr) {
         maybe_init_offensive_item_for(ptr);
         return;
     }
-    if (ptr.name === 'PRIEST' && ptr.difficulty >= 15) {
+    if (ptr.msound === MS_PRIEST) {
         const mace = mksobj(MACE, false, false);
         mace.spe = rnd(3);
         if (!rn2(2)) curse(mace);
@@ -2705,6 +2709,29 @@ const CASTLE_MAP = [
     '}|.....|-----------------------------------------------|.....|}',
     '}-------}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}-------}',
     '}}}}}}}}}.............................................}}}}}}}}}',
+];
+
+const SANCTUM_MAP = [
+    '----------------------------------------------------------------------------',
+    '|             --------------                                               |',
+    '|             |............|             -------                           |',
+    '|       -------............-----         |.....|                           |',
+    '|       |......................|        --.....|            ---------      |',
+    '|    ----......................---------|......----         |.......|      |',
+    '|    |........---------..........|......+.........|     ------+---..|      |',
+    '|  ---........|.......|..........--S----|.........|     |........|..|      |',
+    '|  |..........|.......|.............|   |.........-------..----------      |',
+    '|  |..........|.......|..........----   |..........|....|..|......|        |',
+    '|  |..........|.......|..........|      --.......----+---S---S--..|        |',
+    '|  |..........---------..........|       |.......|.............|..|        |',
+    '|  ---...........................|       -----+-------S---------S---       |',
+    '|    |...........................|          |...| |......|    |....|--     |',
+    '|    ----.....................----          |...---....---  ---......|     |',
+    '|       |.....................|             |..........|    |.....----     |',
+    '|       -------...........-----             --...-------    |.....|        |',
+    '|             |...........|                  |...|          |.....|        |',
+    '|             -------------                  -----          -------        |',
+    '----------------------------------------------------------------------------',
 ];
 
 const SOKO1_XSTART = 27;
@@ -3616,6 +3643,11 @@ const CASTLE_Y = 3;
 function castleX(x) { return x + CASTLE_X; }
 function castleY(y) { return y + CASTLE_Y; }
 
+const SANCTUM_X = 3;
+const SANCTUM_Y = 1;
+function sanctumX(x) { return x + SANCTUM_X; }
+function sanctumY(y) { return y + SANCTUM_Y; }
+
 function clearSpecialLregions() {
     game._special_lregions = [];
     game.updest = { lx: 0, ly: 0, hx: 0, hy: 0, nlx: 0, nly: 0, nhx: 0, nhy: 0 };
@@ -3820,7 +3852,16 @@ function templeAltarInRoom(croom) {
     };
 }
 
-function priestini(croom) {
+function give_mon_obj(mon, obj) {
+    if (!mon || !obj) return obj;
+    obj.ox = mon.mx;
+    obj.oy = mon.my;
+    mon.inventory = mon.inventory || [];
+    mon.inventory.unshift(obj);
+    return obj;
+}
+
+function priestini(croom, sanctum = false) {
     // C ref: priest.c:priestini(), called by sp_lev.c:create_altar() for shrines.
     const altar = templeAltarInRoom(croom);
     const si = rn2(8);
@@ -3834,8 +3875,10 @@ function priestini(croom) {
             break;
         }
     }
-    const priest = MONSTERS.find(m => m.name === 'PRIEST' && m.difficulty >= 15)
-        || MONSTERS.find(m => m.name === 'PRIEST');
+    const priest = sanctum
+        ? MONSTERS.find(m => m.name === 'HIGH_PRIEST')
+        : MONSTERS.find(m => m.name === 'PRIEST' && m.difficulty >= 15)
+            || MONSTERS.find(m => m.name === 'PRIEST');
     makemon(priest, pos.x, pos.y, MM_EPRI);
     const mon = game.level?.monsters?.[0];
     if (mon && mon.mx === pos.x && mon.my === pos.y) {
@@ -3843,10 +3886,12 @@ function priestini(croom) {
         mon.msleeping = 0;
         mon.mpeaceful = 1;
     }
-    rn2(3);
-    for (let i = 0; i < 2; i++) {
-        const book = rnd_class(class_base(SPBOOK_CLASS), 407);
-        mksobj(book, true, false);
+    if (sanctum) {
+        give_mon_obj(mon, mksobj(AMULET_OF_YENDOR, true, false));
+    }
+    const count = rn2(3) + 2;
+    for (let i = 0; i < count; i++) {
+        give_mon_obj(mon, mkobj(SPBOOK_no_NOVEL, false));
     }
     rn2(2);
 }
@@ -4480,6 +4525,194 @@ function loadCastleSpecial() {
     fixup_special();
 }
 
+function sanctumSetDoor(x, y, mask) {
+    const loc = game.level?.at(sanctumX(x), sanctumY(y));
+    if (!loc) return;
+    loc.typ = DOOR;
+    set_door_mask(loc, mask);
+}
+
+function loadSanctumTerrain() {
+    game._special_touched = new Set();
+    for (let y = 0; y < ROWNO; y++) {
+        for (let x = 1; x < COLNO; x++) {
+            const loc = game.level?.at(x, y);
+            if (loc) loc.typ = STONE;
+        }
+    }
+    for (let y = 0; y < SANCTUM_MAP.length; y++) {
+        for (let x = 0; x < SANCTUM_MAP[y].length; x++) {
+            const loc = game.level?.at(sanctumX(x), sanctumY(y));
+            if (!loc) continue;
+            loc.lit = false;
+            switch (SANCTUM_MAP[y][x]) {
+            case '.':
+                loc.typ = ROOM;
+                break;
+            case '-':
+                loc.typ = HWALL;
+                break;
+            case '|':
+                loc.typ = VWALL;
+                break;
+            case '+':
+                loc.typ = DOOR;
+                set_door_mask(loc, D_CLOSED);
+                break;
+            case 'S':
+                loc.typ = SDOOR;
+                set_door_mask(loc, D_CLOSED);
+                loc.horizontal = true;
+                break;
+            default:
+                loc.typ = STONE;
+                break;
+            }
+        }
+    }
+    markSpecialTouchedRect(SANCTUM_X, SANCTUM_Y,
+        sanctumX(SANCTUM_MAP[0].length - 1), sanctumY(SANCTUM_MAP.length - 1));
+    game.level.flags.is_maze_lev = true;
+    game.level.flags.noteleport = true;
+    game.level.flags.hardfloor = true;
+    game.level.flags.nommap = true;
+    game.level.flags.red_walls = true;
+}
+
+function sanctumCreateRoomRegion(x1, y1, x2, y2, lit, rtype, needfill) {
+    for (let y = y1; y <= y2; y++) {
+        for (let x = x1; x <= x2; x++) {
+            const loc = game.level?.at(sanctumX(x), sanctumY(y));
+            if (loc && (loc.typ === ROOM || loc.typ === CORR || loc.typ === DOOR || loc.typ === SDOOR))
+                loc.lit = !!lit;
+        }
+    }
+    const before = game.level?.nroom ?? 0;
+    add_room(sanctumX(x1), sanctumY(y1), sanctumX(x2), sanctumY(y2), lit ? 1 : 0, rtype, true);
+    const croom = game.level?.rooms?.[before];
+    if (!croom) return null;
+    croom.needjoining = true;
+    croom.needfill = needfill;
+    topologize(croom);
+    return croom;
+}
+
+function sanctumDryLocation() {
+    return specialRandomDryLocation(SANCTUM_MAP[0].length, SANCTUM_MAP.length, SANCTUM_X, SANCTUM_Y);
+}
+
+function sanctumTrap(kind, x = null, y = null) {
+    const loc = x == null ? sanctumDryLocation() : { x: sanctumX(x), y: sanctumY(y) };
+    const trap = maketrap(loc.x, loc.y, kind);
+    maybeTrapVictim(trap);
+}
+
+function sanctumObject(ch) {
+    const loc = sanctumDryLocation();
+    const cls = {
+        '[': ARMOR_CLASS,
+        ')': WEAPON_CLASS,
+        '*': GEM_CLASS,
+        '!': POTION_CLASS,
+        '?': SCROLL_CLASS,
+    }[ch] || RANDOM_CLASS;
+    mkobj_at(cls, loc.x, loc.y, true);
+}
+
+function sanctumMonsterPtr(id) {
+    if (String(id || '').toLowerCase() === 'aligned cleric')
+        return MONSTERS.find(m => m.name === 'PRIEST' && m.difficulty >= 15)
+            || MONSTERS.find(m => m.name === 'PRIEST');
+    return monster_by_user_name(id);
+}
+
+function sanctumCreateMonster(id, x = null, y = null, peaceful = null) {
+    const cls = String(id || '').length === 1 ? castleMonsterClass(id) : null;
+    let ptr = cls ? null : sanctumMonsterPtr(id);
+    const alignedCleric = String(id || '').toLowerCase() === 'aligned cleric';
+    if (!cls && ptr && !ptr.neuter && !ptr.male && !ptr.female) rn2(2);
+    if (!alignedCleric) induced_align_80();
+    if (cls) ptr = mkclass_aligned(cls, G_NOGEN);
+    const loc = x == null ? sanctumDryLocation() : { x: sanctumX(x), y: sanctumY(y) };
+    const mon = makemon(ptr, loc.x, loc.y, alignedCleric ? (MM_ADJACENTOK | MM_EMIN | MM_NOMSG) : 0);
+    if (alignedCleric && mon) {
+        mon.isminion = 1;
+        mon.ispriest = 0;
+        mon.mpeaceful = 0;
+        mon.msleeping = 0;
+    } else if (mon && peaceful != null) {
+        mon.mpeaceful = peaceful ? 1 : 0;
+    }
+    return mon;
+}
+
+function loadSanctumSpecial() {
+    // C ref: dat/sanctum.lua loaded via sp_lev.c:load_special().
+    rn2(3); rn2(2); // nhlib shuffle()
+    rn2(2); // splev_initlev()
+    loadSanctumTerrain();
+
+    rn2(4); // des.door({ wall = "random", state = "secret" }) wall
+    rn2(4); // random wall coordinate selection front door
+    const temple = sanctumCreateRoomRegion(15, 7, 21, 10, 1, TEMPLE, FILL_LVFLAGS);
+    const altar = game.level?.at(sanctumX(18), sanctumY(8));
+    if (altar) {
+        altar.typ = ALTAR;
+        altar.altarmask = A_NONE;
+    }
+    if (temple) priestini(temple, true);
+    sanctumCreateRoomRegion(41, 6, 48, 11, 0, MORGUE, FILL_NORMAL);
+
+    for (const [x, y, mask] of [
+        [40, 6, D_CLOSED],
+        [62, 6, D_LOCKED],
+        [46, 12, D_CLOSED],
+        [53, 10, D_CLOSED],
+    ]) sanctumSetDoor(x, y, mask);
+    fix_wall_spines(SANCTUM_X, SANCTUM_Y,
+        sanctumX(SANCTUM_MAP[0].length - 1), sanctumY(SANCTUM_MAP.length - 1));
+
+    for (const [x, y] of [
+        [13, 5], [14, 5], [15, 5], [16, 5], [17, 5], [18, 5],
+        [19, 5], [20, 5], [21, 5], [22, 5], [23, 5],
+        [13, 12], [14, 12], [15, 12], [16, 12], [17, 12], [18, 12],
+        [19, 12], [20, 12], [21, 12], [22, 12], [23, 12],
+        [13, 6], [13, 7], [13, 8], [13, 9], [13, 10], [13, 11],
+        [23, 6], [23, 7], [23, 8], [23, 9], [23, 10], [23, 11],
+    ]) sanctumTrap(FIRE_TRAP, x, y);
+
+    for (const kind of [SPIKED_PIT, FIRE_TRAP, SLP_GAS_TRAP, ANTI_MAGIC, FIRE_TRAP, MAGIC_TRAP])
+        sanctumTrap(kind);
+    for (const ch of ['[', '[', '[', '[', ')', ')', '*', '!', '!', '!', '!', '?', '?', '?', '?', '?'])
+        sanctumObject(ch);
+
+    for (const [id, x, y, peaceful] of [
+        ['horned devil', 14, 12, 0],
+        ['barbed devil', 18, 8, 0],
+        ['erinys', 10, 4, 0],
+        ['marilith', 7, 9, 0],
+        ['nalfeshnee', 27, 8, 0],
+        ['aligned cleric', 20, 3, 0],
+        ['aligned cleric', 15, 4, 0],
+        ['aligned cleric', 11, 5, 0],
+        ['aligned cleric', 11, 7, 0],
+        ['aligned cleric', 11, 9, 0],
+        ['aligned cleric', 11, 12, 0],
+        ['aligned cleric', 15, 13, 0],
+        ['aligned cleric', 17, 13, 0],
+        ['aligned cleric', 21, 13, 0],
+    ]) sanctumCreateMonster(id, x, y, peaceful);
+    for (const id of ['L', 'L', 'V', 'V', 'V']) sanctumCreateMonster(id);
+
+    placeSpecialStair(sanctumX(63), sanctumY(15), true);
+    game._special_lregions.push({
+        rtype: LR_DOWNTELE,
+        inarea: { x1: 54, y1: 1, x2: 79, y2: 18 },
+        delarea: { x1: -1, y1: -1, x2: -1, y2: -1 },
+    });
+    fixup_special();
+}
+
 function makemaz_special(slev) {
     const proto = slev?.proto || '';
     if (proto && slev?.rndlevs) {
@@ -4519,6 +4752,10 @@ function makemaz_special(slev) {
         loadValleySpecial();
         return;
     }
+    if (game._last_special_protofile === 'sanctum') {
+        loadSanctumSpecial();
+        return;
+    }
     game.level.flags.is_maze_lev = true;
 }
 
@@ -4539,7 +4776,9 @@ export async function mklev() {
     g.in_mklev = true;
     clearSpecialLregions();
     await makelevel();
-    if (game._last_special_protofile === 'castle' || game._last_special_protofile === 'valley') {
+    if (game._last_special_protofile === 'castle'
+        || game._last_special_protofile === 'valley'
+        || game._last_special_protofile === 'sanctum') {
         for (let i = 0; i < (g.level?.nroom ?? 0); i++) {
             fill_special_room(g.level.rooms[i]);
         }
@@ -4601,6 +4840,7 @@ function clear_level_structures() {
     lf.hero_memory = true;
     lf.shortsighted = false;
     lf.sokoban_rules = false;
+    lf.red_walls = false;
     lf.is_maze_lev = false;
     lf.is_cavernous_lev = false;
     lf.arboreal = false;
