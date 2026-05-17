@@ -29,6 +29,7 @@ import {
     DIR_N, DIR_S, DIR_E, DIR_W, DIR_180,
     IS_WALL, IS_STWALL, IS_DOOR, IS_OBSTRUCTED, IS_FURNITURE, IS_POOL, IS_LAVA, IS_ROOM,
     SPACE_POS, isok, W_NONDIGGABLE, FILL_NORMAL, FILL_NONE, FILL_LVFLAGS,
+    DRY, WET, HOT, SOLID,
     ICE, MOAT, POOL, WATER, LAVAPOOL, LAVAWALL, DBWALL, DRAWBRIDGE_UP, THRONE,
     A_LAWFUL, A_NONE, Align2amask,
     LR_DOWNSTAIR, LR_UPSTAIR, LR_BRANCH, LR_TELE, LR_UPTELE, LR_DOWNTELE, NO_MINVENT, MM_IGNOREWATER, MM_IGNORELAVA, MM_ANGRY, MM_EPRI, MM_ASLEEP, MM_NOGRP, MM_NOTAIL, GP_CHECKSCARY, GP_AVOID_MONPOS,
@@ -245,6 +246,7 @@ const M2_GNOME = 0x00000040;
 const M2_ORC = 0x00000080;
 const M2_MINION = 0x00001000;
 const M2_GIANT = 0x00002000;
+const M2_SHAPESHIFTER = 0x00004000;
 const M2_LORD = 0x00000400;
 const M2_PRINCE = 0x00000800;
 const M2_HOSTILE = 0x00100000;
@@ -256,6 +258,8 @@ const MIMIC_FURNITURE_CLASS = Symbol('MIMIC_FURNITURE_CLASS');
 const MIMIC_STRANGE_OBJECT = Symbol('MIMIC_STRANGE_OBJECT');
 const M1_FLY = 0x00000001;
 const M1_SWIM = 0x00000002;
+const M1_AMPHIBIOUS = 0x00000200;
+const M1_WALLWALK = 0x00000008;
 const M1_NOEYES = 0x00001000;
 const M1_MINDLESS = 0x00010000;
 const M1_ANIMAL = 0x00040000;
@@ -541,8 +545,29 @@ function mon_swims_for(ptr) {
     return !!((ptr?.mflags1 ?? 0) & M1_SWIM) || !!ptr?.swimmer;
 }
 
+function mon_is_floater_for(ptr) {
+    return ptr?.mlet === 'S_EYE' || ptr?.mlet === 'S_LIGHT';
+}
+
 function mon_likes_lava_for(ptr) {
-    return !!ptr?.likes_lava;
+    return ptr?.name === 'FIRE_ELEMENTAL' || ptr?.name === 'SALAMANDER';
+}
+
+function mon_likes_fire_for(ptr) {
+    return ptr?.name === 'FIRE_VORTEX'
+        || ptr?.name === 'FLAMING_SPHERE'
+        || mon_likes_lava_for(ptr);
+}
+
+function pm_to_humidity(ptr) {
+    let loc = DRY;
+    if (!ptr) return loc;
+    const flags1 = ptr.mflags1 ?? 0;
+    if (ptr.mlet === 'S_EEL' || (flags1 & M1_AMPHIBIOUS) || mon_swims_for(ptr)) loc = WET;
+    if (mon_in_air_for(ptr) || mon_is_floater_for(ptr)) loc |= HOT | WET;
+    if ((flags1 & M1_WALLWALK) || ptr.mlet === 'S_GHOST') loc |= SOLID;
+    if (mon_likes_fire_for(ptr)) loc |= HOT;
+    return loc;
 }
 
 function engr_at(x, y) {
@@ -1569,6 +1594,72 @@ function init_mon_gender_for(ptr) {
     return !!rn2(2);
 }
 
+function pm_to_cham_for(ptr) {
+    if (!ptr || !(ptr.mflags2 & M2_SHAPESHIFTER)) return null;
+    return ptr;
+}
+
+function is_vampire_shifter_base(ptr) {
+    return ptr?.name === 'VAMPIRE'
+        || ptr?.name === 'VAMPIRE_LORD'
+        || ptr?.name === 'VLAD_THE_IMPALER';
+}
+
+function is_pool_or_lava_at(x, y) {
+    const typ = game.level?.at(x, y)?.typ;
+    return typ != null && (IS_POOL(typ) || IS_LAVA(typ));
+}
+
+function pick_vamp_shape_for(mon) {
+    const cham = mon?.cham;
+    if (!cham) return null;
+    let wolfchance = 10;
+    if (cham.name === 'VLAD_THE_IMPALER') {
+        wolfchance = 3;
+    }
+    if ((cham.name === 'VLAD_THE_IMPALER' || cham.name === 'VAMPIRE_LORD')
+        && !rn2(wolfchance) && !is_pool_or_lava_at(mon.mx, mon.my)) {
+        return monsterPtr('WOLF');
+    }
+    if (cham.name === 'VAMPIRE' || cham.name === 'VAMPIRE_LORD' || cham.name === 'VLAD_THE_IMPALER') {
+        return !rn2(4) ? monsterPtr('FOG_CLOUD') : monsterPtr('VAMPIRE_BAT');
+    }
+    return null;
+}
+
+function mgender_from_permonst_for(mon, ptr) {
+    if (!mon || !ptr) return;
+    if (ptr.male) {
+        mon.female = false;
+    } else if (ptr.female) {
+        mon.female = true;
+    } else if (!ptr.neuter) {
+        // C evaluates the rn2(10) gate before noticing vampire shifters keep
+        // their current gender.
+        if (!rn2(10) && !(ptr.mlet === 'S_VAMPIRE' || is_vampire_shifter_base(mon.cham))) {
+            mon.female = !mon.female;
+        }
+    }
+}
+
+function initial_vampshift(mon, ptr) {
+    const cham = pm_to_cham_for(ptr);
+    if (!cham || !is_vampire_shifter_base(cham) || cham.name === 'VLAD_THE_IMPALER') return false;
+    mon.cham = cham;
+    const shape = pick_vamp_shape_for(mon);
+    if (!shape || shape.name === ptr.name) return false;
+    mgender_from_permonst_for(mon, shape);
+    const monLevel = adj_lev_for(shape);
+    const hp = newmonhp_for(shape, monLevel);
+    mon.data = { ...shape, mmove: shape.mmove ?? 12 };
+    mon.ch = MONSTER_SYMBOLS[shape.mlet] ?? 'm';
+    mon.color = shape.color ?? 15;
+    mon.m_lev = monLevel;
+    mon.mhp = hp;
+    mon.mhpmax = hp;
+    return true;
+}
+
 function m_initinv_for(ptr, mon = null) {
     if (!ptr) return;
     const monLevel = adj_lev_for(ptr);
@@ -2344,6 +2435,9 @@ export async function makemon(mdat, x, y, mmflags = 0) {
             for (let i = 8; i > 0; i--) rn2(i);
         }
     }
+    mon.cham = null;
+    let allow_minvent = true;
+    if (initial_vampshift(mon, ptr)) allow_minvent = false;
     const anymon = mdat === null;
     if (anymon && !(mmflags & MM_NOGRP)) {
         if ((ptr.geno & G_SGROUP) && rn2(2)) {
@@ -2353,7 +2447,7 @@ export async function makemon(mdat, x, y, mmflags = 0) {
             else m_initgrp(mon, mon.mx, mon.my, 3, mmflags);
         }
     }
-    if (!(mmflags & NO_MINVENT)) {
+    if (allow_minvent && !(mmflags & NO_MINVENT)) {
         game._in_monster_init = true;
         game._monster_init_current = mon;
         game._monster_init_item_count = 0;
@@ -2930,7 +3024,7 @@ function loadBigrm12Special() {
         let kind;
         do { kind = traptype_rnd(); } while (kind === NO_TRAP);
         maketrap(loc.x, loc.y, kind);
-        const lvl = game.u?.uz?.dlevel ?? 1;
+        const lvl = level_difficulty();
         if (game.in_mklev && kind !== NO_TRAP
             && lvl <= rnd(4)
             && kind !== SQKY_BOARD && kind !== RUST_TRAP
@@ -3085,7 +3179,7 @@ function loadBigrm2Special() {
         let kind;
         do { kind = traptype_rnd(); } while (kind === NO_TRAP);
         maketrap(loc.x, loc.y, kind);
-        const lvl = game.u?.uz?.dlevel ?? 1;
+        const lvl = level_difficulty();
         if (game.in_mklev && kind !== NO_TRAP
             && lvl <= rnd(4)
             && kind !== SQKY_BOARD && kind !== RUST_TRAP
@@ -3102,7 +3196,7 @@ function loadBigrm2Special() {
 
 function maybeTrapVictim(trap) {
     const kind = trap?.ttyp ?? NO_TRAP;
-    const lvl = game.u?.uz?.dlevel ?? 1;
+    const lvl = level_difficulty();
     if (game.in_mklev && kind !== NO_TRAP
         && lvl <= rnd(4)
         && kind !== SQKY_BOARD && kind !== RUST_TRAP
@@ -3532,7 +3626,33 @@ function valleyCorpse(monName) {
 
 function valleyTrap(kind, x = null, y = null) {
     const loc = x == null ? valleyTrapLocation() : { x: valleyX(x), y: valleyY(y) };
-    maketrap(loc.x, loc.y, kind);
+    const trap = maketrap(loc.x, loc.y, kind);
+    maybeTrapVictim(trap);
+}
+
+function specialMonsterLocationOk(x, y, ptr) {
+    const loc = game.level?.at(x, y);
+    if (!loc) return false;
+    const humidity = pm_to_humidity(ptr);
+    if ((humidity & SOLID) && IS_OBSTRUCTED(loc.typ)) return true;
+    if ((humidity & DRY) && SPACE_POS(loc.typ)) {
+        const bould = sobj_at(BOULDER, x, y);
+        if (!bould || (humidity & SOLID)) return true;
+    }
+    if ((humidity & WET) && IS_POOL(loc.typ)) return true;
+    if ((humidity & HOT) && IS_LAVA(loc.typ)) return true;
+    return false;
+}
+
+function valleyMonsterLocation(ptr) {
+    let x = VALLEY_X, y = VALLEY_Y;
+    let trycnt = 0;
+    do {
+        x = VALLEY_X + rn2(VALLEY_MAP[0].length);
+        y = VALLEY_Y + rn2(VALLEY_MAP.length);
+        if (specialMonsterLocationOk(x, y, ptr)) return { x, y };
+    } while (++trycnt < 100);
+    return valleyDryLocation();
 }
 
 function valleyMonster(ref) {
@@ -3541,7 +3661,7 @@ function valleyMonster(ref) {
     if (!cls && ptr && !ptr.neuter && !ptr.male && !ptr.female) rn2(2);
     induced_align_80();
     if (cls) ptr = mkclass_aligned(cls, G_NOGEN);
-    const loc = valleyDryLocation();
+    const loc = valleyMonsterLocation(ptr);
     if (m_at(loc.x, loc.y)) {
         const cc = enexto_core(loc.x, loc.y, ptr, GP_CHECKSCARY)
             || enexto_core(loc.x, loc.y, ptr, 0);
@@ -6354,7 +6474,7 @@ function find_okay_roompos(croom, crd) {
 }
 
 function mktrap_victim(trap) {
-    const lvl = game.u?.uz?.dlevel ?? 1;
+    const lvl = level_difficulty();
     const kind = trap.ttyp;
     const x = trap.tx, y = trap.ty;
     // Object based on trap type
@@ -6426,7 +6546,7 @@ async function mktrap_room(croom) {
     if (!somexyspace(croom, pos)) return;
     const trap = await maketrap(pos.x, pos.y, kind);
     kind = trap ? trap.ttyp : NO_TRAP;
-    const lvl = game.u?.uz?.dlevel ?? 1;
+    const lvl = level_difficulty();
     if (game.in_mklev && kind !== NO_TRAP
         && lvl <= rnd(4)
         && kind !== SQKY_BOARD && kind !== RUST_TRAP
