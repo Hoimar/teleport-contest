@@ -11,6 +11,7 @@ import {
     newsym, show_glyph_cell, flush_screen, pline, clear_pending_message, docrt,
     serialize_terminal_grid, queue_more_prompt,
     apply_hallucination_display_transition, refresh_swallowed_overlay,
+    see_monsters, see_objects, see_traps,
 } from './display.js';
 import { vision_recalc, vision_reset } from './vision.js';
 import { makemon, mklev, mksobj, monster_by_user_name, place_lregion, place_object } from './mklev.js';
@@ -1550,6 +1551,11 @@ function refreshSwallowedHallucinationAfterMore() {
     if (!(game.u?.uhallucination || game.u?.uprops?.hallucination)) return;
     if (game.u?.uswallow && game.u?.ustuck && game._swallowed_map_active)
         refresh_swallowed_overlay();
+    else {
+        see_monsters();
+        see_objects();
+        see_traps();
+    }
 }
 
 async function handleQueuedMore(ch) {
@@ -1637,8 +1643,8 @@ async function handleQueuedMore(ch) {
         // C ref: topl.c:more() returns to the interrupted command before
         // allmain.c's next input prompt; swallowed Hallucination redraws
         // once in that resumed path and again at the input boundary.
-        if (!await finish_pending_swallowed_expulsion())
-            refreshSwallowedHallucinationAfterMore();
+        await finish_pending_swallowed_expulsion();
+        refreshSwallowedHallucinationAfterMore();
     }
     if (pausedFloorListTurn && !game._more) {
         game._resume_floor_list_turn = false;

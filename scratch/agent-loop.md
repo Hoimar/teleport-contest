@@ -15,10 +15,10 @@ and `feature_map.md`.
 - Current branch in this workspace: `main`.
 - Baseline commit at harness cleanup: `f0fdc38`.
 - Active target: `seed0383-wizard-hallucinate`.
-- Active hypothesis: seed0383 is back to the post-expulsion visible-map
-  hallucination redraw blocker. Internal More flushing now services queued
-  engulf messages, and `docrt()` uses C's remembered-map plus monster-overlay
-  redraw shape. Next inspect display-RNG ownership before screen 172.
+- Active hypothesis: seed0383 is narrowed to the residual screen-172
+  post-expulsion visible-map hallucination redraw. Expulsion `unstuck()` now
+  waits behind the blocking More and the resumed Hallucination refresh is
+  modeled; remaining drift is lower-right monster/object redraw state.
 
 ## Latest Verification
 
@@ -31,7 +31,7 @@ npm run verify -- --target seed0383-wizard-hallucinate
 Result:
 
 - Target: `seed0383-wizard-hallucinate` `S 173/219 R 11423/16915`,
-  first screen `172:char+attr:map:Space`, first RNG
+  first screen `172:char:map:Space`, first RNG
   `11367:rn2(20)=8=>rn2(7)=4`, cursor-only `1`.
 - Sentinel total: `S 376/1063 R 31694/64569`.
 - Sentinel details:
@@ -47,13 +47,14 @@ Result:
 
 1. Continue `seed0383` post-expulsion visible-map hallucination redraw ownership.
    - Use `npm run screen:diff -- seed0383-wizard-hallucinate --first`.
-   - Current diff is hallucinated visible-map glyphs on screen 172 (`Space`)
-     after expulsion More is dismissed; screen 171 message/cursor/status now
-     match `You get expelled!--More--`; first RNG mismatch is `FR 11367`.
-   - Stay on the remaining display-RNG ownership inside the post-expulsion
-     visible-map refresh. The duplicate Warning refresh is gone; remaining
-     evidence points at earlier `docrt()`/`newsym()` display-RNG state and
-     retained glyph timing rather than core RNG or per-screen forcing.
+   - Current diff is 12 hallucinated visible-map char cells on screen 172
+     (`Space`) after expulsion More is dismissed; screen 171
+     message/cursor/status match `You get expelled!--More--`; first RNG
+     mismatch is `FR 11367`.
+   - Stay on lower-right monster/object redraw state after the post-expulsion
+     refresh. The duplicate Warning refresh, premature `unstuck()`, and one
+     intermediate resumed-move hallucinated `newsym()` are gone; do not force
+     glyph sequences.
    - Do not add seed-specific color sequences.
 2. Continue `seed0002-healer-reflection-drummer` dog-move candidate work.
    - Current state: `S 53/595 R 4066/27158`.

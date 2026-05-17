@@ -867,6 +867,14 @@ async function unstuck_swallowed_hero(mtmp) {
 export async function finish_pending_swallowed_expulsion() {
     if (!game._pending_swallowed_display_clear) return false;
     game._pending_swallowed_display_clear = false;
+    const mtmp = game._pending_swallowed_expulsion_mon || null;
+    game._pending_swallowed_expulsion_mon = null;
+    game._swallowed_latched_overlay = null;
+    if (mtmp && game.u?.uswallow && game.u.ustuck === mtmp) {
+        await unstuck_swallowed_hero(mtmp);
+        game._latched_status_uhp = null;
+        return true;
+    }
     if (game.u) {
         game.u.uswallow = false;
         game.u.ustuck = null;
@@ -934,9 +942,8 @@ async function engulf_attack(mtmp, attack, toHit) {
         await append_swallowed_damage_message('You get expelled!');
         queue_more_prompt();
         game._latched_status_uhp = game.u?.uhp ?? null;
-        const latchedOverlay = game._swallowed_overlay;
-        await unstuck_swallowed_hero(mtmp);
-        game._swallowed_latched_overlay = latchedOverlay;
+        game._swallowed_latched_overlay = game._swallowed_overlay;
+        game._pending_swallowed_expulsion_mon = mtmp;
         game._pending_swallowed_display_clear = true;
     }
     return true;
@@ -1159,7 +1166,11 @@ async function m_move_basic(mtmp) {
     }
     mon_track_add(mtmp, omx, omy);
     newsym(omx, omy);
-    newsym(nix, niy);
+    if (game._swallowed_expulsion_paused_for_more) {
+        game._swallowed_expulsion_paused_for_more = false;
+    } else {
+        newsym(nix, niy);
+    }
     const doorStatus = postmove_door_basic(mtmp);
     if (doorStatus === MMOVE_DIED) return MMOVE_DIED;
     if (await mpickstuff_basic(mtmp)) return MMOVE_DONE;
@@ -1318,6 +1329,13 @@ export async function movemon() {
             if ((moveStatus !== MMOVE_MOVED && moveStatus !== MMOVE_DONE)
                 || (moveStatus === MMOVE_MOVED && can_attack_after_move_basic(mtmp, postMoveState))) {
                 await mattacku_basic(mtmp, postMoveState);
+                if (g._pending_swallowed_display_clear && g._more) {
+                    g._resume_movemon_after_mon = mtmp;
+                    g._resume_somebody_can_move = mtmp.movement >= NORMAL_SPEED;
+                    g._monster_turn_paused_for_more = true;
+                    g._swallowed_expulsion_paused_for_more = true;
+                    return false;
+                }
                 if (g._fatal_monster_attack_paused && g._monster_turn_paused_for_more
                     && g._more && !hallucinating()) {
                     g._resume_turn_tail_after_more = true;
