@@ -2511,7 +2511,7 @@ function m_initgrp(mon, x, y, n, mmflags) {
 }
 
 // makemon stub
-export async function makemon(mdat, x, y, mmflags = 0) {
+export function makemon(mdat, x, y, mmflags = 0) {
     let ptr = (mdat === null) ? null : mdat;
     const gpflags = ((mmflags & MM_IGNOREWATER) ? MM_IGNOREWATER : 0)
         | GP_CHECKSCARY | GP_AVOID_MONPOS;
