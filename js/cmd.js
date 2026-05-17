@@ -57,6 +57,9 @@ const MIRROR = 230;
 const STETHOSCOPE = 237;
 const MAGIC_MARKER = 242;
 const CHEST = 215;
+const GOLD_PIECE = 438;
+const SCALPEL = 39;
+const LEATHER_GLOVES = 159;
 const ARMOR_CLASS = 3;
 const WEAPON_CLASS = 2;
 const RING_CLASS = 4;
@@ -74,9 +77,11 @@ const SPE_BOOK_OF_THE_DEAD = 409;
 const LEVELCHANGE_MORE_LEN = '--More--'.length;
 
 const OBJECT_BASE_NAMES = new Map([
+    [SCALPEL, 'scalpel'],
     [QUARTERSTAFF, 'quarterstaff'],
     [GRAY_DRAGON_SCALE_MAIL, 'gray dragon scale mail'],
     [CLOAK_OF_MAGIC_RESISTANCE, 'cloak of magic resistance'],
+    [LEATHER_GLOVES, 'leather gloves'],
     [AMULET_OF_LIFE_SAVING, 'amulet of life saving'],
     [178, 'ring of protection'],
     [RIN_INCREASE_ACCURACY, 'ring of increase accuracy'],
@@ -99,10 +104,13 @@ const OBJECT_BASE_NAMES = new Map([
     [332, 'scroll of light'],
     [335, 'scroll of food detection'],
     [336, 'scroll of identify'],
+    [374, 'spellbook of healing'],
     [380, 'spellbook of slow monster'],
     [383, 'spellbook of force bolt'],
+    [391, 'spellbook of extra healing'],
     [397, 'spellbook of identify'],
     [403, 'spellbook of protection'],
+    [405, 'spellbook of stone to flesh'],
     [SPE_NOVEL, 'novel'],
     [SPE_BOOK_OF_THE_DEAD, 'Book of the Dead'],
     [WAN_MAKE_INVISIBLE, 'wand of make invisible'],
@@ -114,6 +122,7 @@ const OBJECT_BASE_NAMES = new Map([
     [WAN_DEATH, 'wand of death'],
     [WAN_LIGHTNING, 'wand of lightning'],
     [421, 'wand of undead turning'],
+    [277, 'apple'],
 ]);
 
 const SPELLBOOK_SPELL_INFO = new Map([
@@ -783,6 +792,45 @@ function dropObjectName(obj) {
     return 'an object';
 }
 
+async function lookHereAfterMove() {
+    const u = game.u;
+    const obj = (game.level?.objects || []).find(o => o.ox === u.ux && o.oy === u.uy);
+    if (!obj || obj.otyp === GOLD_PIECE) return;
+    await pline(`You see here ${inventoryObjectName(obj)}.`);
+}
+
+function floorObjectAtHero() {
+    const u = game.u || {};
+    return (game.level?.objects || []).find((obj) =>
+        typeof obj?.otyp === 'number' && obj.ox === u.ux && obj.oy === u.uy);
+}
+
+function extractFloorObject(obj) {
+    const idx = game.level?.objects?.indexOf(obj) ?? -1;
+    if (idx >= 0) game.level.objects.splice(idx, 1);
+    if (typeof obj?.ox === 'number' && typeof obj?.oy === 'number') newsym(obj.ox, obj.oy);
+    obj.ox = 0;
+    obj.oy = 0;
+}
+
+async function pickupHere() {
+    const obj = floorObjectAtHero();
+    if (!obj) {
+        game.context.move = 0;
+        await pline('There is nothing here to pick up.');
+        return;
+    }
+    game.context.move = 1;
+    extractFloorObject(obj);
+    const merged = merge_inventory_object(obj);
+    const carried = merged || obj;
+    if (!merged) {
+        assignInventoryLetter(obj);
+        game.inventory.push(obj);
+    }
+    await pline(`${carried.invlet} - ${inventoryObjectName(carried)}.`);
+}
+
 function isMovementKey(ch) {
     return 'hjklyubn'.includes(ch);
 }
@@ -852,6 +900,13 @@ function monsterHitName(mon) {
     return `the ${monsterName(mon)}`;
 }
 
+function monsterSwapName(mon) {
+    const name = monsterName(mon);
+    if (mon?.mtame) return `your ${name}`;
+    if (mon?.mpeaceful) return `the peaceful ${name}`;
+    return `the ${name}`;
+}
+
 function monsterHasNoAttacks(mon) {
     const attacks = mon?.data?.mattk || [];
     return !attacks.some((attack) => attack && attack[0]);
@@ -904,6 +959,19 @@ async function attackMonster(mon) {
     // occupied monster squares.  Reuse the current narrow uhitm() RNG front
     // door; full weapon, passive, resist, and death handling remain backlog.
     await heroMeleeAttack(mon);
+}
+
+async function swapWithSafeMonster(mon, x, y) {
+    const u = game.u;
+    const oldx = u.ux;
+    const oldy = u.uy;
+    u.ux = x;
+    u.uy = y;
+    mon.mx = oldx;
+    mon.my = oldy;
+    newsym(oldx, oldy);
+    newsym(x, y);
+    await pline(`You swap places with ${monsterSwapName(mon)}.`);
 }
 
 async function heroMeleeAttack(mon) {
@@ -2803,10 +2871,7 @@ export async function rhack(key) {
         game.context.move = 0;
         await pline("You see no objects here.");
     } else if (ch === ',') {
-        const here = (game.level?.objects || []).some((obj) =>
-            typeof obj.otyp === 'number' && obj.ox === game.u?.ux && obj.oy === game.u?.uy);
-        game.context.move = here ? 1 : 0;
-        if (!here) await pline('There is nothing here to pick up.');
+        await pickupHere();
     } else if (ch === 'p') {
         game.context.move = 0;
         await pline('There appears to be no shopkeeper here to receive your payment.');
@@ -2909,6 +2974,10 @@ export async function domove(dx, dy) {
 
     const mon = mon_at(newx, newy);
     if (mon) {
+        if (mon.mtame || mon.mpeaceful) {
+            await swapWithSafeMonster(mon, newx, newy);
+            return true;
+        }
         await attackMonster(mon);
         return true;
     }
@@ -2934,5 +3003,6 @@ export async function domove(dx, dy) {
     newsym(oldx, oldy);
     vision_recalc(1);
     newsym(newx, newy);
+    await lookHereAfterMove();
     return true;
 }

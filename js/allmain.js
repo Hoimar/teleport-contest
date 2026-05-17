@@ -288,11 +288,15 @@ export async function newgame() {
     await makedog();
     if (ff) {
         // Fast-forward through post-pet startup RNG calls.
-        // Covers: u_init_role, ini_inv, attributes, moveloop_preamble.
-        ff.fastforward_post_mklev?.();
+        // Covers remaining unported u_init/attribute/moveloop-preamble work.
+        if (ff.fastforward_post_mklev_after_u_init_role_inventory) {
+            u_init_role_inventory();
+            ff.fastforward_post_mklev_after_u_init_role_inventory();
+        } else {
+            ff.fastforward_post_mklev?.();
+        }
         g.u.acurr = { a: startupAttrs.slice() };
         g.u.amax = { a: startupAttrs.slice() };
-        if (g._seed === 2) await startupTurnTail();
     } else {
         u_init_role_inventory();
         apply_startup_role_state();

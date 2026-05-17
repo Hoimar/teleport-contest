@@ -70,15 +70,21 @@ const GEM_CLASS = 13;
 
 const QUARTERSTAFF = 79;
 const CLOAK_OF_MAGIC_RESISTANCE = 139;
+const SCALPEL = 39;
+const LEATHER_GLOVES = 159;
 const BLINDFOLD = 220;
+const STETHOSCOPE = 237;
 const MAGIC_MARKER = 242;
 const SPE_FORCE_BOLT = 383;
+const APPLE = 277;
 const RIN_LEVITATION = 183;
 const RIN_HUNGER = 184;
 const RIN_AGGRAVATE_MONSTER = 185;
 const RIN_POLYMORPH = 196;
 const RIN_POLYMORPH_CONTROL = 197;
 const POT_HALLUCINATION = 304;
+const POT_HEALING = 307;
+const POT_EXTRA_HEALING = 308;
 const POT_POLYMORPH = 316;
 const POT_ACID = 320;
 const SCR_ENCHANT_WEAPON = 328;
@@ -87,10 +93,14 @@ const SCR_FIRE = 339;
 const SCR_BLANK_PAPER = 365;
 const SPE_POLYMORPH = 399;
 const SPE_BLANK_PAPER = 407;
+const SPE_HEALING = 374;
+const SPE_EXTRA_HEALING = 391;
+const SPE_STONE_TO_FLESH = 405;
 const SPE_NOVEL = 408;
 const WAN_WISHING = 414;
 const WAN_NOTHING = 416;
 const WAN_POLYMORPH = 422;
+const WAN_SLEEP = 432;
 
 const SPELLBOOK_LEVEL = new Map([
     [366, 5], [367, 2], [368, 4], [369, 4], [370, 3], [371, 7],
@@ -112,6 +122,19 @@ const WIZARD_INVENTORY = [
     { typ: SPE_FORCE_BOLT, spe: 0, cls: SPBOOK_CLASS, min: 1, max: 1, bless: 1 },
     { typ: UNDEF_TYP, spe: UNDEF_SPE, cls: SPBOOK_CLASS, min: 1, max: 1, bless: UNDEF_BLESS },
     { typ: MAGIC_MARKER, spe: 19, cls: TOOL_CLASS, min: 1, max: 1, bless: 0 },
+];
+
+const HEALER_INVENTORY = [
+    { typ: SCALPEL, spe: 0, cls: WEAPON_CLASS, min: 1, max: 1, bless: UNDEF_BLESS, wielded: true },
+    { typ: LEATHER_GLOVES, spe: 1, cls: ARMOR_CLASS, min: 1, max: 1, bless: UNDEF_BLESS, worn: true },
+    { typ: STETHOSCOPE, spe: 0, cls: TOOL_CLASS, min: 1, max: 1, bless: 0 },
+    { typ: POT_HEALING, spe: 0, cls: POTION_CLASS, min: 4, max: 4, bless: UNDEF_BLESS },
+    { typ: POT_EXTRA_HEALING, spe: 0, cls: POTION_CLASS, min: 4, max: 4, bless: UNDEF_BLESS },
+    { typ: WAN_SLEEP, spe: UNDEF_SPE, cls: WAND_CLASS, min: 1, max: 1, bless: UNDEF_BLESS },
+    { typ: SPE_HEALING, spe: 0, cls: SPBOOK_CLASS, min: 1, max: 1, bless: 1 },
+    { typ: SPE_EXTRA_HEALING, spe: 0, cls: SPBOOK_CLASS, min: 1, max: 1, bless: 1 },
+    { typ: SPE_STONE_TO_FLESH, spe: 0, cls: SPBOOK_CLASS, min: 1, max: 1, bless: 1 },
+    { typ: APPLE, spe: 0, cls: FOOD_CLASS, min: 5, max: 5, bless: 0 },
 ];
 
 const BLINDFOLD_INVENTORY = [
@@ -266,14 +289,20 @@ function ini_inv(trobs, noCreate, roleName) {
 }
 
 export function u_init_role_inventory() {
-    const role = findRole(game._nhopts?.role);
+    const role = findRole(game._nhopts?.role) || game.urole;
     const noCreate = {
         nocreate: UNDEF_TYP,
         nocreate2: UNDEF_TYP,
         nocreate3: UNDEF_TYP,
         nocreate4: UNDEF_TYP,
     };
-    if (role?.name?.m === 'Wizard') {
+    if (role?.name?.m === 'Healer') {
+        game._goldCount = rn1(1000, 1001);
+        ini_inv(HEALER_INVENTORY, noCreate, role.name.m);
+        if (!rn2(25)) {
+            // C may add an oil lamp here; object creation is still unported.
+        }
+    } else if (role?.name?.m === 'Wizard') {
         ini_inv(WIZARD_INVENTORY, noCreate, role.name.m);
         if (!rn2(5)) {
             ini_inv(BLINDFOLD_INVENTORY, noCreate, role.name.m);
