@@ -21,7 +21,7 @@ import { merge_inventory_object, pluslvl } from './u_init.js';
 import { adjalign, exercise, gethungry } from './allmain_turns.js';
 import { initrack } from './track.js';
 import { roleGod } from './roles.js';
-import { d, rn1, rn2, rnd, rnz } from './rng.js';
+import { d, rn1, rn2, rnd, rnl, rnz } from './rng.js';
 import { getObjectDescription } from './o_init.js';
 import { getRumor, hallucinatedLiquidName, randomHallucinatedMonsterName } from './random_text.js';
 import { finish_pending_swallowed_expulsion } from './monmove.js';
@@ -29,7 +29,7 @@ import { ATR_INVERSE, NO_COLOR } from './terminal.js';
 import * as C from './const.js';
 import {
     COLNO, ROWNO, STONE, CORR, DOOR, D_NODOOR, D_CLOSED, D_LOCKED,
-    SDOOR, SCORR, IS_WALL, IS_OBSTRUCTED, IS_POOL, LR_UPTELE, A_DEX, A_WIS,
+    SDOOR, SCORR, IS_WALL, IS_OBSTRUCTED, IS_POOL, LR_UPTELE, A_STR, A_DEX, A_CON, A_WIS,
 } from './const.js';
 
 // Direction deltas: y u k
@@ -1340,6 +1340,26 @@ function heroMeleeSmallDamageDie() {
 
 function doorwayBlocksDiagonalForHero(loc) {
     return loc && loc.typ === DOOR && (loc.doormask & ~C.D_BROKEN);
+}
+
+function currentAttr(index) {
+    return game.u?.acurr?.a?.[index] ?? 10;
+}
+
+async function tryAutoOpenDoor(x, y) {
+    const loc = game.level?.at(x, y);
+    if (!loc || loc.typ !== DOOR || !(loc.doormask & D_CLOSED) || (loc.doormask & D_LOCKED)) return false;
+    const threshold = Math.trunc((currentAttr(A_STR) + currentAttr(A_DEX) + currentAttr(A_CON)) / 3);
+    if (rnl(20) < threshold) {
+        loc.doormask = C.D_ISOPEN;
+        loc.flags = C.D_ISOPEN;
+        newsym(x, y);
+        await pline('The door opens.');
+    } else {
+        await pline('The door resists!');
+    }
+    game.context.move = 0;
+    return true;
 }
 
 function runShouldStopAfterMove(source, target) {
@@ -3685,6 +3705,10 @@ export async function domove(dx, dy) {
     const newy = u.uy + dy;
     const target = game.level.at(newx, newy);
 
+    if (target?.typ === DOOR && (target.doormask & (D_CLOSED | D_LOCKED))) {
+        if (await tryAutoOpenDoor(newx, newy)) return false;
+    }
+
     if (blocksMove(newx, newy)) {
         // Can't move there
         game.context.move = 0;
@@ -3715,7 +3739,7 @@ export async function domove(dx, dy) {
     if (is_diag) {
         const source = game.level.at(u.ux, u.uy);
         if (doorwayBlocksDiagonalForHero(target) || doorwayBlocksDiagonalForHero(source)) {
-            await pline(`You can't move diagonally into an intact doorway.`);
+            if (game.flags?.mention_walls) await pline(`You can't move diagonally into an intact doorway.`);
             game.context.move = 0;
             return false;
         }

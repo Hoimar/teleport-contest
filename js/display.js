@@ -198,7 +198,11 @@ function terrain_glyph(loc, x, y) {
     case ROOM:      return { ch: '~', color: NO_COLOR, dec: true };  // DEC middle dot
     case CORR:      return { ch: '#', color: NO_COLOR, dec: false };
     case DOOR:
-        if (loc.doormask & D_ISOPEN) return { ch: '|', color: CLR_BROWN, dec: false };
+        if (loc.doormask & D_ISOPEN) {
+            return loc.horizontal
+                ? { ch: '|', color: CLR_BROWN, dec: false }
+                : { ch: 'a', color: CLR_BROWN, dec: true };
+        }
         if (loc.doormask & (D_CLOSED | D_LOCKED)) return { ch: '+', color: CLR_BROWN, dec: false };
         return { ch: '~', color: NO_COLOR, dec: true };  // D_NODOOR = floor
     case SDOOR:

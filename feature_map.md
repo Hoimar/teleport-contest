@@ -39,7 +39,7 @@ Treat screen totals as lagging evidence of subsystem progress, not as the optimi
 | `rn2(N)` | `rng.c:rn2()` | `js/rng.js:rn2()` | ✅ | |
 | `rnd(N)` | `rng.c:rnd()` | `js/rng.js:rnd()` | ✅ | |
 | `rn1(N,B)` | `rng.c:rn1()` | `js/rng.js:rn1()` | ✅ | |
-| `rnl`, `rne`, `rnz`, `d` | `rng.c` | `js/rng.js` | 🟡 | Stubs or partial — verify log format matches C exactly |
+| `rnl`, `rne`, `rnz`, `d` | `rng.c` | `js/rng.js` | 🟡 | `rnl()` now preserves the distinct log shape for neutral-Luck evidence such as door auto-open; Luck adjustment remains incomplete. `rne`, `rnz`, and `d` are partial; verify broader log format against C. |
 | Three PRNG contexts (core / Lua / display) | `rng.c` context switching | `js/rng.js` | 🔴 | Hallucination/display context not implemented. Blocks `seed0383-wizard-hallucinate`. |
 
 ---
