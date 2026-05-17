@@ -9,7 +9,7 @@ import { nhgetch } from './input.js';
 import {
     ACCFOOD, APPORT, CADAVER, DOGFOOD, MANFOOD, TABU, UNDEF,
     D_CLOSED, D_LOCKED, GP_AVOID_MONPOS, GP_CHECKSCARY, IS_DOOR, IS_OBSTRUCTED,
-    IS_LAVA, IS_POOL, IS_ROOM, MM_EDOG, NO_MINVENT, SPACE_POS,
+    IS_LAVA, IS_POOL, IS_ROOM, MM_EDOG, MTSZ, NO_MINVENT, SPACE_POS,
     isok,
 } from './const.js';
 import { d, rn2, rnd } from './rng.js';
@@ -215,6 +215,12 @@ function object_class(otyp) {
 
 function objects_at(x, y) {
     return (game.level?.objects || []).filter((obj) => obj.ox === x && obj.oy === y);
+}
+
+function mon_track_add(mtmp, x, y) {
+    if (!mtmp.mtrack) mtmp.mtrack = [];
+    mtmp.mtrack.unshift({ x, y });
+    if (mtmp.mtrack.length > MTSZ) mtmp.mtrack.length = MTSZ;
 }
 
 function cursed_object_at(x, y) {
@@ -775,6 +781,18 @@ export async function dog_move(mtmp, after = true) {
     let chcnt = 0;
     const maxx = Math.min(mtmp.mx + 1, 79);
     const maxy = Math.min(mtmp.my + 1, 20);
+    let uncursedcnt = 0;
+    let mfndposcnt = 0;
+
+    for (let nx = Math.max(1, mtmp.mx - 1); nx <= maxx; nx++) {
+        for (let ny = Math.max(0, mtmp.my - 1); ny <= maxy; ny++) {
+            if (nx === mtmp.mx && ny === mtmp.my) continue;
+            const target = mon_at(nx, ny, mtmp);
+            if (!pet_can_enter_square(mtmp, nx, ny, { ignoreMonster: !!target })) continue;
+            mfndposcnt++;
+            if (!cursed_object_at(nx, ny)) uncursedcnt++;
+        }
+    }
 
     for (let nx = Math.max(1, mtmp.mx - 1); nx <= maxx; nx++) {
         for (let ny = Math.max(0, mtmp.my - 1); ny <= maxy; ny++) {
@@ -795,10 +813,19 @@ export async function dog_move(mtmp, after = true) {
             if (avoid_soko_push_loc(mtmp, nx, ny)) continue;
 
             // NetHack lessens backtracking only for pets more than five
-            // squares from the hero.  Track history is not modeled yet.
+            // squares from the hero.
             if (distmin(mtmp.mx, mtmp.my, game.u?.ux ?? mtmp.mx, game.u?.uy ?? mtmp.my) > 5) {
-                // Placeholder for dogmove.c mtrack avoidance; no RNG without
-                // real track state because that would invent consumers.
+                const k = edog ? uncursedcnt : mfndposcnt;
+                const jcnt = Math.min(MTSZ, k - 1, mtmp.mtrack?.length || 0);
+                let backtracking = false;
+                for (let trackIndex = 0; trackIndex < jcnt; trackIndex++) {
+                    const track = mtmp.mtrack[trackIndex];
+                    if (track?.x === nx && track?.y === ny && rn2(MTSZ * (k - trackIndex))) {
+                        backtracking = true;
+                        break;
+                    }
+                }
+                if (backtracking) continue;
             }
 
             const canReachFood = could_reach_item(mtmp, nx, ny);
@@ -834,6 +861,7 @@ export async function dog_move(mtmp, after = true) {
     const oldy = mtmp.my;
     mtmp.mx = nix;
     mtmp.my = niy;
+    mon_track_add(mtmp, oldx, oldy);
     newsym(oldx, oldy);
     newsym(nix, niy);
     return 1;

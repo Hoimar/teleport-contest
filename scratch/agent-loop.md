@@ -14,26 +14,26 @@ and `feature_map.md`.
 
 - Current branch in this workspace: `main`.
 - Baseline commit at harness cleanup: `f0fdc38`.
-- Active target: `seed0383-wizard-hallucinate`.
-- Active hypothesis: seed0383 is now narrowed to hallucinated map redraw
-  ownership after full flat core RNG parity. Non-side-effect packed monster-hit
-  Mores remain queued while later movement redraws happen behind them; physical
-  multiattack overflow, strict follow-up More keys, immediate cold side-effect
-  packing, and monster postmove warning display-RNG ownership are aligned. The
-  next blocker is the later screen 188 map-only redraw drift.
+- Active target: `seed0002-healer-reflection-drummer`.
+- Active hypothesis: seed0002 is narrowed to C `dogmove.c:dog_move()` candidate
+  eligibility/order after the corpse-eat turn. JS and C consume the same
+  dog-goal/object and equal-candidate RNG through the first visible mismatch,
+  but the little dog lands on the wrong equal-choice square. A source-backed
+  pet `mtrack` implementation was added and verified neutral; the next blocker
+  is still the adjacent candidate list/effective filtering, not core RNG.
 
 ## Latest Verification
 
 Run:
 
 ```bash
-npm run verify -- --target seed0383-wizard-hallucinate
+npm run verify -- --target seed0002-healer-reflection-drummer
 ```
 
 Result:
 
-- Target: `seed0383-wizard-hallucinate` `S 189/219 R 16915/16915`,
-  first screen `188:char+attr:map:Space`, first RNG `-`, cursor-only `1`.
+- Target: `seed0002-healer-reflection-drummer` `S 53/595 R 4066/27158`,
+  first screen `53:char:map:y`, first RNG `3880`, cursor-only `1`.
 - Sentinel total: `S 392/1063 R 37186/64569`.
 - Sentinel details:
   - `seed8000-tourist-starter`: `S 23/23 R 3060/3130`, first RNG `3047`.
