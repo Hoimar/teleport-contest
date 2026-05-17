@@ -100,37 +100,41 @@ const CROSSBOW = 88;
 const ELVEN_LEATHER_HELM = 89;
 const ORCISH_HELM = 90;
 const DWARVISH_IRON_HELM = 91;
-const DWARVISH_MITHRIL_COAT = 107;
-const ORCISH_CHAIN_MAIL = 110;
+const DWARVISH_MITHRIL_COAT = 126;
+const ORCISH_CHAIN_MAIL = 129;
 const PLATE_MAIL = 121;
 const CRYSTAL_PLATE_MAIL = 122;
-const SPLINT_MAIL = 125;
-const BANDED_MAIL = 126;
+const SPLINT_MAIL = 124;
+const BANDED_MAIL = 125;
 const STUDDED_LEATHER_ARMOR = 131;
 const RING_MAIL = 132;
 const LEATHER_ARMOR = 134;
-const ORCISH_CLOAK = 121;
-const DWARVISH_CLOAK = 122;
+const ORCISH_CLOAK = 140;
+const DWARVISH_CLOAK = 141;
 const DENTED_POT = 95;
 const HELMET = 97;
-const URUK_HAI_SHIELD = 135;
-const ORCISH_SHIELD = 136;
+const URUK_HAI_SHIELD = 154;
+const ORCISH_SHIELD = 155;
 const SMALL_SHIELD = 150;
-const LARGE_SHIELD = 154;
-const DWARVISH_ROUNDSHIELD = 138;
-const LEATHER_GLOVES = 157;
-const LOW_BOOTS = 164;
-const IRON_SHOES = 145;
-const HIGH_BOOTS = 166;
+const LARGE_SHIELD = 156;
+const DWARVISH_ROUNDSHIELD = 157;
+const LEATHER_GLOVES = 159;
+const GAUNTLETS_OF_FUMBLING = 160;
+const LOW_BOOTS = 163;
+const IRON_SHOES = 164;
+const HIGH_BOOTS = 165;
 const ELVEN_MITHRIL_COAT = 127;
 const MUMMY_WRAPPING = 138;
 const ELVEN_CLOAK = 139;
-const LEATHER_CLOAK = 144;
+const LEATHER_CLOAK = 145;
 const ELVEN_SHIELD = 153;
 const ELVEN_BOOTS = 169;
-const TIN_WHISTLE = 215;
+const FUMBLE_BOOTS = 171;
+const LEVITATION_BOOTS = 172;
+const TIN_WHISTLE = 245;
 const SKELETON_KEY = 221;
 const FIGURINE = 241;
+const BUGLE = 256;
 const MIRROR = 230;
 const CRYSTAL_BALL = 231;
 const PICK_AXE = 259;
@@ -1031,7 +1035,8 @@ function mksobj_init(otmp, otyp, artif) {
         blessorcurse(otmp, 17);
         break;
     case WAND_CLASS:
-        otmp.spe = rn1(5, (OBJECT_DIR[otyp] === 1) ? 11 : 4);
+        if (otyp === WAN_WISHING) otmp.spe = 1;
+        else otmp.spe = rn1(5, (OBJECT_DIR[otyp] === 1) ? 11 : 4);
         blessorcurse(otmp, 17);
         break;
     case RING_CLASS:
@@ -1114,9 +1119,8 @@ function is_multigen_weapon(otyp) {
 
 function is_special_cursed_armor(otyp) {
     // C hard-curses these armor types without the ordinary !rn2(11) gate.
-    // These ids cover helm of opposite alignment, gauntlets of fumbling,
-    // fumble boots, and levitation boots in the generated object table.
-    return otyp === 99 || otyp === 144 || otyp === 171 || otyp === 172;
+    return otyp === 99 || otyp === GAUNTLETS_OF_FUMBLING
+        || otyp === FUMBLE_BOOTS || otyp === LEVITATION_BOOTS;
 }
 
 function is_bad_uncursed_ring(otyp) {
@@ -1501,6 +1505,9 @@ function newmonhp_for(ptr, monLevel = adj_lev_for(ptr)) {
     if (!ptr) return 0;
     const lev = monLevel;
     if (ptr.mlet === 'S_GOLEM') return lev;
+    if (ptr.mlet === 'S_DRAGON' && !String(ptr.name || '').startsWith('BABY_')) {
+        return 4 * lev + d(lev, 4);
+    }
     if (!lev) return rnd(4);
     let hp = d(lev, 8);
     if (hp === lev) hp++;
@@ -1535,9 +1542,9 @@ function m_initinv_for(ptr, mon = null) {
         d(level_difficulty(), 30);
         mksobj(GOLD_PIECE, false, false);
     }
-    if (ptr.name === 'SOLDIER' || ptr.name === 'WATCHMAN') {
-        let mac = 3;
-        const armorBonus = (otyp) => ({
+    if (ptr.name === 'SOLDIER' || ptr.name === 'WATCHMAN' || ptr.name === 'LIEUTENANT') {
+        let mac = ptr.name === 'LIEUTENANT' ? -2 : 3;
+        const armorBaseBonus = (otyp) => ({
             [PLATE_MAIL]: 7,
             [CRYSTAL_PLATE_MAIL]: 7,
             [SPLINT_MAIL]: 6,
@@ -1549,15 +1556,20 @@ function m_initinv_for(ptr, mon = null) {
             [DENTED_POT]: 1,
             [SMALL_SHIELD]: 1,
             [LARGE_SHIELD]: 2,
-            [LOW_BOOTS]: 2,
+            [LOW_BOOTS]: 1,
             [HIGH_BOOTS]: 2,
             [LEATHER_GLOVES]: 1,
             [LEATHER_CLOAK]: 1,
         })[otyp] || 0;
+        const armorBonus = (otmp) => {
+            const base = armorBaseBonus(otmp?.otyp);
+            const erosion = Math.max(otmp?.oeroded ?? 0, otmp?.oeroded2 ?? 0);
+            return base + (otmp?.spe ?? 0) - Math.min(erosion, base);
+        };
         const addArmor = (otyp) => {
             if (!otyp) return;
-            mksobj(otyp, true, false);
-            mac += armorBonus(otyp);
+            const otmp = mksobj(otyp, true, false);
+            mac += armorBonus(otmp);
         };
         if (mac < -1 && rn2(5)) addArmor(rn2(5) ? PLATE_MAIL : CRYSTAL_PLATE_MAIL);
         else if (mac < 3 && rn2(5)) addArmor(rn2(3) ? SPLINT_MAIL : BANDED_MAIL);
@@ -1578,6 +1590,7 @@ function m_initinv_for(ptr, mon = null) {
         } else {
             if (!rn2(3)) mksobj(K_RATION, true, false);
             if (!rn2(2)) mksobj(C_RATION, true, false);
+            if (ptr.name !== 'SOLDIER' && !rn2(3)) mksobj(BUGLE, true, false);
         }
     }
     if (ptr.name === 'SHOPKEEPER') {
@@ -1743,13 +1756,14 @@ function m_initweap_for(ptr) {
         maybe_init_offensive_item_for(ptr);
         return;
     }
-    if (ptr.name === 'SOLDIER' || ptr.name === 'WATCHMAN') {
+    if (ptr.name === 'SOLDIER' || ptr.name === 'WATCHMAN' || ptr.name === 'LIEUTENANT') {
         let w1 = 0, w2 = 0;
-        if (!rn2(3)) {
+        if (ptr.name === 'LIEUTENANT') {
+            w1 = rn2(2) ? BROADSWORD : LONG_SWORD;
+        } else if (!rn2(3)) {
             // C ref: makemon.c:m_initweap() mercenary polearm branch. The
-            // exact polearm skill filter is future work; current evidence
-            // takes the spear/short-sword path below.
-            w1 = PARTISAN + rn2(15);
+            // PARTISAN..BEC_DE_CORBIN generated object span is all polearms.
+            w1 = PARTISAN + rn2(12);
             w2 = rn2(2) ? DAGGER : KNIFE;
         } else {
             w1 = rn2(2) ? SPEAR : SHORT_SWORD;
@@ -2163,6 +2177,12 @@ export async function makemon(mdat, x, y, mmflags = 0) {
     if (ptr.mlet === 'S_LEPRECHAUN') mon.msleeping = 1;
     if ((ptr.mlet === 'S_NYMPH' || ptr.mlet === 'S_JABBERWOCK')
         && rn2(5) && !game.u?.uhave?.amulet) {
+        mon.msleeping = 1;
+    }
+    if (game.in_mklev && !game.u?.uhave?.amulet
+        && (ptr.mlet === 'S_DEMON' || ptr.name === 'WUMPUS'
+            || ptr.name === 'LONG_WORM' || ptr.name === 'GIANT_EEL')
+        && rn2(5)) {
         mon.msleeping = 1;
     }
     const anymon = mdat === null;
@@ -3270,11 +3290,13 @@ function castleMonsterPtr(id) {
 }
 
 function castleCreateMonster(id, x, y, mmflags = 0) {
-    // C ref: sp_lev.c:create_monster() applies random special-level
-    // alignment before choosing/placing both fixed and class monsters.
-    induced_align_80();
     const cls = String(id || '').length === 1 ? castleMonsterClass(id) : null;
-    const ptr = cls ? mkclass_aligned(cls, G_NOGEN) : castleMonsterPtr(id);
+    let ptr = cls ? null : castleMonsterPtr(id);
+    // C ref: sp_lev.c:find_montype() resolves a gender value for named
+    // special monsters before create_monster() applies random alignment.
+    if (!cls && ptr && !ptr.neuter && !ptr.male && !ptr.female) rn2(2);
+    induced_align_80();
+    if (cls) ptr = mkclass_aligned(cls, G_NOGEN);
     return makemon(ptr, x, y, mmflags);
 }
 
@@ -3299,6 +3321,30 @@ function castleApplyRegion(x1, y1, x2, y2, lit, rtype = OROOM) {
             }
         }
     }
+}
+
+function specialRandomDryLocation(width, height, xstart = 0, ystart = 0) {
+    let x = xstart, y = ystart;
+    let trycnt = 0;
+    do {
+        x = xstart + rn2(width);
+        y = ystart + rn2(height);
+        const loc = game.level?.at(x, y);
+        if (loc && SPACE_POS(loc.typ) && !sobj_at(BOULDER, x, y)) return { x, y };
+    } while (++trycnt < 100);
+    for (let xx = xstart; xx < xstart + width; xx++)
+        for (let yy = ystart; yy < ystart + height; yy++) {
+            const loc = game.level?.at(xx, yy);
+            if (loc && SPACE_POS(loc.typ) && !sobj_at(BOULDER, xx, yy)) return { x: xx, y: yy };
+        }
+    return { x, y };
+}
+
+function createSpecialContainerObject(otyp, width, height) {
+    // C ref: sp_lev.c:create_object() resolves a DRY coordinate even for
+    // objects that are immediately removed into a special-level container.
+    specialRandomDryLocation(width, height);
+    return mksobj(otyp, true, false);
 }
 
 function loadCastleTerrain() {
@@ -3390,8 +3436,8 @@ function loadCastleSpecial() {
         wishingChest.olocked = true;
         wishingChest.otrapped = false;
         wishingChest.contents = [
-            mksobj(WAN_WISHING, true, false),
-            mksobj(POT_GAIN_LEVEL, true, false),
+            createSpecialContainerObject(WAN_WISHING, CASTLE_MAP[0].length, CASTLE_MAP.length),
+            createSpecialContainerObject(POT_GAIN_LEVEL, CASTLE_MAP[0].length, CASTLE_MAP.length),
         ];
     }
     make_engr_at(loc.x, loc.y, 'Elbereth', 0, 0, 3); // BURN
