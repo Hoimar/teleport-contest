@@ -15,14 +15,13 @@ and `feature_map.md`.
 - Current branch in this workspace: `main`.
 - Baseline commit at harness cleanup: `f0fdc38`.
 - Active target: `seed1800-tourist-eat-throw`.
-- Active hypothesis: configured Tourist startup is now past the wrong-pantheon
-  lore blocker. Adding the Tourist Discworld gods and the Tourist-specific
-  legacy lore overlay plus startup display-name normalization and Tourist AC
-  reduced screen 0 to 7 residual cells with exact
-  Book-of-The-Lady text and cursor. Remaining seed1800 startup mismatch is a
-  right-side map/status residue, plus first RNG `FR 1045`, so the next safe
-  step is full `ini_inv(Tourist)`/startup inventory and stat RNG, not more
-  role text.
+- Active hypothesis: configured Tourist startup has passed the wrong-pantheon
+  lore blocker and now has a live Tourist `u_init_role()` inventory/gold slice.
+  `seed1800` target RNG improved from `R 2188/2458` to `R 2204/2458` with
+  stable sentinels, but first RNG remains `FR 1045` in level object generation.
+  The screen-0 status cells are therefore downstream of earlier `mklev` RNG
+  drift; the next safe step is to explain the `rnd_class(objnam.c:5413)`
+  mismatch instead of adding more startup-status special cases.
 
 ## Latest Verification
 
@@ -34,7 +33,7 @@ npm run verify -- --target seed1800-tourist-eat-throw
 
 Result:
 
-- Target: `seed1800-tourist-eat-throw` `S 0/26 R 2188/2458`,
+- Target: `seed1800-tourist-eat-throw` `S 0/26 R 2204/2458`,
   first screen `0:char:mixed:init`, first RNG `1045`, cursor-only `0`.
 - Sentinel total: `S 428/1063 R 38622/64569`.
 - Sentinel details:
@@ -50,12 +49,13 @@ Result:
 
 1. Continue `seed1800-tourist-eat-throw` configured Tourist startup.
    - Use `npm run screen:diff -- seed1800-tourist-eat-throw --index 0 --all-cells`.
-   - Current diff is screen 0 only 7 cells: pet glyph one column off in the
-     right-side map and status Int/Cha/gold still reflect incomplete Tourist
-     inventory/stat RNG. Role text, AC, name, and cursor are exact.
-   - First RNG mismatch remains `FR 1045`, so startup identity text is not the
-     RNG blocker; inspect C `u_init_role()` Tourist inventory/gold before
-     `init_attr()` rather than adding isolated RNG rolls.
+   - Current diff is screen 0, 10 cells: pet glyph one column off in the
+     right-side map and status cells shifted because live Tourist inventory now
+     consumes downstream RNG from a still-diverged `mklev()` prefix.
+   - First RNG mismatch remains `FR 1045:rnd(882)=573=>rnd(100)=5`, before
+     `u_init_role()`. Inspect C/JS object generation around ordinary room
+     contents and `objnam.c:rnd_class()` rather than adding startup-status
+     overrides.
 2. Continue `seed0383` hallucinated monster-turn display timing.
    - Use `npm run screen:diff -- seed0383-wizard-hallucinate --first`.
    - Current diff is screen 195 (`c`): C and JS both show the materialize
