@@ -5,10 +5,11 @@ import { adj_lev_for, enexto_core, monsterPtr, MONSTER_SYMBOLS, newmonhp_for } f
 import { OBJECT_CLASS, OBJECT_DIR } from './object_data.js';
 import {
     D_BROKEN, D_CLOSED, D_ISOPEN, D_LOCKED, D_NODOOR, D_TRAPPED,
-    IS_DOOR, IS_LAVA, IS_OBSTRUCTED, IS_POOL, IS_STWALL, IS_WATERWALL,
+    DOOR, ROOM,
+    IS_DOOR, IS_LAVA, IS_OBSTRUCTED, IS_POOL, IS_STWALL, IS_WALL, IS_WATERWALL,
     I_SPECIAL, M_AP_FURNITURE, M_AP_OBJECT,
     MON_POLE_DIST, NEED_HTH_WEAPON, NEED_RANGED_WEAPON, NEED_WEAPON, W_WEP,
-    GP_CHECKSCARY, W_NONPASSWALL,
+    GP_CHECKSCARY, SDOOR, W_NONPASSWALL,
     isok, SPACE_POS,
 } from './const.js';
 import {
@@ -25,6 +26,7 @@ const NORMAL_SPEED = 12;
 const BOLT_LIM = 8;
 const M2_WERE = 0x00000004;
 const M2_HUMAN = 0x00000008;
+const M2_DWARF = 0x00000020;
 const M2_WANDER = 0x00800000;
 const M2_ROCKTHROW = 0x08000000;
 const M1_FLY = 0x00000001;
@@ -59,6 +61,8 @@ const WAND_CLASS = 11;
 const GEM_CLASS = 13;
 const ROCK = 474;
 const BOULDER = 475;
+const DWARVISH_MATTOCK = 71;
+const PICK_AXE = 259;
 const RAY = 3;
 const AMULET_OF_LIFE_SAVING = 202;
 const AMULET_OF_REFLECTION = 208;
@@ -199,6 +203,19 @@ function non_tame_movement_opportunity(mtmp, state) {
     if (mtmp.mcansee === 0 && !rn2(4)) return true;
     if (mtmp.mpeaceful) return true;
     return false;
+}
+
+function can_tunnel_basic(mtmp) {
+    return !!(mtmp.data?.mflags2 & M2_DWARF)
+        && (mtmp.inventory || []).some((obj) => obj?.otyp === PICK_AXE || obj?.otyp === DWARVISH_MATTOCK);
+}
+
+function can_tunnel_at_basic(mtmp, x, y) {
+    if (!can_tunnel_basic(mtmp)) return false;
+    const loc = game.level?.at(x, y);
+    if (!loc) return false;
+    if (IS_WALL(loc.typ) || loc.typ === SDOOR) return true;
+    return loc.typ === DOOR && !!(loc.doormask & (D_CLOSED | D_LOCKED));
 }
 
 function mon_at(x, y, self) {
@@ -1171,6 +1188,15 @@ async function m_move_basic(mtmp) {
     // C ref: monmove.c:m_move().  While swallowed, bystander monsters
     // spend their movement opportunity without ordinary path selection.
     if (game.u?.uswallow && !mtmp.mflee && game.u?.ustuck !== mtmp) return 1;
+    if (mtmp.isshk || mtmp.isgd) return MMOVE_NOTHING;
+    if (mtmp.ispriest) {
+        // C ref: priest.c:pri_move().  A priest in their temple mills around
+        // the shrine before move_special(); the current front door preserves
+        // the altar-offset RNG without falling into ordinary peaceful m_move().
+        rn2(3);
+        rn2(3);
+        return MMOVE_NOTHING;
+    }
     if (mtmp.mconf) {
         appr = 0;
     } else {
@@ -1226,14 +1252,16 @@ async function m_move_basic(mtmp) {
                 && (door_blocks_diagonal(omx, omy) || door_blocks_diagonal(nx, ny))) {
                 continue;
             }
-            if (!can_mon_step(mtmp, nx, ny)) continue;
-            candidates.push({ x: nx, y: ny });
+            const tunnel = can_tunnel_at_basic(mtmp, nx, ny);
+            if (!tunnel && !can_mon_step(mtmp, nx, ny)) continue;
+            candidates.push({ x: nx, y: ny, tunnel });
         }
     }
     if (!candidates.length) return MMOVE_NOTHING;
 
     let nix = omx;
     let niy = omy;
+    let digTunnel = false;
     let nidist = dist2(nix, niy, ggx, ggy);
     let chcnt = 0;
     let moved = false;
@@ -1264,6 +1292,7 @@ async function m_move_basic(mtmp) {
             || !moved) {
             nix = cand.x;
             niy = cand.y;
+            digTunnel = !!cand.tunnel;
             nidist = ndist;
             moved = true;
         }
@@ -1278,6 +1307,11 @@ async function m_move_basic(mtmp) {
     const engulfingHero = game.u?.uswallow && game.u?.ustuck === mtmp;
     mtmp.mx = nix;
     mtmp.my = niy;
+    if (digTunnel) {
+        rnd(12); // C ref: dig.c:mdig_tunnel() pile amount.
+        const loc = game.level?.at(nix, niy);
+        if (loc && !SPACE_POS(loc.typ)) loc.typ = ROOM;
+    }
     if (engulfingHero) {
         game.u.ux0 = game.u.ux;
         game.u.uy0 = game.u.uy;

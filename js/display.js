@@ -194,7 +194,8 @@ function terrain_glyph(loc, x, y) {
     const typ = display_wall_type(loc);
     const wallColor = game.level?.flags?.red_walls
         ? CLR_RED
-        : game.level?.flags?.sokoban_rules ? CLR_BLUE : NO_COLOR;
+        : game.level?.flags?.sokoban_rules ? CLR_BLUE
+            : game.level?.flags?.mines_walls ? CLR_BROWN : NO_COLOR;
     switch (typ) {
     case STONE:     return { ch: ' ', color: NO_COLOR, dec: false };
     case ROOM:      return { ch: '~', color: NO_COLOR, dec: true };  // DEC middle dot

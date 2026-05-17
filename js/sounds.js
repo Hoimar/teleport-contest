@@ -47,6 +47,9 @@ export async function dosounds() {
     if (lvl.flags.has_zoo && !rn2(200)) {
         return;
     }
+    if (lvl.flags.has_shop && !rn2(200)) {
+        return;
+    }
     if (lvl.flags.has_temple && !rn2(200)) {
         const isSanctum = (g.specialLevels || []).some((lev) =>
             lev?.proto === 'sanctum'

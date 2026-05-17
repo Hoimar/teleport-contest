@@ -2491,29 +2491,29 @@ function buildLevelTeleportMenuPage2() {
         J: targetForProto('astral', -5),
     };
     const lines = [
-        ` t -   ${fakeWizardLevels[0].proto}: ${fakeWizardLevels[0].displayLevel}`,
-        ` u -   ${fakeWizardLevels[1].proto}: ${fakeWizardLevels[1].displayLevel}`,
-        ` v -   sanctum: ${dlevelOf('sanctum', 51)}`,
+        ` t - ${currentLevelMarker(choices.t)} ${fakeWizardLevels[0].proto}: ${fakeWizardLevels[0].displayLevel}`,
+        ` u - ${currentLevelMarker(choices.u)} ${fakeWizardLevels[1].proto}: ${fakeWizardLevels[1].displayLevel}`,
+        ` v - ${currentLevelMarker(choices.v)} sanctum: ${dlevelOf('sanctum', 51)}`,
         ` \x1b[7mThe Gnomish Mines: levels ${mines?.depth_start ?? 4} to ${(mines?.depth_start ?? 4) + (mines?.num_dunlevs ?? 8) - 1}\x1b[0m`,
-        ` w -   minetn: ${dlevelOf('minetn', 6)}`,
-        ` x -   minend: ${dlevelOf('minend', 11)}`,
+        ` w - ${currentLevelMarker(choices.w)} minetn: ${dlevelOf('minetn', 6)}`,
+        ` x - ${currentLevelMarker(choices.x)} minend: ${dlevelOf('minend', 11)}`,
         ` \x1b[7mThe Quest: levels ${quest?.depth_start ?? 11} to ${(quest?.depth_start ?? 11) + (quest?.num_dunlevs ?? 5) - 1}\x1b[0m`,
-        ` y -   ${roleCode}-strt: ${dlevelOf('x-strt', 11)}`,
-        ` z -   ${roleCode}-loca: ${dlevelOf('x-loca', 13)}`,
-        ` A -   ${roleCode}-goal: ${dlevelOf('x-goal', 15)}`,
+        ` y - ${currentLevelMarker(choices.y)} ${roleCode}-strt: ${dlevelOf('x-strt', 11)}`,
+        ` z - ${currentLevelMarker(choices.z)} ${roleCode}-loca: ${dlevelOf('x-loca', 13)}`,
+        ` A - ${currentLevelMarker(choices.A)} ${roleCode}-goal: ${dlevelOf('x-goal', 15)}`,
         ` \x1b[7mSokoban: levels ${soko?.depth_start ?? 2} to ${(soko?.depth_start ?? 2) + (soko?.num_dunlevs ?? 4) - 1}, entrance from below\x1b[0m`,
-        ` B -   soko1: ${dlevelOf('soko1', 2)}`,
-        ` C -   soko2: ${dlevelOf('soko2', 3)}`,
-        ` D -   soko3: ${dlevelOf('soko3', 4)}`,
-        ` E -   soko4: ${dlevelOf('soko4', 5)}`,
+        ` B - ${currentLevelMarker(choices.B)} soko1: ${dlevelOf('soko1', 2)}`,
+        ` C - ${currentLevelMarker(choices.C)} soko2: ${dlevelOf('soko2', 3)}`,
+        ` D - ${currentLevelMarker(choices.D)} soko3: ${dlevelOf('soko3', 4)}`,
+        ` E - ${currentLevelMarker(choices.E)} soko4: ${dlevelOf('soko4', 5)}`,
         ` \x1b[7mFort Ludios: depth ${ludios?.depth_start ?? 19}\x1b[0m`,
         `       knox: ${dlevelOf('knox', 19)}`,
         ` \x1b[7mVlad's Tower: levels ${vlad?.depth_start ?? 35} to ${(vlad?.depth_start ?? 35) + (vlad?.num_dunlevs ?? 3) - 1}, entrance from below\x1b[0m`,
-        ` G -   tower1: ${dlevelOf('tower1', 35)}`,
-        ` H -   tower2: ${dlevelOf('tower2', 36)}`,
-        ` I -   tower3: ${dlevelOf('tower3', 37)}`,
+        ` G - ${currentLevelMarker(choices.G)} tower1: ${dlevelOf('tower1', 35)}`,
+        ` H - ${currentLevelMarker(choices.H)} tower2: ${dlevelOf('tower2', 36)}`,
+        ` I - ${currentLevelMarker(choices.I)} tower3: ${dlevelOf('tower3', 37)}`,
         ` \x1b[7mThe Elemental Planes: levels -5 to 0, entrance on -1\x1b[0m`,
-        ` J -   astral: ${dlevelOf('astral', -5)}`,
+        ` J - ${currentLevelMarker(choices.J)} astral: ${dlevelOf('astral', -5)}`,
         ' (2 of 3)',
     ];
     return { screen: lines.join('\n'), choices };
@@ -2595,8 +2595,10 @@ export async function performLevelTeleport(target) {
     const tempMessage = temperatureChangeAfterLevelChange(prevTemperature, wasInHell);
     if (tempMessage?.line) {
         await append_pline(tempMessage.line);
-        if (tempMessage.afterMore) game._after_more_message = tempMessage.afterMore;
-        queue_more_prompt();
+        if (tempMessage.afterMore) {
+            game._after_more_message = tempMessage.afterMore;
+            queue_more_prompt();
+        }
     }
     game.context.mv = 1;
 }
