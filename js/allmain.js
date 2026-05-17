@@ -384,6 +384,7 @@ export async function advanceTurn() {
     }
 
     await maybe_generate_rnd_mon();
+    if (g.u?.uprops?.fast) rn2(3);
     settrack();
 
     regen_hp();

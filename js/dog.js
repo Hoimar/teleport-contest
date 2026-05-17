@@ -10,13 +10,15 @@ import {
     ACCFOOD, APPORT, CADAVER, DOGFOOD, MANFOOD, TABU, UNDEF,
     D_CLOSED, D_LOCKED, GP_AVOID_MONPOS, GP_CHECKSCARY, IS_DOOR, IS_OBSTRUCTED,
     IS_LAVA, IS_POOL, IS_ROOM, LADDER, MM_EDOG, MTSZ, NO_MINVENT, SPACE_POS, STAIRS,
-    isok,
+    W_WEP, isok,
 } from './const.js';
 import { d, rn2, rnd } from './rng.js';
 import { cansee, clear_path } from './vision.js';
 
 const FOOD_CLASS = 7;
+const WEAPON_CLASS = 2;
 const ROCK_CLASS = 14;
+const ORCISH_DAGGER = 36;
 const QUARTERSTAFF = 79;
 const TRIPE_RATION = 264;
 const BOULDER = 475;
@@ -369,6 +371,29 @@ function monster_name(mon) {
     return String(mon?.data?.name || 'monster').toLowerCase().replace(/_/g, ' ');
 }
 
+function monster_has_weapon_attack(mon) {
+    return (mon?.data?.mattk || []).some((attack) => attack?.[0] === 'AT_WEAP');
+}
+
+function monster_weapon_candidate(mon) {
+    return (mon?.inventory || []).find((obj) => OBJECT_CLASS[obj?.otyp] === WEAPON_CLASS);
+}
+
+function monster_weapon_name(obj) {
+    if (obj?.otyp === ORCISH_DAGGER) return 'a crude dagger';
+    return object_name(obj);
+}
+
+function monster_wield_for_pet_counter(mon) {
+    if (!monster_has_weapon_attack(mon) || mon?.mw) return null;
+    const obj = monster_weapon_candidate(mon);
+    if (!obj) return null;
+    mon.mw = obj;
+    obj.owornmask = (obj.owornmask || 0) | W_WEP;
+    mon.weapon_check = 1; // NEED_WEAPON
+    return obj;
+}
+
 const MONSTER_AC = new Map([
     ['kitten', 6],
     ['fox', 7],
@@ -664,6 +689,12 @@ async function pet_melee_attack(mtmp, target) {
 }
 
 async function monster_melee_attack(mtmp, target) {
+    const wielded = monster_wield_for_pet_counter(mtmp);
+    if (wielded) {
+        refresh_pet_attack_symbols(mtmp, target);
+        await append_topline_message(`The ${monster_name(mtmp)} wields ${monster_weapon_name(wielded)}!`);
+        return { attacked: true, wielded: true, defenderDied: false };
+    }
     const dieroll = rnd(20);
     if (!mattackm_hits(mtmp, target, dieroll)) {
         refresh_pet_attack_symbols(mtmp, target);

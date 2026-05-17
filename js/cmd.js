@@ -50,6 +50,8 @@ const WAN_DIGGING = 428;
 const WAN_MAGIC_MISSILE = 429;
 const QUARTERSTAFF = 79;
 const CLOAK_OF_MAGIC_RESISTANCE = 139;
+const SPEED_BOOTS = 166;
+const LEVITATION_BOOTS = 172;
 const RIN_TELEPORT_CONTROL = 195;
 const RIN_INCREASE_ACCURACY = 176;
 const RIN_STEALTH = 181;
@@ -87,6 +89,7 @@ const OBJECT_BASE_NAMES = new Map([
     [QUARTERSTAFF, 'quarterstaff'],
     [GRAY_DRAGON_SCALE_MAIL, 'gray dragon scale mail'],
     [CLOAK_OF_MAGIC_RESISTANCE, 'cloak of magic resistance'],
+    [SPEED_BOOTS, 'speed boots'],
     [LEATHER_GLOVES, 'leather gloves'],
     [AMULET_OF_LIFE_SAVING, 'amulet of life saving'],
     [178, 'ring of protection'],
@@ -249,6 +252,10 @@ function wishedObjectSpec(name) {
     if (wish.includes('gray dragon scale mail') || wish.includes('grey dragon scale mail')) {
         rn2(67);
         return { ...spec, otyp: GRAY_DRAGON_SCALE_MAIL };
+    }
+    if (wish.includes('speed boots')) {
+        rn2(13);
+        return { ...spec, otyp: SPEED_BOOTS };
     }
     if (wish.includes('wand of fire')) {
         rn2(41);
@@ -449,7 +456,7 @@ function compressLetters(letters) {
     for (let i = 0; i < sorted.length; i++) {
         let j = i;
         while (j + 1 < sorted.length && sorted[j + 1].charCodeAt(0) === sorted[j].charCodeAt(0) + 1) j++;
-        if (j - i >= 2) parts.push(`${sorted[i]}-${sorted[j]}`);
+        if (j - i >= 3) parts.push(`${sorted[i]}-${sorted[j]}`);
         else for (let k = i; k <= j; k++) parts.push(sorted[k]);
         i = j;
     }
@@ -748,7 +755,11 @@ function wornSuffix(obj) {
 function inventoryObjectName(obj, opts = {}) {
     if (obj?.menuName) return obj.menuName;
     const quan = obj?.quan || 1;
-    const base = quan > 1 ? pluralizeObjectName(baseObjectName(obj)) : baseObjectName(obj);
+    const rawBase = baseObjectName(obj);
+    const pairObject = /\b(?:boots|gloves)$/.test(rawBase);
+    const base = quan > 1
+        ? (pairObject ? `pairs of ${rawBase}` : pluralizeObjectName(rawBase))
+        : (pairObject ? `pair of ${rawBase}` : rawBase);
     const parts = [bucPrefix(obj), enchantmentPrefix(obj), base].filter(Boolean);
     const body = parts.join(' ') + chargeSuffix(obj, opts);
     const worn = opts.includeWorn ? wornSuffix(obj) : '';
@@ -839,6 +850,7 @@ function armor_base_bonus(obj) {
     case CLOAK_OF_MAGIC_RESISTANCE:
         return 1;
     default:
+        if (obj?.otyp >= SPEED_BOOTS && obj.otyp <= LEVITATION_BOOTS) return 1;
         return 0;
     }
 }
@@ -854,6 +866,14 @@ function calculated_armor_class() {
         if (obj?.oclass === ARMOR_CLASS) uac -= armor_bonus(obj);
     }
     return Math.max(-99, Math.min(99, uac));
+}
+
+function armor_finish_message(obj) {
+    if (obj?.otyp !== SPEED_BOOTS) return 'You finish your dressing maneuver.';
+    const alreadyFast = !!game.u?.uprops?.fast;
+    game.u.uprops = game.u.uprops || {};
+    game.u.uprops.fast = true;
+    return `You finish your dressing maneuver.  You feel yourself speed up${alreadyFast ? ' a bit more' : ''}.`;
 }
 
 function takeoff_worn_cloak() {
@@ -882,7 +902,7 @@ async function start_wearing_object(obj) {
     const delay = OBJECT_DELAY[obj.otyp] || 0;
     if (obj.oclass === ARMOR_CLASS && delay > 1) {
         game._occupation_turns_remaining = Math.max(0, delay - 1);
-        game._occupation_finish_message = 'You finish your dressing maneuver.';
+        game._occupation_finish_message = armor_finish_message(obj);
         game._occupation_finish_uac = calculated_armor_class();
         await pline(`You start putting on ${inventoryObjectName(obj)}.`);
     } else {
@@ -3186,12 +3206,17 @@ export async function rhack(key) {
         }
         const idx = inventoryIndexForLetter(ch);
         const obj = idx >= 0 ? game.inventory?.[idx] : null;
-        if (!obj || obj.oclass !== TOOL_CLASS) {
+        if (!obj) {
             game.context.move = 0;
             game._awaiting_apply_item = true;
             game._apply_invalid_more = true;
             await pline("You don't have that object.");
             queue_more_prompt();
+            return;
+        }
+        if (obj.oclass !== TOOL_CLASS) {
+            game.context.move = 0;
+            await pline("Sorry, I don't know how to use that.");
             return;
         }
         if (obj.otyp === EXPENSIVE_CAMERA || obj.otyp === STETHOSCOPE) {
