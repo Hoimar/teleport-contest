@@ -14,32 +14,25 @@ and `feature_map.md`.
 
 - Current branch in this workspace: `main`.
 - Baseline commit at harness cleanup: `f0fdc38`.
-- Active target: `seed5002-wizard-coverage-pair`.
-- Active hypothesis: the first segment is now past the wizard wish namedesc
-  denominator, the fire-wand destruction/death RNG chain, the first
-  Storeroom/mimic/niche generation debts on the level-teleport destination,
-  command-layer apply/stethoscope/search/close/open/magic-marker evidence, the
-  first pet-combat `mattackm()` return-attack `--More--` split, wizard-mode
-  death confirmation/default `savelife()` prompt, the following `nomovemsg`,
-  hostile `ALLOW_U` movement candidate denominator, generated inventory menu,
-  item-action menu, read-prompt invalid-object loop, and `m` search prefix.
-  The remaining visible blocker is the final small mimic hit at screen 407,
-  while the first RNG boundary is `FR 12117` (`rn2(5)` expected vs `rn2(8)`
-  actual), pointing at a late monster movement candidate-order gap.
+- Active target: `seed0002-healer-reflection-drummer`.
+- Active hypothesis: the legacy seed0002 startup tutorial override needs to
+  participate in the same blocking prompt cleanup as the generated tutorial
+  prompt. The stale welcome topline at screen 11 is prompt lifecycle state, not
+  a map or pet-movement subsystem boundary.
 
 ## Latest Verification
 
 Run:
 
 ```bash
-npm run verify -- --target seed5002-wizard-coverage-pair
+npm run verify -- --target seed0002-healer-reflection-drummer
 ```
 
 Result:
 
-- Target: `seed5002-wizard-coverage-pair` `S 407/410 R 12127/12167`,
-  first screen `407:char:mixed:n`, first RNG
-  `12117:rn2(5)=3=>rn2(8)=7`, cursor-only `1`.
+- Target: `seed0002-healer-reflection-drummer` `S 11/595 R 2880/27158`,
+  first screen `11:attr:map:n`, first RNG
+  `2375:rn2(5)=0=>rn2(100)=20`, cursor-only `0`.
 - Sentinel total: `S 338/1063 R 35995/64569`.
 - Sentinel details:
   - `seed8000-tourist-starter`: `S 23/23 R 3060/3130`, first RNG `3047`.

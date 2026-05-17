@@ -2578,8 +2578,11 @@ export async function rhack(key) {
     if (game._override_prev) {
         const prev = game._override_prev;
         game._override_prev = null;
-        if (prev === game._tutorial_prompt_screen) {
+        const tutorialOverride = prev === game._tutorial_prompt_screen
+            || (typeof prev === 'string' && prev.includes('Do you want a tutorial?'));
+        if (tutorialOverride) {
             if (ch === 'n' || ch === '\x1b') {
+                clear_pending_message();
                 game._tutorial_answered = true;
                 game.context.move = 0;
                 return;
@@ -2587,6 +2590,7 @@ export async function rhack(key) {
             if (ch === 'y') {
                 // Tutorial dungeon transfer is not implemented yet; record
                 // the answer so regular play continues without corrupting RNG.
+                clear_pending_message();
                 game._tutorial_answered = true;
                 game.context.move = 0;
                 return;
