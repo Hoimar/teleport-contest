@@ -3599,6 +3599,34 @@ function flipPoint(pt, flp, minx, miny, maxx, maxy, xprop = 'x', yprop = 'y') {
     if (flp & 2) pt[xprop] = flipXForBounds(x, minx, maxx);
 }
 
+function flipDestArea(dest, flp, minx, miny, maxx, maxy) {
+    if (!dest?.lx) return;
+    if (flp & 1) {
+        const ly = flipYForBounds(dest.hy, miny, maxy);
+        const hy = flipYForBounds(dest.ly, miny, maxy);
+        dest.ly = Math.min(ly, hy);
+        dest.hy = Math.max(ly, hy);
+        if (dest.nly || dest.nhy) {
+            const nly = flipYForBounds(dest.nhy, miny, maxy);
+            const nhy = flipYForBounds(dest.nly, miny, maxy);
+            dest.nly = Math.min(nly, nhy);
+            dest.nhy = Math.max(nly, nhy);
+        }
+    }
+    if (flp & 2) {
+        const lx = flipXForBounds(dest.hx, minx, maxx);
+        const hx = flipXForBounds(dest.lx, minx, maxx);
+        dest.lx = Math.min(lx, hx);
+        dest.hx = Math.max(lx, hx);
+        if (dest.nlx || dest.nhx) {
+            const nlx = flipXForBounds(dest.nhx, minx, maxx);
+            const nhx = flipXForBounds(dest.nlx, minx, maxx);
+            dest.nlx = Math.min(nlx, nhx);
+            dest.nhx = Math.max(nlx, nhx);
+        }
+    }
+}
+
 function flip_level(flp) {
     if (!(flp & 3) || !game.level) return;
     const { xmin, xmax, ymin, ymax } = get_level_extends();
@@ -3649,6 +3677,8 @@ function flip_level(flp) {
         flipPoint(st, flp, minx, miny, maxx, maxy, 'sx', 'sy');
     flipPoint(map.upstair, flp, minx, miny, maxx, maxy);
     flipPoint(map.dnstair, flp, minx, miny, maxx, maxy);
+    flipDestArea(game.updest, flp, minx, miny, maxx, maxy);
+    flipDestArea(game.dndest, flp, minx, miny, maxx, maxy);
 
     // JS stores display-oriented wall spines directly in terrain; C derives
     // the rendered wall angle from seenv, so rebuild spines after transposing.
