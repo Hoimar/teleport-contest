@@ -19,7 +19,7 @@ import { getObjectColor, getObjectMaterial } from './o_init.js';
 import { MONSTER_DATA } from './monster_data.js';
 import { m_dowear_basic } from './mon_wear.js';
 import {
-    COLNO, ROWNO, STONE, ROOM, CORR, DOOR, STAIRS,
+    COLNO, ROWNO, STONE, ROOM, CORR, DOOR, STAIRS, LADDER,
     HWALL, VWALL, TLCORNER, TRCORNER, BLCORNER, BRCORNER,
     CROSSWALL, TUWALL, TDWALL, TLWALL, TRWALL,
     D_NODOOR, D_CLOSED, D_ISOPEN, D_LOCKED, D_TRAPPED,
@@ -3490,6 +3490,17 @@ function valleyDryLocation() {
     return specialRandomDryLocation(VALLEY_MAP[0].length, VALLEY_MAP.length, VALLEY_X, VALLEY_Y);
 }
 
+function valleyTrapLocation() {
+    let loc = valleyDryLocation();
+    let trycnt = 0;
+    while ((game.level?.at(loc.x, loc.y)?.typ === STAIRS
+            || game.level?.at(loc.x, loc.y)?.typ === LADDER)
+           && ++trycnt <= 100) {
+        loc = valleyDryLocation();
+    }
+    return loc;
+}
+
 function valleyObject(oclassOrType) {
     const loc = valleyDryLocation();
     if (typeof oclassOrType === 'number' && oclassOrType < 0)
@@ -3505,7 +3516,7 @@ function valleyCorpse(monName) {
 }
 
 function valleyTrap(kind, x = null, y = null) {
-    const loc = x == null ? valleyDryLocation() : { x: valleyX(x), y: valleyY(y) };
+    const loc = x == null ? valleyTrapLocation() : { x: valleyX(x), y: valleyY(y) };
     maketrap(loc.x, loc.y, kind);
 }
 
