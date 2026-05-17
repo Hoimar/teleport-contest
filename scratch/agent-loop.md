@@ -14,87 +14,37 @@ and `feature_map.md`.
 
 - Current branch in this workspace: `main`.
 - Baseline commit at harness cleanup: `f0fdc38`.
-- Active target: `seed0002-healer-reflection-drummer`.
-- Active hypothesis: seed0002 is now past the legacy tutorial prompt,
-  startup wand color mismatch, floor-look/pickup, safe pet-displacement,
-  engraving-wipe success amount, carried Healer money object, startup
-  `seer_turn`, ambient sound packing, startup discovery naming, the first
-  grid-bug melee sequence, doorway run stop, multi-object floor/pickup menus,
-  dart trap, and floor-corpse eating. The next visible blocker is screen 53
-  (`y`): RNG is exact through the eat turn, but the little dog chooses the
-  wrong equal-candidate square after `dog_move()`; first later RNG mismatch is
-  in the following dog-goal scan.
+- Active target: `seed5002-wizard-coverage-pair`.
+- Active hypothesis: seed5002 is now a full pass. The last blocker was ordinary
+  `mfndpos()` candidate shape: non-`ALLOW_ROCK` monsters must not count boulder
+  squares, and short standalone monster-to-hero hit plines defer `--More--`
+  until a later monster pline would overwrite them.
 
 ## Latest Verification
 
 Run:
 
 ```bash
-npm run verify -- --target seed0002-healer-reflection-drummer
+npm run verify -- --target seed5002-wizard-coverage-pair
 ```
 
 Result:
 
-- Target: `seed0002-healer-reflection-drummer` `S 53/595 R 4066/27158`,
-  first screen `53:char:map:y`, first RNG
-  `3880:rn2(100)=2=>rn2(4)=2`, cursor-only `1`.
-- Sentinel total: `S 376/1063 R 31694/64569`.
+- Target: `seed5002-wizard-coverage-pair` `S 410/410 R 12167/12167`,
+  first screen/RNG clear, cursor-only `1`.
+- Sentinel total: `S 371/1063 R 31694/64569`.
 - Sentinel details:
   - `seed8000-tourist-starter`: `S 23/23 R 3060/3130`, first RNG `3047`.
   - `seed0002-healer-reflection-drummer`: `S 53/595 R 4066/27158`, first RNG `3880`.
   - `seed0013-friday13-save-then-fullmoon-restore`: `S 0/99 R 583/4804`, first RNG `540`.
   - `seed0116-wizard-wear-shop`: `S 127/127 R 12562/12562`, pass.
-  - `seed0383-wizard-hallucinate`: `S 173/219 R 11423/16915`.
+  - `seed0383-wizard-hallucinate`: `S 168/219 R 11423/16915`, first screen 141.
 - Hack-debt audit: hard `0`, suspicious `37` existing replay/override/seed findings.
 - Memory lint: clean after this compaction target.
 
 ## Current Queue
 
-1. Continue `seed5002-wizard-coverage-pair` post-fire/restart boundary.
-   - Use `npm run triage -- seed5002-wizard-coverage-pair` and
-     `node scratch/trace-rng-window.mjs seed5002-wizard-coverage-pair --segment 1 --moves 285 --rng 12105:12145`
-     for the current second-segment tail.
-   - Current state: `S 407/410 R 12127/12167`.
-   - Search safety now prints the expected `You already found a monster...`
-     zero-time warning, `m` prefixes force the following search, close/open and
-     inventory-action throw use `In what direction?` plus cmdassist
-     invalid-direction `--More--`, applying the magic marker enters the
-     write-on target prompt, and `r` enters the read prompt, re-prompting after
-     `You don't have that object.` until Space cancels with `Never mind.`
-   - Pet-combat `mattackm()` now covers the giant bat return attack and the
-     tty `--More--` interruption/resume through the following bat hit without
-     moving sentinels. Monster-hit death now enters `You die...--More--`,
-     blocks invalid `Die? [yn] (n)` keys, default-Enter resumes with
-     `OK, so you don't die.` plus the queued kitten hit, and the follow-up
-     `nomovemsg` prints after More dismissal. `o` now uses the shared
-     direction prompt and open-specific invalid-direction `Never mind.` tail.
-     Hostile `m_move()` now counts the hero square as an `ALLOW_U` candidate.
-   - Pet combat now uses C's `find_mac(defender) + attacker level > dieroll`
-     hit comparison for current kitten/rat/bat evidence, suppresses fitting
-     packed monster/death More at C-like boundaries, allows defender return
-     attacks outside the savelife resume, delays defender-kills-attacker death
-     side effects until after the hit-message More, and clears the dead pet
-     resume marker so the live defender can continue the pass.
-   - Death prompts now latch HP 0/cursor and non-paused savelife packs the
-     `You survived...` message onto the OK line. `e` with no food now prints
-     `You don't have anything to eat.`. Hero melee now prints the kill line
-     before `xkilled()` side effects for the current lethal giant-bat hit.
-     Fatal non-pet monster hits now pause before turn-tail `regen_hp()`/hunger
-     and resume only the pending tail after wizard-mode `savelife()`, while the
-     pet-combat savelife path still resumes combat after the OK line.
-   - First visible mismatch is screen 407: C prints `The small mimic hits!`
-     and drops HP to 4, while JS has no message and remains at HP 12.
-   - First RNG mismatch is `FR 12117` (`rn2(5)` expected vs `rn2(8)` actual),
-     after fire-wand destruction, nested `--More--` messages, wizard-mode death
-     prompt handling, Storeroom mimic shape/default inventory/explicit chest
-     appearance, niche `mkclass(S_HUMAN)`, sorted `mongen_order`, post-teleport
-     tool wishes, apply prompt, stethoscope self/adjacent use, mimic
-     reveal/status, search safety, close/open/throw prompts, magic-marker write
-     prompt, inventory/action/read menus, `m` search prefix, the first
-     pet-combat More split, wizard-mode death confirmation, and savelife resume.
-   - Immediate hypothesis: late `m_move()` candidate ordering leaves the final
-     small mimic outside attack range.
-2. Continue `seed0383` post-expulsion visible-map hallucination redraw ownership.
+1. Continue `seed0383` post-expulsion visible-map hallucination redraw ownership.
    - Use `npm run screen:diff -- seed0383-wizard-hallucinate --first`.
    - Current diff is hallucinated visible-map glyphs on screen 172 (`Space`)
      after expulsion More is dismissed; screen 171 message/cursor/status now
@@ -104,18 +54,16 @@ Result:
      evidence points at earlier `docrt()`/`newsym()` display-RNG state and
      retained glyph timing rather than core RNG or per-screen forcing.
    - Do not add seed-specific color sequences.
-3. Continue `seed0002-healer-reflection-drummer` hero/grid-bug combat work.
-   - Current state: `S 31/595 R 3197/27158`.
-   - First visible mismatch is screen 31 (`l`): expected
-     `You miss the grid bug.  The grid bug bites!  You get zapped!`, actual
-     `You hit the grid bug.`
-   - First RNG mismatch is `FR 3044` (`rn2(3)` expected vs `rn2(19)` actual).
-   - The previous dog-goal gap was carried startup gold, not missing floor
-     objects. Startup `seer_turn`, sound packing, and known `WAN_SLEEP` naming
-     are fixed. Next inspect C refs `uhitm.c` and grid bug passive/active
-     attack handling before changing monster movement.
-4. Broaden `o_init`/`objnam`/discovery state away from limited evidence tables.
-5. Broaden sleeping/hider front doors only when current C evidence reaches them.
+2. Continue `seed0002-healer-reflection-drummer` dog-move candidate work.
+   - Current state: `S 53/595 R 4066/27158`.
+   - First visible mismatch is screen 53 (`y`): exact RNG through the floor
+     corpse eat turn, but the little dog chooses the wrong equal-candidate
+     square after `dog_move()`. Later first RNG mismatch is `FR 3880` in the
+     following dog-goal scan.
+   - Compare `dogmove.c:dog_move()`/`mfndpos()` effective candidates against
+     JS before changing pet position; do not force the screen.
+3. Broaden `o_init`/`objnam`/discovery state away from limited evidence tables.
+4. Broaden sleeping/hider front doors only when current C evidence reaches them.
 
 ## Regression Notes
 

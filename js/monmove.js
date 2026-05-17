@@ -22,6 +22,7 @@ const BOLT_LIM = 8;
 const M2_WERE = 0x00000004;
 const M2_HUMAN = 0x00000008;
 const M2_WANDER = 0x00800000;
+const M2_ROCKTHROW = 0x08000000;
 const M1_FLY = 0x00000001;
 const M1_SWIM = 0x00000002;
 const M1_WALLWALK = 0x00000008;
@@ -34,6 +35,8 @@ const M2_STRONG = 0x04000000;
 const M2_COLLECT = 0x40000000;
 const M2_MAGIC = 0x80000000;
 const MTSZ = 4;
+const MS_RIDER = 35;
+const MS_LEADER = 36;
 const MSLOW = 1;
 const MFAST = 2;
 const MMOVE_NOTHING = 0;
@@ -51,6 +54,7 @@ const SPBOOK_CLASS = 10;
 const WAND_CLASS = 11;
 const GEM_CLASS = 13;
 const ROCK = 474;
+const BOULDER = 475;
 const RAY = 3;
 const AMULET_OF_LIFE_SAVING = 202;
 const AMULET_OF_REFLECTION = 208;
@@ -252,7 +256,21 @@ function mfndpos_terrain_ok(mtmp, x, y) {
 function can_mon_step(mtmp, x, y) {
     if (x === game.u?.ux && y === game.u?.uy) return !mtmp.mpeaceful && !mtmp.mtame;
     if (mon_at(x, y, mtmp)) return false;
+    // C ref: mon.c:mfndpos()/mon_allowflags(). Boulder squares are not
+    // ordinary movement candidates unless the monster has ALLOW_ROCK.
+    if (boulder_at(x, y) && !mon_allows_boulder_square(mtmp)) return false;
     return mfndpos_terrain_ok(mtmp, x, y);
+}
+
+function mon_allows_boulder_square(mtmp) {
+    const flags2 = mtmp.data?.mflags2 ?? 0;
+    return !!(flags2 & M2_ROCKTHROW) || m_can_break_boulder_basic(mtmp);
+}
+
+function m_can_break_boulder_basic(mtmp) {
+    return mtmp.data?.msound === MS_RIDER
+        || (!mtmp.mspec_used
+            && (mtmp.isshk || mtmp.ispriest || mtmp.data?.msound === MS_LEADER));
 }
 
 function door_blocks_diagonal(x, y) {
@@ -284,6 +302,10 @@ function object_class(obj) {
 
 function objects_at(x, y) {
     return (game.level?.objects || []).filter((obj) => obj.ox === x && obj.oy === y);
+}
+
+function boulder_at(x, y) {
+    return objects_at(x, y).some((obj) => obj.otyp === BOULDER);
 }
 
 function could_reach_item(mtmp, x, y) {
@@ -595,11 +617,21 @@ async function show_blocking_monster_message(line) {
         return;
     }
     if (game._pending_message && !game._more && `${game._pending_message}  ${line}`.length < 80) {
-        const appendToKillMessage = /^The .+ is killed!$/.test(game._pending_message);
-        game._pending_message = `${game._pending_message}  ${line}`;
-        if (!appendToKillMessage) {
+        if (/^The .+ is killed!$/.test(game._pending_message)) {
+            game._pending_message = `${game._pending_message}  ${line}`;
+            return;
+        }
+        if (/^The .+ (?:misses|hits|bites|stings|kicks|butts) the .+\.$/.test(game._pending_message)) {
+            game._pending_message = `${game._pending_message}  ${line}`;
             queue_more_prompt();
             game._packed_monster_more_candidate = true;
+            return;
+        }
+        queue_more_prompt();
+        game._monster_more_accepts_any_key = true;
+        if (!game._monster_death_pending) {
+            game._after_more_message = line;
+            game._after_more_needs_prompt = true;
         }
         return;
     }
@@ -611,7 +643,7 @@ async function show_blocking_monster_message(line) {
         return;
     }
     await pline(line);
-    queue_more_prompt();
+    if (game._monster_death_pending || game._fatal_monster_attack_paused) queue_more_prompt();
 }
 
 async function append_swallowed_damage_message(line) {
@@ -914,7 +946,7 @@ function physical_melee_attacks(mtmp, attacks, toHit) {
             apply_hero_damage(damage);
             if ((game.u?.uhp ?? 0) <= 0) {
                 if (!game._pet_combat_resume_active)
-                    game._latched_status_uhp = Math.max(0, preDamageHp);
+                    game._latched_status_uhp = preDamageHp <= 1 ? Math.max(0, preDamageHp) : 0;
                 game._monster_death_pending = true;
                 if (!game._pet_combat_resume_active) {
                     game._fatal_monster_attack_paused = true;

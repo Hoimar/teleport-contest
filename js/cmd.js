@@ -1554,7 +1554,8 @@ function refreshSwallowedHallucinationAfterMore() {
 
 async function handleQueuedMore(ch) {
     if (!game._more || (game._more_dismissals_remaining || 0) <= 0) return false;
-    const moreDismissKey = ch === ' ' || ch === '\r' || ch === '\n' || ch === '\x1b';
+    const moreDismissKey = !!game._monster_more_accepts_any_key
+        || ch === ' ' || ch === '\r' || ch === '\n' || ch === '\x1b';
     const pausedMonsterTurn = !!game._monster_turn_paused_for_more;
     const pausedFloorListTurn = !!game._resume_floor_list_turn;
     if (!moreDismissKey) {
@@ -1567,6 +1568,7 @@ async function handleQueuedMore(ch) {
     }
 
     game._more_dismissals_remaining--;
+    game._monster_more_accepts_any_key = false;
     if (game._fire_wand_side_effect_pending) {
         game._more_dismissals_remaining = 0;
         await showFireWandSideEffects();

@@ -884,6 +884,7 @@ export function clear_pending_message() {
     game._pet_combat_more_latched = false;
     game._prompt_cursor = null;
     game._packed_monster_more_candidate = false;
+    game._monster_more_accepts_any_key = false;
     game._floor_list_lines = null;
     game._floor_list_col = null;
     game._floor_list_show_more = true;
