@@ -342,6 +342,29 @@ const mkobjprobs = [
     { iprob: 1, iclass: AMULET_CLASS },
 ];
 
+const rogueprobs = [
+    { iprob: 12, iclass: WEAPON_CLASS },
+    { iprob: 12, iclass: ARMOR_CLASS },
+    { iprob: 22, iclass: FOOD_CLASS },
+    { iprob: 22, iclass: POTION_CLASS },
+    { iprob: 22, iclass: SCROLL_CLASS },
+    { iprob: 5, iclass: WAND_CLASS },
+    { iprob: 5, iclass: RING_CLASS },
+];
+
+const hellprobs = [
+    { iprob: 20, iclass: WEAPON_CLASS },
+    { iprob: 20, iclass: ARMOR_CLASS },
+    { iprob: 16, iclass: FOOD_CLASS },
+    { iprob: 12, iclass: TOOL_CLASS },
+    { iprob: 10, iclass: GEM_CLASS },
+    { iprob: 1, iclass: POTION_CLASS },
+    { iprob: 1, iclass: SCROLL_CLASS },
+    { iprob: 8, iclass: WAND_CLASS },
+    { iprob: 8, iclass: RING_CLASS },
+    { iprob: 4, iclass: AMULET_CLASS },
+];
+
 const boxiprobs = [
     { iprob: 18, iclass: GEM_CLASS },
     { iprob: 15, iclass: FOOD_CLASS },
@@ -1334,7 +1357,8 @@ function mksobj_at(otyp, x, y, init, artif) {
 export function mkobj(oclass, artif) {
     let chosenClass = oclass;
     if (chosenClass === RANDOM_CLASS) {
-        chosenClass = pick_prob_entry(mkobjprobs).iclass;
+        const probs = rogue_level_active() ? rogueprobs : Inhell() ? hellprobs : mkobjprobs;
+        chosenClass = pick_prob_entry(probs).iclass;
     }
     const otyp = pick_object_type_for_class(chosenClass);
     return mksobj(otyp, true, artif);
@@ -1557,6 +1581,21 @@ function Inhell(uz = game.u?.uz) {
     return !!game.dungeons?.[uz?.dnum ?? 0]?.flags?.hellish;
 }
 
+function is_demon_lord_or_prince(ptr) {
+    return ptr?.mlet === 'S_DEMON' && !!((ptr.mflags2 ?? 0) & (M2_LORD | M2_PRINCE));
+}
+
+function noteleport_level_for(mon = null, ptr = mon?.data) {
+    // C ref: teleport.c:noteleport_level(); demon courts in Gehennom block
+    // teleportation for non-lord/prince monsters.
+    if (Inhell() && !is_demon_lord_or_prince(ptr)) {
+        if ((game.level?.monsters || []).some(m => is_demon_lord_or_prince(m.data)))
+            return true;
+    }
+    if (game.level?.flags?.noteleport) return true;
+    return false;
+}
+
 let alignShiftOldMoves = null;
 let alignShiftSeed = null;
 let alignShiftSpecial = null;
@@ -1705,6 +1744,7 @@ export function newmonhp_for(ptr, monLevel = adj_lev_for(ptr)) {
     if (!ptr) return 0;
     const lev = monLevel;
     if (ptr.mlet === 'S_GOLEM') return lev;
+    if ((ptr.mlevel ?? 0) > 49) return 2 * (ptr.mlevel - 6);
     if (ptr.mlet === 'S_DRAGON' && !String(ptr.name || '').startsWith('BABY_')) {
         return 4 * lev + d(lev, 4);
     }
@@ -1928,6 +1968,15 @@ function m_initinv_for(ptr, mon = null) {
         d(level_difficulty(), 30);
         mksobj(GOLD_PIECE, false, false);
     }
+    if (ptr.mlet === 'S_DEMON') {
+        // C ref: makemon.c:m_initinv() gives Asmodeus wands despite no weapon attack.
+        if (ptr.name === 'ASMODEUS') {
+            mksobj(WAN_COLD, true, false);
+            mksobj(WAN_FIRE, true, false);
+        } else if (ptr.name === 'ICE_DEVIL' && !rn2(4)) {
+            mksobj(SPEAR, true, false);
+        }
+    }
     if (is_mercenary_for(ptr)) {
         let mac = 0;
         switch (ptr.name) {
@@ -2066,7 +2115,7 @@ function rnd_defensive_item_for(ptr, mon = null) {
         switch (rn2(8 + (difficulty > 3 ? 1 : 0) + (difficulty > 6 ? 1 : 0) + (difficulty > 8 ? 1 : 0))) {
         case 6:
         case 9:
-            if (game.level?.flags?.noteleport && ++trycnt < 2) continue;
+            if (noteleport_level_for(mon, ptr) && ++trycnt < 2) continue;
             if (!rn2(3)) return WAN_TELEPORTATION;
             return SCR_TELEPORTATION;
         case 0:
@@ -2416,14 +2465,15 @@ function m_initweap_for(ptr) {
         m_initweap_general_for(ptr);
         return;
     }
+    if (ptr.mlet === 'S_GOLEM') {
+        m_initweap_general_for(ptr);
+        return;
+    }
     if (ptr.mlet === 'S_HUMANOID') {
         maybe_init_offensive_item_for(ptr);
         return;
     }
     if (ptr.mlet !== 'S_ORC') {
-        // C ref: makemon.c:m_initweap() always runs the offensive-item
-        // chance after type-specific weapon handling, even when there was
-        // no type-specific case for an armed monster.
         maybe_init_offensive_item_for(ptr);
         return;
     }
@@ -6576,6 +6626,412 @@ function loadSanctumSpecial() {
     fixup_special();
 }
 
+const ASMO1_X = 15;
+const ASMO1_Y = 5;
+const ASMO1_MAP = [
+    '---------------------',
+    '|.............|.....|',
+    '|.............S.....|',
+    '|---+------------...|',
+    '|.....|.........|-+--',
+    '|..---|.........|....',
+    '|..|..S.........|....',
+    '|..|..|.........|....',
+    '|..|..|.........|-+--',
+    '|..|..-----------...|',
+    '|..S..........|.....|',
+    '---------------------',
+];
+const ASMO2_X = 35;
+const ASMO2_Y = 9;
+const ASMO2_MAP = [
+    '---------------------------------',
+    '................................|',
+    '................................+',
+    '................................|',
+    '---------------------------------',
+];
+
+function asmoX(x, xstart = ASMO1_X) { return x + xstart; }
+function asmoY(y, ystart = ASMO1_Y) { return y + ystart; }
+
+function asmoSetTerrain(xstart, ystart, x, y, ch) {
+    const loc = game.level?.at(asmoX(x, xstart), asmoY(y, ystart));
+    if (!loc) return;
+    loc.lit = false;
+    switch (ch) {
+    case '.':
+        loc.typ = ROOM;
+        break;
+    case '-':
+        loc.typ = HWALL;
+        break;
+    case '|':
+        loc.typ = VWALL;
+        break;
+    case '+':
+        loc.typ = DOOR;
+        set_door_mask(loc, D_CLOSED);
+        break;
+    case 'S':
+        loc.typ = SDOOR;
+        set_door_mask(loc, D_CLOSED);
+        break;
+    default:
+        loc.typ = STONE;
+        break;
+    }
+}
+
+function asmoLoadMap(mapRows, xstart, ystart) {
+    for (let y = 0; y < mapRows.length; y++)
+        for (let x = 0; x < mapRows[y].length; x++)
+            asmoSetTerrain(xstart, ystart, x, y, mapRows[y][x]);
+    markSpecialTouchedRect(xstart, ystart,
+        xstart + mapRows[0].length - 1, ystart + mapRows.length - 1);
+}
+
+function loadAsmodeusTerrain() {
+    game._special_touched = new Set();
+    for (let x = 2; x <= COLNO - 2; x++) {
+        for (let y = 0; y <= ROWNO - 1; y++) {
+            const loc = game.level?.at(x, y);
+            if (!loc) continue;
+            loc.typ = (y < 2 || ((x % 2) && (y % 2))) ? STONE : HWALL;
+            loc.lit = false;
+        }
+    }
+    asmoLoadMap(ASMO1_MAP, ASMO1_X, ASMO1_Y);
+    asmoLoadMap(ASMO2_MAP, ASMO2_X, ASMO2_Y);
+    game.level.flags.is_maze_lev = true;
+}
+
+function asmoDryLocation(mapRows = ASMO1_MAP, xstart = ASMO1_X, ystart = ASMO1_Y) {
+    return specialRandomDryLocation(mapRows[0].length, mapRows.length, xstart, ystart);
+}
+
+function asmoTrapLocation(mapRows = ASMO1_MAP, xstart = ASMO1_X, ystart = ASMO1_Y) {
+    let loc = asmoDryLocation(mapRows, xstart, ystart);
+    let trycnt = 0;
+    while ((game.level?.at(loc.x, loc.y)?.typ === STAIRS
+            || game.level?.at(loc.x, loc.y)?.typ === LADDER)
+           && ++trycnt <= 100) {
+        loc = asmoDryLocation(mapRows, xstart, ystart);
+    }
+    return loc;
+}
+
+function asmoObject(ch, mapRows = ASMO1_MAP, xstart = ASMO1_X, ystart = ASMO1_Y) {
+    const loc = asmoDryLocation(mapRows, xstart, ystart);
+    const cls = {
+        '[': ARMOR_CLASS,
+        ')': WEAPON_CLASS,
+        '*': GEM_CLASS,
+        '!': POTION_CLASS,
+        '?': SCROLL_CLASS,
+    }[ch] || RANDOM_CLASS;
+    mkobj_at(cls, loc.x, loc.y, true);
+}
+
+function asmoTrap(kind, x = null, y = null, mapRows = ASMO1_MAP, xstart = ASMO1_X, ystart = ASMO1_Y) {
+    const loc = x == null ? asmoTrapLocation(mapRows, xstart, ystart)
+        : { x: asmoX(x, xstart), y: asmoY(y, ystart) };
+    const trap = maketrap(loc.x, loc.y, kind);
+    maybeTrapVictim(trap);
+}
+
+function asmoMonsterClass(ch) {
+    if (ch === '&') return 'S_DEMON';
+    return castleMonsterClass(ch);
+}
+
+function asmoMonsterLocation(ptr, mapRows = ASMO1_MAP, xstart = ASMO1_X, ystart = ASMO1_Y) {
+    let x = xstart, y = ystart;
+    let trycnt = 0;
+    do {
+        x = xstart + rn2(mapRows[0].length);
+        y = ystart + rn2(mapRows.length);
+        if (specialMonsterLocationOk(x, y, ptr)) return { x, y };
+    } while (++trycnt < 100);
+    return asmoDryLocation(mapRows, xstart, ystart);
+}
+
+function asmoCreateMonster(id, x = null, y = null,
+    mapRows = ASMO1_MAP, xstart = ASMO1_X, ystart = ASMO1_Y) {
+    const cls = String(id || '').length === 1 ? asmoMonsterClass(id) : null;
+    let ptr = cls ? null : monster_by_user_name(id);
+    if (!cls && ptr && !ptr.neuter && !ptr.male && !ptr.female) rn2(2);
+    induced_align_80();
+    if (cls) ptr = mkclass_aligned(cls, G_NOGEN);
+    const loc = x == null ? asmoMonsterLocation(ptr, mapRows, xstart, ystart)
+        : { x: asmoX(x, xstart), y: asmoY(y, ystart) };
+    if (m_at(loc.x, loc.y)) {
+        const cc = enexto_core(loc.x, loc.y, ptr, GP_CHECKSCARY)
+            || enexto_core(loc.x, loc.y, ptr, 0);
+        if (cc) {
+            loc.x = cc.x;
+            loc.y = cc.y;
+        }
+    }
+    return makemon(ptr, loc.x, loc.y, 0);
+}
+
+function asmoMazeWalk(x, y, dirName, xstart = ASMO2_X, ystart = ASMO2_Y) {
+    x = asmoX(x, xstart);
+    y = asmoY(y, ystart);
+    switch (dirName) {
+    case 'north': y--; break;
+    case 'south': y++; break;
+    case 'east': x++; break;
+    case 'west': x--; break;
+    default: break;
+    }
+    const loc = game.level?.at(x, y);
+    if (loc && !IS_DOOR(loc.typ)) {
+        loc.typ = ROOM;
+        loc.flags = 0;
+    }
+    if (!(x % 2)) {
+        if (dirName === 'east') x++;
+        else x--;
+        const xloc = game.level?.at(x, y);
+        if (xloc) {
+            xloc.typ = ROOM;
+            xloc.flags = 0;
+        }
+    }
+    if (!(y % 2)) {
+        if (dirName === 'south') y++;
+        else y--;
+    }
+    specialWalkfrom(x, y, ROOM);
+    castleFillEmptyMaze();
+}
+
+function registerAsmodeusLregions(flp, bounds) {
+    const inarea = { x1: 1, y1: 0, x2: 6, y2: 20 };
+    const delarea = { x1: 6, y1: 1, x2: 70, y2: 16 };
+    const up = flipRectForBounds(inarea, flp, bounds.minx, bounds.miny, bounds.maxx, bounds.maxy);
+    const branch = flipRectForBounds(inarea, flp, bounds.minx, bounds.miny, bounds.maxx, bounds.maxy);
+    const exclude = flipRectForBounds(delarea, flp, bounds.minx, bounds.miny, bounds.maxx, bounds.maxy);
+    game._special_lregions = [
+        { rtype: LR_UPSTAIR, inarea: up, delarea: exclude },
+        { rtype: LR_BRANCH, inarea: branch, delarea: exclude },
+        { rtype: LR_TELE, inarea: up, delarea: exclude },
+    ];
+}
+
+function selKey(x, y) { return `${x},${y}`; }
+function selPoint(set, x, y) { set.add(selKey(x, y)); return set; }
+function selHas(set, x, y) { return set.has(selKey(x, y)); }
+function selCoords(set) {
+    return [...set].map(k => {
+        const [x, y] = k.split(',').map(Number);
+        return { x, y };
+    });
+}
+
+function hellTweaksProtectedOk(x, y) {
+    if (x < 2 || x > 76 || y < 3 || y > 19) return false;
+    if (x >= ASMO1_X && x < ASMO1_X + ASMO1_MAP[0].length
+        && y >= ASMO1_Y && y < ASMO1_Y + ASMO1_MAP.length) return false;
+    if (x >= ASMO2_X && x < ASMO2_X + ASMO2_MAP[0].length
+        && y >= ASMO2_Y && y < ASMO2_Y + ASMO2_MAP.length) return false;
+    return true;
+}
+
+function hellTweaksRandomPoint() {
+    return { x: 1 + rn2(COLNO - 1), y: rn2(ROWNO) };
+}
+
+function hellTweaksSetRandom(set) {
+    const p = hellTweaksRandomPoint();
+    selPoint(set, p.x, p.y);
+    return set;
+}
+
+function hellTweaksGrow(set, dirName = 'all') {
+    let dir = dirName;
+    if (dir === 'random') {
+        dir = ['north', 'south', 'east', 'west'][rn2(4)];
+    }
+    const dirs = {
+        west: [[-1, 0]],
+        east: [[1, 0]],
+        north: [[0, -1]],
+        south: [[0, 1]],
+        all: [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1]],
+    }[dir] || [];
+    const add = [];
+    for (const { x, y } of selCoords(set)) {
+        for (const [dx, dy] of dirs) {
+            const nx = x + dx, ny = y + dy;
+            if (nx >= 0 && nx < COLNO && ny >= 0 && ny < ROWNO) add.push({ x: nx, y: ny });
+        }
+    }
+    for (const p of add) selPoint(set, p.x, p.y);
+    return set;
+}
+
+function hellTweaksFilterProtected(set) {
+    const out = new Set();
+    for (const { x, y } of selCoords(set))
+        if (hellTweaksProtectedOk(x, y)) selPoint(out, x, y);
+    return out;
+}
+
+function hellTweaksPercentage(set, pct) {
+    const out = new Set();
+    for (const { x, y } of selCoords(set).sort((a, b) => a.x - b.x || a.y - b.y)) {
+        if (rn2(100) < pct) selPoint(out, x, y);
+    }
+    return out;
+}
+
+function hellTweaksRndCoord(set) {
+    const coords = selCoords(set).sort((a, b) => a.x - b.x || a.y - b.y);
+    if (!coords.length) return { x: -1, y: -1 };
+    return coords[rn2(coords.length)];
+}
+
+function hellTweaksRandLine(x1, y1, x2, y2, rough, rec, set = new Set()) {
+    if (rec < 1 || (x2 === x1 && y2 === y1)) return set;
+    rough = Math.min(rough, Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1)));
+    let mx, my;
+    if (rough < 2) {
+        mx = Math.trunc((x1 + x2) / 2);
+        my = Math.trunc((y1 + y2) / 2);
+    } else {
+        do {
+            const dx = rn2(rough) - Math.trunc(rough / 2);
+            const dy = rn2(rough) - Math.trunc(rough / 2);
+            mx = Math.trunc((x1 + x2) / 2) + dx;
+            my = Math.trunc((y1 + y2) / 2) + dy;
+        } while (mx > COLNO - 1 || mx < 0 || my < 0 || my > ROWNO - 1);
+    }
+    selPoint(set, mx, my);
+    rough = Math.trunc((rough * 2) / 3);
+    rec--;
+    hellTweaksRandLine(x1, y1, mx, my, rough, rec, set);
+    hellTweaksRandLine(mx, my, x2, y2, rough, rec, set);
+    selPoint(set, x2, y2);
+    return set;
+}
+
+function hellTweaksFloorSelection() {
+    const set = new Set();
+    for (let x = 0; x < COLNO; x++)
+        for (let y = 0; y < ROWNO; y++) {
+            const loc = game.level?.at(x, y);
+            if (loc?.typ === ROOM) selPoint(set, x, y);
+        }
+    return set;
+}
+
+function applyTerrainSelection(set, typ) {
+    for (const { x, y } of selCoords(set)) {
+        const loc = game.level?.at(x, y);
+        if (loc) loc.typ = typ;
+    }
+}
+
+function hellTweaksAsmodeus() {
+    // C ref: dat/nhlib.lua:hell_tweaks().
+    const depth = depth_of_level(game.u?.uz);
+    if (rn2(100) < 20 + depth) {
+        let pools = new Set();
+        const maxpools = 5 + (1 + rn2(depth));
+        for (let i = 0; i < maxpools; i++) hellTweaksSetRandom(pools);
+        const west = hellTweaksGrow(hellTweaksSetRandom(new Set()), 'west');
+        const north = hellTweaksGrow(hellTweaksSetRandom(new Set()), 'north');
+        const random = hellTweaksGrow(hellTweaksSetRandom(new Set()), 'random');
+        pools = new Set([...pools, ...west, ...north, ...random]);
+        pools = hellTweaksFilterProtected(pools);
+        if (rn2(100) < 80) {
+            const poolground = hellTweaksFilterProtected(hellTweaksGrow(new Set(pools), 'all'));
+            const pval = (1 + rn2(8)) * 10;
+            applyTerrainSelection(hellTweaksPercentage(poolground, pval), ROOM);
+        }
+        applyTerrainSelection(pools, LAVAPOOL);
+    }
+    if (rn2(100) < 50) {
+        let allrivers = new Set();
+        const unprotectedCount = (() => {
+            let n = 0;
+            for (let x = 0; x < COLNO; x++)
+                for (let y = 0; y < ROWNO; y++)
+                    if (hellTweaksProtectedOk(x, y)) n++;
+            return n;
+        })();
+        const reqpts = unprotectedCount / 12;
+        let rpts = 0;
+        let rivertries = 0;
+        do {
+            const floor = hellTweaksFloorSelection();
+            const a = hellTweaksRndCoord(floor);
+            const b = hellTweaksRndCoord(floor);
+            let lavariver = hellTweaksRandLine(a.x, a.y, b.x, b.y, 10, 4);
+            if (rn2(100) < 50) lavariver = hellTweaksGrow(lavariver, 'north');
+            if (rn2(100) < 50) lavariver = hellTweaksGrow(lavariver, 'west');
+            allrivers = new Set([...allrivers, ...lavariver]);
+            allrivers = hellTweaksFilterProtected(allrivers);
+            rpts = allrivers.size;
+            rivertries++;
+        } while (!(rpts > reqpts || rivertries > 7));
+        if (rn2(100) < 60) {
+            const prc = 10 * (1 + rn2(6));
+            const riverbanks = hellTweaksFilterProtected(hellTweaksGrow(new Set(allrivers), 'all'));
+            applyTerrainSelection(hellTweaksPercentage(riverbanks, prc), ROOM);
+        }
+        applyTerrainSelection(allrivers, LAVAPOOL);
+    }
+}
+
+function loadAsmodeusSpecial() {
+    // C ref: dat/asmodeus.lua loaded through sp_lev.c:lspo_map().
+    rn2(3); rn2(2); // nhlib shuffle()
+    loadAsmodeusTerrain();
+    asmoSetTerrain(ASMO1_X, ASMO1_Y, 4, 3, '+');
+    game.level.at(asmoX(4), asmoY(3)).doormask = D_CLOSED;
+    asmoSetTerrain(ASMO1_X, ASMO1_Y, 18, 4, '+');
+    game.level.at(asmoX(18), asmoY(4)).doormask = D_LOCKED;
+    asmoSetTerrain(ASMO1_X, ASMO1_Y, 18, 8, '+');
+    game.level.at(asmoX(18), asmoY(8)).doormask = D_CLOSED;
+    placeSpecialStair(asmoX(13), asmoY(7), false);
+
+    asmoCreateMonster('Asmodeus', 12, 7);
+    for (const ch of ['[', '[', ')', ')', '*', '!', '!', '?', '?', '?']) asmoObject(ch);
+    asmoTrap(SPIKED_PIT, 5, 2);
+    asmoTrap(FIRE_TRAP, 8, 6);
+    for (const kind of [SLP_GAS_TRAP, ANTI_MAGIC, FIRE_TRAP, MAGIC_TRAP, MAGIC_TRAP])
+        asmoTrap(kind);
+    asmoCreateMonster('ghost', 11, 7);
+    asmoCreateMonster('horned devil', 10, 5);
+    asmoCreateMonster('L');
+    for (const id of ['V', 'V', 'V']) asmoCreateMonster(id);
+
+    asmoMazeWalk(32, 2, 'east');
+    asmoSetTerrain(ASMO2_X, ASMO2_Y, 32, 2, '+');
+    game.level.at(asmoX(32, ASMO2_X), asmoY(2, ASMO2_Y)).doormask = D_CLOSED;
+    for (const id of ['&', '&', '&'])
+        asmoCreateMonster(id, null, null, ASMO2_MAP, ASMO2_X, ASMO2_Y);
+    for (const kind of [ANTI_MAGIC, FIRE_TRAP, MAGIC_TRAP])
+        asmoTrap(kind, null, null, ASMO2_MAP, ASMO2_X, ASMO2_Y);
+
+    const ext = get_level_extends();
+    const bounds = {
+        minx: Math.max(1, ext.xmin),
+        maxx: Math.min(COLNO - 1, ext.xmax),
+        miny: Math.max(0, ext.ymin),
+        maxy: Math.min(ROWNO - 1, ext.ymax),
+    };
+    hellTweaksAsmodeus();
+    wallification(1, 0, COLNO - 1, ROWNO - 1);
+    const flp = flip_level_rnd(3);
+    registerAsmodeusLregions(flp, bounds);
+    fixup_special();
+}
+
 function makemaz_special(slev) {
     const proto = slev?.proto || '';
     if (proto && slev?.rndlevs) {
@@ -6630,6 +7086,10 @@ function makemaz_special(slev) {
     }
     if (game._last_special_protofile === 'sanctum') {
         loadSanctumSpecial();
+        return;
+    }
+    if (game._last_special_protofile === 'asmodeus') {
+        loadAsmodeusSpecial();
         return;
     }
     if (game._last_special_protofile === 'tower1') {
