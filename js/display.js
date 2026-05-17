@@ -300,14 +300,15 @@ function warning_glyph(mon) {
     // display_warning(). Warning floats over unseen hostile monsters.
     if (!game.u?.uprops?.warning || mon?.mpeaceful) return null;
     if (dist2(game.u?.ux ?? 0, game.u?.uy ?? 0, mon.mx, mon.my) >= 100) return null;
+    const realLevel = Math.trunc((mon.m_lev ?? mon.data?.mlevel ?? 0) / 4);
+    if (realLevel < (game.context?.warnlevel ?? 1)) return null;
     let level;
     if ((game.u?.uprops?.hallucination || game.u?.uhallucination)
         && (game._hallucination_warning_rng_active || game._monster_move_warning_rng_active)) {
         level = rn2Display(WARNCOUNT - 1) + 1;
     } else {
-        level = Math.trunc((mon.m_lev ?? mon.data?.mlevel ?? 0) / 4);
+        level = realLevel;
     }
-    if (level < (game.context?.warnlevel ?? 1)) return null;
     return def_warnsyms[Math.min(WARNCOUNT - 1, Math.max(0, level))] || null;
 }
 
@@ -501,9 +502,16 @@ export function newsym(x, y) {
         const og = object_glyph_for_display(obj, x, y, visible);
         draw_ch = og.ch; draw_color = og.color; draw_dec = false;
     }
-    const memory_ch = draw_ch;
-    const memory_color = draw_color;
-    const memory_dec = draw_dec;
+    let memory_ch = draw_ch;
+    let memory_color = draw_color;
+    let memory_dec = draw_dec;
+    if (obj && !covered && obj.otyp === STATUE
+        && (game.u?.uprops?.hallucination || game.u?.uhallucination)) {
+        // C ref: display.c:map_object(). Hallucinated statues are shown as
+        // random monsters but remembered as separate random objects.
+        const mem = random_object_glyph_for_display();
+        memory_ch = mem.ch; memory_color = mem.color; memory_dec = false;
+    }
     if (mon) {
         const mg = monster_glyph(mon);
         draw_ch = mg.ch; draw_color = mg.color; draw_dec = mg.dec;

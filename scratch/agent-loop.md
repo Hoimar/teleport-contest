@@ -13,28 +13,26 @@ and `feature_map.md`.
 ## Current State
 
 - Current branch in this workspace: `main`.
-- Baseline commit at harness cleanup: `f0fdc38`.
-- Active target: `seed1800-tourist-eat-throw`.
-- Active hypothesis: configured Tourist startup has passed the wrong-pantheon
-  lore blocker and now has a live Tourist `u_init_role()` inventory/gold slice.
-  `seed1800` target RNG improved from `R 2188/2458` to `R 2204/2458` with
-  stable sentinels, but first RNG remains `FR 1045` in level object generation.
-  The screen-0 status cells are therefore downstream of earlier `mklev` RNG
-  drift; the next safe step is to explain the `rnd_class(objnam.c:5413)`
-  mismatch instead of adding more startup-status special cases.
+- Baseline commit before this pass: `5dea6bd`.
+- Active target: `seed0383-wizard-hallucinate`.
+- Active hypothesis: the remaining blocker is hallucinated display-RNG ownership
+  during debug level-teleport arrival, not core game RNG. Narrow display fixes
+  landed for C-shaped warning qualification and hallucinated statue memory, but
+  the first visible mismatch remains the arrival `docrt()`/new-level redraw
+  frame at screen 195.
 
 ## Latest Verification
 
 Run:
 
 ```bash
-npm run verify -- --target seed1800-tourist-eat-throw --full
+npm run verify -- --target seed0383-wizard-hallucinate --full
 ```
 
 Result:
 
-- Target: `seed1800-tourist-eat-throw` `S 26/26 R 2458/2458`,
-  full screen/RNG parity.
+- Target: `seed0383-wizard-hallucinate` `S 195/219 R 16915/16915`,
+  first screen 195 (`c`), core RNG complete.
 - Sentinel total: `S 428/1063 R 38633/64569`.
 - Sentinel details:
   - `seed8000-tourist-starter`: `S 23/23 R 3130/3130`, pass.
@@ -48,14 +46,7 @@ Result:
 
 ## Current Queue
 
-1. Commit the coherent `seed1800-tourist-eat-throw` parity unit if not already
-   committed.
-   - Subsystems changed: container contents (`mkbox_cnts()` rock/gold
-     post-processing), Tourist command front doors (`e` fortune cookie, `t`
-     dart throw, `a` invalid apply, `:` look), `dosounds()` special-room gates,
-     pet stair-follow front door, seed8000 replay seer-turn state.
-   - No new per-seed forcing or replay screens were added.
-2. Continue `seed0383` hallucinated level-arrival display timing.
+1. Continue `seed0383` hallucinated level-arrival display timing.
    - Use `npm run screen:diff -- seed0383-wizard-hallucinate --first`.
    - Current diff is screen 195 (`c`): C and JS both show the materialize
      message and cursor exactly, but the hallucinated arrival-level soldier and
@@ -63,7 +54,11 @@ Result:
    - Core RNG is complete (`R 16915/16915`). Do not change combat RNG for this
      blocker; compare `goto_level()` display ordering: `vision_reset()`,
      `reset_glyphmap()`, `docrt()`, visible object redraws, and monster overlay.
-3. Continue `seed0002-healer-reflection-drummer` monster/pet ordering work.
+   - Broad probes tested and reverted/withheld: pre-switch `vision_recalc(2)`
+     plus C-shaped `docrt()` ordering regressed `seed0116` screen 114; removing
+     prompt suppression regressed `seed0383` screen 192. Full-screen menu
+     Hallucination refresh remains an open lifecycle question.
+2. Continue `seed0002-healer-reflection-drummer` monster/pet ordering work.
    - Current state: `S 83/595 R 5502/27158`.
    - First visible mismatch is screen 83 (`Enter`): expected dog display at
      `[74,12]`, JS at `[73,12]`, and status turn count differs (`5` vs `6`).
@@ -72,8 +67,8 @@ Result:
      pet object scan. The next safe step is to explain why C reaches a pet
      object-goal scan before the next monster `distfleeck()` during the eating
      occupation without adding a full extra hidden turn.
-4. Broaden `o_init`/`objnam`/discovery state away from limited evidence tables.
-5. Broaden sleeping/hider front doors only when current C evidence reaches them.
+3. Broaden `o_init`/`objnam`/discovery state away from limited evidence tables.
+4. Broaden sleeping/hider front doors only when current C evidence reaches them.
 
 ## Regression Notes
 
