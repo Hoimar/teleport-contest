@@ -2446,7 +2446,18 @@ function buildLevelTeleportMenuPage2() {
     const vlad = game.dungeons?.find((d) => d.dname === "Vlad's Tower");
     const planes = game.dungeons?.find((d) => d.dname === 'The Elemental Planes');
     const roleCode = game.urole?.filecode || 'Wiz';
+    const fakeWizardLevels = [
+        { proto: 'fakewiz1', fallback: 47 },
+        { proto: 'fakewiz2', fallback: 48 },
+    ].map((lev) => ({
+        ...lev,
+        displayLevel: dlevelOf(lev.proto, lev.fallback),
+        target: targetForProto(lev.proto, lev.fallback),
+    })).sort((a, b) => a.displayLevel - b.displayLevel);
     const choices = {
+        t: fakeWizardLevels[0].target,
+        u: fakeWizardLevels[1].target,
+        v: targetForProto('sanctum', 51),
         w: targetForProto('minetn', 6),
         x: targetForProto('minend', 11),
         y: targetForProto('x-strt', 11),
@@ -2462,8 +2473,8 @@ function buildLevelTeleportMenuPage2() {
         J: targetForProto('astral', -5),
     };
     const lines = [
-        ` t -   fakewiz2: ${dlevelOf('fakewiz2', 47)}`,
-        ` u -   fakewiz1: ${dlevelOf('fakewiz1', 48)}`,
+        ` t -   ${fakeWizardLevels[0].proto}: ${fakeWizardLevels[0].displayLevel}`,
+        ` u -   ${fakeWizardLevels[1].proto}: ${fakeWizardLevels[1].displayLevel}`,
         ` v -   sanctum: ${dlevelOf('sanctum', 51)}`,
         ` \x1b[7mThe Gnomish Mines: levels ${mines?.depth_start ?? 4} to ${(mines?.depth_start ?? 4) + (mines?.num_dunlevs ?? 8) - 1}\x1b[0m`,
         ` w -   minetn: ${dlevelOf('minetn', 6)}`,
