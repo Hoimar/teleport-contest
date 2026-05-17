@@ -816,6 +816,22 @@ export async function dog_move(mtmp, after = true) {
             }
             if (avoid_soko_push_loc(mtmp, nx, ny)) continue;
 
+            let cursedOnCandidate = false;
+            const canReachFood = could_reach_item(mtmp, nx, ny);
+            for (const obj of objects_at(nx, ny)) {
+                if (obj.cursed) {
+                    cursedOnCandidate = true;
+                } else if (canReachFood) {
+                    const foodType = dogfood(mtmp, obj);
+                    if (foodType < MANFOOD
+                        && (foodType < ACCFOOD || init_edog(mtmp).hungrytime <= (game.moves || 1))) {
+                        // Eating/fetching the object is still future work;
+                        // this preserves the candidate-square dogfood probe.
+                    }
+                }
+            }
+            if (cursedOnCandidate && uncursedcnt > 0 && rn2(13 * uncursedcnt)) continue;
+
             // NetHack lessens backtracking only for pets more than five
             // squares from the hero.
             if (distmin(mtmp.mx, mtmp.my, game.u?.ux ?? mtmp.mx, game.u?.uy ?? mtmp.my) > 5) {
@@ -830,18 +846,6 @@ export async function dog_move(mtmp, after = true) {
                     }
                 }
                 if (backtracking) continue;
-            }
-
-            const canReachFood = could_reach_item(mtmp, nx, ny);
-            for (const obj of objects_at(nx, ny)) {
-                if (!obj.cursed && canReachFood) {
-                    const foodType = dogfood(mtmp, obj);
-                    if (foodType < MANFOOD
-                        && (foodType < ACCFOOD || init_edog(mtmp).hungrytime <= (game.moves || 1))) {
-                        // Eating/fetching the object is still future work;
-                        // this preserves the candidate-square dogfood probe.
-                    }
-                }
             }
 
             const ndist = dist2(nx, ny, goal.gx, goal.gy);

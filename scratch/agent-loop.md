@@ -15,9 +15,10 @@ and `feature_map.md`.
 - Current branch in this workspace: `main`.
 - Baseline commit before this pass: `5dea6bd`.
 - Active target: `seed0002-healer-reflection-drummer`.
-- Active hypothesis: object-call prompt timing is now C-shaped and zero-time;
-  the remaining seed0002 blocker is still pet/monster ordering around the
-  post-call frame and the FR4518 dog/object-goal boundary.
+- Active hypothesis: object-call prompt timing is now C-shaped and zero-time,
+  and pet candidate-square object probes now precede cursed/backtracking gates
+  like C. The remaining seed0002 blocker is still pet/monster ordering around
+  the post-call frame and the FR4518 dog/object-goal boundary.
 
 ## Latest Verification
 
@@ -50,6 +51,8 @@ Result:
    - The turn-count status mismatch on screen 83 is gone; remaining cells show
      the pet at the wrong map square. First RNG mismatch is still FR4518,
      expected `rn2(100)` `obj_resists()` while JS enters `distfleeck()`.
+   - A neutral source-shaped cleanup now probes candidate-square pet food
+     before cursed reluctance and far-backtracking gates (`dogmove.c:dog_move()`).
    - The object-call prompt completion is coherent truth (`docall()` style
      naming is zero-time after the quaff turn) even though the public RNG
      count drops by removing the accidental extra turn.
