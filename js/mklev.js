@@ -3491,6 +3491,14 @@ function valleyLine(x1, y1, x2, y2, ch) {
     }
 }
 
+function valleyMapCleanupBoundaries() {
+    for (let y = 0; y < VALLEY_MAP.length; y++)
+        for (let x = 0; x < VALLEY_MAP[y].length; x++) {
+            const loc = game.level?.at(valleyX(x), valleyY(y));
+            if (loc?.typ === CROSSWALL) loc.typ = ROOM;
+        }
+}
+
 function valleyDryLocation() {
     return specialRandomDryLocation(VALLEY_MAP[0].length, VALLEY_MAP.length, VALLEY_X, VALLEY_Y);
 }
@@ -3749,6 +3757,7 @@ function loadValleySpecial() {
     for (const cls of ['V', 'V', 'V', 'Z', 'Z', 'Z', 'Z', 'M', 'M', 'M', 'M'])
         valleyMonster(cls);
 
+    valleyMapCleanupBoundaries();
     const ext = get_level_extends();
     const bounds = {
         minx: Math.max(1, ext.xmin),
