@@ -1432,6 +1432,7 @@ async function swapWithSafeMonster(mon, x, y) {
     mon.mx = oldx;
     mon.my = oldy;
     newsym(oldx, oldy);
+    vision_recalc(1);
     newsym(x, y);
     await pline(`You swap places with ${monsterSwapName(mon)}.`);
 }
