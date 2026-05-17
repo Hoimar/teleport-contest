@@ -23,7 +23,7 @@ import {
     HWALL, VWALL, TLCORNER, TRCORNER, BLCORNER, BRCORNER,
     CROSSWALL, TUWALL, TDWALL, TLWALL, TRWALL,
     D_NODOOR, D_BROKEN, D_CLOSED, D_ISOPEN, D_LOCKED, D_TRAPPED,
-    OROOM, VAULT, THEMEROOM, COURT, BARRACKS, ZOO, LEPREHALL, SHOPBASE, DELPHI, MORGUE, TEMPLE,
+    OROOM, VAULT, THEMEROOM, COURT, BARRACKS, ZOO, LEPREHALL, SHOPBASE, DELPHI, MORGUE, TEMPLE, SWAMP,
     CANDLESHOP, TOOLSHOP, FOODSHOP,
     ROOMOFFSET, MAXNROFROOMS, SHARED,
     SDOOR, SCORR, IRONBARS, TREE, FOUNTAIN, SINK, ALTAR, GRAVE,
@@ -7083,6 +7083,302 @@ function loadAsmodeusSpecial() {
     fixup_special();
 }
 
+function loadJuiblexSwampTerrain() {
+    // C ref: sp_lev.c:lvlfill_swamp().
+    for (let x = 2; x <= COLNO - 2; x++) {
+        for (let y = 0; y <= ROWNO - 1; y++) {
+            const loc = game.level?.at(x, y);
+            if (!loc) continue;
+            loc.typ = MOAT;
+            loc.lit = false;
+        }
+    }
+    for (let x = 2; x <= Math.min(COLNO - 2, COLNO - 2); x += 2) {
+        for (let y = 0; y <= Math.min(ROWNO - 1, ROWNO - 2); y += 2) {
+            const loc = game.level?.at(x, y);
+            if (loc) {
+                loc.typ = ROOM;
+                loc.lit = false;
+            }
+            let c = 0;
+            if (game.level?.at(x + 1, y)?.typ === MOAT) c++;
+            if (game.level?.at(x, y + 1)?.typ === MOAT) c++;
+            if (game.level?.at(x + 1, y + 1)?.typ === MOAT) c++;
+            if (c === 3) {
+                switch (rn2(3)) {
+                case 0:
+                    game.level.at(x + 1, y).typ = ROOM;
+                    break;
+                case 1:
+                    game.level.at(x, y + 1).typ = ROOM;
+                    break;
+                case 2:
+                    game.level.at(x + 1, y + 1).typ = ROOM;
+                    break;
+                default:
+                    break;
+                }
+            }
+        }
+    }
+    game.level.flags.is_maze_lev = true;
+}
+
+const JUIB_LEFT_X = 1;
+const JUIB_LEFT_Y = 15;
+const JUIB_RIGHT_X = 69;
+const JUIB_RIGHT_Y = 3;
+const JUIB_LAIR_X = 15;
+const JUIB_LAIR_Y = 3;
+const JUIB_SMALL_LEFT = [
+    'xxxxxxxx',
+    'xx...xxx',
+    'xxx...xx',
+    'xxxx.xxx',
+    'xxxxxxxx',
+];
+const JUIB_SMALL_RIGHT = [
+    'xxxxxxxx',
+    'xxxx.xxx',
+    'xxx...xx',
+    'xx...xxx',
+    'xxxxxxxx',
+];
+const JUIB_LAIR = [
+    'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+    'xxxx.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.xxxx',
+    'xxx...xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx...xxx',
+    'xxxx.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.xxxx',
+    'xxxxxxxxxxxxxxxxxxxxxxxx}}}xxxxxxxxxxxxxxx}}}}}xxxx',
+    'xxxxxxxxxxxxxxxxxxxxxxx}}}}}xxxxxxxxxxxxx}.....}xxx',
+    'xxxxxxxxxxxxxxxxxxxxxx}}...}}xxxxxxxxxxx}..P.P..}xx',
+    'xxxxxxxxxxxxxxxxxxxxx}}..P..}}xxxxxxxxxxx}.....}xxx',
+    'xxxxxxxxxxxxxxxxxxxxx}}.P.P.}}xxxxxxxxxxxx}...}xxxx',
+    'xxxxxxxxxxxxxxxxxxxxx}}..P..}}xxxxxxxxxxxx}...}xxxx',
+    'xxxxxxxxxxxxxxxxxxxxxx}}...}}xxxxxxxxxxxxxx}}}xxxxx',
+    'xxxxxxxxxxxxxxxxxxxxxxx}}}}}xxxxxxxxxxxxxxxxxxxxxxx',
+    'xxxxxxxxxxxxxxxxxxxxxxxx}}}xxxxxxxxxxxxxxxxxxxxxxxx',
+    'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+    'xxxx.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.xxxx',
+    'xxx...xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx...xxx',
+    'xxxx.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.xxxx',
+    'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+];
+
+function juibSetTerrain(xstart, ystart, x, y, ch) {
+    if (ch === 'x') return;
+    const loc = game.level?.at(xstart + x, ystart + y);
+    if (!loc) return;
+    loc.lit = false;
+    switch (ch) {
+    case '.': loc.typ = ROOM; break;
+    case '}': loc.typ = MOAT; break;
+    case 'P': loc.typ = POOL; break;
+    default: break;
+    }
+}
+
+function juibLoadMap(rows, xstart, ystart) {
+    for (let y = 0; y < rows.length; y++)
+        for (let x = 0; x < rows[y].length; x++)
+            juibSetTerrain(xstart, ystart, x, y, rows[y][x]);
+}
+
+function juibDryLocation(rows, xstart, ystart) {
+    return specialRandomDryLocation(rows[0].length, rows.length, xstart, ystart);
+}
+
+function juibObject(otyp, rows, xstart, ystart) {
+    const loc = juibDryLocation(rows, xstart, ystart);
+    mksobj_at(otyp, loc.x, loc.y, true, false);
+}
+
+function juibAbs(x, y) {
+    return { x: JUIB_LAIR_X + x, y: JUIB_LAIR_Y + y };
+}
+
+function juibObjectAt(oclass, x, y) {
+    const loc = juibAbs(x, y);
+    mkobj_at(oclass, loc.x, loc.y, true);
+}
+
+function juibRandomObject(oclass) {
+    const loc = juibDryLocation(JUIB_LAIR, JUIB_LAIR_X, JUIB_LAIR_Y);
+    mkobj_at(oclass, loc.x, loc.y, true);
+}
+
+function juibRandomBoulder() {
+    const loc = juibDryLocation(JUIB_LAIR, JUIB_LAIR_X, JUIB_LAIR_Y);
+    mksobj_at(BOULDER, loc.x, loc.y, true, false);
+}
+
+function juibTrap(kind) {
+    const loc = juibDryLocation(JUIB_LAIR, JUIB_LAIR_X, JUIB_LAIR_Y);
+    const trap = maketrap(loc.x, loc.y, kind);
+    maybeTrapVictim(trap);
+}
+
+function registerJuiblexLregions() {
+    const left = { x1: 1, y1: 0, x2: 11, y2: 20 };
+    const right = { x1: 69, y1: 0, x2: 79, y2: 20 };
+    const exclude = {
+        x1: JUIB_LAIR_X, y1: JUIB_LAIR_Y,
+        x2: JUIB_LAIR_X + JUIB_LAIR[0].length - 1,
+        y2: JUIB_LAIR_Y + JUIB_LAIR.length - 1,
+    };
+    game._special_lregions = [
+        { rtype: LR_DOWNSTAIR, inarea: left, delarea: exclude },
+        { rtype: LR_UPSTAIR, inarea: right, delarea: exclude },
+        { rtype: LR_BRANCH, inarea: left, delarea: exclude },
+        { rtype: LR_UPTELE, inarea: left, delarea: exclude },
+        { rtype: LR_DOWNTELE, inarea: right, delarea: exclude },
+    ];
+}
+
+function shuffleArrayInPlace(arr) {
+    for (let i = arr.length; i > 1; i--) {
+        const j = rn2(i);
+        const tmp = arr[i - 1];
+        arr[i - 1] = arr[j];
+        arr[j] = tmp;
+    }
+    return arr;
+}
+
+function juibSelectionPoint(set, x, y) {
+    return selPoint(set, JUIB_LAIR_X + x, JUIB_LAIR_Y + y);
+}
+
+function juibRndCoordRemove(set) {
+    const coords = selCoords(set).sort((a, b) => a.x - b.x || a.y - b.y);
+    const p = coords[rn2(coords.length)];
+    set.delete(selKey(p.x, p.y));
+    return p;
+}
+
+function juibCreateFountainMimic(loc) {
+    rn2(2); // C ref: sp_lev.c:find_montype() ambiguity gate for "giant mimic".
+    rn2(3); // C ref: sp_lev.c:create_monster() induced_align().
+    const ptr = MONSTERS.find(m => m.name === 'GIANT_MIMIC');
+    const mon = makemon(ptr, loc.x, loc.y, 0);
+    if (mon) {
+        mon.m_ap_type = M_AP_FURNITURE;
+        mon.mappearance = FOUNTAIN;
+    }
+}
+
+function juibCreateSwampRegion() {
+    // C ref: dat/juiblex.lua des.region(..., type="swamp", filled=2).
+    add_room(JUIB_LAIR_X, JUIB_LAIR_Y,
+        JUIB_LAIR_X + JUIB_LAIR[0].length - 1,
+        JUIB_LAIR_Y + JUIB_LAIR.length - 1,
+        false, SWAMP, true);
+    const room = game.level.rooms?.[game.level.nroom - 1];
+    if (room) {
+        room.needfill = FILL_LVFLAGS;
+        topologize(room);
+    }
+}
+
+function juibCreateMonster(id, x, y) {
+    let ptr = monster_by_user_name(id);
+    if (String(id || '').toLowerCase() === 'lemure') rn2(2);
+    else if (ptr && !ptr.neuter && !ptr.male && !ptr.female) rn2(2);
+    induced_align_80();
+    const loc = juibAbs(x, y);
+    return makemon(ptr, loc.x, loc.y, 0);
+}
+
+function juibCreateRandomMonster(id) {
+    const ptr = monster_by_user_name(id);
+    rn2(2);
+    induced_align_80();
+    let loc = asmoMonsterLocation(ptr, JUIB_LAIR, JUIB_LAIR_X, JUIB_LAIR_Y);
+    if (m_at(loc.x, loc.y)) {
+        loc = enexto_core(loc.x, loc.y, ptr, GP_CHECKSCARY)
+            || enexto_core(loc.x, loc.y, ptr, 0)
+            || loc;
+    }
+    return makemon(ptr, loc.x, loc.y, 0);
+}
+
+function juibMonsterClass(ch) {
+    return Object.entries(MONSTER_SYMBOLS).find(([, sym]) => sym === ch)?.[0] ?? null;
+}
+
+function juibCreateClassMonster(ch, x, y) {
+    induced_align_80();
+    const ptr = mkclass_aligned(juibMonsterClass(ch), G_NOGEN);
+    let loc = x == null ? asmoMonsterLocation(ptr, JUIB_LAIR, JUIB_LAIR_X, JUIB_LAIR_Y)
+        : juibAbs(x, y);
+    if (m_at(loc.x, loc.y)) {
+        loc = enexto_core(loc.x, loc.y, ptr, GP_CHECKSCARY)
+            || enexto_core(loc.x, loc.y, ptr, 0)
+            || loc;
+    }
+    return makemon(ptr, loc.x, loc.y, 0);
+}
+
+function loadJuiblexSpecial() {
+    // C ref: dat/juiblex.lua starts with nhlib shuffle then LVLINIT_SWAMP.
+    rn2(3); rn2(2);
+    loadJuiblexSwampTerrain();
+    game.level.flags.shortsighted = true;
+    game.level.flags.temperature = 0; // des.level_flags("temperate")
+    juibLoadMap(JUIB_SMALL_LEFT, JUIB_LEFT_X, JUIB_LEFT_Y);
+    juibObject(BOULDER, JUIB_SMALL_LEFT, JUIB_LEFT_X, JUIB_LEFT_Y);
+    juibLoadMap(JUIB_SMALL_RIGHT, JUIB_RIGHT_X, JUIB_RIGHT_Y);
+    juibObject(BOULDER, JUIB_SMALL_RIGHT, JUIB_RIGHT_X, JUIB_RIGHT_Y);
+    juibLoadMap(JUIB_LAIR, JUIB_LAIR_X, JUIB_LAIR_Y);
+    const monster = shuffleArrayInPlace(['j', 'b', 'P', 'F']);
+    const place = new Set();
+    juibSelectionPoint(place, 4, 2);
+    juibSelectionPoint(place, 46, 2);
+    juibSelectionPoint(place, 4, 15);
+    juibSelectionPoint(place, 46, 15);
+    juibCreateSwampRegion();
+    const fountain = juibRndCoordRemove(place);
+    if (game.level?.at(fountain.x, fountain.y)) game.level.at(fountain.x, fountain.y).typ = FOUNTAIN;
+    juibCreateFountainMimic(juibRndCoordRemove(place));
+    juibCreateFountainMimic(juibRndCoordRemove(place));
+    juibCreateFountainMimic(juibRndCoordRemove(place));
+    juibCreateMonster('Juiblex', 25, 8);
+    juibCreateMonster('lemure', 43, 8);
+    juibCreateMonster('lemure', 44, 8);
+    juibCreateMonster('lemure', 45, 8);
+    juibObjectAt(GEM_CLASS, 43, 6);
+    juibObjectAt(GEM_CLASS, 45, 6);
+    juibObjectAt(POTION_CLASS, 43, 9);
+    juibObjectAt(POTION_CLASS, 44, 9);
+    juibObjectAt(POTION_CLASS, 45, 9);
+    juibCreateClassMonster(monster[3], 25, 6);
+    juibCreateClassMonster(monster[0], 24, 7);
+    juibCreateClassMonster(monster[1], 26, 7);
+    juibCreateClassMonster(monster[2], 23, 8);
+    juibCreateClassMonster(monster[2], 27, 8);
+    juibCreateClassMonster(monster[1], 24, 9);
+    juibCreateClassMonster(monster[0], 26, 9);
+    juibCreateClassMonster(monster[3], 25, 10);
+    for (let i = 0; i < 4; i++) juibCreateClassMonster('j');
+    for (let i = 0; i < 4; i++) juibCreateClassMonster('P');
+    for (let i = 0; i < 3; i++) juibCreateClassMonster('b');
+    for (let i = 0; i < 3; i++) juibCreateClassMonster('F');
+    for (let i = 0; i < 2; i++) juibCreateClassMonster('m');
+    juibCreateRandomMonster('jellyfish');
+    juibCreateRandomMonster('jellyfish');
+    for (let i = 0; i < 3; i++) juibRandomObject(POTION_CLASS);
+    for (let i = 0; i < 3; i++) juibRandomObject(FOOD_CLASS);
+    juibRandomBoulder();
+    juibTrap(SLP_GAS_TRAP);
+    juibTrap(SLP_GAS_TRAP);
+    juibTrap(ANTI_MAGIC);
+    juibTrap(ANTI_MAGIC);
+    juibTrap(MAGIC_TRAP);
+    juibTrap(MAGIC_TRAP);
+    registerJuiblexLregions();
+    fixup_special();
+}
+
 function makemaz_special(slev) {
     const proto = slev?.proto || '';
     if (proto && slev?.rndlevs) {
@@ -7141,6 +7437,10 @@ function makemaz_special(slev) {
     }
     if (game._last_special_protofile === 'asmodeus') {
         loadAsmodeusSpecial();
+        return;
+    }
+    if (game._last_special_protofile === 'juiblex') {
+        loadJuiblexSpecial();
         return;
     }
     if (game._last_special_protofile === 'tower1') {
