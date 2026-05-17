@@ -443,7 +443,12 @@ async function refreshHallucinationDisplayAtInputBoundary(g) {
         refresh_swallowed_overlay();
     } else {
         // C ref: allmain.c:moveloop_core() Hallucination branch.
-        see_monsters();
+        g._hallucination_warning_rng_active = true;
+        try {
+            see_monsters();
+        } finally {
+            g._hallucination_warning_rng_active = false;
+        }
         see_objects();
         see_traps();
     }

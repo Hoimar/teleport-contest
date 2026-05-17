@@ -1230,7 +1230,6 @@ async function heroMeleeAttack(mon) {
     rn2(25);
     rn2(3);
     game.context.run = null;
-    newsym(mon.mx, mon.my);
 }
 
 async function swallowedHeroAttack(mon) {

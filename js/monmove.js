@@ -11,11 +11,15 @@ import {
     GP_CHECKSCARY, W_NONPASSWALL,
     isok, SPACE_POS,
 } from './const.js';
-import { newsym, queue_more_prompt, pline, flush_screen, clear_pending_message, docrt } from './display.js';
+import {
+    newsym, queue_more_prompt, pline, flush_screen, clear_pending_message,
+    docrt, refresh_swallowed_overlay,
+} from './display.js';
 import { nhgetch } from './input.js';
 import { clear_path, cansee, couldsee } from './vision.js';
 import { m_dowear_basic } from './mon_wear.js';
 import { gettrack } from './track.js';
+import { randomHallucinatedMonsterName } from './random_text.js';
 
 const NORMAL_SPEED = 12;
 const BOLT_LIM = 8;
@@ -568,6 +572,7 @@ function remove_dead_monster(mtmp) {
 }
 
 function monster_name(mtmp) {
+    if (hallucinating()) return randomHallucinatedMonsterName();
     return String(mtmp?.data?.name || 'monster').toLowerCase().replace(/_/g, ' ');
 }
 
@@ -614,6 +619,8 @@ async function flush_pending_more_before_monster_message() {
         game._swallowed_display_pending = false;
         game._swallowed_map_active = true;
         game._swallowed_overlay = null;
+        refresh_swallowed_overlay();
+        refresh_swallowed_overlay();
     }
 }
 
@@ -897,15 +904,15 @@ async function engulf_attack(mtmp, attack, toHit) {
     if (!alreadySwallowed && !(toHit > rnd(20))) return true;
     let damage = d(damn, damd);
     if (!alreadySwallowed) {
-        game.u.uswallow = true;
         game.u.ustuck = mtmp;
         mtmp.mx = game.u.ux;
         mtmp.my = game.u.uy;
-        game.u.uswldtim = Math.max(2, rnd(monster_level(mtmp) + 5));
         newsym(mtmp.mx, mtmp.my);
         game._pet_combat_more_latched = false;
         await show_blocking_monster_message(`The ${monster_name(mtmp)} engulfs you!`);
         if (!game._more) queue_more_prompt();
+        game.u.uswallow = true;
+        game.u.uswldtim = Math.max(2, rnd(monster_level(mtmp) + 5));
         game._swallowed_display_pending = true;
     }
     if ((game.u.uswldtim || 0) > 0) {

@@ -15,10 +15,12 @@ and `feature_map.md`.
 - Current branch in this workspace: `main`.
 - Baseline commit at harness cleanup: `f0fdc38`.
 - Active target: `seed0383-wizard-hallucinate`.
-- Active hypothesis: seed0383 is narrowed to the residual screen-172
-  post-expulsion visible-map hallucination redraw. Expulsion `unstuck()` now
-  waits behind the blocking More and the resumed Hallucination refresh is
-  modeled; remaining drift is lower-right monster/object redraw state.
+- Active hypothesis: seed0383 is narrowed to swallowed turn/timer ownership
+  after the second engulf. Post-expulsion hallucination redraw, shuffled
+  hallucinated object color, engulf `Monnam()` display RNG, ordinary-hit redraw
+  suppression, and the first visible swallowed overlay now match through
+  screen 174. Remaining drift is a premature `You get expelled!--More--` on
+  screen 175.
 
 ## Latest Verification
 
@@ -30,32 +32,31 @@ npm run verify -- --target seed0383-wizard-hallucinate
 
 Result:
 
-- Target: `seed0383-wizard-hallucinate` `S 173/219 R 11423/16915`,
-  first screen `172:char:map:Space`, first RNG
+- Target: `seed0383-wizard-hallucinate` `S 176/219 R 11423/16915`,
+  first screen `175:message:message:y`, first RNG
   `11367:rn2(20)=8=>rn2(7)=4`, cursor-only `1`.
-- Sentinel total: `S 376/1063 R 31694/64569`.
+- Sentinel total: `S 379/1063 R 31694/64569`.
 - Sentinel details:
   - `seed8000-tourist-starter`: `S 23/23 R 3060/3130`, first RNG `3047`.
   - `seed0002-healer-reflection-drummer`: `S 53/595 R 4066/27158`, first RNG `3880`.
   - `seed0013-friday13-save-then-fullmoon-restore`: `S 0/99 R 583/4804`, first RNG `540`.
   - `seed0116-wizard-wear-shop`: `S 127/127 R 12562/12562`, pass.
-  - `seed0383-wizard-hallucinate`: `S 173/219 R 11423/16915`, first screen 172.
+  - `seed0383-wizard-hallucinate`: `S 176/219 R 11423/16915`, first screen 175.
 - Hack-debt audit: hard `0`, suspicious `37` existing replay/override/seed findings.
 - Memory lint: clean after this compaction target.
 
 ## Current Queue
 
-1. Continue `seed0383` post-expulsion visible-map hallucination redraw ownership.
+1. Continue `seed0383` swallowed turn/timer ownership.
    - Use `npm run screen:diff -- seed0383-wizard-hallucinate --first`.
-   - Current diff is 12 hallucinated visible-map char cells on screen 172
-     (`Space`) after expulsion More is dismissed; screen 171
-     message/cursor/status match `You get expelled!--More--`; first RNG
-     mismatch is `FR 11367`.
-   - Stay on lower-right monster/object redraw state after the post-expulsion
-     refresh. The duplicate Warning refresh, premature `unstuck()`, and one
-     intermediate resumed-move hallucinated `newsym()` are gone; do not force
-     glyph sequences.
-   - Do not add seed-specific color sequences.
+   - Current diff is screen 175 (`y`): expected
+     `You hit the spotted jelly.  You are freezing to death!--More--`, actual
+     appends `You get expelled!--More--` in the same topline. First RNG
+     mismatch is still `FR 11367`, because the premature expulsion relocation
+     consumes `rn2(7)` where C next performs a `rn2(20)` check.
+   - Do not suppress the message text directly. Compare swallowed command
+     turn flow, repeat `gulpmu()` timer decrement count, and More/turn resume
+     ownership.
 2. Continue `seed0002-healer-reflection-drummer` dog-move candidate work.
    - Current state: `S 53/595 R 4066/27158`.
    - First visible mismatch is screen 53 (`y`): exact RNG through the floor

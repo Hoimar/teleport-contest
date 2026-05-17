@@ -5,7 +5,8 @@ import { game } from './gstate.js';
 import { cansee } from './vision.js';
 import { rn2Display } from './rng.js';
 import { MONSTER_DATA } from './monster_data.js';
-import { OBJECT_CLASS, OBJECT_COLOR } from './object_data.js';
+import { OBJECT_CLASS } from './object_data.js';
+import { getObjectColor } from './o_init.js';
 import {
     COLNO, ROWNO, STONE, ROOM, CORR, DOOR, SDOOR, STAIRS,
     HWALL, VWALL, TLCORNER, TRCORNER, BLCORNER, BRCORNER,
@@ -141,7 +142,7 @@ function random_object_glyph_for_display() {
     const oclass = OBJECT_CLASS[otyp];
     return {
         ch: OBJECT_CLASS_CHARS[oclass] || '?',
-        color: OBJECT_COLOR[otyp] ?? NO_COLOR,
+        color: getObjectColor(otyp) ?? NO_COLOR,
     };
 }
 
@@ -287,7 +288,7 @@ function monster_glyph(mon) {
         const oclass = OBJECT_CLASS[otyp];
         return {
             ch: OBJECT_CLASS_CHARS[oclass] || '?',
-            color: OBJECT_COLOR[otyp] ?? NO_COLOR,
+            color: getObjectColor(otyp) ?? NO_COLOR,
             dec: false,
         };
     }
@@ -299,7 +300,10 @@ function warning_glyph(mon) {
     // display_warning(). Warning floats over unseen hostile monsters.
     if (!game.u?.uprops?.warning || mon?.mpeaceful) return null;
     if (dist2(game.u?.ux ?? 0, game.u?.uy ?? 0, mon.mx, mon.my) >= 100) return null;
-    const level = Math.trunc((mon.m_lev ?? mon.data?.mlevel ?? 0) / 4);
+    const level = (game._hallucination_warning_rng_active
+            && (game.u?.uprops?.hallucination || game.u?.uhallucination))
+        ? rn2Display(WARNCOUNT - 1) + 1
+        : Math.trunc((mon.m_lev ?? mon.data?.mlevel ?? 0) / 4);
     if (level < (game.context?.warnlevel ?? 1)) return null;
     return def_warnsyms[Math.min(WARNCOUNT - 1, Math.max(0, level))] || null;
 }
