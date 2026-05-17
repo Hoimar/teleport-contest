@@ -68,6 +68,7 @@ const WAND_CLASS = 11;
 const COIN_CLASS = 12;
 const GEM_CLASS = 13;
 
+const GOLD_PIECE = 438;
 const QUARTERSTAFF = 79;
 const CLOAK_OF_MAGIC_RESISTANCE = 139;
 const SCALPEL = 39;
@@ -135,6 +136,10 @@ const HEALER_INVENTORY = [
     { typ: SPE_EXTRA_HEALING, spe: 0, cls: SPBOOK_CLASS, min: 1, max: 1, bless: 1 },
     { typ: SPE_STONE_TO_FLESH, spe: 0, cls: SPBOOK_CLASS, min: 1, max: 1, bless: 1 },
     { typ: APPLE, spe: 0, cls: FOOD_CLASS, min: 5, max: 5, bless: 0 },
+];
+
+const MONEY_INVENTORY = [
+    { typ: GOLD_PIECE, spe: 0, cls: COIN_CLASS, min: 1, max: 1, bless: 0 },
 ];
 
 const BLINDFOLD_INVENTORY = [
@@ -222,8 +227,19 @@ export function add_inventory_object(obj) {
     return obj;
 }
 
+function discover_starting_object(obj) {
+    if (!obj?.knownName || typeof obj.otyp !== 'number') return;
+    game.discoveredObjects = game.discoveredObjects || new Set();
+    if (typeof game.discoveredObjects.add === 'function') game.discoveredObjects.add(obj.otyp);
+}
+
 function ini_inv_adjust_obj(trop, obj) {
     let stop = false;
+    if (trop.cls === COIN_CLASS) {
+        obj.quan = game._goldCount || 0;
+        obj.invlet = '$';
+        return false;
+    }
     obj.cursed = false;
     // C ref: u_init.c:ini_inv_adjust_obj(). Starting inventory is known to
     // the hero; later wished/floor objects keep their own unknown flags.
@@ -232,6 +248,7 @@ function ini_inv_adjust_obj(trop, obj) {
     obj.dknown = true;
     obj.bknown = true;
     obj.rknown = true;
+    discover_starting_object(obj);
     if (obj.oclass === WEAPON_CLASS || obj.oclass === TOOL_CLASS) {
         obj.quan = trquan(trop);
         stop = true;
@@ -290,6 +307,7 @@ function ini_inv(trobs, noCreate, roleName) {
 
 export function u_init_role_inventory() {
     const role = findRole(game._nhopts?.role) || game.urole;
+    let roleStartingGold = 0;
     const noCreate = {
         nocreate: UNDEF_TYP,
         nocreate2: UNDEF_TYP,
@@ -298,6 +316,7 @@ export function u_init_role_inventory() {
     };
     if (role?.name?.m === 'Healer') {
         game._goldCount = rn1(1000, 1001);
+        roleStartingGold = game._goldCount;
         ini_inv(HEALER_INVENTORY, noCreate, role.name.m);
         if (!rn2(25)) {
             // C may add an oil lamp here; object creation is still unported.
@@ -307,6 +326,9 @@ export function u_init_role_inventory() {
         if (!rn2(5)) {
             ini_inv(BLINDFOLD_INVENTORY, noCreate, role.name.m);
         }
+    }
+    if (roleStartingGold > 0) {
+        ini_inv(MONEY_INVENTORY, noCreate, role?.name?.m);
     }
 }
 

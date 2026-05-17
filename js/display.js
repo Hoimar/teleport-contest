@@ -829,6 +829,16 @@ export async function pline(msg) {
     game._pending_message = msg;
 }
 
+export async function append_pline(msg) {
+    if (game._pending_message) {
+        const packed = `${game._pending_message}  ${msg}`;
+        game._pending_message = packed;
+        if (packed.length >= (game.nhDisplay?.cols || COLNO)) queue_more_prompt();
+    } else {
+        await pline(msg);
+    }
+}
+
 export function queue_more_prompt(count = 1) {
     game._more_dismissals_remaining = (game._more_dismissals_remaining || 0) + Math.max(1, count);
     game._more = true;

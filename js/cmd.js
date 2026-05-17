@@ -70,6 +70,7 @@ const POTION_CLASS = 8;
 const SCROLL_CLASS = 9;
 const SPBOOK_CLASS = 10;
 const WAND_CLASS = 11;
+const COIN_CLASS = 12;
 const FIRST_SPELL = 366;
 const LAST_SPELL = 407;
 const SPE_NOVEL = 408;
@@ -300,11 +301,19 @@ function ensureInventoryLetters() {
     game.inventory = game.inventory || [];
     const used = new Set();
     for (const obj of game.inventory) {
+        if (obj?.oclass === COIN_CLASS || obj?.invlet === '$') {
+            if (obj) obj.invlet = '$';
+            continue;
+        }
         if (validInvlet(obj?.invlet)) used.add(obj.invlet);
     }
 
     let nextCode = 97;
     for (const obj of game.inventory) {
+        if (obj?.oclass === COIN_CLASS || obj?.invlet === '$') {
+            if (obj) obj.invlet = '$';
+            continue;
+        }
         if (!obj || validInvlet(obj.invlet)) continue;
         while (nextCode <= 122 && used.has(String.fromCharCode(nextCode))) nextCode++;
         if (nextCode > 122) break;
@@ -547,7 +556,7 @@ function pluralizeObjectName(name) {
 }
 
 function unknownAppearanceName(obj) {
-    if (!obj || obj.knownName) return '';
+    if (!obj || obj.knownName || knownObjectType(obj.otyp)) return '';
     if (obj?.appearanceName) return obj.appearanceName;
     const shuffledDescription = getObjectDescription(obj?.otyp);
     if (shuffledDescription && !obj?.knownName) {
@@ -574,8 +583,14 @@ function unknownAppearanceName(obj) {
     return '';
 }
 
+function knownObjectType(otyp) {
+    return !!game.discoveredObjects
+        && typeof game.discoveredObjects.has === 'function'
+        && game.discoveredObjects.has(otyp);
+}
+
 function baseObjectName(obj) {
-    if (obj?.knownName && OBJECT_BASE_NAMES.has(obj.otyp)) return OBJECT_BASE_NAMES.get(obj.otyp);
+    if ((obj?.knownName || knownObjectType(obj?.otyp)) && OBJECT_BASE_NAMES.has(obj.otyp)) return OBJECT_BASE_NAMES.get(obj.otyp);
     const appearanceName = unknownAppearanceName(obj);
     if (appearanceName) return appearanceName;
     if (OBJECT_BASE_NAMES.has(obj?.otyp)) return OBJECT_BASE_NAMES.get(obj.otyp);
@@ -618,6 +633,7 @@ function chargeSuffix(obj, opts = {}) {
     if (typeof obj?.spe !== 'number') return '';
     if (obj.otyp === MAGIC_MARKER) return obj.known || obj.knownName ? ` (0:${obj.spe})` : '';
     if (obj.oclass !== WAND_CLASS) return '';
+    if (!obj.known && !obj.knownName && !obj.chargesKnown) return '';
     if (unknownAppearanceName(obj)) return '';
     if (obj.otyp === WAN_DIGGING && obj.knownName && !obj.chargesKnown) return '';
     return ` (0:${obj.spe})`;

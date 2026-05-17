@@ -16,12 +16,12 @@ and `feature_map.md`.
 - Baseline commit at harness cleanup: `f0fdc38`.
 - Active target: `seed0002-healer-reflection-drummer`.
 - Active hypothesis: seed0002 is now past the legacy tutorial prompt,
-  startup wand color mismatch, floor-look/pickup, safe pet-displacement, and
-  the engraving-wipe success amount. The next visible blocker is screen 21/22:
-  JS prints `You see here a drum.` but C packs `You hear a slow drip.` onto the
-  same topline. First RNG evidence points at a missing `obj_resists()` in
-  `dog_goal()`/floor-object scanning, likely retained level-object state rather
-  than a message-packing bug.
+  startup wand color mismatch, floor-look/pickup, safe pet-displacement,
+  engraving-wipe success amount, carried Healer money object, startup
+  `seer_turn`, ambient sound packing, and startup discovery naming. The next
+  visible blocker is screen 31 (`l`): C misses the grid bug and receives its
+  passive shock attack, while JS hits it. First RNG evidence points at hero
+  combat hit/miss and grid-bug retaliation, not the earlier dog-object scan.
 
 ## Latest Verification
 
@@ -33,13 +33,13 @@ npm run verify -- --target seed0002-healer-reflection-drummer
 
 Result:
 
-- Target: `seed0002-healer-reflection-drummer` `S 22/595 R 2697/27158`,
-  first screen `21:char:mixed:b`, first RNG
-  `2526:rn2(100)=5=>rn2(1)=0`, cursor-only `0`.
-- Sentinel total: `S 345/1063 R 30325/64569`.
+- Target: `seed0002-healer-reflection-drummer` `S 31/595 R 3197/27158`,
+  first screen `31:char:mixed:l`, first RNG
+  `3044:rn2(3)=2=>rn2(19)=15`, cursor-only `0`.
+- Sentinel total: `S 354/1063 R 30825/64569`.
 - Sentinel details:
   - `seed8000-tourist-starter`: `S 23/23 R 3060/3130`, first RNG `3047`.
-  - `seed0002-healer-reflection-drummer`: `S 22/595 R 2697/27158`, first RNG `2526`.
+  - `seed0002-healer-reflection-drummer`: `S 31/595 R 3197/27158`, first RNG `3044`.
   - `seed0013-friday13-save-then-fullmoon-restore`: `S 0/99 R 583/4804`, first RNG `540`.
   - `seed0116-wizard-wear-shop`: `S 127/127 R 12562/12562`, pass.
   - `seed0383-wizard-hallucinate`: `S 173/219 R 11423/16915`.
@@ -103,17 +103,16 @@ Result:
      evidence points at earlier `docrt()`/`newsym()` display-RNG state and
      retained glyph timing rather than core RNG or per-screen forcing.
    - Do not add seed-specific color sequences.
-3. Continue `seed0002-healer-reflection-drummer` retained-object/dog-goal work.
-   - Current state: `S 22/595 R 2697/27158`.
-   - First visible mismatch is screen 21 (`b`): expected
-     `You see here a drum.  You hear a slow drip.`, actual
-     `You see here a drum.`
-   - First RNG mismatch is `FR 2526` (`rn2(100)` expected vs `rn2(1)` actual).
-   - The previous safe-pet guard and engraving-wipe gaps are fixed. The C log
-     for step 20 shows one more `obj_resists(zap.c:1469)` before `dog_move()`
-     enters its equal-candidate `rn2(1)`; JS appears to have fewer retained
-     floor objects in/near the little dog's search/candidate area. Do not add
-     fake resistance rolls; inspect C/JS object retention for seed0002.
+3. Continue `seed0002-healer-reflection-drummer` hero/grid-bug combat work.
+   - Current state: `S 31/595 R 3197/27158`.
+   - First visible mismatch is screen 31 (`l`): expected
+     `You miss the grid bug.  The grid bug bites!  You get zapped!`, actual
+     `You hit the grid bug.`
+   - First RNG mismatch is `FR 3044` (`rn2(3)` expected vs `rn2(19)` actual).
+   - The previous dog-goal gap was carried startup gold, not missing floor
+     objects. Startup `seer_turn`, sound packing, and known `WAN_SLEEP` naming
+     are fixed. Next inspect C refs `uhitm.c` and grid bug passive/active
+     attack handling before changing monster movement.
 4. Broaden `o_init`/`objnam`/discovery state away from limited evidence tables.
 5. Broaden sleeping/hider front doors only when current C evidence reaches them.
 
