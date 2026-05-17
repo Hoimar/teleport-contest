@@ -23,7 +23,7 @@ import {
     HWALL, VWALL, TLCORNER, TRCORNER, BLCORNER, BRCORNER,
     CROSSWALL, TUWALL, TDWALL, TLWALL, TRWALL,
     D_NODOOR, D_CLOSED, D_ISOPEN, D_LOCKED, D_TRAPPED,
-    OROOM, VAULT, THEMEROOM, COURT, BARRACKS, ZOO, LEPREHALL, SHOPBASE, DELPHI,
+    OROOM, VAULT, THEMEROOM, COURT, BARRACKS, ZOO, LEPREHALL, SHOPBASE, DELPHI, MORGUE, TEMPLE,
     ROOMOFFSET, MAXNROFROOMS, SHARED,
     SDOOR, SCORR, IRONBARS, FOUNTAIN, SINK, ALTAR, GRAVE,
     DIR_N, DIR_S, DIR_E, DIR_W, DIR_180,
@@ -2846,6 +2846,7 @@ function flip_level_rnd(allow_flips) {
     if ((allow_flips & 1) && rn2(2)) flp |= 1;
     if ((allow_flips & 2) && rn2(2)) flp |= 2;
     if (flp) flip_level(flp);
+    return flp;
 }
 
 function wallify_map(x1, y1, x2, y2) {
@@ -3413,6 +3414,232 @@ function clearSpecialLregions() {
     game.dndest = { lx: 0, ly: 0, hx: 0, hy: 0, nlx: 0, nly: 0, nhx: 0, nhy: 0 };
 }
 
+const VALLEY_X = 3;
+const VALLEY_Y = 1;
+const VALLEY_MAP = [
+    '----------------------------------------------------------------------------',
+    '|...S.|..|.....|  |.....-|      |................|   |...............| |...|',
+    '|---|.|.--.---.|  |......--- ----..........-----.-----....---........---.-.|',
+    '|   |.|.|..| |.| --........| |.............|   |.......---| |-...........--|',
+    '|   |...S..| |.| |.......-----.......------|   |--------..---......------- |',
+    '|----------- |.| |-......| |....|...-- |...-----................----       |',
+    '|.....S....---.| |.......| |....|...|  |..............-----------          |',
+    '|.....|.|......| |.....--- |......---  |....---.......|                    |',
+    '|.....|.|------| |....--   --....-- |-------- ----....---------------      |',
+    '|.....|--......---BBB-|     |...--  |.......|    |..................|      |',
+    '|..........||........-|    --...|   |.......|    |...||.............|      |',
+    '|.....|...-||-........------....|   |.......---- |...||.............--     |',
+    '|.....|--......---...........--------..........| |.......---------...--    |',
+    '|.....| |------| |--.......--|   |..B......----- -----....| |.|  |....---  |',
+    '|.....| |......--| ------..| |----..B......|       |.--------.-- |-.....---|',
+    '|------ |........|  |.|....| |.....----BBBB---------...........---.........|',
+    '|       |........|  |...|..| |.....|  |-.............--------...........---|',
+    '|       --.....-----------.| |....-----.....----------     |.........----  |',
+    '|        |..|..B...........| |.|..........|.|              |.|........|    |',
+    '----------------------------------------------------------------------------',
+];
+
+function valleyX(x) { return x + VALLEY_X; }
+function valleyY(y) { return y + VALLEY_Y; }
+
+function valleySetTerrain(x, y, ch) {
+    const loc = game.level?.at(valleyX(x), valleyY(y));
+    if (!loc) return;
+    loc.lit = false;
+    switch (ch) {
+    case '.': loc.typ = ROOM; break;
+    case '-': loc.typ = HWALL; break;
+    case '|': loc.typ = VWALL; break;
+    case '+': loc.typ = DOOR; loc.doormask = D_NODOOR; break;
+    case 'S': loc.typ = SDOOR; loc.doormask = D_CLOSED; break;
+    case 'B': loc.typ = CROSSWALL; break;
+    default: loc.typ = STONE; break;
+    }
+}
+
+function valleyLine(x1, y1, x2, y2, ch) {
+    const dx = Math.sign(x2 - x1);
+    const dy = Math.sign(y2 - y1);
+    let x = x1, y = y1;
+    while (true) {
+        valleySetTerrain(x, y, ch);
+        if (x === x2 && y === y2) break;
+        x += dx;
+        y += dy;
+    }
+}
+
+function valleyDryLocation() {
+    return specialRandomDryLocation(VALLEY_MAP[0].length, VALLEY_MAP.length, VALLEY_X, VALLEY_Y);
+}
+
+function valleyObject(oclassOrType) {
+    const loc = valleyDryLocation();
+    if (typeof oclassOrType === 'number' && oclassOrType < 0)
+        mksobj_at(-oclassOrType, loc.x, loc.y, true, true);
+    else
+        mkobj_at(oclassOrType, loc.x, loc.y, true);
+}
+
+function valleyCorpse(monName) {
+    const loc = valleyDryLocation();
+    const corpse = mksobj_at(CORPSE, loc.x, loc.y, true, true);
+    set_corpsenm(corpse, monster_ptr(monName));
+}
+
+function valleyTrap(kind, x = null, y = null) {
+    const loc = x == null ? valleyDryLocation() : { x: valleyX(x), y: valleyY(y) };
+    maketrap(loc.x, loc.y, kind);
+}
+
+function valleyMonster(ref) {
+    const loc = valleyDryLocation();
+    const ptr = castleMonsterClass(ref) ? mkclass_aligned(castleMonsterClass(ref), 0) : monster_ptr(ref);
+    makemon(ptr, loc.x, loc.y, 0);
+}
+
+function valleyAddFillRoom(x1, y1, x2, y2, lit, rtype) {
+    add_room(valleyX(x1), valleyY(y1), valleyX(x2), valleyY(y2), lit, rtype, true);
+    const room = game.level.rooms[(game.level.nroom || 1) - 1];
+    if (room) {
+        room.needfill = FILL_NORMAL;
+        room.irregular = true;
+        const rmno = room.roomnoidx + ROOMOFFSET;
+        for (let x = room.lx; x <= room.hx; x++)
+            for (let y = room.ly; y <= room.hy; y++) {
+                const loc = game.level?.at(x, y);
+                if (loc && SPACE_POS(loc.typ)) {
+                    loc.roomno = rmno;
+                    loc.edge = false;
+                }
+            }
+    }
+}
+
+function flipRectForBounds(rect, flp, minx, miny, maxx, maxy) {
+    let { x1, y1, x2, y2 } = rect;
+    if (flp & 1) {
+        const ny1 = flipYForBounds(y2, miny, maxy);
+        const ny2 = flipYForBounds(y1, miny, maxy);
+        y1 = Math.min(ny1, ny2);
+        y2 = Math.max(ny1, ny2);
+    }
+    if (flp & 2) {
+        const nx1 = flipXForBounds(x2, minx, maxx);
+        const nx2 = flipXForBounds(x1, minx, maxx);
+        x1 = Math.min(nx1, nx2);
+        x2 = Math.max(nx1, nx2);
+    }
+    return { x1, y1, x2, y2 };
+}
+
+function registerValleyLregions(flp, bounds) {
+    const branch = flipRectForBounds({
+        x1: valleyX(66), y1: valleyY(17), x2: valleyX(66), y2: valleyY(17),
+    }, flp, bounds.minx, bounds.miny, bounds.maxx, bounds.maxy);
+    const down = flipRectForBounds({
+        x1: valleyX(58), y1: valleyY(9), x2: valleyX(72), y2: valleyY(18),
+    }, flp, bounds.minx, bounds.miny, bounds.maxx, bounds.maxy);
+    game._special_lregions = [
+        { rtype: LR_BRANCH, inarea: branch, delarea: { x1: -1, y1: -1, x2: -1, y2: -1 } },
+        { rtype: LR_DOWNTELE, inarea: down, delarea: { x1: -1, y1: -1, x2: -1, y2: -1 } },
+    ];
+}
+
+function loadValleySpecial() {
+    // C ref: dat/valley.lua loaded through sp_lev.c:lspo_map().
+    for (let y = 0; y < ROWNO; y++)
+        for (let x = 1; x < COLNO; x++)
+            game.level.at(x, y).typ = STONE;
+    game.level.flags.is_maze_lev = true;
+    game.level.flags.noteleport = true;
+    game.level.flags.hardfloor = true;
+    game.level.flags.nommap = true;
+
+    for (let y = 0; y < VALLEY_MAP.length; y++)
+        for (let x = 0; x < VALLEY_MAP[y].length; x++)
+            valleySetTerrain(x, y, VALLEY_MAP[y][x]);
+
+    if (rn2(100) < 50) {
+        valleyLine(50, 8, 53, 8, '-');
+        valleyLine(40, 8, 43, 8, 'B');
+    }
+    if (rn2(100) < 50) {
+        valleySetTerrain(27, 12, '|');
+        valleyLine(27, 3, 29, 3, 'B');
+        valleySetTerrain(28, 2, '-');
+    }
+    if (rn2(100) < 50) {
+        valleyLine(16, 10, 16, 11, '|');
+        valleyLine(9, 13, 14, 13, 'B');
+    }
+
+    valleyAddFillRoom(1, 6, 5, 14, true, TEMPLE);
+    valleyAddFillRoom(19, 1, 24, 8, false, MORGUE);
+    valleyAddFillRoom(9, 14, 16, 18, false, MORGUE);
+    valleyAddFillRoom(37, 9, 43, 14, false, MORGUE);
+
+    placeSpecialStair(valleyX(1), valleyY(1), false);
+    valleySetTerrain(4, 1, '+');
+    game.level.at(valleyX(4), valleyY(1)).doormask = D_LOCKED;
+    valleySetTerrain(8, 4, '+');
+    game.level.at(valleyX(8), valleyY(4)).doormask = D_LOCKED;
+    valleySetTerrain(6, 6, '+');
+    game.level.at(valleyX(6), valleyY(6)).doormask = D_LOCKED;
+    const altar = game.level.at(valleyX(3), valleyY(10));
+    if (altar) altar.typ = ALTAR;
+
+    for (const name of [
+        'ARCHEOLOGIST', 'ARCHEOLOGIST', 'BARBARIAN', 'BARBARIAN',
+        'CAVEMAN', 'CAVEWOMAN', 'HEALER', 'HEALER',
+        'KNIGHT', 'KNIGHT', 'RANGER', 'RANGER',
+        'ROGUE', 'ROGUE', 'SAMURAI', 'SAMURAI',
+        'TOURIST', 'TOURIST', 'VALKYRIE', 'VALKYRIE',
+        'WIZARD', 'WIZARD',
+    ]) valleyCorpse(name);
+    for (const cls of [ARMOR_CLASS, ARMOR_CLASS, ARMOR_CLASS, ARMOR_CLASS,
+        WEAPON_CLASS, WEAPON_CLASS, WEAPON_CLASS, WEAPON_CLASS]) {
+        valleyObject(cls);
+    }
+    for (const cls of [GEM_CLASS, GEM_CLASS, GEM_CLASS,
+        POTION_CLASS, POTION_CLASS, POTION_CLASS,
+        SCROLL_CLASS, SCROLL_CLASS, SCROLL_CLASS,
+        WAND_CLASS, WAND_CLASS, RING_CLASS, RING_CLASS,
+        SPBOOK_CLASS, SPBOOK_CLASS, TOOL_CLASS, TOOL_CLASS, TOOL_CLASS]) {
+        valleyObject(cls);
+    }
+
+    valleyTrap(SPIKED_PIT, 5, 2);
+    valleyTrap(SPIKED_PIT, 14, 5);
+    valleyTrap(SLP_GAS_TRAP, 3, 1);
+    valleyTrap(SQKY_BOARD, 21, 12);
+    valleyTrap(SQKY_BOARD);
+    valleyTrap(DART_TRAP, 60, 1);
+    valleyTrap(DART_TRAP, 26, 17);
+    valleyTrap(ANTI_MAGIC);
+    valleyTrap(ANTI_MAGIC);
+    valleyTrap(MAGIC_TRAP);
+    valleyTrap(MAGIC_TRAP);
+
+    for (let i = 0; i < 6; i++) valleyMonster('GHOST');
+    for (let i = 0; i < 3; i++) valleyMonster('VAMPIRE_BAT');
+    valleyMonster('L');
+    for (const cls of ['V', 'V', 'V', 'Z', 'Z', 'Z', 'Z', 'M', 'M', 'M', 'M'])
+        valleyMonster(cls);
+
+    const ext = get_level_extends();
+    const bounds = {
+        minx: Math.max(1, ext.xmin),
+        maxx: Math.min(COLNO - 1, ext.xmax),
+        miny: Math.max(0, ext.ymin),
+        maxy: Math.min(ROWNO - 1, ext.ymax),
+    };
+    wallification(1, 0, COLNO - 1, ROWNO - 1);
+    const flp = flip_level_rnd(3);
+    registerValleyLregions(flp, bounds);
+    fixup_special();
+}
+
 function castleLevelRegion(x1, y1, x2, y2) {
     return { x1, y1, x2, y2 };
 }
@@ -3941,6 +4168,10 @@ function makemaz_special(slev) {
         loadCastleSpecial();
         return;
     }
+    if (game._last_special_protofile === 'valley') {
+        loadValleySpecial();
+        return;
+    }
     game.level.flags.is_maze_lev = true;
 }
 
@@ -3961,7 +4192,7 @@ export async function mklev() {
     g.in_mklev = true;
     clearSpecialLregions();
     await makelevel();
-    if (game._last_special_protofile === 'castle') {
+    if (game._last_special_protofile === 'castle' || game._last_special_protofile === 'valley') {
         for (let i = 0; i < (g.level?.nroom ?? 0); i++) {
             fill_special_room(g.level.rooms[i]);
         }
@@ -5734,6 +5965,7 @@ function fill_zoo(croom) {
             let mdat = null;
             if (type === LEPREHALL) mdat = MONSTERS.find(m => m.name === 'LEPRECHAUN');
             else if (type === BARRACKS) mdat = squadmon();
+            else if (type === MORGUE) mdat = morguemon();
             makemon(mdat, sx, sy, MM_ASLEEP | MM_NOGRP);
             const mon = game.level.monsters?.[0];
             if (mon && mon.mx === sx && mon.my === sy) mon.msleeping = 1;
@@ -5752,8 +5984,22 @@ function fill_zoo(croom) {
                 if (!rn2(20)) {
                     mksobj_at(rn2(3) ? LARGE_BOX : CHEST, sx, sy, true, false);
                 }
+            } else if (type === MORGUE) {
+                if (!rn2(5)) mksobj_at(CORPSE, sx, sy, true, true);
+                if (!rn2(10)) mksobj_at(rn2(3) ? LARGE_BOX : CHEST, sx, sy, true, false);
+                if (!rn2(5)) make_grave(sx, sy, null);
             }
         }
+}
+
+function morguemon() {
+    const i = rn2(100);
+    const hd = rn2(level_difficulty());
+    if (hd > 10 && i < 10) return mkclass_aligned('S_DEMON', 0);
+    if (hd > 8 && i > 85) return mkclass_aligned('S_VAMPIRE', 0);
+    if (i < 20) return MONSTERS.find(m => m.name === 'GHOST') || null;
+    if (i < 40) return MONSTERS.find(m => m.name === 'WRAITH') || null;
+    return mkclass_aligned('S_ZOMBIE', 0);
 }
 
 function squadmon() {
@@ -5781,9 +6027,11 @@ function fill_special_room(croom) {
             for (let y = croom.ly; y <= croom.hy; y++)
                 mkgold(rn1(amountRange, 51), x, y);
         game.level.flags.has_vault = true;
-    } else if (croom.rtype === ZOO || croom.rtype === LEPREHALL || croom.rtype === BARRACKS) {
+    } else if (croom.rtype === ZOO || croom.rtype === LEPREHALL
+               || croom.rtype === BARRACKS || croom.rtype === MORGUE) {
         fill_zoo(croom);
         if (croom.rtype === ZOO) game.level.flags.has_zoo = true;
+        if (croom.rtype === MORGUE) game.level.flags.has_morgue = true;
     } else if (croom.rtype >= SHOPBASE) {
         stock_room(croom);
     }
