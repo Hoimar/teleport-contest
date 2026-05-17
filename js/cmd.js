@@ -1651,6 +1651,7 @@ async function handleQueuedMore(ch) {
         await showDeathPrompt();
     } else if (game._more_dismissals_remaining <= 0) {
         clear_pending_message();
+        game._hallucination_warning_rng_active = false;
         if (game._direction_help_screen) {
             game._direction_help_screen = '';
             game._override_prev = null;

@@ -599,6 +599,7 @@ async function flush_pending_more_before_monster_message() {
     await flush_screen(1);
     await nhgetch();
     clear_pending_message();
+    game._hallucination_warning_rng_active = false;
     if (game._after_more_message) {
         const msg = game._after_more_message;
         const needsPrompt = !!game._after_more_needs_prompt;
@@ -991,7 +992,8 @@ function physical_melee_attacks(mtmp, attacks, toHit) {
         const attack = attacks[i];
         if (!attack) continue;
         const [, adtyp, damn, damd] = attack;
-        if (toHit > rnd(20 + i)) {
+        const roll = rnd(20 + i);
+        if (toHit > roll) {
             const verb = monster_attack_verb(attack, attackVerbCounts);
             const extra = adtyp === 'AD_ELEC' ? '  You get zapped!' : '';
             const target = verb === 'touches' ? ' you' : '';
@@ -1019,7 +1021,8 @@ function physical_melee_attacks(mtmp, attacks, toHit) {
                 break;
             }
         } else {
-            hitMessages.push(`The ${monster_name(mtmp)} misses!`);
+            const miss = toHit === roll ? 'just misses' : 'misses';
+            hitMessages.push(`The ${monster_name(mtmp)} ${miss}!`);
         }
     }
     return hitMessages;
@@ -1387,12 +1390,21 @@ export async function movemon() {
                     return false;
                 }
                 if (g._monster_attack_more_latched && g._more) {
+                    // C ref: topl.c:more()/pline_mon(). A queued monster-hit
+                    // More only interrupts immediately when dismissing it must
+                    // expose a delayed side-effect pline. Otherwise it remains
+                    // on the topline while later map updates in the same monster
+                    // pass can happen; the next pline or input-boundary flush
+                    // services the More.
                     g._monster_attack_more_latched = false;
-                    g._resume_movemon_after_mon = mtmp;
-                    g._resume_somebody_can_move = mtmp.movement >= NORMAL_SPEED;
-                    g._monster_turn_paused_for_more = true;
-                    g._monster_attack_more_waiting = true;
-                    return false;
+                    if (g._after_more_message) {
+                        g._resume_movemon_after_mon = mtmp;
+                        g._resume_somebody_can_move = mtmp.movement >= NORMAL_SPEED;
+                        g._monster_turn_paused_for_more = true;
+                        g._monster_attack_more_waiting = true;
+                        return false;
+                    }
+                    g._hallucination_warning_rng_active = true;
                 }
                 if (g._fatal_monster_attack_paused && g._monster_turn_paused_for_more
                     && g._more && !hallucinating()) {
