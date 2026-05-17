@@ -34,6 +34,8 @@ const M2_ROCKTHROW = 0x08000000;
 const M1_FLY = 0x00000001;
 const M1_SWIM = 0x00000002;
 const M1_WALLWALK = 0x00000008;
+const M1_TUNNEL = 0x00000020;
+const M1_NEEDPICK = 0x00000040;
 const M1_HIDE = 0x00000100;
 const M1_NOEYES = 0x00001000;
 const M1_NOHANDS = 0x00002000;
@@ -213,13 +215,18 @@ function non_tame_movement_opportunity(mtmp, state) {
 }
 
 function can_tunnel_basic(mtmp) {
+    const flags1 = mtmp.data?.mflags1 ?? 0;
+    if (!(flags1 & M1_TUNNEL)) return false;
     const targetX = mtmp.mux ?? game.u?.ux ?? mtmp.mx;
     const targetY = mtmp.muy ?? game.u?.uy ?? mtmp.my;
     // C ref: mon.c:mon_allowflags().  Hostile pick-using tunnellers near
     // their target prefer a weapon instead of digging.
-    if (!mtmp.mpeaceful && dist2(mtmp.mx, mtmp.my, targetX, targetY) <= 8) return false;
-    return !!(mtmp.data?.mflags2 & M2_DWARF)
-        && (mtmp.inventory || []).some((obj) => obj?.otyp === PICK_AXE || obj?.otyp === DWARVISH_MATTOCK);
+    if ((flags1 & M1_NEEDPICK)
+        && !mtmp.mpeaceful && dist2(mtmp.mx, mtmp.my, targetX, targetY) <= 8) return false;
+    if (!(flags1 & M1_NEEDPICK)) return true;
+    return (mtmp.inventory || []).some((obj) =>
+        obj?.otyp === PICK_AXE || obj?.otyp === DWARVISH_MATTOCK
+        || obj?.otyp === AXE || obj?.otyp === BATTLE_AXE);
 }
 
 function can_tunnel_at_basic(mtmp, x, y) {
@@ -241,7 +248,7 @@ function is_axe_weapon_basic(obj) {
 function m_digweapon_check_basic(mtmp, x, y) {
     // C ref: monmove.c:m_digweapon_check().  Pick-using tunnellers spend a
     // move wielding the needed tool before entering rock/tree/door terrain.
-    if (!(mtmp.data?.mflags2 & M2_DWARF)) return false;
+    if (!((mtmp.data?.mflags1 ?? 0) & M1_NEEDPICK)) return false;
     const loc = game.level?.at(x, y);
     if (!loc) return false;
     const closedDoor = loc.typ === DOOR && !!(loc.doormask & (D_CLOSED | D_LOCKED));
