@@ -14,27 +14,25 @@ and `feature_map.md`.
 
 - Current branch in this workspace: `main`.
 - Baseline commit before this pass: `5dea6bd`.
-- Active target: `seed0360-wizard-world-tour`.
-- Active hypothesis: the wished speed-boots and amulet setup now follows more
-  of the general wear/pet-combat path. The current seed0360 blocker is a
-  paused delayed-occupation turn-tail resume gap: C consumes an `exercise()`
-  roll on the Space that clears the pet-combat `--More--` before printing the
-  speed-boots finish line, while JS reaches the next pet attack one RNG call
-  early.
+- Active target: `seed0383-wizard-hallucinate`.
+- Active hypothesis: the remaining seed0383 blocker is hallucinated level
+  arrival redraw ownership. The latest kept change redraws visible objects once
+  after `docrt()` and before the materialize pline; the remaining cells are one
+  hallucinated monster glyph and one object glyph/color choice.
 
 ## Latest Verification
 
 Run:
 
 ```bash
-npm run verify -- --target seed0360-wizard-world-tour
+npm run verify -- --target seed0383-wizard-hallucinate
 ```
 
 Result:
 
-- Target: `seed0360-wizard-world-tour`
-  `S 139/833 R 3037/120639`, first screen 139 (`q`), first RNG 1355.
-- Sentinel total: `S 428/1063 R 38856/64569`.
+- Target: `seed0383-wizard-hallucinate`
+  `S 196/219 R 16915/16915`, first screen 195 (`c`), full RNG parity.
+- Sentinel total: `S 429/1063 R 38856/64569`.
 - Sentinel details:
   - `seed8000-tourist-starter`: `S 23/23 R 3130/3130`, pass.
   - `seed0002-healer-reflection-drummer`: `S 83/595 R 5669/27158`, first RNG `4518`; remaining pet map offset persists.
@@ -47,7 +45,17 @@ Result:
 
 ## Current Queue
 
-1. Continue `seed0360` delayed occupation / pet-combat resume.
+1. Continue `seed0383` hallucinated level-arrival display timing.
+   - Current diff is screen 195 (`c`): message and cursor match; remaining
+     cells are a hallucinated monster glyph at row 6 col 67 and object
+     glyph/color choices at rows 7/8.
+   - Kept change: after level-change `docrt()`, redraw visible objects once
+     before `You materialize on a different level!`. Removing the pre-`docrt()`
+     `vision_recalc(0)` regresses map memory, including seed0116, so keep it.
+   - Probes tested and reverted: dropping `vision_recalc(0)` globally, dropping
+     it only while hallucinating, double object redraw, and adding a post-object
+     monster redraw.
+2. Continue `seed0360` delayed occupation / pet-combat resume.
    - Current target evidence: `S 139/833 R 3037/120639`.
    - New general behavior kept: wished `+3 speed boots` use the namedesc RNG
      shape and pair naming, speed boots give base boot AC plus enchantment,
@@ -61,7 +69,7 @@ Result:
      `rn2(19)=14 @ exercise(attrib.c:509)` before the speed-boots finish
      screen. JS currently resumes the delayed occupation finish without that
      roll, so the later `mattackm()` roll is early.
-2. Continue `seed0002` pet/monster ordering after potion-call naming.
+3. Continue `seed0002` pet/monster ordering after potion-call naming.
    - Latest verified target after zero-time call naming:
      `S 83/595 R 5669/27158`, first screen 83 (`Enter`).
    - The turn-count status mismatch on screen 83 is gone; remaining cells show
@@ -72,21 +80,6 @@ Result:
    - The object-call prompt completion is coherent truth (`docall()` style
      naming is zero-time after the quaff turn) even though the public RNG
      count drops by removing the accidental extra turn.
-3. Continue `seed0383` hallucinated level-arrival display timing.
-   - Use `npm run screen:diff -- seed0383-wizard-hallucinate --first`.
-   - Current diff is screen 195 (`c`): C and JS both show the materialize
-     message and cursor exactly, but the hallucinated arrival-level soldier and
-     two nearby object glyphs differ.
-   - Core RNG is complete (`R 16915/16915`). Do not change combat RNG for this
-     blocker; compare `goto_level()` display ordering: `vision_reset()`,
-     `reset_glyphmap()`, `docrt()`, visible object redraws, and monster overlay.
-   - Broad probes tested and reverted/withheld: pre-switch `vision_recalc(2)`
-     plus C-shaped `docrt()` ordering regressed `seed0116` screen 114; removing
-     prompt suppression regressed `seed0383` screen 192. Full-screen menu
-     Hallucination refresh remains an open lifecycle question.
-   - Neutral lifecycle cleanup kept: numeric and menu `^V` targets now defer
-     level change until after `rhack()` returns, matching C `schedule_goto()` /
-     `deferred_goto()`.
 4. Broaden `o_init`/`objnam`/discovery state away from limited evidence tables.
 5. Broaden sleeping/hider front doors only when current C evidence reaches them.
 

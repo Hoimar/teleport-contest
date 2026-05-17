@@ -2483,6 +2483,7 @@ export async function performLevelTeleport(target) {
     vision_reset();
     vision_recalc(0);
     await docrt();
+    if (game.u?.uhallucination || game.u?.uprops?.hallucination) see_objects();
     await pline('You materialize on a different level!');
     // C ref: do.c:goto_level() performs docrt()/flush before the deferred
     // materialize pline; the following input boundary does not immediately
