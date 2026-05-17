@@ -14,39 +14,46 @@ and `feature_map.md`.
 
 - Current branch in this workspace: `main`.
 - Baseline commit before this pass: `5dea6bd`.
-- Active target: `seed0383-wizard-hallucinate`.
-- Active hypothesis: the remaining blocker is hallucinated display-RNG ownership
-  during debug level-teleport arrival, not core game RNG. Narrow display fixes
-  landed for C-shaped warning qualification and hallucinated statue memory, but
-  the first visible mismatch remains the arrival `docrt()`/new-level redraw
-  frame at screen 195.
+- Active target: `seed0002-healer-reflection-drummer`.
+- Active hypothesis: object-call prompt timing is now C-shaped and zero-time;
+  the remaining seed0002 blocker is still pet/monster ordering around the
+  post-call frame and the FR4518 dog/object-goal boundary.
 
 ## Latest Verification
 
 Run:
 
 ```bash
-npm run verify -- --target seed0383-wizard-hallucinate --full
+npm run verify -- --target seed0002-healer-reflection-drummer
 ```
 
 Result:
 
-- Target: `seed0383-wizard-hallucinate` `S 195/219 R 16915/16915`,
-  first screen 195 (`c`), core RNG complete.
-- Sentinel total: `S 428/1063 R 38633/64569`.
+- Target: `seed0002-healer-reflection-drummer`
+  `S 83/595 R 5373/27158`, first screen 83 (`Enter`), first RNG 4518.
+- Sentinel total: `S 428/1063 R 38560/64569`.
 - Sentinel details:
   - `seed8000-tourist-starter`: `S 23/23 R 3130/3130`, pass.
-  - `seed0002-healer-reflection-drummer`: `S 83/595 R 5446/27158`, first RNG `4518`; first mismatch unchanged, lagging re-alignment decreased after the C-like stair-follow pet front door.
+  - `seed0002-healer-reflection-drummer`: `S 83/595 R 5373/27158`, first RNG `4518`; turn-count status mismatch on screen 83 removed, remaining pet map offset persists.
   - `seed0013-friday13-save-then-fullmoon-restore`: `S 0/99 R 580/4804`, first RNG `540`.
   - `seed0116-wizard-wear-shop`: `S 127/127 R 12562/12562`, pass.
   - `seed0383-wizard-hallucinate`: `S 195/219 R 16915/16915`, first screen 195.
-- Full public suite: `S 996/11405 R 106293/792838`.
+- Full public suite: not rerun for the narrow prompt-timing change.
 - Hack-debt audit: hard `0`, suspicious `37` existing replay/override/seed findings.
 - Memory lint: clean.
 
 ## Current Queue
 
-1. Continue `seed0383` hallucinated level-arrival display timing.
+1. Continue `seed0002` pet/monster ordering after potion-call naming.
+   - Latest verified target after zero-time call naming:
+     `S 83/595 R 5373/27158`, first screen 83 (`Enter`).
+   - The turn-count status mismatch on screen 83 is gone; remaining cells show
+     the pet at the wrong map square. First RNG mismatch is still FR4518,
+     expected `rn2(100)` `obj_resists()` while JS enters `distfleeck()`.
+   - The object-call prompt completion is coherent truth (`docall()` style
+     naming is zero-time after the quaff turn) even though the public RNG
+     count drops by removing the accidental extra turn.
+2. Continue `seed0383` hallucinated level-arrival display timing.
    - Use `npm run screen:diff -- seed0383-wizard-hallucinate --first`.
    - Current diff is screen 195 (`c`): C and JS both show the materialize
      message and cursor exactly, but the hallucinated arrival-level soldier and
@@ -61,15 +68,6 @@ Result:
    - Neutral lifecycle cleanup kept: numeric and menu `^V` targets now defer
      level change until after `rhack()` returns, matching C `schedule_goto()` /
      `deferred_goto()`.
-2. Continue `seed0002-healer-reflection-drummer` monster/pet ordering work.
-   - Current state: `S 83/595 R 5502/27158`.
-   - First visible mismatch is screen 83 (`Enter`): expected dog display at
-     `[74,12]`, JS at `[73,12]`, and status turn count differs (`5` vs `6`).
-   - First RNG mismatch is `FR 4518`, after the corpse-eating turn tail.
-     Recorder traces show C removes the eaten corpse before the final hidden
-     pet object scan. The next safe step is to explain why C reaches a pet
-     object-goal scan before the next monster `distfleeck()` during the eating
-     occupation without adding a full extra hidden turn.
 3. Broaden `o_init`/`objnam`/discovery state away from limited evidence tables.
 4. Broaden sleeping/hider front doors only when current C evidence reaches them.
 

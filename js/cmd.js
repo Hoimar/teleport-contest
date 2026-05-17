@@ -2899,7 +2899,7 @@ export async function rhack(key) {
         if (ch === '\r' || ch === '\n') {
             clear_pending_message();
             game._awaiting_potion_call_name = null;
-            game.context.move = 1;
+            game.context.move = 0;
             return;
         }
         if (ch === '\x7f' || ch === '\b') {
