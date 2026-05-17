@@ -21,6 +21,7 @@ import { clear_path, cansee, couldsee } from './vision.js';
 import { m_dowear_basic } from './mon_wear.js';
 import { gettrack } from './track.js';
 import { randomHallucinatedMonsterName } from './random_text.js';
+import { getObjectDescription } from './o_init.js';
 
 const NORMAL_SPEED = 12;
 const BOLT_LIM = 8;
@@ -88,6 +89,9 @@ const WAN_STRIKING = 417;
 const WAN_MAKE_INVISIBLE = 418;
 const WAN_SPEED_MONSTER = 420;
 const WAN_UNDEAD_TURNING = 421;
+const DILITHIUM_CRYSTAL = 439;
+const LUCKSTONE = 470;
+const FLINT = 473;
 const WAN_POLYMORPH = 422;
 const WAN_TELEPORTATION = 424;
 const WAN_DIGGING = 428;
@@ -596,6 +600,14 @@ function monster_name(mtmp) {
 
 function floor_object_name(obj) {
     if (obj?.oclass === POTION_CLASS) return 'a potion';
+    if (obj?.oclass === GEM_CLASS) {
+        if (obj.otyp === ROCK) return 'a rock';
+        const noun = obj.otyp >= DILITHIUM_CRYSTAL && obj.otyp <= FLINT
+            ? (obj.otyp >= LUCKSTONE ? 'stone' : 'gem')
+            : 'gem';
+        const appearance = obj.dknown ? getObjectDescription(obj.otyp) : '';
+        return appearance ? `a ${appearance} ${noun}` : `a ${noun}`;
+    }
     return 'an object';
 }
 
