@@ -148,6 +148,10 @@ export class NethackGame {
             nhGame._screens.push(term?.serialize ? term.serialize() : '');
             const cursor = disp ? [disp.cursorCol ?? 0, disp.cursorRow ?? 0, 1] : null;
             nhGame._cursors.push(cursor);
+            if (game._latched_more_screen) {
+                game._latched_more_screen = null;
+                game._latched_more_cursor = null;
+            }
             if (game._override_screen) {
                 game._override_prev = game._override_screen; // let rhack know what was shown
                 game._override_cursor = null;

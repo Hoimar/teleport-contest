@@ -730,8 +730,9 @@ function renderOverrideScreen(display, screen) {
         state.col++;
     }
 
-    if (game._override_cursor && display.setCursor) {
-        display.setCursor(game._override_cursor[0], game._override_cursor[1]);
+    const cursor = game._override_cursor || game._latched_more_cursor;
+    if (cursor && display.setCursor) {
+        display.setCursor(cursor[0], cursor[1]);
     }
 }
 
@@ -739,6 +740,10 @@ function renderOverrideScreen(display, screen) {
 function _buildScreenOutput() {
     const display = game?.nhDisplay;
     if (!display) return;
+    if (game._latched_more_screen) {
+        renderOverrideScreen(display, game._latched_more_screen);
+        return;
+    }
     if (game._override_screen) {
         renderOverrideScreen(display, game._override_screen);
         return;

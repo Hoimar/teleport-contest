@@ -13,7 +13,7 @@ import {
 } from './const.js';
 import {
     newsym, queue_more_prompt, pline, flush_screen, clear_pending_message,
-    docrt, refresh_swallowed_overlay,
+    docrt, refresh_swallowed_overlay, serialize_terminal_grid,
 } from './display.js';
 import { nhgetch } from './input.js';
 import { clear_path, cansee, couldsee } from './vision.js';
@@ -985,9 +985,25 @@ async function engulf_attack(mtmp, attack, toHit) {
     return true;
 }
 
-function physical_melee_attacks(mtmp, attacks, toHit) {
+async function latch_monster_attack_more_frame(line) {
+    if (!line || game._more || game._latched_more_screen) return false;
+    const oldPending = game._pending_message;
+    game._pending_message = line;
+    queue_more_prompt();
+    await flush_screen(1);
+    game._latched_more_screen = serialize_terminal_grid(game.nhDisplay);
+    game._latched_more_cursor = [
+        game.nhDisplay?.cursorCol ?? Math.min(`${line}--More--`.length, 79),
+        game.nhDisplay?.cursorRow ?? 0,
+    ];
+    game._pending_message = oldPending;
+    return true;
+}
+
+async function physical_melee_attacks(mtmp, attacks, toHit) {
     const hitMessages = [];
     const attackVerbCounts = new Map();
+    let latchedTailStart = null;
     for (let i = 0; i < attacks.length; i++) {
         const attack = attacks[i];
         if (!attack) continue;
@@ -997,7 +1013,13 @@ function physical_melee_attacks(mtmp, attacks, toHit) {
             const verb = monster_attack_verb(attack, attackVerbCounts);
             const extra = adtyp === 'AD_ELEC' ? '  You get zapped!' : '';
             const target = verb === 'touches' ? ' you' : '';
-            hitMessages.push(`The ${monster_name(mtmp)} ${verb}${target}!${extra}`);
+            const line = `The ${monster_name(mtmp)} ${verb}${target}!${extra}`;
+            if (hitMessages.length
+                && `${hitMessages.join('  ')}  ${line}`.length >= (game.nhDisplay?.cols || 80)) {
+                if (await latch_monster_attack_more_frame(hitMessages.join('  ')))
+                    latchedTailStart = hitMessages.length;
+            }
+            hitMessages.push(line);
             let damage = d(damn, damd);
             damage = elemental_hit_side_effects(mtmp, adtyp, damage);
             mhitm_knockback_frontdoor();
@@ -1022,8 +1044,18 @@ function physical_melee_attacks(mtmp, attacks, toHit) {
             }
         } else {
             const miss = toHit === roll ? 'just misses' : 'misses';
-            hitMessages.push(`The ${monster_name(mtmp)} ${miss}!`);
+            const line = `The ${monster_name(mtmp)} ${miss}!`;
+            if (hitMessages.length
+                && `${hitMessages.join('  ')}  ${line}`.length >= (game.nhDisplay?.cols || 80)) {
+                if (await latch_monster_attack_more_frame(hitMessages.join('  ')))
+                    latchedTailStart = hitMessages.length;
+            }
+            hitMessages.push(line);
         }
+    }
+    if (latchedTailStart != null && !game._after_more_message) {
+        game._after_more_message = hitMessages.slice(latchedTailStart).join('  ');
+        game._after_more_needs_prompt = true;
     }
     return hitMessages;
 }
@@ -1054,7 +1086,7 @@ async function mattacku_basic(mtmp, state) {
     if (cooldownAttack) {
         if (game._hero_melee_message_pending && game._pending_message) queue_more_prompt();
         await flush_pending_more_before_monster_message();
-        const messages = physical_melee_attacks(mtmp, [cooldownAttack], mattacku_to_hit(mtmp));
+        const messages = await physical_melee_attacks(mtmp, [cooldownAttack], mattacku_to_hit(mtmp));
         if (messages.length) await show_blocking_monster_message(messages.join('  '));
         return true;
     }
@@ -1074,7 +1106,7 @@ async function mattacku_basic(mtmp, state) {
     }
     if (engulf) return engulf_attack(mtmp, engulf, toHit);
     await flush_pending_more_before_monster_message();
-    const messages = physical_melee_attacks(mtmp, physical, toHit);
+    const messages = await physical_melee_attacks(mtmp, physical, toHit);
     if (messages.length) mtmp.mlstmv = game.moves || 0;
     if (messages.length) await show_blocking_monster_message(messages.join('  '));
     return true;
