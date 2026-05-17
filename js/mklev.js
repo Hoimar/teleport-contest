@@ -1250,13 +1250,18 @@ function sobj_at(otyp, x, y) {
     return (game.level?.objects || []).find(o => o.otyp === otyp && o.ox === x && o.oy === y) || false;
 }
 
-// set_corpsenm stub
 function set_corpsenm(otmp, pm) {
     if (otmp) otmp.corpsenm = pm;
 }
 
+function set_corpsenm_restart(otmp, pm) {
+    set_corpsenm(otmp, pm);
+    if (otmp?.otyp === CORPSE) start_corpse_timeout(otmp);
+}
+
 function monster_ptr(ref) {
     if (typeof ref === 'number') return MONSTERS[ref] || null;
+    if (ref === 'CAVEWOMAN') return MONSTERS.find((mon) => mon.name === 'CAVEMAN') || null;
     if (typeof ref === 'string') return MONSTERS.find((mon) => mon.name === ref) || null;
     return ref?.name ? ref : null;
 }
@@ -1401,7 +1406,7 @@ function mkcorpstat(objtyp, mtmp, pm, x, y, flags) {
     const otmp = mksobj(objtyp, !!(flags & 8), false);
     const oldCorpsenm = otmp.corpsenm;
     if (pm !== null && pm !== undefined) {
-        otmp.corpsenm = pm;
+        set_corpsenm(otmp, pm);
         if (otmp.otyp === CORPSE && (special_corpse(oldCorpsenm) || special_corpse(otmp.corpsenm))) {
             start_corpse_timeout(otmp);
         }
@@ -3512,7 +3517,7 @@ function valleyObject(oclassOrType) {
 function valleyCorpse(monName) {
     const loc = valleyDryLocation();
     const corpse = mksobj_at(CORPSE, loc.x, loc.y, true, true);
-    set_corpsenm(corpse, monster_ptr(monName));
+    set_corpsenm_restart(corpse, monster_ptr(monName));
 }
 
 function valleyTrap(kind, x = null, y = null) {
@@ -6100,8 +6105,7 @@ function mkToptenCorpseAt(x, y) {
     // C ref: mkobj.c:mk_tt_object(CORPSE).
     const corpse = mksobj(CORPSE, true, true);
     rnd(10); // get_rnd_toptenentry()
-    corpse.corpsenm = monster_ptr(TOPTEN_CORPSE_ROLES[rn2(TOPTEN_CORPSE_ROLES.length)]);
-    start_corpse_timeout(corpse);
+    set_corpsenm_restart(corpse, monster_ptr(TOPTEN_CORPSE_ROLES[rn2(TOPTEN_CORPSE_ROLES.length)]));
     return place_object(corpse, x, y);
 }
 
