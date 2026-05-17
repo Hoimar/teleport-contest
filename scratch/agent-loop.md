@@ -17,10 +17,12 @@ and `feature_map.md`.
 - Active target: `seed1800-tourist-eat-throw`.
 - Active hypothesis: configured Tourist startup is now past the wrong-pantheon
   lore blocker. Adding the Tourist Discworld gods and the Tourist-specific
-  legacy lore overlay reduced screen 0 to 15 residual cells with exact
+  legacy lore overlay plus startup display-name normalization and Tourist AC
+  reduced screen 0 to 7 residual cells with exact
   Book-of-The-Lady text and cursor. Remaining seed1800 startup mismatch is a
   right-side map/status residue, plus first RNG `FR 1045`, so the next safe
-  step is startup map/status state rather than more role text.
+  step is full `ini_inv(Tourist)`/startup inventory and stat RNG, not more
+  role text.
 
 ## Latest Verification
 
@@ -48,11 +50,12 @@ Result:
 
 1. Continue `seed1800-tourist-eat-throw` configured Tourist startup.
    - Use `npm run screen:diff -- seed1800-tourist-eat-throw --index 0 --all-cells`.
-   - Current diff is screen 0 only 15 cells: pet glyph one column off in the
-     right-side map and status HP/Pw/gold/Xp text still reflect generic
-     hardcoded Tourist startup state. Role text and cursor are exact.
+   - Current diff is screen 0 only 7 cells: pet glyph one column off in the
+     right-side map and status Int/Cha/gold still reflect incomplete Tourist
+     inventory/stat RNG. Role text, AC, name, and cursor are exact.
    - First RNG mismatch remains `FR 1045`, so startup identity text is not the
-     RNG blocker; inspect C role startup stats/gold/status and map placement.
+     RNG blocker; inspect C `u_init_role()` Tourist inventory/gold before
+     `init_attr()` rather than adding isolated RNG rolls.
 2. Continue `seed0383` hallucinated monster-turn display timing.
    - Use `npm run screen:diff -- seed0383-wizard-hallucinate --first`.
    - Current diff is screen 195 (`c`): C and JS both show the materialize

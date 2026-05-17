@@ -24,7 +24,7 @@ const ROLE_INIT = new Map([
         attrbase: [7, 10, 6, 7, 7, 10],
         attrmax: [15, 10, 10, 15, 30, 20],
         attrdist: [15, 10, 10, 15, 30, 20],
-        hp: 10, pwBase: 2, pwRnd: 0, ac: 10, gold: 757,
+        hp: 10, pwBase: 2, pwRnd: 0, ac: 0, gold: 757,
     }],
     ['Wizard', {
         attrbase: [7, 10, 7, 7, 7, 7],

@@ -103,6 +103,11 @@ function startupAlign() {
     return findAlign(game._nhopts?.align) || findAlign('neutral') || { name: 'neutral', value: 0 };
 }
 
+function startupPlayerName(name) {
+    const raw = String(name || 'Contestant');
+    return raw ? raw[0].toUpperCase() + raw.slice(1) : 'Contestant';
+}
+
 function drawQuestIntroOverlay(alignName) {
     const g = game;
     const display = g.nhDisplay;
@@ -288,7 +293,7 @@ export async function newgame() {
     const startupRoleName = g.flags?.female ? (g.urole.name.f || g.urole.name.m) : g.urole.name.m;
     g.plname = g._seed === 2 ? 'David'
         : g.flags?.debug ? startupRoleName
-        : (g.plname || 'Contestant');
+        : startupPlayerName(g.plname);
     // C ref: allmain.c newgame() → u_on_upstairs()
     // Places hero on upstair, or special stair, or random room position.
     u_on_upstairs();
