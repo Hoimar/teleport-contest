@@ -2311,6 +2311,24 @@ function isHellLevel(uz) {
     return !!game.dungeons?.[uz?.dnum ?? 0]?.flags?.hellish;
 }
 
+function temperatureChangeAfterLevelChange(prevTemperature, wasInHell) {
+    const temperature = game.level?.flags?.temperature || 0;
+    if (prevTemperature === temperature) return;
+    if (temperature) {
+        return {
+            line: `It is ${temperature > 0 ? 'hot' : 'cold'} here.`,
+            afterMore: isHellLevel(game.u?.uz) && temperature > 0 ? 'You smell smoke...' : '',
+        };
+    }
+    if (prevTemperature > 0) {
+        return { line: `The heat ${wasInHell ? 'and smoke are' : 'is'} gone.` };
+    }
+    if (prevTemperature < 0) {
+        return { line: 'You are out of the cold.' };
+    }
+    return null;
+}
+
 function isSpecialProtoLevel(uz, proto) {
     return !!game.specialLevels?.some((lev) =>
         lev?.proto === proto
@@ -2534,6 +2552,7 @@ function enqueueLevelchangePostMessages(oldLevel, newLevel) {
 export async function performLevelTeleport(target) {
     const oldUz = { ...(game.u?.uz || { dnum: 0, dlevel: 1 }) };
     const wasInHell = isHellLevel(oldUz);
+    const prevTemperature = game.level?.flags?.temperature || 0;
     const migratingPet = (game.level?.monsters || []).find(m =>
         m.mtame && dist2(m.mx, m.my, game.u?.ux ?? m.mx, game.u?.uy ?? m.my) < 3);
     game._migrating_pet = migratingPet ? {
@@ -2571,8 +2590,14 @@ export async function performLevelTeleport(target) {
         ];
     }
     // C ref: do.c:goto_level() performs docrt()/flush before the deferred
-    // materialize pline; the following input boundary does not immediately
-    // rerandomize the hallucinated new-level map.
+    // materialize pline and temperature-change messages; the following input
+    // boundary does not immediately rerandomize the hallucinated new-level map.
+    const tempMessage = temperatureChangeAfterLevelChange(prevTemperature, wasInHell);
+    if (tempMessage?.line) {
+        await append_pline(tempMessage.line);
+        if (tempMessage.afterMore) game._after_more_message = tempMessage.afterMore;
+        queue_more_prompt();
+    }
     game.context.mv = 1;
 }
 

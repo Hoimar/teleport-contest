@@ -3892,6 +3892,7 @@ function loadValleySpecial() {
     game.level.flags.noteleport = true;
     game.level.flags.hardfloor = true;
     game.level.flags.nommap = true;
+    game.level.flags.temperature = 0; // des.level_flags("temperate")
 
     for (let y = 0; y < VALLEY_MAP.length; y++)
         for (let x = 0; x < VALLEY_MAP[y].length; x++)
@@ -4606,7 +4607,7 @@ function clear_level_structures() {
     lf.has_town = false;
     lf.wizard_bones = false;
     lf.corrmaze = false;
-    lf.temperature = 0;
+    lf.temperature = Inhell() ? 1 : 0;
     lf.rndmongen = true;
     lf.deathdrops = true;
     lf.noautosearch = false;
