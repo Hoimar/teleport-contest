@@ -138,6 +138,7 @@ const ORCISH_SHIELD = 155;
 const SMALL_SHIELD = 150;
 const LARGE_SHIELD = 156;
 const DWARVISH_ROUNDSHIELD = 157;
+const SHIELD_OF_REFLECTION = 158;
 const LEATHER_GLOVES = 159;
 const GAUNTLETS_OF_FUMBLING = 160;
 const LOW_BOOTS = 163;
@@ -1733,6 +1734,55 @@ function pick_sandestin_shape_for() {
     return null;
 }
 
+function doppel_general_shape_for() {
+    const humanoidMlets = new Set([
+        'S_HUMAN', 'S_GNOME', 'S_ORC', 'S_KOP', 'S_LICH', 'S_MUMMY',
+        'S_NYMPH', 'S_OGRE', 'S_WRAITH', 'S_ZOMBIE',
+    ]);
+    for (let tryct = 5; tryct > 0; tryct--) {
+        const ptr = MONSTERS[rn2(330)]; // C ref: rn1(SPECIAL_PM - LOW_PM, LOW_PM)
+        if (ptr && humanoidMlets.has(ptr.mlet) && !(ptr.geno & (G_NOGEN | G_UNIQ))) {
+            return ptr;
+        }
+    }
+    return null;
+}
+
+function random_poly_shape_for() {
+    for (let tryct = 50; tryct > 0; tryct--) {
+        const ptr = MONSTERS[rn2(330)]; // C ref: SPECIAL_PM - LOW_PM
+        if (ptr && !(ptr.geno & (G_NOGEN | G_UNIQ))) return ptr;
+    }
+    return null;
+}
+
+function pick_doppelganger_shape_for(mon) {
+    if (!rn2(7)) return pick_nasty_for((monsterPtr('JABBERWOCK')?.difficulty ?? 0) - 1);
+    if (rn2(3)) {
+        // Role-monster `tt_doppel()` remains future work; current evidence
+        // takes the general humanoid fallback.
+        return null;
+    }
+    if (!rn2(3)) {
+        const guardians = [
+            'STUDENT', 'CHIEFTAIN', 'NEANDERTHAL', 'ATTENDANT', 'PAGE',
+            'ABBOT', 'ACOLYTE', 'HUNTER', 'THUG', 'NINJA', 'ROSHI',
+            'GUIDE', 'APPRENTICE',
+        ];
+        return monsterPtr(guardians[rn2(guardians.length)]);
+    }
+    return doppel_general_shape_for(mon);
+}
+
+function pick_chameleon_shape_for() {
+    if (!rn2(3)) {
+        // Full pick_animal() is future work.  Current evidence misses this
+        // branch and falls through to the generic polymorph form.
+        return null;
+    }
+    return random_poly_shape_for();
+}
+
 function mgender_from_permonst_for(mon, ptr) {
     if (!mon || !ptr) return;
     if (ptr.male) {
@@ -1754,6 +1804,10 @@ function initial_shapeshift(mon, ptr) {
     mon.cham = cham;
     const shape = cham.name === 'SANDESTIN'
         ? pick_sandestin_shape_for(mon)
+        : cham.name === 'DOPPELGANGER'
+            ? pick_doppelganger_shape_for(mon)
+        : cham.name === 'CHAMELEON'
+            ? pick_chameleon_shape_for(mon)
         : is_vampire_shifter_base(cham)
             ? pick_vamp_shape_for(mon)
             : null;
@@ -2121,6 +2175,29 @@ function m_initweap_for(ptr) {
         }
         if (ptr.mflags2 & M2_DEMON) m_initweap_general_for(ptr);
         else maybe_init_offensive_item_for(ptr);
+        return;
+    }
+    if (ptr.mlet === 'S_ANGEL' && ptr.name !== 'KI_RIN') {
+        const typ = rn2(3) ? LONG_SWORD : SILVER_MACE;
+        const weapon = mksobj(typ, false, false);
+        rn2(20); // artifact-promotion gate; artifact naming has no RNG here.
+        if (weapon) {
+            weapon.blessed = true;
+            weapon.cursed = false;
+            weapon.oerodeproof = true;
+            weapon.spe = rn2(4) + (typ === SILVER_MACE ? 3 : 0);
+        } else {
+            rn2(4);
+        }
+        const shieldTyp = (!rn2(4) || (ptr.mflags2 & M2_LORD))
+            ? SHIELD_OF_REFLECTION
+            : LARGE_SHIELD;
+        const shield = mksobj(shieldTyp, false, false);
+        if (shield) {
+            shield.oerodeproof = true;
+            shield.spe = 0;
+        }
+        maybe_init_offensive_item_for(ptr);
         return;
     }
     if (ptr.mlet === 'S_GIANT') {
@@ -2573,12 +2650,7 @@ export function makemon(mdat, x, y, mmflags = 0) {
     // its own speed-rounding roll.
     if (game.level?.monsters) game.level.monsters.unshift(mon);
     if (ptr.mlet === 'S_MIMIC') {
-        if (isSokobanLevel()) {
-            mon.m_ap_type = M_AP_OBJECT;
-            mon.mappearance = BOULDER;
-        } else {
-            set_mimic_sym(mon);
-        }
+        set_mimic_sym(mon);
     }
     if ((ptr.mlet === 'S_SPIDER' || ptr.mlet === 'S_SNAKE') && game.in_mklev && x && y) {
         mkobj_at(RANDOM_CLASS, x, y, true);
@@ -3521,13 +3593,6 @@ function sokoDryLocation(spec) {
     return { x: x + SOKO1_XSTART, y: y + SOKO1_YSTART };
 }
 
-function sokoBadMimicBoulderSpot(x, y) {
-    const loc = game.level?.at(x, y);
-    return !!((game.level?.traps || []).find(t => t.tx === x && t.ty === y)
-        || sobj_at(BOULDER, x, y)
-        || (loc?.typ === DOOR && (loc.doormask & (D_CLOSED | D_LOCKED))));
-}
-
 function loadBigrm12Terrain() {
     for (let y = 0; y < BIGRM_12_MAP.length; y++) {
         for (let x = 0; x < BIGRM_12_MAP[y].length; x++) {
@@ -3657,6 +3722,7 @@ function flip_level(flp) {
         flipPoint(trap.launch, flp, minx, miny, maxx, maxy);
     }
     for (const mon of map.monsters || []) flipPoint(mon, flp, minx, miny, maxx, maxy, 'mx', 'my');
+    for (const ep of map.engravings || []) flipPoint(ep, flp, minx, miny, maxx, maxy);
     for (const door of map.doors || []) flipPoint(door, flp, minx, miny, maxx, maxy);
     for (const room of map.rooms || []) {
         if (!room || room.hx < 0) continue;
@@ -3937,14 +4003,12 @@ function createSokoGiantMimic(spec) {
     rn2(2); // find_montype() name ambiguity gate for "giant mimic".
     rn2(3); // induced_align() for special-level monsters.
     const ptr = MONSTERS.find(m => m.name === 'GIANT_MIMIC');
-    let loc = sokoDryLocation(spec);
-    if (sokoBadMimicBoulderSpot(loc.x, loc.y)) {
-        let retrylimit = 10;
-        do {
-            loc = sokoDryLocation(spec);
-        } while (sokoBadMimicBoulderSpot(loc.x, loc.y) && --retrylimit > 0);
+    const loc = sokoDryLocation(spec);
+    const mon = makemon(ptr, loc.x, loc.y, 0);
+    if (mon) {
+        mon.m_ap_type = M_AP_OBJECT;
+        mon.mappearance = BOULDER;
     }
-    makemon(ptr, loc.x, loc.y, 0);
 }
 
 function sokoRandomObject(spec, oclass) {

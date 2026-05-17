@@ -4,8 +4,9 @@ import { dog_move } from './dog.js';
 import { adj_lev_for, enexto_core, monsterPtr, MONSTER_SYMBOLS, newmonhp_for } from './mklev.js';
 import { OBJECT_CLASS, OBJECT_DIR } from './object_data.js';
 import {
+    BURN, DUST, ENGR_BLOOD, HEADSTONE,
     D_BROKEN, D_CLOSED, D_ISOPEN, D_LOCKED, D_NODOOR, D_TRAPPED,
-    DOOR, ROOM,
+    DOOR, IRONBARS, LADDER, ROOM, STAIRS, WEB,
     IS_DOOR, IS_LAVA, IS_OBSTRUCTED, IS_POOL, IS_STWALL, IS_TREE, IS_WALL, IS_WATERWALL,
     I_SPECIAL, M_AP_FURNITURE, M_AP_OBJECT,
     MON_POLE_DIST, NEED_AXE, NEED_HTH_WEAPON, NEED_PICK_AXE, NEED_PICK_OR_AXE,
@@ -53,6 +54,9 @@ const MMOVE_NOTHING = 0;
 const MMOVE_MOVED = 1;
 const MMOVE_DIED = 2;
 const MMOVE_DONE = 3;
+const MCF_INDIRECT = 0x0001;
+const MCF_SIGHT = 0x0002;
+const MCF_HOSTILE = 0x0004;
 const WEAPON_CLASS = 2;
 const ARMOR_CLASS = 3;
 const RING_CLASS = 4;
@@ -108,6 +112,37 @@ const AKLYS = 80;
 const ORCISH_DAGGER = 36;
 const BASIC_MELEE_ATTACKS = new Set(['AT_CLAW', 'AT_KICK', 'AT_BITE', 'AT_STNG', 'AT_TUCH', 'AT_BUTT', 'AT_TENT', 'AT_WEAP']);
 const DISTANCE_ATTACK_TYPES = new Set(['AT_SPIT', 'AT_BREA', 'AT_MAGC', 'AT_GAZE']);
+const MCAST = {
+    PSI_BOLT: { level: 0, flags: MCF_HOSTILE | MCF_SIGHT },
+    OPEN_WOUNDS: { level: 0, flags: MCF_HOSTILE | MCF_SIGHT },
+    CURE_SELF: { level: 1, flags: MCF_INDIRECT },
+    HASTE_SELF: { level: 2, flags: MCF_INDIRECT },
+    CONFUSE_YOU: { level: 2, flags: MCF_HOSTILE | MCF_SIGHT },
+    STUN_YOU: { level: 3, flags: MCF_HOSTILE | MCF_SIGHT },
+    DISAPPEAR: { level: 4, flags: MCF_INDIRECT },
+    PARALYZE: { level: 4, flags: MCF_HOSTILE | MCF_SIGHT },
+    BLIND_YOU: { level: 6, flags: MCF_HOSTILE | MCF_SIGHT },
+    WEAKEN_YOU: { level: 6, flags: MCF_HOSTILE | MCF_SIGHT },
+    DESTRY_ARMR: { level: 8, flags: MCF_HOSTILE | MCF_SIGHT },
+    INSECTS: { level: 8, flags: MCF_HOSTILE | MCF_INDIRECT | MCF_SIGHT },
+    CURSE_ITEMS: { level: 10, flags: MCF_HOSTILE | MCF_SIGHT },
+    LIGHTNING: { level: 11, flags: MCF_HOSTILE | MCF_SIGHT },
+    FIRE_PILLAR: { level: 12, flags: MCF_HOSTILE | MCF_SIGHT },
+    GEYSER: { level: 13, flags: MCF_HOSTILE | MCF_SIGHT },
+    AGGRAVATION: { level: 13, flags: MCF_INDIRECT | MCF_HOSTILE | MCF_SIGHT },
+    SUMMON_MONS: { level: 15, flags: MCF_HOSTILE | MCF_INDIRECT | MCF_SIGHT },
+    CLONE_WIZ: { level: 18, flags: MCF_HOSTILE | MCF_INDIRECT | MCF_SIGHT },
+    DEATH_TOUCH: { level: 20, flags: MCF_HOSTILE | MCF_SIGHT },
+};
+const MON_WIZARD_SPELLS = [
+    'PSI_BOLT', 'CURE_SELF', 'HASTE_SELF', 'STUN_YOU', 'DISAPPEAR',
+    'WEAKEN_YOU', 'DESTRY_ARMR', 'CURSE_ITEMS', 'AGGRAVATION',
+    'SUMMON_MONS', 'CLONE_WIZ', 'DEATH_TOUCH',
+];
+const MON_CLERIC_SPELLS = [
+    'OPEN_WOUNDS', 'CURE_SELF', 'CONFUSE_YOU', 'PARALYZE', 'BLIND_YOU',
+    'INSECTS', 'CURSE_ITEMS', 'LIGHTNING', 'FIRE_PILLAR', 'GEYSER',
+];
 
 export function mcalcmove(mtmp, m_moving) {
     let mmove = mtmp.data.mmove;
@@ -238,10 +273,11 @@ function can_tunnel_at_basic(mtmp, x, y) {
     if (!loc) return false;
     const flags1 = mtmp.data?.mflags1 ?? 0;
     const needsPick = !!(flags1 & M1_NEEDPICK);
-    const rockok = !needsPick || mon_has_dig_tool_basic(mtmp, is_pick_weapon_basic);
+    const rockok = !needsPick || mon_has_dig_tool_basic(mtmp, (obj) => is_pick_weapon_for_mon_basic(mtmp, obj));
     const treeok = !needsPick || mon_has_dig_tool_basic(mtmp, is_axe_weapon_basic);
-    if (IS_STWALL(loc.typ) || loc.typ === SDOOR) return rockok;
-    if (IS_TREE(loc.typ)) return treeok;
+    if (IS_STWALL(loc.typ)) return rockok && may_dig_basic(x, y);
+    if (loc.typ === SDOOR) return rockok;
+    if (IS_TREE(loc.typ)) return treeok && may_dig_basic(x, y);
     if (loc.typ === DOOR && (loc.doormask & (D_CLOSED | D_LOCKED))) {
         if (loc.doormask & D_LOCKED) return rockok || treeok;
         return mon_can_open_doors(mtmp) || rockok || treeok;
@@ -251,6 +287,11 @@ function can_tunnel_at_basic(mtmp, x, y) {
 
 function is_pick_weapon_basic(obj) {
     return obj?.otyp === PICK_AXE || obj?.otyp === DWARVISH_MATTOCK;
+}
+
+function is_pick_weapon_for_mon_basic(mtmp, obj) {
+    return obj?.otyp === PICK_AXE
+        || (obj?.otyp === DWARVISH_MATTOCK && !(mtmp.misc_worn_check & W_ARMS));
 }
 
 function is_axe_weapon_basic(obj) {
@@ -264,14 +305,14 @@ function m_digweapon_check_basic(mtmp, x, y) {
     const loc = game.level?.at(x, y);
     if (!loc) return false;
     const closedDoor = loc.typ === DOOR && !!(loc.doormask & (D_CLOSED | D_LOCKED));
-    const diggableWall = IS_STWALL(loc.typ) && !(loc.wall_info & W_NONPASSWALL);
+    const diggableWall = IS_STWALL(loc.typ) && !(loc.wall_info & W_NONDIGGABLE);
     if (!closedDoor && !diggableWall) return false;
     const mw = mtmp.mw || null;
     if (closedDoor) {
-        if (!mw || (!is_pick_weapon_basic(mw) && !is_axe_weapon_basic(mw))) {
+        if (!mw || (!is_pick_weapon_for_mon_basic(mtmp, mw) && !is_axe_weapon_basic(mw))) {
             mtmp.weapon_check = NEED_PICK_OR_AXE;
         }
-    } else if (!mw || !is_pick_weapon_basic(mw)) {
+    } else if (!mw || !is_pick_weapon_for_mon_basic(mtmp, mw)) {
         mtmp.weapon_check = NEED_PICK_AXE;
     }
     return mtmp.weapon_check >= NEED_PICK_AXE && mon_wield_item_basic(mtmp);
@@ -317,6 +358,26 @@ function may_dig_basic(x, y) {
     // mdig_tunnel() and let that routine decide that there is no digging.
     return !((IS_STWALL(loc.typ) || IS_TREE(loc.typ))
         && (loc.wall_info & W_NONDIGGABLE));
+}
+
+function engr_at_basic(x, y) {
+    return (game.level?.engravings || []).find((ep) => ep.x === x && ep.y === y) || null;
+}
+
+function wipe_engr_at_basic(x, y, cnt, magical = false) {
+    const ep = engr_at_basic(x, y);
+    if (!ep || ep.type === HEADSTONE || ep.nowipeout) return;
+    if (ep.type === BURN && !magical) return;
+    if (ep.type !== DUST && ep.type !== ENGR_BLOOD) {
+        cnt = rn2(1 + Math.trunc(50 / (cnt + 1))) ? 0 : 1;
+    }
+    if (cnt <= 0) return;
+    ep.text = String(ep.text || '').slice(cnt);
+    if (!ep.text) {
+        const list = game.level?.engravings || [];
+        const idx = list.indexOf(ep);
+        if (idx >= 0) list.splice(idx, 1);
+    }
 }
 
 function mfndpos_terrain_ok(mtmp, x, y) {
@@ -909,6 +970,93 @@ function monster_level(mtmp) {
     return mtmp?.m_lev ?? mtmp?.data?.mlevel ?? 0;
 }
 
+function is_undirected_spell_basic(spellName) {
+    return !!(MCAST[spellName]?.flags & MCF_INDIRECT);
+}
+
+function spell_would_be_useless_basic(mtmp, spellName) {
+    const spell = MCAST[spellName];
+    if (!spell) return false;
+    if ((spell.flags & MCF_HOSTILE) && mtmp.mpeaceful) return true;
+    if ((spell.flags & MCF_SIGHT) && !couldsee(mtmp.mx, mtmp.my)) return true;
+    switch (spellName) {
+    case 'HASTE_SELF':
+        return mtmp.permspeed === MFAST;
+    case 'DISAPPEAR':
+        return !!(mtmp.minvis || mtmp.invis_blkd);
+    case 'CURE_SELF':
+        return (mtmp.mhp ?? 1) >= (mtmp.mhpmax ?? mtmp.mhp ?? 1);
+    case 'CLONE_WIZ':
+        return !mtmp.iswiz || (game.context?.no_of_wizards ?? 0) > 1;
+    case 'GEYSER':
+        return !rn2(5);
+    case 'DEATH_TOUCH':
+        if (hallucinating() && !rn2(2)) return true;
+        return false;
+    default:
+        return false;
+    }
+}
+
+function choose_monster_spell_basic(mtmp, adtyp) {
+    const list = adtyp === 'AD_CLRC' ? MON_CLERIC_SPELLS : MON_WIZARD_SPELLS;
+    const maxlev = MCAST[list[list.length - 1]].level;
+    let spellval = rn2(Math.max(1, monster_level(mtmp)));
+    if (spellval > maxlev && rn2(maxlev)) spellval = rn2(maxlev);
+    for (let i = list.length - 1; i >= 0; i--) {
+        const spellName = list[i];
+        if (MCAST[spellName].level <= spellval
+            && !spell_would_be_useless_basic(mtmp, spellName)) {
+            return spellName;
+        }
+    }
+    return list[0];
+}
+
+function magic_spell_attack_basic(mtmp) {
+    return (mtmp.data?.mattk || []).find((attack) =>
+        attack?.[0] === 'AT_MAGC' && (attack?.[1] === 'AD_SPEL' || attack?.[1] === 'AD_CLRC'));
+}
+
+function apply_undirected_spell_basic(mtmp, spellName) {
+    switch (spellName) {
+    case 'HASTE_SELF':
+        mtmp.mspeed = MFAST;
+        mtmp.permspeed = MFAST;
+        return true;
+    case 'DISAPPEAR':
+        mtmp.minvis = 1;
+        return true;
+    case 'CURE_SELF':
+        if ((mtmp.mhp ?? 0) < (mtmp.mhpmax ?? 0)) {
+            mtmp.mhp = Math.min(mtmp.mhpmax, (mtmp.mhp ?? 0) + Math.max(1, monster_level(mtmp)));
+        }
+        return true;
+    default:
+        return true;
+    }
+}
+
+function maybe_cast_undirected_spell_before_move(mtmp) {
+    // C ref: monmove.c:dochug()/mcastu.c:castmu().  Non-attacking casters
+    // still choose one spell before m_move(); directed picks usually miss and
+    // leave the monster to move normally.
+    if (mtmp.mspec_used || dist2(mtmp.mx, mtmp.my, game.u?.ux ?? mtmp.mx, game.u?.uy ?? mtmp.my) > 49) {
+        return false;
+    }
+    const attack = magic_spell_attack_basic(mtmp);
+    if (!attack) return false;
+    const spellName = choose_monster_spell_basic(mtmp, attack[1]);
+    if (!is_undirected_spell_basic(spellName) || spell_would_be_useless_basic(mtmp, spellName)) {
+        return false;
+    }
+    const ml = monster_level(mtmp);
+    if (mtmp.mcan || mtmp.mspec_used || !ml) return false;
+    mtmp.mspec_used = ml < 8 ? 10 - ml : 2;
+    if (rn2(ml * 10) < (mtmp.mconf ? 100 : 20)) return false;
+    return apply_undirected_spell_basic(mtmp, spellName);
+}
+
 function attack_is_basic_physical(attack) {
     if (!attack) return true;
     const [aatyp, adtyp, damn, damd] = attack;
@@ -1445,7 +1593,11 @@ async function m_move_basic(mtmp) {
         game._monster_move_warning_rng_active = previousWarningRng;
     }
     if (doorStatus === MMOVE_DIED) return MMOVE_DIED;
-    if (await mpickstuff_basic(mtmp)) return MMOVE_DONE;
+    if (await mpickstuff_basic(mtmp)) {
+        maybe_spin_web_basic(mtmp);
+        return MMOVE_DONE;
+    }
+    maybe_spin_web_basic(mtmp);
     return doorStatus;
 }
 
@@ -1560,6 +1712,69 @@ function decide_to_shapeshift_basic(mon) {
     }
 }
 
+function webmaker_basic(mtmp) {
+    return mtmp.data?.name === 'CAVE_SPIDER' || mtmp.data?.name === 'GIANT_SPIDER';
+}
+
+function trap_at_basic(x, y) {
+    return (game.level?.traps || []).find((trap) => trap.tx === x && trap.ty === y) || null;
+}
+
+function count_traps_basic(ttyp) {
+    return (game.level?.traps || []).filter((trap) => trap.ttyp === ttyp).length;
+}
+
+function holds_up_web_basic(x, y) {
+    if (!isok(x, y)) return true;
+    const loc = game.level?.at(x, y);
+    if (!loc) return true;
+    if (IS_OBSTRUCTED(loc.typ) || loc.typ === IRONBARS) return true;
+    if (loc.typ === STAIRS || loc.typ === LADDER) {
+        const stair = (game.level?.stairs || []).find((st) => st.sx === x && st.sy === y);
+        if (stair?.up) return true;
+    }
+    return false;
+}
+
+function count_webbing_walls_basic(x, y) {
+    return (holds_up_web_basic(x, y - 1) ? 1 : 0)
+        + (holds_up_web_basic(x + 1, y) ? 1 : 0)
+        + (holds_up_web_basic(x, y + 1) ? 1 : 0)
+        + (holds_up_web_basic(x - 1, y) ? 1 : 0);
+}
+
+function is_sokoban_level_basic() {
+    const dnum = game.u?.uz?.dnum;
+    return !!game.level?.flags?.sokoban_rules || game.dungeons?.[dnum]?.dname === 'Sokoban';
+}
+
+function soko_allow_web_basic(mtmp) {
+    if (!is_sokoban_level_basic()) return true;
+    const up = (game.level?.stairs || []).find((st) => st.up);
+    return !!up && clear_path(mtmp.mx, mtmp.my, up.sx, up.sy);
+}
+
+function maybe_spin_web_basic(mtmp) {
+    // C ref: monmove.c:maybe_spin_web().  The roll is made after the
+    // monster movement/attack phase and only for active webmakers on
+    // trap-free squares.
+    if (!webmaker_basic(mtmp) || mtmp.mcanmove === 0 || mtmp.msleeping
+        || mtmp.mfrozen || mtmp.mspec_used || trap_at_basic(mtmp.mx, mtmp.my)
+        || !soko_allow_web_basic(mtmp)) {
+        return;
+    }
+    const prob = (((mtmp.data?.name === 'GIANT_SPIDER' ? 15 : 5)
+        * (count_webbing_walls_basic(mtmp.mx, mtmp.my) + 1))
+        - (3 * count_traps_basic(WEB)));
+    if (rn2(1000) < prob) {
+        const trap = { ttyp: WEB, tx: mtmp.mx, ty: mtmp.my, tseen: false, once: false, launch: { x: 0, y: 0 } };
+        if (!game.level.traps) game.level.traps = [];
+        game.level.traps.push(trap);
+        mtmp.mspec_used = d(4, 4);
+        if (cansee(mtmp.mx, mtmp.my)) trap.tseen = true;
+    }
+}
+
 export function mcalcdistress() {
     for (const mtmp of game.level?.monsters || []) {
         if (mtmp.mspec_used) mtmp.mspec_used--;
@@ -1626,8 +1841,12 @@ export async function movemon() {
             continue;
         }
 
-        // C ref: monmove.c:dochug().  Awake movable monsters roll confusion
-        // and stun recovery before targeting, fleeing, or ordinary movement.
+        // C ref: monmove.c:dochug().  Awake movable monsters scuff any
+        // engraving underfoot before status recovery and movement AI.
+        wipe_engr_at_basic(mtmp.mx, mtmp.my, 1, false);
+
+        // C ref: monmove.c:dochug().  Confusion and stun recovery happen
+        // before targeting, fleeing, or ordinary movement.
         if (mtmp.mconf && !rn2(50)) mtmp.mconf = 0;
         if (mtmp.mstun && !rn2(10)) mtmp.mstun = 0;
 
@@ -1657,7 +1876,7 @@ export async function movemon() {
             let postMoveState = fleeState;
             let moveStatus = 0;
             if (non_tame_movement_opportunity(mtmp, fleeState)) {
-                moveStatus = await m_move_basic(mtmp);
+                moveStatus = maybe_cast_undirected_spell_before_move(mtmp) ? MMOVE_DONE : await m_move_basic(mtmp);
                 if (moveStatus === MMOVE_DIED) continue;
                 // C calls distfleeck() again after m_move() returns for ordinary
                 // movement, even when the monster is off-screen.
