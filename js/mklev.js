@@ -6052,7 +6052,7 @@ function fill_zoo(croom) {
                     mksobj_at(rn2(3) ? LARGE_BOX : CHEST, sx, sy, true, false);
                 }
             } else if (type === MORGUE) {
-                if (!rn2(5)) mksobj_at(CORPSE, sx, sy, true, true);
+                if (!rn2(5)) mkToptenCorpseAt(sx, sy);
                 if (!rn2(10)) mksobj_at(rn2(3) ? LARGE_BOX : CHEST, sx, sy, true, false);
                 if (!rn2(5)) make_grave(sx, sy, null);
             }
@@ -6067,6 +6067,20 @@ function morguemon() {
     if (i < 20) return MONSTERS.find(m => m.name === 'GHOST') || null;
     if (i < 40) return MONSTERS.find(m => m.name === 'WRAITH') || null;
     return mkclass_aligned('S_ZOMBIE', 0);
+}
+
+const TOPTEN_CORPSE_ROLES = [
+    'ARCHEOLOGIST', 'BARBARIAN', 'CAVEMAN', 'HEALER', 'KNIGHT', 'MONK',
+    'PRIEST', 'RANGER', 'ROGUE', 'SAMURAI', 'TOURIST', 'VALKYRIE', 'WIZARD',
+];
+
+function mkToptenCorpseAt(x, y) {
+    // C ref: mkobj.c:mk_tt_object(CORPSE).
+    const corpse = mksobj(CORPSE, true, true);
+    rnd(10); // get_rnd_toptenentry()
+    corpse.corpsenm = monster_ptr(TOPTEN_CORPSE_ROLES[rn2(TOPTEN_CORPSE_ROLES.length)]);
+    start_corpse_timeout(corpse);
+    return place_object(corpse, x, y);
 }
 
 function squadmon() {
