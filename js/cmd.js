@@ -1386,7 +1386,7 @@ function isSafeMonster(mon) {
 
 function monsterHasNoAttacks(mon) {
     const attacks = mon?.data?.mattk || [];
-    return !attacks.some((attack) => attack && attack[0]);
+    return !attacks.some((attack) => attack && attack[0] && attack[0] !== 'AT_BOOM');
 }
 
 function monsterNearbyForSafety() {
@@ -1399,7 +1399,10 @@ function monsterNearbyForSafety() {
         if (mon.mpeaceful && !(game.u?.uhallucination || game.u?.uprops?.hallucination)) continue;
         if (monsterHasNoAttacks(mon)) continue;
         if (mon.mundetected) continue;
-        if (mon.mfrozen) continue;
+        // C ref: hack.c:monster_nearby() skips helpless(mon), which is
+        // msleeping || !mcanmove.  mfrozen is retained for older JS callers
+        // that may not have synchronized mcanmove yet.
+        if (mon.msleeping || mon.mcanmove === 0 || mon.mfrozen) continue;
         if (mon.minvis && !(game.u?.usee_invisible || game.u?.uprops?.see_invisible)) continue;
         return true;
     }
