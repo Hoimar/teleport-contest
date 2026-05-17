@@ -6,10 +6,10 @@ import { OBJECT_CLASS, OBJECT_DIR } from './object_data.js';
 import {
     D_BROKEN, D_CLOSED, D_ISOPEN, D_LOCKED, D_NODOOR, D_TRAPPED,
     DOOR, ROOM,
-    IS_DOOR, IS_LAVA, IS_OBSTRUCTED, IS_POOL, IS_STWALL, IS_WALL, IS_WATERWALL,
+    IS_DOOR, IS_LAVA, IS_OBSTRUCTED, IS_POOL, IS_STWALL, IS_TREE, IS_WALL, IS_WATERWALL,
     I_SPECIAL, M_AP_FURNITURE, M_AP_OBJECT,
     MON_POLE_DIST, NEED_AXE, NEED_HTH_WEAPON, NEED_PICK_AXE, NEED_PICK_OR_AXE,
-    NEED_RANGED_WEAPON, NEED_WEAPON, W_ARMS, W_WEP,
+    NEED_RANGED_WEAPON, NEED_WEAPON, W_ARMS, W_NONDIGGABLE, W_WEP,
     GP_CHECKSCARY, SDOOR, W_NONPASSWALL,
     isok, SPACE_POS,
 } from './const.js';
@@ -223,18 +223,30 @@ function can_tunnel_basic(mtmp) {
     // their target prefer a weapon instead of digging.
     if ((flags1 & M1_NEEDPICK)
         && !mtmp.mpeaceful && dist2(mtmp.mx, mtmp.my, targetX, targetY) <= 8) return false;
-    if (!(flags1 & M1_NEEDPICK)) return true;
-    return (mtmp.inventory || []).some((obj) =>
-        obj?.otyp === PICK_AXE || obj?.otyp === DWARVISH_MATTOCK
-        || obj?.otyp === AXE || obj?.otyp === BATTLE_AXE);
+    return true;
+}
+
+function mon_has_dig_tool_basic(mtmp, predicate) {
+    const mw = mtmp.mw || null;
+    if (mw && predicate(mw)) return true;
+    return (mtmp.inventory || []).some((obj) => predicate(obj));
 }
 
 function can_tunnel_at_basic(mtmp, x, y) {
     if (!can_tunnel_basic(mtmp)) return false;
     const loc = game.level?.at(x, y);
     if (!loc) return false;
-    if (IS_WALL(loc.typ) || loc.typ === SDOOR) return true;
-    return loc.typ === DOOR && !!(loc.doormask & (D_CLOSED | D_LOCKED));
+    const flags1 = mtmp.data?.mflags1 ?? 0;
+    const needsPick = !!(flags1 & M1_NEEDPICK);
+    const rockok = !needsPick || mon_has_dig_tool_basic(mtmp, is_pick_weapon_basic);
+    const treeok = !needsPick || mon_has_dig_tool_basic(mtmp, is_axe_weapon_basic);
+    if (IS_STWALL(loc.typ) || loc.typ === SDOOR) return rockok;
+    if (IS_TREE(loc.typ)) return treeok;
+    if (loc.typ === DOOR && (loc.doormask & (D_CLOSED | D_LOCKED))) {
+        if (loc.doormask & D_LOCKED) return rockok || treeok;
+        return mon_can_open_doors(mtmp) || rockok || treeok;
+    }
+    return false;
 }
 
 function is_pick_weapon_basic(obj) {
@@ -295,6 +307,16 @@ function may_passwall(x, y) {
     // C ref: hack.c:may_passwall() only blocks special wall types that
     // explicitly carry W_NONPASSWALL.
     return !(IS_STWALL(loc.typ) && (loc.wall_info & W_NONPASSWALL));
+}
+
+function may_dig_basic(x, y) {
+    const loc = game.level?.at(x, y);
+    if (!loc) return false;
+    // C ref: hack.c:may_dig().  This helper is intentionally permissive:
+    // it returns true for non-rock terrain, so monmove.c:postmov() can enter
+    // mdig_tunnel() and let that routine decide that there is no digging.
+    return !((IS_STWALL(loc.typ) || IS_TREE(loc.typ))
+        && (loc.wall_info & W_NONDIGGABLE));
 }
 
 function mfndpos_terrain_ok(mtmp, x, y) {
@@ -1321,6 +1343,7 @@ async function m_move_basic(mtmp) {
             if (appr === -1) appr = 1;
         }
     }
+    const canTunnel = can_tunnel_basic(mtmp);
     const candidates = [];
     const maxx = Math.min(omx + 1, 79);
     const maxy = Math.min(omy + 1, 20);
@@ -1390,10 +1413,10 @@ async function m_move_basic(mtmp) {
     const engulfingHero = game.u?.uswallow && game.u?.ustuck === mtmp;
     mtmp.mx = nix;
     mtmp.my = niy;
-    if (digTunnel) {
+    if (canTunnel && may_dig_basic(nix, niy)) {
         rnd(12); // C ref: dig.c:mdig_tunnel() pile amount.
         const loc = game.level?.at(nix, niy);
-        if (loc && !SPACE_POS(loc.typ)) loc.typ = ROOM;
+        if (digTunnel && loc && !SPACE_POS(loc.typ)) loc.typ = ROOM;
     }
     if (engulfingHero) {
         game.u.ux0 = game.u.ux;
