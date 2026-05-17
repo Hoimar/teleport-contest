@@ -17,7 +17,7 @@ import { init_objects } from './o_init.js';
 import { init_dungeons } from './dungeon.js';
 import { apply_startup_role_state, u_init_misc_rng, u_init_role_inventory } from './u_init.js';
 import { makedog } from './dog.js';
-import { continueRunStep, finish_pending_eaten_corpse, rhack } from './cmd.js';
+import { continueRunStep, finish_pending_eaten_corpse, performLevelTeleport, rhack } from './cmd.js';
 import { nhgetch } from './input.js';
 import {
     docrt, cls, bot, flush_screen, pline, append_pline, newsym, serialize_terminal_grid,
@@ -515,6 +515,13 @@ export async function moveloop_core() {
     const key = await nhgetch();
     // Read and execute one command
     await rhack(key);
+    // C ref: teleport.c:level_tele() schedules the destination; allmain.c
+    // performs deferred_goto() after rhack() returns.
+    if (g._pending_level_teleport_target) {
+        const target = g._pending_level_teleport_target;
+        g._pending_level_teleport_target = null;
+        await performLevelTeleport(target);
+    }
 
     // Advance turn; run/rush movement may consume multiple turns before
     // returning to the input boundary.

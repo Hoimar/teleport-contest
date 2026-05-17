@@ -58,6 +58,9 @@ Result:
      plus C-shaped `docrt()` ordering regressed `seed0116` screen 114; removing
      prompt suppression regressed `seed0383` screen 192. Full-screen menu
      Hallucination refresh remains an open lifecycle question.
+   - Neutral lifecycle cleanup kept: numeric and menu `^V` targets now defer
+     level change until after `rhack()` returns, matching C `schedule_goto()` /
+     `deferred_goto()`.
 2. Continue `seed0002-healer-reflection-drummer` monster/pet ordering work.
    - Current state: `S 83/595 R 5502/27158`.
    - First visible mismatch is screen 83 (`Enter`): expected dog display at

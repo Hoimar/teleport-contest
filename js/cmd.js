@@ -2446,7 +2446,7 @@ function enqueueLevelchangePostMessages(oldLevel, newLevel) {
     queue.push(...applyLevelchangeInnates(oldLevel, newLevel));
 }
 
-async function performLevelTeleport(target) {
+export async function performLevelTeleport(target) {
     const migratingPet = (game.level?.monsters || []).find(m => m.mtame);
     game._migrating_pet = migratingPet ? {
         ...migratingPet,
@@ -2829,9 +2829,8 @@ export async function rhack(key) {
         clear_pending_message();
         game._awaiting_level_teleport = false;
         game._level_teleport_input = '';
-        if ((ch === '\r' || ch === '\n') && target > 0) {
-            await performLevelTeleport(target);
-        }
+        if ((ch === '\r' || ch === '\n') && target > 0)
+            game._pending_level_teleport_target = target;
         game.context.move = 0;
         return;
     }
@@ -3304,13 +3303,13 @@ export async function rhack(key) {
                 return;
             }
             const target = game._level_teleport_menu_choices?.[ch];
-            if (target) await performLevelTeleport(target);
+            if (target) game._pending_level_teleport_target = target;
             game.context.move = 0;
             return;
         }
         if (prev === game._level_teleport_menu_page2_screen) {
             const target = game._level_teleport_menu_page2_choices?.[ch];
-            if (target) await performLevelTeleport(target);
+            if (target) game._pending_level_teleport_target = target;
             game.context.move = 0;
             return;
         }
