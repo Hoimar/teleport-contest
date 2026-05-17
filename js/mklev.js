@@ -2975,6 +2975,15 @@ function induced_align_80() {
 function createSpecialMonster(croom, ptr = null, relx = -1, rely = -1) {
     induced_align_80();
     const loc = specialRoomLocation(croom, relx, rely);
+    if (m_at(loc.x, loc.y)) {
+        const cc = enexto_core(loc.x, loc.y, ptr, GP_CHECKSCARY)
+            || enexto_core(loc.x, loc.y, ptr, 0);
+        if (cc) {
+            loc.x = cc.x;
+            loc.y = cc.y;
+        }
+    }
+    if (croom && !inside_room(croom, loc.x, loc.y)) return null;
     return makemon(ptr, loc.x, loc.y, 0);
 }
 

@@ -146,10 +146,25 @@ function random_object_glyph_for_display() {
     };
 }
 
+function monster_data_for_corpsenm(corpsenm) {
+    if (Number.isInteger(corpsenm)) return MONSTER_DATA[corpsenm] || null;
+    if (typeof corpsenm === 'string') return MONSTER_DATA.find(m => m[0] === corpsenm) || null;
+    return null;
+}
+
 function object_glyph_for_display(obj, x, y, visible) {
     if (game.u?.uprops?.hallucination || game.u?.uhallucination) {
         if (obj?.otyp === STATUE) return hallucinated_statue_glyph();
         return random_object_glyph_for_display();
+    }
+    if (obj?.otyp === STATUE) {
+        const mdat = monster_data_for_corpsenm(obj.corpsenm);
+        if (mdat) {
+            return {
+                ch: MONSTER_SYMBOLS[mdat[1]] ?? (obj.ch || '?'),
+                color: obj.color ?? getObjectColor(STATUE) ?? NO_COLOR,
+            };
+        }
     }
 
     let generic = obj_is_generic(obj);

@@ -190,6 +190,30 @@ export function pet_arrive_with_you() {
     if (migrating?.edog) mon.edog = { ...migrating.edog };
     init_edog(mon);
     if (game.level?.monsters) game.level.monsters.unshift(mon);
+    if (mon.mx === game.u?.ux && mon.my === game.u?.uy) {
+        if (!rn2(2)) {
+            const cc = enexto_core(game.u.ux, game.u.uy, null, GP_CHECKSCARY)
+                || enexto_core(game.u.ux, game.u.uy, null, 0);
+            if (cc && Math.max(Math.abs(cc.x - game.u.ux), Math.abs(cc.y - game.u.uy)) <= 1) {
+                game.u.ux = cc.x;
+                game.u.uy = cc.y;
+            } else {
+                const mc = enexto_core(mon.mx, mon.my, pet, GP_CHECKSCARY)
+                    || enexto_core(mon.mx, mon.my, pet, 0);
+                if (mc) {
+                    mon.mx = mc.x;
+                    mon.my = mc.y;
+                }
+            }
+        } else {
+            const mc = enexto_core(mon.mx, mon.my, pet, GP_CHECKSCARY)
+                || enexto_core(mon.mx, mon.my, pet, 0);
+            if (mc) {
+                mon.mx = mc.x;
+                mon.my = mc.y;
+            }
+        }
+    }
     return mon;
 }
 
