@@ -19,7 +19,7 @@ import { getObjectColor, getObjectMaterial } from './o_init.js';
 import { MONSTER_DATA } from './monster_data.js';
 import { m_dowear_basic } from './mon_wear.js';
 import {
-    COLNO, ROWNO, STONE, ROOM, CORR, DOOR, STAIRS, LADDER,
+    COLNO, ROWNO, STONE, ROOM, CORR, DOOR, STAIRS, LADDER, AIR,
     HWALL, VWALL, TLCORNER, TRCORNER, BLCORNER, BRCORNER,
     CROSSWALL, TUWALL, TDWALL, TLWALL, TRWALL,
     D_NODOOR, D_CLOSED, D_ISOPEN, D_LOCKED, D_TRAPPED,
@@ -445,8 +445,9 @@ function bad_location(x, y, nlx, nly, nhx, nhy) {
     if (occupied(x, y)) return true;
     // Excluded region
     if (nlx && x >= nlx && x <= nhx && y >= nly && y <= nhy) return true;
-    // Must be ROOM or (CORR in maze)
-    if (loc.typ !== ROOM && !(loc.typ === CORR && game.level?.flags?.is_maze_lev))
+    // Must be ROOM, AIR, or (CORR in maze).
+    if (loc.typ !== ROOM && loc.typ !== AIR
+        && !(loc.typ === CORR && game.level?.flags?.is_maze_lev))
         return true;
     return false;
 }
