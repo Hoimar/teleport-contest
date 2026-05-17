@@ -32,7 +32,7 @@ import {
     DRY, WET, HOT, SOLID,
     ICE, MOAT, POOL, WATER, LAVAPOOL, LAVAWALL, DBWALL, DRAWBRIDGE_UP, THRONE,
     A_LAWFUL, A_NONE, Align2amask,
-    LR_DOWNSTAIR, LR_UPSTAIR, LR_BRANCH, LR_TELE, LR_UPTELE, LR_DOWNTELE, NO_MINVENT, MM_IGNOREWATER, MM_IGNORELAVA, MM_ANGRY, MM_EPRI, MM_ASLEEP, MM_NOGRP, MM_NOTAIL, GP_CHECKSCARY, GP_AVOID_MONPOS,
+    LR_DOWNSTAIR, LR_UPSTAIR, LR_BRANCH, LR_TELE, LR_UPTELE, LR_DOWNTELE, NO_MINVENT, MM_IGNOREWATER, MM_IGNORELAVA, MM_ADJACENTOK, MM_ANGRY, MM_EPRI, MM_ASLEEP, MM_NOGRP, MM_NOTAIL, MM_NONAME, GP_CHECKSCARY, GP_AVOID_MONPOS,
     MARK as ENGR_MARK, N_ENGRAVE,
     M_AP_OBJECT, M_AP_FURNITURE,
 } from './const.js';
@@ -62,6 +62,7 @@ const BOULDER = 475;
 const ELVEN_ARROW = 19;
 const ELVEN_SPEAR = 28;
 const DWARVISH_SPEAR = 30;
+const TRIDENT = 33;
 const DAGGER = 34;
 const ELVEN_DAGGER = 35;
 const ORCISH_DAGGER = 36;
@@ -96,6 +97,7 @@ const WAR_HAMMER = 76;
 const CLUB = 77;
 const AKLYS = 80;
 const FLAIL = 81;
+const BULLWHIP = 82;
 const BOW = 83;
 const ELVEN_BOW = 84;
 const ORCISH_BOW = 85;
@@ -244,6 +246,7 @@ const M2_ELF = 0x00000010;
 const M2_DWARF = 0x00000020;
 const M2_GNOME = 0x00000040;
 const M2_ORC = 0x00000080;
+const M2_DEMON = 0x00000100;
 const M2_MINION = 0x00001000;
 const M2_GIANT = 0x00002000;
 const M2_SHAPESHIFTER = 0x00004000;
@@ -305,6 +308,15 @@ const boxiprobs = [
     { iprob: 6, iclass: WAND_CLASS },
     { iprob: 5, iclass: RING_CLASS },
     { iprob: 1, iclass: AMULET_CLASS },
+];
+
+const GHOST_NAMES = [
+    'Adri', 'Andries', 'Andreas', 'Bert', 'David', 'Dirk',
+    'Emile', 'Frans', 'Fred', 'Greg', 'Hether', 'Jay',
+    'John', 'Jon', 'Karnov', 'Kay', 'Kenny', 'Kevin',
+    'Maud', 'Michiel', 'Mike', 'Peter', 'Robert', 'Ron',
+    'Tom', 'Wilmar', 'Nick Danger', 'Phoenix', 'Jiro', 'Mizue',
+    'Stephan', 'Lance Braccus', 'Shadowhawk', 'Murphy',
 ];
 
 // Direction deltas
@@ -999,9 +1011,9 @@ function mksobj_init(otmp, otyp, artif) {
                 let tryct = 50;
                 let ptr = null;
                 do {
-                    ptr = rndmonnum_ptr();
+                    ptr = undead_to_corpse_ptr(rndmonnum_ptr());
                 } while (ptr && (ptr.geno & G_NOCORPSE) && --tryct > 0);
-                otmp.corpsenm = ptr ? ptr.name : null;
+                otmp.corpsenm = ptr ? ptr.name : 'HUMAN';
             }
         } else if (otyp === EGG) {
             otmp.corpsenm = null;
@@ -1660,6 +1672,11 @@ function initial_vampshift(mon, ptr) {
     return true;
 }
 
+function rndghostname() {
+    if (rn2(7)) return GHOST_NAMES[rn2(GHOST_NAMES.length)];
+    return game.plname || game.u?.name || 'wizard';
+}
+
 function m_initinv_for(ptr, mon = null) {
     if (!ptr) return;
     const monLevel = adj_lev_for(ptr);
@@ -1983,6 +2000,29 @@ function m_initweap_for(ptr) {
         mace.spe = rnd(3);
         if (!rn2(2)) curse(mace);
         maybe_init_offensive_item_for(ptr);
+        return;
+    }
+    if (ptr.mlet === 'S_DEMON') {
+        switch (ptr.name) {
+        case 'BALROG':
+            mksobj(BULLWHIP, true, false);
+            mksobj(BROADSWORD, true, false);
+            break;
+        case 'ORCUS':
+            mksobj(WAN_DEATH, true, false);
+            break;
+        case 'HORNED_DEVIL':
+            mksobj(rn2(4) ? TRIDENT : BULLWHIP, true, false);
+            break;
+        case 'DISPATER':
+            mksobj(WAN_STRIKING, true, false);
+            break;
+        case 'YEENOGHU':
+            mksobj(FLAIL, true, false);
+            break;
+        }
+        if (ptr.mflags2 & M2_DEMON) m_initweap_general_for(ptr);
+        else maybe_init_offensive_item_for(ptr);
         return;
     }
     if (ptr.mlet === 'S_GIANT') {
@@ -2371,6 +2411,14 @@ export async function makemon(mdat, x, y, mmflags = 0) {
         x = cc.x;
         y = cc.y;
     }
+    if (!isok(x, y)) return null;
+    if (m_at(x, y)) {
+        if (!(mmflags & MM_ADJACENTOK)) return null;
+        const cc = enexto_core(x, y, ptr, gpflags);
+        if (!cc) return null;
+        x = cc.x;
+        y = cc.y;
+    }
     if (!ptr) {
         let tryct = 0;
         do {
@@ -2438,6 +2486,7 @@ export async function makemon(mdat, x, y, mmflags = 0) {
     mon.cham = null;
     let allow_minvent = true;
     if (initial_vampshift(mon, ptr)) allow_minvent = false;
+    if (ptr.name === 'GHOST' && !(mmflags & MM_NONAME)) mon.mgivenname = rndghostname();
     const anymon = mdat === null;
     if (anymon && !(mmflags & MM_NOGRP)) {
         if ((ptr.geno & G_SGROUP) && rn2(2)) {
@@ -6338,12 +6387,12 @@ function find_branch_room(mp) {
     return croom;
 }
 
-function place_branch(branchp) {
+function place_branch(branchp, x = 0, y = 0) {
     const g = game;
     if (!branchp || g.made_branch) return;
-    const mp = { x: 0, y: 0 };
-    const croom = find_branch_room(mp);
-    if (croom && mp.x > 0) {
+    const mp = { x, y };
+    if (!x) find_branch_room(mp);
+    if (mp.x > 0) {
         const on_end1 = (branchp.end1?.dnum === g.u?.uz?.dnum
             && branchp.end1?.dlevel === g.u?.uz?.dlevel);
         const dest = on_end1 ? branchp.end2 : branchp.end1;
