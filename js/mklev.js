@@ -23,13 +23,13 @@ import {
     HWALL, VWALL, TLCORNER, TRCORNER, BLCORNER, BRCORNER,
     CROSSWALL, TUWALL, TDWALL, TLWALL, TRWALL,
     D_NODOOR, D_CLOSED, D_ISOPEN, D_LOCKED, D_TRAPPED,
-    OROOM, VAULT, THEMEROOM, COURT, ZOO, LEPREHALL, SHOPBASE, DELPHI,
+    OROOM, VAULT, THEMEROOM, COURT, BARRACKS, ZOO, LEPREHALL, SHOPBASE, DELPHI,
     ROOMOFFSET, MAXNROFROOMS, SHARED,
     SDOOR, SCORR, IRONBARS, FOUNTAIN, SINK, ALTAR, GRAVE,
     DIR_N, DIR_S, DIR_E, DIR_W, DIR_180,
     IS_WALL, IS_STWALL, IS_DOOR, IS_OBSTRUCTED, IS_FURNITURE, IS_POOL, IS_LAVA, IS_ROOM,
     SPACE_POS, isok, W_NONDIGGABLE, FILL_NORMAL, FILL_NONE,
-    ICE, MOAT, POOL, WATER, LAVAPOOL, LAVAWALL, DBWALL,
+    ICE, MOAT, POOL, WATER, LAVAPOOL, LAVAWALL, DBWALL, DRAWBRIDGE_UP, THRONE,
     A_LAWFUL, A_NONE, Align2amask,
     LR_TELE, LR_UPTELE, LR_DOWNTELE, NO_MINVENT, MM_IGNOREWATER, MM_IGNORELAVA, MM_ANGRY, MM_ASLEEP, MM_NOGRP, GP_CHECKSCARY, GP_AVOID_MONPOS,
     MARK as ENGR_MARK, N_ENGRAVE,
@@ -173,6 +173,7 @@ const SCR_CONFUSE_MONSTER = 325;
 const SCR_SCARE_MONSTER = 326;
 const SCR_CREATE_MONSTER = 329;
 const WAN_CREATE_MONSTER = 413;
+const WAN_WISHING = 414;
 const WAN_STRIKING = 417;
 const WAN_MAKE_INVISIBLE = 418;
 const WAN_SPEED_MONSTER = 420;
@@ -238,6 +239,7 @@ const M1_NOEYES = 0x00001000;
 const M1_MINDLESS = 0x00010000;
 const M1_ANIMAL = 0x00040000;
 const M1_UNSOLID = 0x00100000;
+const M1_OVIPAROUS = 0x00400000;
 
 const MS_LEADER = 36;
 const MS_NEMESIS = 37;
@@ -937,9 +939,9 @@ function mksobj_init(otmp, otyp, artif) {
             otmp.corpsenm = null;
             if (!rn2(3)) {
                 for (let tryct = 200; tryct > 0; tryct--) {
-                    const mndx = rndmonnum();
-                    if (mndx) {
-                        otmp.corpsenm = mndx;
+                    const ptr = can_be_hatched_ptr(rndmonnum_ptr());
+                    if (ptr) {
+                        otmp.corpsenm = ptr.name;
                         break;
                     }
                 }
@@ -951,13 +953,23 @@ function mksobj_init(otmp, otyp, artif) {
             if (!rn2(6)) {
                 otmp.spe = 1; // SPINACH_TIN
             } else {
-                otmp.corpsenm = rndmonnum();
-                rn2(15); // set_tin_variety(RANDOM_TIN)
+                for (let tryct = 200; tryct > 0; tryct--) {
+                    const ptr = undead_to_corpse_ptr(rndmonnum_ptr());
+                    if (!tin_can_contain(ptr)) continue;
+                    otmp.corpsenm = ptr.name;
+                    rn2(15); // set_tin_variety(RANDOM_TIN)
+                    break;
+                }
             }
             blessorcurse(otmp, 10);
         }
         if (otyp !== CORPSE && otyp !== MEAT_RING && otyp !== KELP_FROND && !rn2(6)) {
             otmp.quan = 2;
+        }
+        if (otyp === EGG && otmp.corpsenm) {
+            for (let i = 151; i <= 200; i++) {
+                if (rnd(i) > 150) break;
+            }
         }
         break;
     case GEM_CLASS:
@@ -1222,6 +1234,112 @@ function special_corpse(ref) {
     if (!ptr) return false;
     return ptr.name === 'LIZARD' || ptr.name === 'LICHEN'
         || ptr.mlet === 'S_TROLL' || is_rider_ref(ptr);
+}
+
+function undead_to_corpse_ptr(ptr) {
+    if (!ptr) return null;
+    const mapped = ({
+        KOBOLD_ZOMBIE: 'KOBOLD',
+        KOBOLD_MUMMY: 'KOBOLD',
+        DWARF_ZOMBIE: 'DWARF',
+        DWARF_MUMMY: 'DWARF',
+        GNOME_ZOMBIE: 'GNOME',
+        GNOME_MUMMY: 'GNOME',
+        ORC_ZOMBIE: 'ORC',
+        ORC_MUMMY: 'ORC',
+        ELF_ZOMBIE: 'ELF',
+        ELF_MUMMY: 'ELF',
+        VAMPIRE: 'HUMAN',
+        VAMPIRE_LEADER: 'HUMAN',
+        HUMAN_ZOMBIE: 'HUMAN',
+        HUMAN_MUMMY: 'HUMAN',
+        GIANT_ZOMBIE: 'GIANT',
+        GIANT_MUMMY: 'GIANT',
+        ETTIN_ZOMBIE: 'ETTIN',
+        ETTIN_MUMMY: 'ETTIN',
+    })[ptr.name];
+    return mapped ? monster_ptr(mapped) : ptr;
+}
+
+function little_to_big_ptr(ptr) {
+    if (!ptr) return null;
+    const mapped = ({
+        GNOME: 'GNOME_LEADER',
+        GNOME_LEADER: 'GNOME_RULER',
+        DWARF: 'DWARF_LEADER',
+        DWARF_LEADER: 'DWARF_RULER',
+        MIND_FLAYER: 'MASTER_MIND_FLAYER',
+        ORC: 'ORC_CAPTAIN',
+        HILL_ORC: 'ORC_CAPTAIN',
+        MORDOR_ORC: 'ORC_CAPTAIN',
+        URUK_HAI: 'ORC_CAPTAIN',
+        SEWER_RAT: 'GIANT_RAT',
+        CAVE_SPIDER: 'GIANT_SPIDER',
+        OGRE: 'OGRE_LEADER',
+        OGRE_LEADER: 'OGRE_TYRANT',
+        ELF: 'ELF_NOBLE',
+        WOODLAND_ELF: 'ELF_NOBLE',
+        GREEN_ELF: 'ELF_NOBLE',
+        GREY_ELF: 'ELF_NOBLE',
+        ELF_NOBLE: 'ELVEN_MONARCH',
+        LICH: 'DEMILICH',
+        DEMILICH: 'MASTER_LICH',
+        MASTER_LICH: 'ARCH_LICH',
+        VAMPIRE: 'VAMPIRE_LEADER',
+        BAT: 'GIANT_BAT',
+        BABY_GRAY_DRAGON: 'GRAY_DRAGON',
+        BABY_GOLD_DRAGON: 'GOLD_DRAGON',
+        BABY_SILVER_DRAGON: 'SILVER_DRAGON',
+        BABY_RED_DRAGON: 'RED_DRAGON',
+        BABY_WHITE_DRAGON: 'WHITE_DRAGON',
+        BABY_ORANGE_DRAGON: 'ORANGE_DRAGON',
+        BABY_BLACK_DRAGON: 'BLACK_DRAGON',
+        BABY_BLUE_DRAGON: 'BLUE_DRAGON',
+        BABY_GREEN_DRAGON: 'GREEN_DRAGON',
+        BABY_YELLOW_DRAGON: 'YELLOW_DRAGON',
+        RED_NAGA_HATCHLING: 'RED_NAGA',
+        BLACK_NAGA_HATCHLING: 'BLACK_NAGA',
+        GOLDEN_NAGA_HATCHLING: 'GOLDEN_NAGA',
+        GUARDIAN_NAGA_HATCHLING: 'GUARDIAN_NAGA',
+        SMALL_MIMIC: 'LARGE_MIMIC',
+        LARGE_MIMIC: 'GIANT_MIMIC',
+        BABY_LONG_WORM: 'LONG_WORM',
+        BABY_PURPLE_WORM: 'PURPLE_WORM',
+        BABY_CROCODILE: 'CROCODILE',
+        SOLDIER: 'SERGEANT',
+        SERGEANT: 'LIEUTENANT',
+        LIEUTENANT: 'CAPTAIN',
+        WATCHMAN: 'WATCH_CAPTAIN',
+        ALIGNED_CLERIC: 'HIGH_CLERIC',
+        STUDENT: 'ARCHEOLOGIST',
+        ATTENDANT: 'HEALER',
+        PAGE: 'KNIGHT',
+        ACOLYTE: 'CLERIC',
+        APPRENTICE: 'WIZARD',
+        MANES: 'LEMURE',
+        KEYSTONE_KOP: 'KOP_SERGEANT',
+        KOP_SERGEANT: 'KOP_LIEUTENANT',
+        KOP_LIEUTENANT: 'KOP_KAPTAIN',
+    })[ptr.name];
+    return mapped ? monster_ptr(mapped) : ptr;
+}
+
+function can_be_hatched_ptr(ptr) {
+    if (!ptr) return null;
+    if (ptr.name === 'SCORPIUS') ptr = monster_ptr('SCORPION') || ptr;
+    ptr = little_to_big_ptr(ptr);
+    const lays = !!(ptr?.mflags1 & M1_OVIPAROUS);
+    if (ptr?.name === 'KILLER_BEE' || ptr?.name === 'GARGOYLE') return ptr;
+    if (lays) {
+        const breederEgg = !rn2(77);
+        if (breederEgg || !['QUEEN_BEE', 'WINGED_GARGOYLE'].includes(ptr.name))
+            return ptr;
+    }
+    return null;
+}
+
+function tin_can_contain(ptr) {
+    return !!ptr && !(ptr.geno & G_NOCORPSE);
 }
 
 function start_corpse_timeout(body) {
@@ -2206,6 +2324,26 @@ const BIGRM_2_MAP = [
 const BIGRM_2_XSTART = 3;
 const BIGRM_2_YSTART = 3;
 
+const CASTLE_MAP = [
+    '}}}}}}}}}.............................................}}}}}}}}}',
+    '}-------}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}-------}',
+    '}|.....|-----------------------------------------------|.....|}',
+    '}|.....+...............................................+.....|}',
+    '}-------------------------------+-----------------------------}',
+    '}}}}}}|........|..........+...........|.......S.S.......|}}}}}}',
+    '.....}|........|..........|...........|.......|.|.......|}.....',
+    '.....}|........------------...........---------S---------}.....',
+    '.....}|...{....+..........+.........\\.S.................+......',
+    '.....}|........------------...........---------S---------}.....',
+    '.....}|........|..........|...........|.......|.|.......|}.....',
+    '}}}}}}|........|..........+...........|.......S.S.......|}}}}}}',
+    '}-------------------------------+-----------------------------}',
+    '}|.....+...............................................+.....|}',
+    '}|.....|-----------------------------------------------|.....|}',
+    '}-------}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}-------}',
+    '}}}}}}}}}.............................................}}}}}}}}}',
+];
+
 const SOKO1_XSTART = 27;
 const SOKO1_YSTART = 3;
 
@@ -3099,6 +3237,223 @@ function loadOracleSpecial() {
     wallification(1, 0, COLNO - 1, ROWNO - 1);
 }
 
+function castleObjectClass(ch) {
+    switch (ch) {
+    case '[': return ARMOR_CLASS;
+    case ')': return WEAPON_CLASS;
+    case '*': return GEM_CLASS;
+    case '%': return FOOD_CLASS;
+    default: return RANDOM_CLASS;
+    }
+}
+
+function castleMonsterClass(ch) {
+    switch (ch) {
+    case 'L': return 'S_LICH';
+    case 'N': return 'S_NAGA';
+    case 'E': return 'S_ELEMENTAL';
+    case 'H': return 'S_GIANT';
+    case 'M': return 'S_MUMMY';
+    case 'O': return 'S_OGRE';
+    case 'R': return 'S_RUSTMONST';
+    case 'T': return 'S_TROLL';
+    case 'X': return 'S_XORN';
+    case 'Z': return 'S_ZOMBIE';
+    case 'D': return 'S_DRAGON';
+    default: return null;
+    }
+}
+
+function castleMonsterPtr(id) {
+    const key = String(id || '').trim().toUpperCase().replace(/[\s-]+/g, '_');
+    return MONSTERS.find(mon => mon.name === key) || null;
+}
+
+function castleCreateMonster(id, x, y, mmflags = 0) {
+    // C ref: sp_lev.c:create_monster() applies random special-level
+    // alignment before choosing/placing both fixed and class monsters.
+    induced_align_80();
+    const cls = String(id || '').length === 1 ? castleMonsterClass(id) : null;
+    const ptr = cls ? mkclass_aligned(cls, G_NOGEN) : castleMonsterPtr(id);
+    return makemon(ptr, x, y, mmflags);
+}
+
+function castleSetDoor(x, y, mask) {
+    const loc = game.level?.at(x, y);
+    if (!loc) return;
+    loc.typ = DOOR;
+    set_door_mask(loc, mask);
+}
+
+function castleApplyRegion(x1, y1, x2, y2, lit, rtype = OROOM) {
+    let seeded = false;
+    for (let y = y1; y <= y2; y++) {
+        for (let x = x1; x <= x2; x++) {
+            const loc = game.level?.at(x, y);
+            if (!loc) continue;
+            if (loc.typ === ROOM || loc.typ === CORR || loc.typ === DOOR || loc.typ === SDOOR)
+                loc.lit = !!lit;
+            if (!seeded && loc.typ === ROOM) {
+                createIrregularRoomFromSeed(x, y, rtype, lit ? 1 : 0, FILL_NONE);
+                seeded = true;
+            }
+        }
+    }
+}
+
+function loadCastleTerrain() {
+    for (let y = 0; y < CASTLE_MAP.length; y++) {
+        for (let x = 0; x < CASTLE_MAP[y].length; x++) {
+            const loc = game.level?.at(x, y);
+            if (!loc) continue;
+            loc.lit = false;
+            switch (CASTLE_MAP[y][x]) {
+            case '.':
+                loc.typ = ROOM;
+                break;
+            case '-':
+                loc.typ = HWALL;
+                break;
+            case '|':
+                loc.typ = VWALL;
+                break;
+            case '+':
+                loc.typ = DOOR;
+                set_door_mask(loc, D_CLOSED);
+                break;
+            case 'S':
+                loc.typ = SDOOR;
+                set_door_mask(loc, D_CLOSED);
+                break;
+            case '{':
+                loc.typ = FOUNTAIN;
+                break;
+            case '\\':
+                loc.typ = THRONE;
+                break;
+            case '}':
+                loc.typ = MOAT;
+                break;
+            default:
+                loc.typ = STONE;
+                break;
+            }
+        }
+    }
+    game.level.flags.is_maze_lev = true;
+    game.level.flags.noteleport = true;
+}
+
+function loadCastleSpecial() {
+    // C ref: dat/castle.lua loaded via sp_lev.c:load_special().
+    l_nhcore_init();
+    loadCastleTerrain();
+
+    const object = ['[', ')', '*', '%'];
+    lua_shuffle(object);
+    const towerPlaces = [{ x: 4, y: 2 }, { x: 58, y: 2 }, { x: 4, y: 14 }, { x: 58, y: 14 }];
+    const monster = ['L', 'N', 'E', 'H', 'M', 'O', 'R', 'T', 'X', 'Z'];
+    lua_shuffle(monster);
+
+    const fountain = game.level?.at(10, 8);
+    if (fountain) fountain.typ = FOUNTAIN;
+
+    for (const [x, y, mask] of [
+        [7, 3, D_CLOSED], [55, 3, D_CLOSED],
+        [32, 4, D_LOCKED], [26, 5, D_LOCKED], [46, 5, D_LOCKED], [48, 5, D_LOCKED],
+        [47, 7, D_LOCKED], [15, 8, D_CLOSED], [26, 8, D_CLOSED],
+        [38, 8, D_LOCKED], [56, 8, D_LOCKED], [47, 9, D_LOCKED],
+        [26, 11, D_LOCKED], [46, 11, D_LOCKED], [48, 11, D_LOCKED],
+        [32, 12, D_LOCKED], [7, 13, D_CLOSED], [55, 13, D_CLOSED],
+    ]) castleSetDoor(x, y, mask);
+
+    const bridge = game.level?.at(5, 8);
+    if (bridge) bridge.typ = DRAWBRIDGE_UP;
+    const bridgeWall = game.level?.at(6, 8);
+    if (bridgeWall) bridgeWall.typ = DBWALL;
+
+    const storerooms = [
+        { cls: castleObjectClass(object[0]), xs: [39, 40, 41, 42, 43, 44, 45], ys: [5, 6] },
+        { cls: castleObjectClass(object[1]), xs: [49, 50, 51, 52, 53, 54, 55], ys: [5, 6] },
+        { cls: castleObjectClass(object[2]), xs: [39, 40, 41, 42, 43, 44, 45], ys: [10, 11] },
+        { cls: castleObjectClass(object[3]), xs: [49, 50, 51, 52, 53, 54, 55], ys: [10, 11] },
+    ];
+    for (const store of storerooms) {
+        for (const y of store.ys)
+            for (const x of store.xs)
+                mkobj_at(store.cls, x, y, true);
+    }
+
+    const loc = towerPlaces[rn2(towerPlaces.length)];
+    const wishingChest = mksobj_at(CHEST, loc.x, loc.y, true, false);
+    if (wishingChest) {
+        wishingChest.olocked = true;
+        wishingChest.otrapped = false;
+        wishingChest.contents = [
+            mksobj(WAN_WISHING, true, false),
+            mksobj(POT_GAIN_LEVEL, true, false),
+        ];
+    }
+    make_engr_at(loc.x, loc.y, 'Elbereth', 0, 0, 3); // BURN
+    const scare = mksobj_at(SCR_SCARE_MONSTER, loc.x, loc.y, true, false);
+    if (scare) {
+        scare.cursed = true;
+        scare.blessed = false;
+    }
+
+    mksobj_at(CHEST, 37, 8, true, false);
+    for (const [x, y] of [[40, 8], [44, 8], [48, 8], [52, 8], [55, 8]]) {
+        const trap = maketrap(x, y, TRAPDOOR);
+        maybeTrapVictim(trap);
+    }
+
+    for (const [id, x, y] of [
+        ['soldier', 8, 6], ['soldier', 9, 5], ['soldier', 11, 5], ['soldier', 12, 6],
+        ['soldier', 8, 10], ['soldier', 9, 11], ['soldier', 11, 11], ['soldier', 12, 10],
+        ['lieutenant', 9, 8],
+        ['soldier', 3, 2], ['soldier', 5, 2], ['soldier', 57, 2], ['soldier', 59, 2],
+        ['soldier', 3, 14], ['soldier', 5, 14], ['soldier', 57, 14], ['soldier', 59, 14],
+        ['D', 47, 5], ['D', 47, 6], ['D', 47, 10], ['D', 47, 11],
+        ['giant eel', 5, 7], ['giant eel', 5, 9], ['giant eel', 57, 7], ['giant eel', 57, 9],
+        ['shark', 5, 0], ['shark', 5, 16], ['shark', 57, 0], ['shark', 57, 16],
+    ]) castleCreateMonster(id, x, y);
+
+    for (const [idx, x, y] of [
+        [9, 27, 5], [0, 30, 5], [1, 33, 5], [2, 36, 5],
+        [3, 28, 6], [4, 31, 6], [5, 34, 6], [6, 37, 6],
+        [7, 27, 7], [8, 30, 7], [9, 33, 7], [0, 36, 7],
+        [1, 28, 8], [2, 31, 8], [3, 34, 8],
+        [4, 27, 9], [5, 30, 9], [6, 33, 9], [7, 36, 9],
+        [8, 28, 10], [9, 31, 10], [0, 34, 10], [1, 37, 10],
+        [2, 27, 11], [3, 30, 11], [4, 33, 11], [5, 36, 11],
+    ]) castleCreateMonster(monster[idx], x, y);
+
+    castleApplyRegion(0, 0, 62, 16, 0);
+    castleApplyRegion(0, 5, 5, 11, 1);
+    castleApplyRegion(57, 5, 62, 11, 1);
+    castleApplyRegion(27, 5, 37, 11, 1, COURT);
+    castleApplyRegion(7, 5, 14, 11, 1);
+    castleApplyRegion(39, 5, 45, 6, 1);
+    castleApplyRegion(39, 10, 45, 11, 1);
+    castleApplyRegion(49, 5, 55, 6, 1);
+    castleApplyRegion(49, 10, 55, 11, 1);
+    castleApplyRegion(2, 2, 6, 3, 1);
+    castleApplyRegion(56, 2, 60, 3, 1);
+    castleApplyRegion(2, 13, 6, 14, 1);
+    castleApplyRegion(56, 13, 60, 14, 1);
+    castleApplyRegion(16, 5, 25, 6, 1, BARRACKS);
+    castleApplyRegion(16, 10, 25, 11, 1, BARRACKS);
+    castleApplyRegion(8, 3, 54, 3, 0);
+    castleApplyRegion(8, 13, 54, 13, 0);
+    castleApplyRegion(16, 8, 25, 8, 0);
+    castleApplyRegion(39, 8, 55, 8, 0);
+    castleApplyRegion(47, 5, 47, 6, 0);
+    castleApplyRegion(47, 10, 47, 11, 0);
+
+    wallification(1, 0, COLNO - 1, ROWNO - 1);
+    flip_level_rnd(2); // des.level_flags("noflipy") leaves horizontal flipping enabled.
+}
+
 function makemaz_special(slev) {
     const proto = slev?.proto || '';
     if (proto && slev?.rndlevs) {
@@ -3128,6 +3483,10 @@ function makemaz_special(slev) {
     }
     if (game._last_special_protofile === 'oracle') {
         loadOracleSpecial();
+        return;
+    }
+    if (game._last_special_protofile === 'castle') {
+        loadCastleSpecial();
         return;
     }
     game.level.flags.is_maze_lev = true;
