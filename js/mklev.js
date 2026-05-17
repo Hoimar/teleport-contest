@@ -3543,21 +3543,50 @@ function valleyMonster(ref) {
     makemon(ptr, loc.x, loc.y, 0);
 }
 
-function valleyAddFillRoom(x1, y1, x2, y2, lit, rtype, needfill = FILL_NORMAL) {
+function valleyFloodRoomCells(sx, sy) {
+    const start = { x: valleyX(sx), y: valleyY(sy) };
+    const seen = new Set();
+    const cells = [];
+    const queue = [start];
+    while (queue.length) {
+        const { x, y } = queue.shift();
+        const key = `${x},${y}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const loc = game.level?.at(x, y);
+        if (!loc || !SPACE_POS(loc.typ)) continue;
+        cells.push({ x, y });
+        queue.push({ x: x + 1, y }, { x: x - 1, y }, { x, y: y + 1 }, { x, y: y - 1 });
+    }
+    return cells;
+}
+
+function valleyAddFillRoom(x1, y1, x2, y2, lit, rtype, needfill = FILL_NORMAL, irregular = false) {
+    const cells = irregular ? valleyFloodRoomCells(x1, y1) : [];
+    if (irregular && cells.length) {
+        x1 = Math.min(...cells.map(c => c.x)) - VALLEY_X;
+        y1 = Math.min(...cells.map(c => c.y)) - VALLEY_Y;
+        x2 = Math.max(...cells.map(c => c.x)) - VALLEY_X;
+        y2 = Math.max(...cells.map(c => c.y)) - VALLEY_Y;
+    }
     add_room(valleyX(x1), valleyY(y1), valleyX(x2), valleyY(y2), lit, rtype, true);
     const room = game.level.rooms[(game.level.nroom || 1) - 1];
     if (room) {
         room.needfill = needfill;
-        room.irregular = true;
+        room.irregular = irregular;
         const rmno = room.roomnoidx + ROOMOFFSET;
-        for (let x = room.lx; x <= room.hx; x++)
-            for (let y = room.ly; y <= room.hy; y++) {
+        const markCells = irregular ? cells : [];
+        if (!irregular) {
+            for (let x = room.lx; x <= room.hx; x++)
+                for (let y = room.ly; y <= room.hy; y++) markCells.push({ x, y });
+        }
+        for (const { x, y } of markCells) {
                 const loc = game.level?.at(x, y);
                 if (loc && SPACE_POS(loc.typ)) {
                     loc.roomno = rmno;
                     loc.edge = false;
                 }
-            }
+        }
     }
 }
 
@@ -3661,9 +3690,9 @@ function loadValleySpecial() {
     }
 
     valleyAddFillRoom(1, 6, 5, 14, true, TEMPLE, FILL_LVFLAGS);
-    valleyAddFillRoom(19, 1, 24, 8, false, MORGUE);
-    valleyAddFillRoom(9, 14, 16, 18, false, MORGUE);
-    valleyAddFillRoom(37, 9, 43, 14, false, MORGUE);
+    valleyAddFillRoom(19, 1, 24, 8, false, MORGUE, FILL_NORMAL, true);
+    valleyAddFillRoom(9, 14, 16, 18, false, MORGUE, FILL_NORMAL, true);
+    valleyAddFillRoom(37, 9, 43, 14, false, MORGUE, FILL_NORMAL, true);
 
     placeSpecialStair(valleyX(1), valleyY(1), false);
     valleySetTerrain(4, 1, '+');
