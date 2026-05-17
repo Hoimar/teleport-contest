@@ -183,9 +183,11 @@ function object_glyph_for_display(obj, x, y, visible) {
     return { ch: obj.ch || '?', color: obj.color ?? NO_COLOR };
 }
 
-function is_branch_stair(x, y) {
+function is_known_branch_stair(x, y) {
+    const currentDnum = game.u?.uz?.dnum ?? 0;
     for (let st = game.stairs; st; st = st.next)
-        if (st.sx === x && st.sy === y && st.isbranch) return true;
+        if (st.sx === x && st.sy === y && st.isbranch
+            && st.u_traversed && st.tolev?.dnum !== currentDnum) return true;
     return false;
 }
 
@@ -216,7 +218,7 @@ function terrain_glyph(loc, x, y) {
             : { ch: 'x', color: wallColor, dec: true };
     case STAIRS:
         {
-            const color = is_branch_stair(x, y) ? CLR_YELLOW : CLR_GRAY;
+            const color = is_known_branch_stair(x, y) ? CLR_YELLOW : CLR_GRAY;
             if (game.level?.upstair?.x === x && game.level?.upstair?.y === y)
                 return { ch: '<', color, dec: false };
             return { ch: '>', color, dec: false };

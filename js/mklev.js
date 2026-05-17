@@ -53,6 +53,8 @@ const WAX_CANDLE = 225;
 const BRASS_LANTERN = 226;
 const OIL_LAMP = 227;
 const MAGIC_LAMP = 228;
+const LOCK_PICK = 222;
+const BLINDFOLD = 233;
 const FOOD_CLASS = 7;
 const POTION_CLASS = 8;
 const POT_BOOZE = 317;
@@ -61,7 +63,14 @@ const POT_OIL = 321;
 const SCROLL_CLASS = 9;
 const SCR_LIGHT = 332;
 const SPBOOK_CLASS = 10;
+const SPE_CONE_OF_COLD = 369;
 const SPE_LIGHT = 372;
+const SPE_CLAIRVOYANCE = 385;
+const SPE_CHARM_MONSTER = 387;
+const SPE_INVISIBILITY = 393;
+const SPE_POLYMORPH = 399;
+const SPE_CREATE_FAMILIAR = 401;
+const SPE_STONE_TO_FLESH = 405;
 const WAND_CLASS = 11;
 const WAN_LIGHT = 410;
 const COIN_CLASS = 12;
@@ -144,6 +153,7 @@ const GAUNTLETS_OF_FUMBLING = 160;
 const LOW_BOOTS = 163;
 const IRON_SHOES = 164;
 const HIGH_BOOTS = 165;
+const WATER_WALKING_BOOTS = 167;
 const ELVEN_MITHRIL_COAT = 127;
 const MUMMY_WRAPPING = 138;
 const ELVEN_CLOAK = 139;
@@ -162,6 +172,7 @@ const CRYSTAL_BALL = 231;
 const PICK_AXE = 259;
 const GRAPPLING_HOOK = 260;
 const UNICORN_HORN = 261;
+const CANDELABRUM_OF_INVOCATION = 262;
 const GOLD_PIECE = 438;
 const DILITHIUM_CRYSTAL = 439;
 const DIAMOND = 440;
@@ -466,7 +477,7 @@ function verysmall_monster(mon) {
 
 // Stairway list management
 function stairway_add(x, y, up, isladder, dest, isbranch = false) {
-    const node = { sx: x, sy: y, up, isladder, isbranch, tolev: { ...dest }, next: game.stairs };
+    const node = { sx: x, sy: y, up, isladder, isbranch, u_traversed: false, tolev: { ...dest }, next: game.stairs };
     game.stairs = node;
 }
 
@@ -2357,6 +2368,10 @@ function m_initweap_for(ptr) {
         m_initweap_general_for(ptr);
         return;
     }
+    if (ptr.mlet === 'S_VAMPIRE') {
+        m_initweap_general_for(ptr);
+        return;
+    }
     if (ptr.mlet === 'S_HUMANOID') {
         maybe_init_offensive_item_for(ptr);
         return;
@@ -2662,6 +2677,13 @@ export function makemon(mdat, x, y, mmflags = 0) {
         mon.msleeping = 1;
     }
     mon.cham = null;
+    if (ptr.name === 'VLAD_THE_IMPALER') {
+        const candelabrum = mksobj(CANDELABRUM_OF_INVOCATION, true, false);
+        if (candelabrum) {
+            candelabrum.spe = 0;
+            candelabrum.age = 0;
+        }
+    }
     let allow_minvent = true;
     if (initial_shapeshift(mon, ptr)) allow_minvent = false;
     if (ptr.name === 'GHOST' && !(mmflags & MM_NONAME)) mon.mgivenname = rndghostname();
@@ -3005,6 +3027,116 @@ const SOKO2_2_MAP = [
     '  --------------------',
 ];
 
+const SOKO3_1_MAP = [
+    '-----------       -----------',
+    '|....|....|--     |.........|',
+    '|....|......|     |.........|',
+    '|.........|--     |.........|',
+    '|....|....|       |.........|',
+    '|-.---------      |.........|',
+    '|....|.....|      |.........|',
+    '|....|.....|      |.........|',
+    '|..........|      |.........|',
+    '|....|.....|---------------+|',
+    '|....|......................|',
+    '-----------------------------',
+];
+
+const SOKO3_2_MAP = [
+    ' ----          -----------',
+    '-|..|-------   |.........|',
+    '|..........|   |.........|',
+    '|..-----.-.|   |.........|',
+    '|..|...|...|   |.........|',
+    '|.........-|   |.........|',
+    '|.......|..|   |.........|',
+    '|.----..--.|   |.........|',
+    '|........|.--  |.........|',
+    '|.---.-.....------------+|',
+    '|...|...-................|',
+    '|.........----------------',
+    '----|..|..|               ',
+    '    -------               ',
+];
+
+const SOKO4_1_MAP = [
+    '------  ----- ',
+    '|....|  |...| ',
+    '|....----...| ',
+    '|...........| ',
+    '|..|-|.|-|..| ',
+    '---------|.---',
+    '|......|.....|',
+    '|..----|.....|',
+    '--.|   |.....|',
+    ' |.|---|.....|',
+    ' |...........|',
+    ' |..|---------',
+    ' ----         ',
+];
+
+const SOKO4_2_MAP = [
+    '-------- ------',
+    '|.|....|-|....|',
+    '|.|-..........|',
+    '|.||....|.....|',
+    '|.||....|.....|',
+    '|.|-----|.-----',
+    '|.|    |......|',
+    '|.-----|......|',
+    '|.............|',
+    '|..|---|......|',
+    '----   --------',
+];
+
+const TOWER1_X = 17;
+const TOWER1_Y = 5;
+const TOWER3_X = 17;
+const TOWER3_Y = 5;
+const TOWER1_MAP = [
+    '  --- --- ---  ',
+    '  |.| |.| |.|  ',
+    '---S---S---S---',
+    '|.......+.+...|',
+    '---+-----.-----',
+    '  |...\\.|.+.|  ',
+    '---+-----.-----',
+    '|.......+.+...|',
+    '---S---S---S---',
+    '  |.| |.| |.|  ',
+    '  --- --- ---  ',
+];
+
+const TOWER2_MAP = [
+    '  --- --- ---  ',
+    '  |.| |.| |.|  ',
+    '---S---S---S---',
+    '|.S.........S.|',
+    '---.------+----',
+    '  |......|..|  ',
+    '--------.------',
+    '|.S......+..S.|',
+    '---S---S---S---',
+    '  |.| |.| |.|  ',
+    '  --- --- ---  ',
+];
+
+const TOWER3_MAP = [
+    '    --- --- ---    ',
+    '    |.| |.| |.|    ',
+    '  ---S---S---S---  ',
+    '  |.S.........S.|  ',
+    '-----.........-----',
+    '|...|.........+...|',
+    '|.---.........---.|',
+    '|.|.S.........S.|.|',
+    '|.---S---S---S---.|',
+    '|...|.|.|.|.|.|...|',
+    '---.---.---.---.---',
+    '  |.............|  ',
+    '  ---------------  ',
+];
+
 const SOKO_LEVELS = {
     'soko1-1': {
         map: SOKO1_1_MAP,
@@ -3092,6 +3224,90 @@ const SOKO_LEVELS = {
         ],
         randomObjects: [FOOD_CLASS, FOOD_CLASS, FOOD_CLASS, FOOD_CLASS, RING_CLASS, WAND_CLASS],
         doors: [[19, 9, D_LOCKED], [19, 11, D_LOCKED]],
+    },
+    'soko3-1': {
+        map: SOKO3_1_MAP,
+        xstart: 27,
+        ystart: 5,
+        stairs: [[false, 11, 2], [true, 23, 4]],
+        boulders: [
+            [3, 2], [4, 2],
+            [6, 2], [6, 3], [7, 2],
+            [3, 6], [2, 7], [3, 7], [3, 8], [2, 9], [3, 9], [4, 9],
+            [6, 7], [6, 9], [8, 7], [8, 10], [9, 8], [9, 9], [10, 7], [10, 10],
+        ],
+        traps: [
+            [ROLLING_BOULDER_TRAP, 11, 10],
+            [HOLE, 12, 10], [HOLE, 13, 10], [HOLE, 14, 10],
+            [HOLE, 15, 10], [HOLE, 16, 10], [HOLE, 17, 10],
+            [HOLE, 18, 10], [HOLE, 19, 10], [HOLE, 20, 10],
+            [HOLE, 21, 10], [HOLE, 22, 10], [HOLE, 23, 10],
+            [HOLE, 24, 10], [HOLE, 25, 10], [HOLE, 26, 10],
+        ],
+        randomObjects: [FOOD_CLASS, FOOD_CLASS, FOOD_CLASS, FOOD_CLASS, RING_CLASS, WAND_CLASS],
+        doors: [[27, 9, D_LOCKED]],
+    },
+    'soko3-2': {
+        map: SOKO3_2_MAP,
+        xstart: 27,
+        ystart: 5,
+        stairs: [[false, 3, 1], [true, 20, 4]],
+        boulders: [
+            [2, 3], [8, 3], [9, 4], [2, 5], [4, 5], [9, 5],
+            [2, 6], [5, 6], [6, 7], [3, 8], [7, 8], [5, 9],
+            [10, 9], [7, 10], [10, 10], [3, 11],
+        ],
+        traps: [
+            [ROLLING_BOULDER_TRAP, 11, 10],
+            [HOLE, 12, 10], [HOLE, 13, 10], [HOLE, 14, 10],
+            [HOLE, 15, 10], [HOLE, 16, 10], [HOLE, 17, 10],
+            [HOLE, 18, 10], [HOLE, 19, 10], [HOLE, 20, 10],
+            [HOLE, 21, 10], [HOLE, 22, 10], [HOLE, 23, 10],
+        ],
+        randomObjects: [FOOD_CLASS, FOOD_CLASS, FOOD_CLASS, FOOD_CLASS, RING_CLASS, WAND_CLASS],
+        doors: [[24, 9, D_LOCKED]],
+    },
+    'soko4-1': {
+        map: SOKO4_1_MAP,
+        xstart: 33,
+        ystart: 5,
+        stairs: [[true, 6, 6]],
+        branchRegion: [6, 4, 6, 4],
+        boulders: [
+            [2, 2], [2, 3],
+            [10, 2], [9, 3], [10, 4],
+            [8, 7], [9, 8], [9, 9], [8, 10], [10, 10],
+        ],
+        traps: [
+            [PIT, 4, 6],
+            [PIT, 2, 6], [PIT, 2, 7], [PIT, 2, 8], [ROLLING_BOULDER_TRAP, 2, 9],
+            [PIT, 2, 10], [PIT, 3, 10], [PIT, 4, 10], [PIT, 5, 10],
+            [PIT, 6, 10], [ROLLING_BOULDER_TRAP, 7, 10],
+        ],
+        typedObjects: [[SCR_EARTH, 2, 11], [SCR_EARTH, 3, 11]],
+        randomObjects: [FOOD_CLASS, FOOD_CLASS, FOOD_CLASS, FOOD_CLASS, RING_CLASS, WAND_CLASS],
+        doors: [],
+    },
+    'soko4-2': {
+        map: SOKO4_2_MAP,
+        xstart: 33,
+        ystart: 7,
+        stairs: [[true, 1, 1]],
+        branchRegion: [3, 1, 3, 1],
+        boulders: [
+            [5, 2], [6, 2], [6, 3], [7, 3],
+            [9, 5], [10, 3], [11, 2], [12, 3],
+            [7, 8], [8, 8], [9, 8], [10, 8],
+        ],
+        traps: [
+            [PIT, 1, 2], [PIT, 1, 3], [PIT, 1, 4], [PIT, 1, 5],
+            [PIT, 1, 6], [ROLLING_BOULDER_TRAP, 1, 7],
+            [PIT, 1, 8], [PIT, 2, 8], [PIT, 3, 8], [PIT, 4, 8],
+            [PIT, 5, 8], [ROLLING_BOULDER_TRAP, 6, 8],
+        ],
+        typedObjects: [[SCR_EARTH, 1, 9], [SCR_EARTH, 2, 9]],
+        randomObjects: [FOOD_CLASS, FOOD_CLASS, FOOD_CLASS, FOOD_CLASS, RING_CLASS, WAND_CLASS],
+        doors: [],
     },
 };
 
@@ -4160,6 +4376,11 @@ function loadSokoSpecial(protofile) {
         maybeTrapVictim(trap);
     }
 
+    for (const [otyp, x, y] of spec.typedObjects || []) {
+        loc = sokoAbs(spec, x, y);
+        mksobj_at(otyp, loc.x, loc.y, true, false);
+    }
+
     if (spec.rewardPlaces) {
         createSokoGiantMimic(spec);
         createSokoGiantMimic(spec);
@@ -4181,10 +4402,341 @@ function loadSokoSpecial(protofile) {
     const zooRoom = spec.zooRegion ? createSokoZooRoom(spec) : null;
     if (spec.rewardPlaces) createSokoReward(spec);
     wallification(1, 0, COLNO - 1, ROWNO - 1);
-    flip_level_rnd(3);
+    const flp = flip_level_rnd(3);
+    if (spec.branchRegion) {
+        const [x1, y1, x2, y2] = spec.branchRegion;
+        const inarea = {
+            x1: sokoXStart(spec) + x1,
+            y1: sokoYStart(spec) + y1,
+            x2: sokoXStart(spec) + x2,
+            y2: sokoYStart(spec) + y2,
+        };
+        const bounds = {
+            minx: sokoXStart(spec),
+            miny: sokoYStart(spec),
+            maxx: sokoXStart(spec) + spec.map[0].length - 1,
+            maxy: sokoYStart(spec) + spec.map.length - 1,
+        };
+        if (flp & 1) {
+            const ny1 = flipYForBounds(inarea.y2, bounds.miny, bounds.maxy);
+            const ny2 = flipYForBounds(inarea.y1, bounds.miny, bounds.maxy);
+            inarea.y1 = Math.min(ny1, ny2);
+            inarea.y2 = Math.max(ny1, ny2);
+        }
+        if (flp & 2) {
+            const nx1 = flipXForBounds(inarea.x2, bounds.minx, bounds.maxx);
+            const nx2 = flipXForBounds(inarea.x1, bounds.minx, bounds.maxx);
+            inarea.x1 = Math.min(nx1, nx2);
+            inarea.x2 = Math.max(nx1, nx2);
+        }
+        game._special_lregions = [{
+            rtype: LR_BRANCH,
+            inarea,
+            delarea: { x1: -1, y1: -1, x2: -1, y2: -1 },
+        }];
+        fixup_special();
+    }
     premapSokoban();
     if (zooRoom) fill_special_room(zooRoom);
     return true;
+}
+
+function towerX(x, xstart = TOWER1_X) { return xstart + x; }
+function towerY(y, ystart = TOWER1_Y) { return ystart + y; }
+function towerAbs(x, y, xstart = TOWER1_X, ystart = TOWER1_Y) {
+    return { x: towerX(x, xstart), y: towerY(y, ystart) };
+}
+function tower1X(x) { return towerX(x, TOWER1_X); }
+function tower1Y(y) { return towerY(y, TOWER1_Y); }
+function tower1Abs(x, y) { return towerAbs(x, y, TOWER1_X, TOWER1_Y); }
+
+function loadTowerTerrain(mapRows, xstart = TOWER1_X, ystart = TOWER1_Y) {
+    game.level.flags.is_maze_lev = true;
+    game.level.flags.noteleport = true;
+    game.level.flags.hardfloor = true;
+    for (let y = 0; y < mapRows.length; y++) {
+        const row = mapRows[y];
+        for (let x = 0; x < row.length; x++) {
+            const loc = game.level?.at(towerX(x, xstart), towerY(y, ystart));
+            if (!loc) continue;
+            switch (row[x]) {
+            case '.':
+                loc.typ = ROOM;
+                break;
+            case '-':
+                loc.typ = HWALL;
+                break;
+            case '|':
+                loc.typ = VWALL;
+                break;
+            case '+':
+                loc.typ = DOOR;
+                set_door_mask(loc, D_CLOSED);
+                break;
+            case 'S':
+                loc.typ = SDOOR;
+                loc.horizontal = row[x - 1] === '-' || row[x + 1] === '-';
+                set_door_mask(loc, D_CLOSED);
+                break;
+            case '\\':
+                loc.typ = THRONE;
+                break;
+            default:
+                loc.typ = STONE;
+                break;
+            }
+        }
+    }
+}
+
+function loadTower1Terrain() {
+    loadTowerTerrain(TOWER1_MAP);
+}
+
+function placeSpecialLadder(x, y, up) {
+    const loc = game.level?.at(x, y);
+    if (loc) {
+        loc.typ = LADDER;
+        loc.ladder = up ? 1 : 2;
+    }
+    const dest = {
+        dnum: game.u?.uz?.dnum ?? 0,
+        dlevel: (game.u?.uz?.dlevel ?? 1) + (up ? -1 : 1),
+    };
+    stairway_add(x, y, !!up, true, dest);
+}
+
+function towerMonsterClass(ch) {
+    if (ch === 'V') return 'S_VAMPIRE';
+    if (ch === '&') return 'S_DEMON';
+    if (ch === 'D') return 'S_DRAGON';
+    return null;
+}
+
+function towerCreateMonster(id, x, y, opts = {}) {
+    const xstart = opts.xstart ?? TOWER1_X;
+    const ystart = opts.ystart ?? TOWER1_Y;
+    const cls = String(id || '').length === 1 ? towerMonsterClass(id) : null;
+    let ptr = cls ? null : monster_by_user_name(id);
+    if (!cls && !opts.waiting && ptr && !ptr.neuter && !ptr.male && !ptr.female) rn2(2);
+    rn2(3); // C ref: dungeon.c:induced_align() on unaligned Vlad's Tower levels.
+    if (cls) ptr = mkclass_aligned(cls, G_NOGEN);
+    const mon = makemon(ptr, towerX(x, xstart), towerY(y, ystart), opts.mmflags || 0);
+    if (mon && opts.name) mon.mgivenname = opts.name;
+    if (mon && opts.waiting) {
+        mon.mstrategy_waiting = 1;
+        if (ptr && mon.data?.name !== ptr.name) {
+            mgender_from_permonst_for(mon, ptr);
+            const monLevel = adj_lev_for(ptr);
+            const hp = newmonhp_for(ptr, monLevel);
+            mon.data = { ...ptr, mmove: ptr.mmove ?? 12 };
+            mon.ch = MONSTER_SYMBOLS[ptr.mlet] ?? mon.ch;
+            mon.color = ptr.color ?? mon.color;
+            mon.m_lev = monLevel;
+            mon.mhp = hp;
+            mon.mhpmax = hp;
+            mon.cham = null;
+        }
+    }
+    return mon;
+}
+
+function tower1SetDoor(x, y, mask) {
+    towerSetDoor(x, y, mask, TOWER1_X, TOWER1_Y);
+}
+
+function towerSetDoor(x, y, mask, xstart = TOWER1_X, ystart = TOWER1_Y) {
+    const loc = game.level?.at(towerX(x, xstart), towerY(y, ystart));
+    if (!loc) return;
+    loc.typ = DOOR;
+    set_door_mask(loc, mask);
+}
+
+function towerRandomDryLocation(mapRows, xstart = TOWER1_X, ystart = TOWER1_Y) {
+    return specialRandomDryLocation(mapRows[0].length, mapRows.length, xstart, ystart);
+}
+
+function towerCreateTrapAt(x, y, xstart = TOWER1_X, ystart = TOWER1_Y) {
+    let kind;
+    do { kind = traptype_rnd(); } while (kind === NO_TRAP);
+    const trap = maketrap(towerX(x, xstart), towerY(y, ystart), kind);
+    maybeTrapVictim(trap);
+}
+
+function towerCreateRandomMonster(mapRows, xstart = TOWER1_X, ystart = TOWER1_Y) {
+    rn2(3); // C ref: dungeon.c:induced_align() on unaligned Vlad's Tower levels.
+    const loc = towerRandomDryLocation(mapRows, xstart, ystart);
+    if (m_at(loc.x, loc.y)) {
+        const cc = enexto_core(loc.x, loc.y, null, GP_CHECKSCARY)
+            || enexto_core(loc.x, loc.y, null, 0);
+        if (cc) {
+            loc.x = cc.x;
+            loc.y = cc.y;
+        }
+    }
+    return makemon(null, loc.x, loc.y, 0);
+}
+
+function loadTower1Special() {
+    loadTower1Terrain();
+    const align = [0, 0, 0];
+    for (let i = align.length; i > 1; i--) {
+        const j = rn2(i);
+        [align[i - 1], align[j]] = [align[j], align[i - 1]];
+    }
+    rn2(2); // splev_initlev lit state for solidfill.
+
+    const niches = [[3, 1], [3, 9], [7, 1], [7, 9], [11, 1], [11, 9]];
+    for (let i = niches.length; i > 1; i--) {
+        const j = rn2(i);
+        [niches[i - 1], niches[j]] = [niches[j], niches[i - 1]];
+    }
+
+    placeSpecialLadder(tower1X(11), tower1Y(5), false);
+    towerCreateMonster('Vlad the Impaler', 6, 5);
+    for (let i = 0; i < 3; i++) towerCreateMonster('V', niches[i][0], niches[i][1]);
+    const names = ['Madame', 'Marquise', 'Countess'];
+    for (let i = 3; i < 6; i++) {
+        towerCreateMonster('vampire lord', niches[i][0], niches[i][1], {
+            name: names[i - 3],
+            waiting: true,
+        });
+    }
+
+    for (const [x, y, mask] of [
+        [8, 3, D_CLOSED], [10, 3, D_CLOSED], [3, 4, D_CLOSED],
+        [10, 5, D_LOCKED], [8, 7, D_LOCKED], [10, 7, D_LOCKED],
+        [3, 6, D_CLOSED],
+    ]) tower1SetDoor(x, y, mask);
+
+    mksobj_at(CHEST, tower1X(7), tower1Y(5), true, false);
+    for (const idx of [5, 0, 1, 2, 3, 4]) {
+        const [x, y] = niches[idx];
+        const chest = mksobj_at(CHEST, tower1X(x), tower1Y(y), true, false);
+        if ((idx === 3 || idx === 4) && chest) {
+            rn1(5, 4); // Lua math.random(4,8) for scripted candle quantity.
+            specialRandomDryLocation(TOWER1_MAP[0].length, TOWER1_MAP.length, TOWER1_X, TOWER1_Y);
+            mksobj(idx === 3 ? WAX_CANDLE : TALLOW_CANDLE, true, false);
+        }
+    }
+
+    wallification(1, 0, COLNO - 1, ROWNO - 1);
+    flip_level_rnd(3);
+}
+
+function loadTower2Special() {
+    loadTowerTerrain(TOWER2_MAP);
+    const align = [0, 0, 0];
+    for (let i = align.length; i > 1; i--) {
+        const j = rn2(i);
+        [align[i - 1], align[j]] = [align[j], align[i - 1]];
+    }
+    rn2(2); // splev_initlev lit state for solidfill.
+
+    const place = [[3, 1], [7, 1], [11, 1], [1, 3], [13, 3],
+        [1, 7], [13, 7], [3, 9], [7, 9], [11, 9]];
+    for (let i = place.length; i > 1; i--) {
+        const j = rn2(i);
+        [place[i - 1], place[j]] = [place[j], place[i - 1]];
+    }
+
+    placeSpecialLadder(tower1X(11), tower1Y(5), true);
+    placeSpecialLadder(tower1X(3), tower1Y(7), false);
+    tower1SetDoor(10, 4, D_LOCKED);
+    tower1SetDoor(9, 7, D_LOCKED);
+
+    towerCreateMonster('&', place[9][0], place[9][1]);
+    towerCreateMonster('&', place[0][0], place[0][1]);
+    towerCreateMonster('hell hound pup', place[1][0], place[1][1]);
+    towerCreateMonster('hell hound pup', place[2][0], place[2][1]);
+    towerCreateMonster('winter wolf', place[3][0], place[3][1]);
+
+    let loc = tower1Abs(place[4][0], place[4][1]);
+    mksobj_at(CHEST, loc.x, loc.y, true, false);
+    specialRandomDryLocation(TOWER2_MAP[0].length, TOWER2_MAP.length, TOWER1_X, TOWER1_Y);
+    mksobj(AMULET_OF_LIFE_SAVING, true, false);
+
+    loc = tower1Abs(place[5][0], place[5][1]);
+    mksobj_at(CHEST, loc.x, loc.y, true, false);
+    specialRandomDryLocation(TOWER2_MAP[0].length, TOWER2_MAP.length, TOWER1_X, TOWER1_Y);
+    mksobj(AMULET_OF_STRANGULATION, true, false);
+
+    loc = tower1Abs(place[6][0], place[6][1]);
+    mksobj_at(WATER_WALKING_BOOTS, loc.x, loc.y, true, false);
+    loc = tower1Abs(place[7][0], place[7][1]);
+    mksobj_at(CRYSTAL_PLATE_MAIL, loc.x, loc.y, true, false);
+    rn2(40); // C ref: sp_lev.c:create_object() permits artifact promotion for scripted armor.
+
+    const spbooks = [
+        SPE_INVISIBILITY, SPE_CONE_OF_COLD, SPE_CREATE_FAMILIAR,
+        SPE_CLAIRVOYANCE, SPE_CHARM_MONSTER, SPE_STONE_TO_FLESH,
+        SPE_POLYMORPH,
+    ];
+    for (let i = spbooks.length; i > 1; i--) {
+        const j = rn2(i);
+        [spbooks[i - 1], spbooks[j]] = [spbooks[j], spbooks[i - 1]];
+    }
+    loc = tower1Abs(place[8][0], place[8][1]);
+    mksobj_at(spbooks[0], loc.x, loc.y, true, false);
+
+    wallification(1, 0, COLNO - 1, ROWNO - 1);
+    flip_level_rnd(3);
+}
+
+function loadTower3Special() {
+    loadTowerTerrain(TOWER3_MAP, TOWER3_X, TOWER3_Y);
+    const align = [0, 0, 0];
+    for (let i = align.length; i > 1; i--) {
+        const j = rn2(i);
+        [align[i - 1], align[j]] = [align[j], align[i - 1]];
+    }
+    rn2(2); // splev_initlev lit state for solidfill.
+
+    const place = [[5, 1], [9, 1], [13, 1], [3, 3], [15, 3],
+        [3, 7], [15, 7], [5, 9], [9, 9], [13, 9]];
+
+    placeSpecialLadder(towerX(5, TOWER3_X), towerY(7, TOWER3_Y), true);
+    towerSetDoor(14, 5, D_LOCKED, TOWER3_X, TOWER3_Y);
+
+    towerCreateMonster('D', 13, 5, { xstart: TOWER3_X, ystart: TOWER3_Y });
+    towerCreateMonster(null, 12, 4, { xstart: TOWER3_X, ystart: TOWER3_Y });
+    towerCreateMonster(null, 12, 6, { xstart: TOWER3_X, ystart: TOWER3_Y });
+    for (let i = 0; i < 6; i++) towerCreateRandomMonster(TOWER3_MAP, TOWER3_X, TOWER3_Y);
+
+    let loc = towerAbs(place[3][0], place[3][1], TOWER3_X, TOWER3_Y);
+    mksobj_at(LONG_SWORD, loc.x, loc.y, true, true);
+    towerCreateTrapAt(place[3][0], place[3][1], TOWER3_X, TOWER3_Y);
+
+    loc = towerAbs(place[0][0], place[0][1], TOWER3_X, TOWER3_Y);
+    mksobj_at(LOCK_PICK, loc.x, loc.y, true, true);
+    towerCreateTrapAt(place[0][0], place[0][1], TOWER3_X, TOWER3_Y);
+
+    loc = towerAbs(place[1][0], place[1][1], TOWER3_X, TOWER3_Y);
+    mksobj_at(ELVEN_CLOAK, loc.x, loc.y, true, true);
+    towerCreateTrapAt(place[1][0], place[1][1], TOWER3_X, TOWER3_Y);
+
+    loc = towerAbs(place[2][0], place[2][1], TOWER3_X, TOWER3_Y);
+    mksobj_at(BLINDFOLD, loc.x, loc.y, true, true);
+    towerCreateTrapAt(place[2][0], place[2][1], TOWER3_X, TOWER3_Y);
+
+    wallification(1, 0, COLNO - 1, ROWNO - 1);
+    const flp = flip_level_rnd(3);
+    const bounds = {
+        minx: TOWER3_X,
+        miny: TOWER3_Y,
+        maxx: TOWER3_X + TOWER3_MAP[0].length - 1,
+        maxy: TOWER3_Y + TOWER3_MAP.length - 1,
+    };
+    const branch = flipRectForBounds({
+        x1: towerX(2, TOWER3_X), y1: towerY(5, TOWER3_Y),
+        x2: towerX(2, TOWER3_X), y2: towerY(5, TOWER3_Y),
+    }, flp, bounds.minx, bounds.miny, bounds.maxx, bounds.maxy);
+    game._special_lregions = [{
+        rtype: LR_BRANCH,
+        inarea: branch,
+        delarea: { x1: -1, y1: -1, x2: -1, y2: -1 },
+    }];
+    fixup_special();
 }
 
 function buildSpecialRoom(spec, parent = null) {
@@ -5553,6 +6105,18 @@ function makemaz_special(slev) {
         loadSanctumSpecial();
         return;
     }
+    if (game._last_special_protofile === 'tower1') {
+        loadTower1Special();
+        return;
+    }
+    if (game._last_special_protofile === 'tower2') {
+        loadTower2Special();
+        return;
+    }
+    if (game._last_special_protofile === 'tower3') {
+        loadTower3Special();
+        return;
+    }
     game.level.flags.is_maze_lev = true;
 }
 
@@ -5759,7 +6323,12 @@ async function makelevel() {
 
     // Place dungeon branch
     if (branchp) {
+        const prevstairs = g.stairs;
         place_branch(branchp);
+        if ((g.u?.uz?.dnum ?? 0) === 0 && (g.u?.uz?.dlevel ?? 1) === 1
+            && g.stairs !== prevstairs) {
+            g.stairs.u_traversed = true;
+        }
     }
 
     // Fill rooms
