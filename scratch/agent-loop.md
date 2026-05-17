@@ -15,12 +15,12 @@ and `feature_map.md`.
 - Current branch in this workspace: `main`.
 - Baseline commit at harness cleanup: `f0fdc38`.
 - Active target: `seed0383-wizard-hallucinate`.
-- Active hypothesis: seed0383 is narrowed to swallowed turn/timer ownership
-  after the second engulf. Post-expulsion hallucination redraw, shuffled
-  hallucinated object color, engulf `Monnam()` display RNG, ordinary-hit redraw
-  suppression, and the first visible swallowed overlay now match through
-  screen 174. Remaining drift is a premature `You get expelled!--More--` on
-  screen 175.
+- Active hypothesis: seed0383 is now narrowed to monster-turn More display
+  timing after full flat core RNG parity. Swallowed cold-damage More timing,
+  expulsion dismissal, hallucinated Warning/object redraw order, hallucinating
+  safe-pet attack behavior, tame-kill yelp/reaction plines, and packed monster
+  attack side-effect messages now match through screen 179. Remaining drift is
+  map-only at screen 180 after the packed frost/bite monster-turn More.
 
 ## Latest Verification
 
@@ -32,31 +32,29 @@ npm run verify -- --target seed0383-wizard-hallucinate
 
 Result:
 
-- Target: `seed0383-wizard-hallucinate` `S 176/219 R 11423/16915`,
-  first screen `175:message:message:y`, first RNG
-  `11367:rn2(20)=8=>rn2(7)=4`, cursor-only `1`.
-- Sentinel total: `S 379/1063 R 31694/64569`.
+- Target: `seed0383-wizard-hallucinate` `S 181/219 R 16915/16915`,
+  first screen `180:char:map:Space`, first RNG `-`, cursor-only `1`.
+- Sentinel total: `S 384/1063 R 37186/64569`.
 - Sentinel details:
   - `seed8000-tourist-starter`: `S 23/23 R 3060/3130`, first RNG `3047`.
   - `seed0002-healer-reflection-drummer`: `S 53/595 R 4066/27158`, first RNG `3880`.
   - `seed0013-friday13-save-then-fullmoon-restore`: `S 0/99 R 583/4804`, first RNG `540`.
   - `seed0116-wizard-wear-shop`: `S 127/127 R 12562/12562`, pass.
-  - `seed0383-wizard-hallucinate`: `S 176/219 R 11423/16915`, first screen 175.
+  - `seed0383-wizard-hallucinate`: `S 181/219 R 16915/16915`, first screen 180.
 - Hack-debt audit: hard `0`, suspicious `37` existing replay/override/seed findings.
 - Memory lint: clean after this compaction target.
 
 ## Current Queue
 
-1. Continue `seed0383` swallowed turn/timer ownership.
+1. Continue `seed0383` monster-turn More display timing.
    - Use `npm run screen:diff -- seed0383-wizard-hallucinate --first`.
-   - Current diff is screen 175 (`y`): expected
-     `You hit the spotted jelly.  You are freezing to death!--More--`, actual
-     appends `You get expelled!--More--` in the same topline. First RNG
-     mismatch is still `FR 11367`, because the premature expulsion relocation
-     consumes `rn2(7)` where C next performs a `rn2(20)` check.
-   - Do not suppress the message text directly. Compare swallowed command
-     turn flow, repeat `gulpmu()` timer decrement count, and More/turn resume
-     ownership.
+   - Current diff is screen 180 (`Space`): message and cursor match
+     `You're covered in frost!  The hill orc bites!--More--`; remaining
+     mismatch is six map cells from resumed monster-turn display timing.
+   - Core RNG is complete (`R 16915/16915`). Do not change combat RNG for this
+     blocker; compare C `mhitu.c:hitmsg()`/side-effect ordering, `topl.c`
+     More returns, and which `newsym()` calls are visible before the packed
+     bite More frame.
 2. Continue `seed0002-healer-reflection-drummer` dog-move candidate work.
    - Current state: `S 53/595 R 4066/27158`.
    - First visible mismatch is screen 53 (`y`): exact RNG through the floor

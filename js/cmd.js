@@ -8,12 +8,12 @@
 import { game } from './gstate.js';
 import { nhgetch } from './input.js';
 import {
-    newsym, show_glyph_cell, flush_screen, pline, clear_pending_message, docrt,
+    newsym, show_glyph_cell, flush_screen, pline, append_pline, clear_pending_message, docrt,
     serialize_terminal_grid, queue_more_prompt,
     apply_hallucination_display_transition, refresh_swallowed_overlay,
     see_monsters, see_objects, see_traps,
 } from './display.js';
-import { vision_recalc, vision_reset } from './vision.js';
+import { cansee, vision_recalc, vision_reset } from './vision.js';
 import { makemon, mklev, mksobj, monster_by_user_name, place_lregion, place_object } from './mklev.js';
 import { OBJECT_DELAY } from './object_data.js';
 import { finish_pet_kill, pet_arrive_with_you } from './dog.js';
@@ -1083,6 +1083,37 @@ function monsterHitName(mon) {
     return `the ${monsterName(mon)}`;
 }
 
+function monsterKillName(mon) {
+    if (mon?.mtame && (game.u?.uhallucination || game.u?.uprops?.hallucination)) {
+        // C ref: mon.c:xkilled() passes adjective "poor" to x_monnam().
+        return `the poor ${randomHallucinatedMonsterName('')}`;
+    }
+    return monsterHitName(mon);
+}
+
+const HALLUCINATED_PET_SOUNDS = [
+    'beep', 'boing', 'sing', 'belche', 'creak', 'cough',
+    'rattle', 'ululate', 'pop', 'jingle', 'sniffle', 'tinkle',
+    'eep', 'clatter', 'hum', 'sizzle', 'twitter', 'wheeze',
+    'rustle', 'honk', 'lisp', 'yodel', 'coo', 'burp',
+    'moo', 'boom', 'murmur', 'oink', 'quack', 'rumble',
+    'twang', 'toot', 'gargle', 'hoot', 'warble',
+];
+
+function vtenseThirdPerson(verb) {
+    if (verb.endsWith('e')) return `${verb}s`;
+    return `${verb}s`;
+}
+
+async function maybePetAbuseSound(mon) {
+    if (!(game.u?.uhallucination || game.u?.uprops?.hallucination)) return false;
+    const verb = HALLUCINATED_PET_SOUNDS[rn2(HALLUCINATED_PET_SOUNDS.length)];
+    const subject = randomHallucinatedMonsterName('the');
+    const line = `${subject.slice(0, 1).toUpperCase()}${subject.slice(1)} ${vtenseThirdPerson(verb)}!`;
+    await pline(line);
+    return true;
+}
+
 const MONSTER_AC = new Map([
     ['grid bug', 9],
 ]);
@@ -1127,6 +1158,16 @@ function monsterSwapName(mon) {
     if (mon?.mtame) return `your ${name}`;
     if (mon?.mpeaceful) return `the peaceful ${name}`;
     return `the ${name}`;
+}
+
+function isSafeMonster(mon) {
+    if (!mon || game.flags?.safe_dog === false) return false;
+    if (!mon.mpeaceful) return false;
+    if (!cansee(mon.mx, mon.my)) return false;
+    if (game.u?.uprops?.confusion || game.u?.uconfusion) return false;
+    if (game.u?.uprops?.hallucination || game.u?.uhallucination) return false;
+    if (game.u?.uprops?.stunned || game.u?.ustunned) return false;
+    return true;
 }
 
 function monsterHasNoAttacks(mon) {
@@ -1218,8 +1259,16 @@ async function heroMeleeAttack(mon) {
     if (typeof mon.mhp === 'number') {
         mon.mhp -= damage;
         if (mon.mhp <= 0) {
-            await pline(`You kill ${monsterHitName(mon)}!`);
+            const petSoundPrinted = mon.mtame ? await abuseDog(mon) : false;
+            const killLine = `You kill ${monsterKillName(mon)}!`;
+            if (game._pending_message) await append_pline(killLine);
+            else await pline(killLine);
+            if (petSoundPrinted) queue_more_prompt();
             heroKilledMonster(mon);
+            if (game._more) {
+                game._pre_turn_more_waiting = true;
+                game._monster_turn_paused_for_more = true;
+            }
             game.context.run = null;
             return;
         }
@@ -1238,8 +1287,8 @@ async function swallowedHeroAttack(mon) {
     await heroMeleeAttack(mon);
 }
 
-function abuseDog(mon) {
-    if (!mon.mtame) return;
+async function abuseDog(mon) {
+    if (!mon.mtame) return false;
     if (game.u?.conflict || game.u?.uprops?.conflict) {
         mon.mtame = Math.trunc(mon.mtame / 2);
     } else {
@@ -1248,9 +1297,12 @@ function abuseDog(mon) {
     if (mon.mtame && mon.edog) mon.edog.abuse = (mon.edog.abuse || 0) + 1;
     if (mon.mx !== 0) {
         if (mon.mtame && rn2(mon.mtame)) {
-            if (game.u?.uprops?.hallucination) rn2(35);
+            return await maybePetAbuseSound(mon);
+        } else {
+            return await maybePetAbuseSound(mon);
         }
     }
+    return false;
 }
 
 function corpseChance(mon) {
@@ -1262,10 +1314,10 @@ function corpseChance(mon) {
 
 function heroKilledMonster(mon) {
     if (mon.mtame) {
-        abuseDog(mon);
         // C ref: mon.c:xkilled(); killing a tame monster is a major
         // alignment abuse and feeds later peace_minded() RNG gates.
         adjalign(-15);
+        game._pending_tame_kill_reaction = true;
     }
     if (!rn2(6)) {
         // Treasure-drop object creation is still future work; current
@@ -1562,6 +1614,9 @@ async function handleQueuedMore(ch) {
     const moreDismissKey = !!game._monster_more_accepts_any_key
         || ch === ' ' || ch === '\r' || ch === '\n' || ch === '\x1b';
     const pausedMonsterTurn = !!game._monster_turn_paused_for_more;
+    const swallowedDamageResume = pausedMonsterTurn && !!game._swallowed_damage_more_waiting;
+    const preTurnResume = pausedMonsterTurn && !!game._pre_turn_more_waiting;
+    const monsterAttackResume = pausedMonsterTurn && !!game._monster_attack_more_waiting;
     const pausedFloorListTurn = !!game._resume_floor_list_turn;
     if (!moreDismissKey) {
         if (game._direction_help_screen) {
@@ -1639,11 +1694,19 @@ async function handleQueuedMore(ch) {
             game._nomovemsg = '';
             await pline(msg);
         }
+        if (game._pending_tame_kill_reaction) {
+            game._pending_tame_kill_reaction = false;
+            if (game.u?.uhallucination || game.u?.uprops?.hallucination)
+                await pline('You hear the studio audience applaud!');
+            else
+                await pline('You hear the rumble of distant thunder...');
+        }
         // C ref: topl.c:more() returns to the interrupted command before
         // allmain.c's next input prompt; swallowed Hallucination redraws
         // once in that resumed path and again at the input boundary.
         await finish_pending_swallowed_expulsion();
-        refreshSwallowedHallucinationAfterMore();
+        if (!swallowedDamageResume && !preTurnResume && !monsterAttackResume)
+            refreshSwallowedHallucinationAfterMore();
     }
     if (pausedFloorListTurn && !game._more) {
         game._resume_floor_list_turn = false;
@@ -1651,6 +1714,13 @@ async function handleQueuedMore(ch) {
         game.context.move = 1;
     } else if (pausedMonsterTurn && !game._more && !game._death_prompt_active) {
         game._monster_turn_paused_for_more = false;
+        game._swallowed_damage_more_waiting = false;
+        game._pre_turn_more_waiting = false;
+        game._monster_attack_more_waiting = false;
+        if (game._clear_latched_status_after_more) {
+            game._clear_latched_status_after_more = false;
+            game._latched_status_uhp = null;
+        }
         game._resume_monster_turn = true;
         game.context.move = 1;
     } else {
@@ -3243,7 +3313,7 @@ export async function domove(dx, dy) {
 
     const mon = mon_at(newx, newy);
     if (mon) {
-        if (mon.mtame || mon.mpeaceful) {
+        if (isSafeMonster(mon)) {
             await swapWithSafeMonster(mon, newx, newy);
             return true;
         }

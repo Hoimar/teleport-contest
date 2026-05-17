@@ -637,6 +637,22 @@ async function show_blocking_monster_message(line) {
         return;
     }
     if (game._pending_message && !game._more && `${game._pending_message}  ${line}`.length < 80) {
+        if (/^You hear the (?:studio audience applaud|rumble of distant thunder\.\.\.)!$/.test(game._pending_message)) {
+            game._pending_message = `${game._pending_message}  ${line}`;
+            queue_more_prompt();
+            game._monster_attack_more_latched = true;
+            if (game._pending_monster_attack_side_effect) {
+                game._after_more_message = game._pending_monster_attack_side_effect;
+                game._pending_monster_attack_side_effect = '';
+            }
+            return;
+        }
+        if (game._pending_message === "You're covered in frost!") {
+            game._pending_message = `${game._pending_message}  ${line}`;
+            queue_more_prompt();
+            game._monster_attack_more_latched = true;
+            return;
+        }
         if (/^The .+ is killed!$/.test(game._pending_message)) {
             game._pending_message = `${game._pending_message}  ${line}`;
             return;
@@ -673,8 +689,10 @@ async function append_swallowed_damage_message(line) {
     // that forces `--More--`, so don't make every damage message block.
     if (game._pending_message && !game._more) {
         game._pending_message = `${game._pending_message}  ${line}`;
+        return true;
     } else {
         await pline(line);
+        return false;
     }
 }
 
@@ -919,6 +937,7 @@ async function engulf_attack(mtmp, attack, toHit) {
         game.u.uswldtim--;
     }
 
+    let swallowedDamagePackedWithHeroHit = false;
     switch (adtyp) {
     case 'AD_COLD':
     case 'AD_FIRE':
@@ -927,11 +946,14 @@ async function engulf_attack(mtmp, attack, toHit) {
         if (mtmp.mcan || !rn2(2)) {
             damage = 0;
         } else if (adtyp === 'AD_COLD') {
-            await append_swallowed_damage_message('You are freezing to death!');
+            swallowedDamagePackedWithHeroHit = await append_swallowed_damage_message('You are freezing to death!')
+                && /^You hit /.test(game._pending_message || '');
         } else if (adtyp === 'AD_FIRE') {
-            await append_swallowed_damage_message('You are burning to a crisp!');
+            swallowedDamagePackedWithHeroHit = await append_swallowed_damage_message('You are burning to a crisp!')
+                && /^You hit /.test(game._pending_message || '');
         } else if (adtyp === 'AD_ELEC') {
-            await append_swallowed_damage_message('The air around you crackles with electricity.');
+            swallowedDamagePackedWithHeroHit = await append_swallowed_damage_message('The air around you crackles with electricity.')
+                && /^You hit /.test(game._pending_message || '');
         }
         break;
     case 'AD_PHYS':
@@ -952,6 +974,12 @@ async function engulf_attack(mtmp, attack, toHit) {
         game._swallowed_latched_overlay = game._swallowed_overlay;
         game._pending_swallowed_expulsion_mon = mtmp;
         game._pending_swallowed_display_clear = true;
+        swallowedDamagePackedWithHeroHit = false;
+    }
+    if (swallowedDamagePackedWithHeroHit && !game._more
+        && (game._pending_message?.length || 0) >= 54) {
+        queue_more_prompt();
+        game._swallowed_damage_more_latched = true;
     }
     return true;
 }
@@ -966,13 +994,20 @@ function physical_melee_attacks(mtmp, attacks, toHit) {
         if (toHit > rnd(20 + i)) {
             const verb = monster_attack_verb(attack, attackVerbCounts);
             const extra = adtyp === 'AD_ELEC' ? '  You get zapped!' : '';
-            hitMessages.push(`The ${monster_name(mtmp)} ${verb}!${extra}`);
+            const target = verb === 'touches' ? ' you' : '';
+            hitMessages.push(`The ${monster_name(mtmp)} ${verb}${target}!${extra}`);
             let damage = d(damn, damd);
             damage = elemental_hit_side_effects(mtmp, adtyp, damage);
             mhitm_knockback_frontdoor();
             damage = reduce_damage_by_negative_ac(damage);
+            if (adtyp === 'AD_COLD' && damage > 0)
+                game._pending_monster_attack_side_effect = "You're covered in frost!";
             const preDamageHp = game.u?.uhp ?? 0;
             apply_hero_damage(damage);
+            if (damage > 0 && /^You hear the studio audience applaud!$/.test(game._pending_message || '')) {
+                game._latched_status_uhp = preDamageHp;
+                game._clear_latched_status_after_more = true;
+            }
             if ((game.u?.uhp ?? 0) <= 0) {
                 if (!game._pet_combat_resume_active)
                     game._latched_status_uhp = preDamageHp <= 1 ? Math.max(0, preDamageHp) : 0;
@@ -1336,11 +1371,27 @@ export async function movemon() {
             if ((moveStatus !== MMOVE_MOVED && moveStatus !== MMOVE_DONE)
                 || (moveStatus === MMOVE_MOVED && can_attack_after_move_basic(mtmp, postMoveState))) {
                 await mattacku_basic(mtmp, postMoveState);
+                if (g._swallowed_damage_more_latched && g._more) {
+                    g._swallowed_damage_more_latched = false;
+                    g._resume_movemon_after_mon = mtmp;
+                    g._resume_somebody_can_move = mtmp.movement >= NORMAL_SPEED;
+                    g._monster_turn_paused_for_more = true;
+                    g._swallowed_damage_more_waiting = true;
+                    return false;
+                }
                 if (g._pending_swallowed_display_clear && g._more) {
                     g._resume_movemon_after_mon = mtmp;
                     g._resume_somebody_can_move = mtmp.movement >= NORMAL_SPEED;
                     g._monster_turn_paused_for_more = true;
                     g._swallowed_expulsion_paused_for_more = true;
+                    return false;
+                }
+                if (g._monster_attack_more_latched && g._more) {
+                    g._monster_attack_more_latched = false;
+                    g._resume_movemon_after_mon = mtmp;
+                    g._resume_somebody_can_move = mtmp.movement >= NORMAL_SPEED;
+                    g._monster_turn_paused_for_more = true;
+                    g._monster_attack_more_waiting = true;
                     return false;
                 }
                 if (g._fatal_monster_attack_paused && g._monster_turn_paused_for_more

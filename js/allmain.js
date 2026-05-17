@@ -446,11 +446,11 @@ async function refreshHallucinationDisplayAtInputBoundary(g) {
         g._hallucination_warning_rng_active = true;
         try {
             see_monsters();
+            see_objects();
+            see_traps();
         } finally {
             g._hallucination_warning_rng_active = false;
         }
-        see_objects();
-        see_traps();
     }
 }
 
@@ -480,6 +480,7 @@ export async function moveloop_core() {
     // Advance turn; run/rush movement may consume multiple turns before
     // returning to the input boundary.
     if (g.context?.move) {
+        if (g._monster_turn_paused_for_more && g._more) return;
         if (g._floor_list_pauses_turn && g._more) {
             g._floor_list_pauses_turn = false;
             g._resume_floor_list_turn = true;
