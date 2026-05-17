@@ -6832,7 +6832,7 @@ function selCoords(set) {
 }
 
 function hellTweaksProtectedOk(x, y) {
-    if (x < 2 || x > 76 || y < 3 || y > 19) return false;
+    if (x < 3 || x > 77 || y < 3 || y > 19) return false;
     if (x >= ASMO1_X && x < ASMO1_X + ASMO1_MAP[0].length
         && y >= ASMO1_Y && y < ASMO1_Y + ASMO1_MAP.length) return false;
     if (x >= ASMO2_X && x < ASMO2_X + ASMO2_MAP[0].length
@@ -6841,10 +6841,7 @@ function hellTweaksProtectedOk(x, y) {
 }
 
 function hellTweaksRandomPoint() {
-    // C ref: sp_lev.c:get_location() for this Lua selection context uses
-    // the current gx.xstart/gx.xsize area; Asmodeus evidence has xstart 0,
-    // xsize COLNO-1, giving x = rn2(79), y = rn2(21).
-    return { x: rn2(COLNO - 1), y: rn2(ROWNO) };
+    return { x: 1 + rn2(COLNO - 1), y: rn2(ROWNO) };
 }
 
 function hellTweaksSetRandom(set) {
@@ -6931,6 +6928,31 @@ function hellTweaksFloorSelection() {
     return set;
 }
 
+function hellTweaksMatchPattern(rows) {
+    const set = new Set();
+    const h = rows.length;
+    const w = rows[0]?.length ?? 0;
+    const cx = Math.trunc(w / 2);
+    const cy = Math.trunc(h / 2);
+    for (let x = 1; x < COLNO; x++) {
+        for (let y = 0; y < ROWNO; y++) {
+            let ok = true;
+            for (let py = 0; py < h && ok; py++) {
+                for (let px = 0; px < w; px++) {
+                    const tx = x + px - cx;
+                    const ty = y + py - cy;
+                    const typ = isok(tx, ty) ? game.level?.at(tx, ty)?.typ : STONE;
+                    const ch = rows[py][px];
+                    if (ch === '.' && typ !== ROOM) { ok = false; break; }
+                    if (ch === 'w' && !IS_STWALL(typ)) { ok = false; break; }
+                }
+            }
+            if (ok) selPoint(set, x, y);
+        }
+    }
+    return set;
+}
+
 function applyTerrainSelection(set, typ) {
     for (const { x, y } of selCoords(set)) {
         const loc = game.level?.at(x, y);
@@ -6988,6 +7010,31 @@ function hellTweaksAsmodeus() {
             applyTerrainSelection(hellTweaksPercentage(riverbanks, prc), ROOM);
         }
         applyTerrainSelection(allrivers, LAVAPOOL);
+    }
+    if (rn2(100) < 20) {
+        const amount = 3 * (1 + rn2(8));
+        let bwalls = new Set([
+            ...hellTweaksPercentage(hellTweaksMatchPattern(['.w.']), amount),
+            ...hellTweaksPercentage(hellTweaksMatchPattern(['.', 'w', '.']), amount),
+        ]);
+        bwalls = hellTweaksFilterProtected(bwalls);
+        for (const { x, y } of selCoords(bwalls).sort((a, b) => a.y - b.y || a.x - b.x)) {
+            applyTerrainSelection(selPoint(new Set(), x, y), ROOM);
+            mksobj_at(BOULDER, x, y, true, false);
+        }
+    }
+    if (rn2(100) < 20) {
+        const amount = 3 * (1 + rn2(8));
+        let fwalls = new Set([
+            ...hellTweaksPercentage(hellTweaksMatchPattern(['.w.']), amount),
+            ...hellTweaksPercentage(hellTweaksMatchPattern(['.', 'w', '.']), amount),
+        ]);
+        fwalls = hellTweaksGrow(fwalls, 'all');
+        const wallSet = hellTweaksMatchPattern(['w']);
+        fwalls = hellTweaksFilterProtected(new Set(selCoords(fwalls)
+            .filter(p => selHas(wallSet, p.x, p.y))
+            .map(p => selKey(p.x, p.y))));
+        applyTerrainSelection(fwalls, IRONBARS);
     }
 }
 
