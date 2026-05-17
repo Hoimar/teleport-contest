@@ -3781,6 +3781,7 @@ function castleMonsterClass(ch) {
     case 'O': return 'S_OGRE';
     case 'R': return 'S_RUSTMONST';
     case 'T': return 'S_TROLL';
+    case 'V': return 'S_VAMPIRE';
     case 'X': return 'S_XORN';
     case 'Z': return 'S_ZOMBIE';
     case 'D': return 'S_DRAGON';
