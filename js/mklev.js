@@ -385,7 +385,7 @@ const MONSTERS = MONSTER_DATA.map(([name, mlet, mlevel, mmove, maligntyp, geno, 
 const SPECIAL_PM = MONSTERS.findIndex(mon => mon.name === 'LONG_WORM_TAIL');
 const MONGEN_ORDER_LIMIT = SPECIAL_PM >= 0 ? SPECIAL_PM : MONSTERS.length;
 
-const MONSTER_SYMBOLS = {
+export const MONSTER_SYMBOLS = {
     S_ANT: 'a', S_BLOB: 'b', S_COCKATRICE: 'c', S_DOG: 'd',
     S_EYE: 'e', S_FELINE: 'f', S_GREMLIN: 'g', S_HUMANOID: 'h',
     S_IMP: 'i', S_JELLY: 'j', S_KOBOLD: 'k', S_LEPRECHAUN: 'l',
@@ -429,7 +429,7 @@ function monsterName(mon) {
     return typeof mon === 'string' ? mon : mon.name;
 }
 
-function monsterPtr(mon) {
+export function monsterPtr(mon) {
     if (!mon) return null;
     if (typeof mon === 'object') return mon;
     return MONSTERS.find(ptr => ptr.name === mon) || null;
@@ -1607,7 +1607,7 @@ function mkclass_aligned(mlet, spc = 0, atyp = A_NONE) {
     return null;
 }
 
-function adj_lev_for(ptr) {
+export function adj_lev_for(ptr) {
     if (!ptr) return 0;
     let tmp = ptr.mlevel ?? 0;
     if (tmp > 49) return 50;
@@ -1621,7 +1621,7 @@ function adj_lev_for(ptr) {
     return tmp > limit ? limit : (tmp > 0 ? tmp : 0);
 }
 
-function newmonhp_for(ptr, monLevel = adj_lev_for(ptr)) {
+export function newmonhp_for(ptr, monLevel = adj_lev_for(ptr)) {
     if (!ptr) return 0;
     const lev = monLevel;
     if (ptr.mlet === 'S_GOLEM') return lev;

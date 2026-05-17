@@ -1,7 +1,7 @@
 import { game } from './gstate.js';
 import { d, rn2, rnd } from './rng.js';
 import { dog_move } from './dog.js';
-import { enexto_core } from './mklev.js';
+import { adj_lev_for, enexto_core, monsterPtr, MONSTER_SYMBOLS, newmonhp_for } from './mklev.js';
 import { OBJECT_CLASS, OBJECT_DIR } from './object_data.js';
 import {
     D_BROKEN, D_CLOSED, D_ISOPEN, D_LOCKED, D_NODOOR, D_TRAPPED,
@@ -1356,9 +1356,74 @@ function were_change(mtmp) {
     }
 }
 
+function vampire_shifter_base(ptr) {
+    return ptr?.name === 'VAMPIRE'
+        || ptr?.name === 'VAMPIRE_LORD'
+        || ptr?.name === 'VLAD_THE_IMPALER';
+}
+
+function shapeshift_pool_or_lava(mon) {
+    const typ = game.level?.at(mon.mx, mon.my)?.typ;
+    return typ != null && (IS_POOL(typ) || IS_LAVA(typ));
+}
+
+function pick_vampire_shape(mon) {
+    const cham = mon?.cham;
+    let ptr = cham;
+    let wolfchance = 10;
+    if (cham?.name === 'VLAD_THE_IMPALER') wolfchance = 3;
+    if ((cham?.name === 'VLAD_THE_IMPALER' || cham?.name === 'VAMPIRE_LORD')
+        && !rn2(wolfchance) && !shapeshift_pool_or_lava(mon)) {
+        ptr = monsterPtr('WOLF');
+    } else if (vampire_shifter_base(cham)) {
+        ptr = !rn2(4) ? monsterPtr('FOG_CLOUD') : monsterPtr('VAMPIRE_BAT');
+    }
+    if (ptr && mon.data?.name !== cham?.name && !rn2(4)) return cham;
+    return ptr;
+}
+
+function apply_newcham_basic(mon, ptr) {
+    if (!mon || !ptr || mon.data?.name === ptr.name) return false;
+    if (!ptr.male && !ptr.female && !ptr.neuter) rn2(10);
+    const monLevel = adj_lev_for(ptr);
+    const hp = newmonhp_for(ptr, monLevel);
+    mon.data = { ...ptr, mmove: ptr.mmove ?? 12 };
+    mon.ch = MONSTER_SYMBOLS[ptr.mlet] ?? mon.ch ?? 'm';
+    mon.color = ptr.color ?? mon.color ?? 15;
+    mon.m_lev = monLevel;
+    mon.mhp = hp;
+    mon.mhpmax = hp;
+    return true;
+}
+
+function decide_to_shapeshift_basic(mon) {
+    if (!vampire_shifter_base(mon?.cham)) return;
+    if (mon.data?.mlet !== 'S_VAMPIRE') {
+        let ptr = null;
+        let change = false;
+        if (mon.mhp <= Math.trunc(((mon.mhpmax ?? 0) + 5) / 6) && rn2(4)) {
+            ptr = mon.cham;
+            change = true;
+        } else if (mon.data?.name === 'FOG_CLOUD'
+                   && mon.mhp === mon.mhpmax
+                   && !rn2(4)
+                   && (!cansee(mon.mx, mon.my) || dist2(mon.mx, mon.my, game.u?.ux ?? 0, game.u?.uy ?? 0) > BOLT_LIM * BOLT_LIM)) {
+            ptr = pick_vampire_shape(mon);
+            change = !!ptr && ptr.name !== mon.data?.name;
+        }
+        if (change) apply_newcham_basic(mon, ptr);
+    } else if (mon.mhp >= Math.trunc(9 * (mon.mhpmax ?? 0) / 10)
+               && !rn2(6)
+               && (!cansee(mon.mx, mon.my) || dist2(mon.mx, mon.my, game.u?.ux ?? 0, game.u?.uy ?? 0) > BOLT_LIM * BOLT_LIM)) {
+        const ptr = pick_vampire_shape(mon);
+        if (ptr) apply_newcham_basic(mon, ptr);
+    }
+}
+
 export function mcalcdistress() {
     for (const mtmp of game.level?.monsters || []) {
         if (mtmp.mspec_used) mtmp.mspec_used--;
+        if (mtmp.cham) decide_to_shapeshift_basic(mtmp);
         were_change(mtmp);
         if (mtmp.mfrozen && --mtmp.mfrozen <= 0) {
             mtmp.mfrozen = 0;
