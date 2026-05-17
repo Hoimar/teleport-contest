@@ -1443,7 +1443,8 @@ function align_shift(ptr) {
 function uncommon_monster(ptr) {
     if (!ptr) return true;
     if (ptr.geno & (G_NOGEN | G_UNIQ)) return true;
-    return !!(ptr.geno & (Inhell() ? G_NOHELL : G_HELL));
+    if (Inhell()) return (ptr.maligntyp ?? 0) > 0 || !!(ptr.geno & G_NOHELL);
+    return !!(ptr.geno & G_HELL);
 }
 
 function rndmonst_adj(minadj = 0, maxadj = 0) {
