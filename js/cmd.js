@@ -22,6 +22,7 @@ import { adjalign, exercise, gethungry } from './allmain_turns.js';
 import { initrack } from './track.js';
 import { roleGod } from './roles.js';
 import { d, rn1, rn2, rnd, rnl, rnz } from './rng.js';
+import { dist2 } from './hacklib.js';
 import { getObjectDescription } from './o_init.js';
 import { getRumor, hallucinatedLiquidName, randomHallucinatedMonsterName } from './random_text.js';
 import { finish_pending_swallowed_expulsion } from './monmove.js';
@@ -29,7 +30,7 @@ import { ATR_INVERSE, NO_COLOR } from './terminal.js';
 import * as C from './const.js';
 import {
     COLNO, ROWNO, STONE, CORR, DOOR, D_NODOOR, D_CLOSED, D_LOCKED,
-    SDOOR, SCORR, IS_WALL, IS_OBSTRUCTED, IS_POOL, LR_UPTELE, A_STR, A_DEX, A_CON, A_WIS,
+    SDOOR, SCORR, IS_WALL, IS_OBSTRUCTED, IS_POOL, LR_UPTELE, LR_DOWNTELE, A_STR, A_DEX, A_CON, A_WIS,
 } from './const.js';
 
 // Direction deltas: y u k
@@ -2497,7 +2498,9 @@ function enqueueLevelchangePostMessages(oldLevel, newLevel) {
 }
 
 export async function performLevelTeleport(target) {
-    const migratingPet = (game.level?.monsters || []).find(m => m.mtame);
+    const oldUz = { ...(game.u?.uz || { dnum: 0, dlevel: 1 }) };
+    const migratingPet = (game.level?.monsters || []).find(m =>
+        m.mtame && dist2(m.mx, m.my, game.u?.ux ?? m.mx, game.u?.uy ?? m.my) < 3);
     game._migrating_pet = migratingPet ? {
         ...migratingPet,
         data: migratingPet.data ? { ...migratingPet.data } : migratingPet.data,
@@ -2507,7 +2510,15 @@ export async function performLevelTeleport(target) {
         ? { ...target }
         : { ...(game.u.uz || { dnum: 0 }), dlevel: target };
     await mklev();
-    place_lregion(0, 0, 0, 0, 0, 0, 0, 0, LR_UPTELE, null);
+    const goingUp = displayDepth(game.u.uz) < displayDepth(oldUz);
+    const dest = goingUp ? game.updest : game.dndest;
+    if (dest?.lx) {
+        place_lregion(dest.lx, dest.ly, dest.hx, dest.hy,
+            dest.nlx, dest.nly, dest.nhx, dest.nhy,
+            goingUp ? LR_UPTELE : LR_DOWNTELE, null);
+    } else {
+        place_lregion(0, 0, 0, 0, 0, 0, 0, 0, LR_UPTELE, null);
+    }
     pet_arrive_with_you();
     initrack();
     vision_reset();
