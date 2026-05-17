@@ -92,7 +92,8 @@ const RANSEUR = 57;
 const SPETUM = 58;
 const BEC_DE_CORBIN = 67;
 const AKLYS = 80;
-const BASIC_MELEE_ATTACKS = new Set(['AT_CLAW', 'AT_KICK', 'AT_BITE', 'AT_STNG', 'AT_TUCH', 'AT_BUTT', 'AT_TENT']);
+const ORCISH_DAGGER = 36;
+const BASIC_MELEE_ATTACKS = new Set(['AT_CLAW', 'AT_KICK', 'AT_BITE', 'AT_STNG', 'AT_TUCH', 'AT_BUTT', 'AT_TENT', 'AT_WEAP']);
 const DISTANCE_ATTACK_TYPES = new Set(['AT_SPIT', 'AT_BREA', 'AT_MAGC', 'AT_GAZE']);
 
 export function mcalcmove(mtmp, m_moving) {
@@ -581,6 +582,17 @@ function floor_object_name(obj) {
     return 'an object';
 }
 
+function monster_weapon_name(obj) {
+    if (obj?.otyp === ORCISH_DAGGER) return 'crude dagger';
+    return floor_object_name(obj).replace(/^(?:an?|the) /, '');
+}
+
+function monster_possessive(mtmp) {
+    if (mtmp?.female) return 'her';
+    if (mtmp?.male) return 'his';
+    return 'its';
+}
+
 function occupation_message_boundary_active() {
     return (game._occupation_turns_remaining || 0) > 0 || !!game._occupation_finish_message;
 }
@@ -785,9 +797,10 @@ function attack_is_basic_physical(attack) {
         && damd > 0;
 }
 
-function basic_physical_attacks(mtmp) {
+function basic_physical_attacks(mtmp, includeWeapon = true) {
     const attacks = mtmp.data?.mattk || [];
     if (!attacks.filter(Boolean).length) return null;
+    if (!includeWeapon && attacks.some((attack) => attack?.[0] === 'AT_WEAP')) return null;
     if (!attacks.every(attack_is_basic_physical)) return null;
     return attacks;
 }
@@ -1030,7 +1043,9 @@ async function physical_melee_attacks(mtmp, attacks, toHit) {
             const verb = monster_attack_verb(attack, attackVerbCounts);
             const extra = adtyp === 'AD_ELEC' ? '  You get zapped!' : '';
             const target = verb === 'touches' ? ' you' : '';
-            const line = `The ${monster_name(mtmp)} ${verb}${target}!${extra}`;
+            const line = verb === 'weapon'
+                ? `The ${monster_name(mtmp)} thrusts ${monster_possessive(mtmp)} ${monster_weapon_name(mtmp.mw)}.  The ${monster_name(mtmp)} hits!`
+                : `The ${monster_name(mtmp)} ${verb}${target}!${extra}`;
             if (hitMessages.length
                 && `${hitMessages.join('  ')}  ${line}`.length >= (game.nhDisplay?.cols || 80)) {
                 if (await latch_monster_attack_more_frame(hitMessages.join('  ')))
@@ -1038,6 +1053,7 @@ async function physical_melee_attacks(mtmp, attacks, toHit) {
             }
             hitMessages.push(line);
             let damage = d(damn, damd);
+            if (verb === 'weapon') damage += monster_weapon_damage(mtmp.mw);
             damage = elemental_hit_side_effects(mtmp, adtyp, damage);
             mhitm_knockback_frontdoor();
             damage = reduce_damage_by_negative_ac(damage);
@@ -1061,7 +1077,9 @@ async function physical_melee_attacks(mtmp, attacks, toHit) {
             }
         } else {
             const miss = toHit === roll ? 'just misses' : 'misses';
-            const line = `The ${monster_name(mtmp)} ${miss}!`;
+            const line = attack?.[0] === 'AT_WEAP'
+                ? `The ${monster_name(mtmp)} thrusts ${monster_possessive(mtmp)} ${monster_weapon_name(mtmp.mw)}.  The ${monster_name(mtmp)} ${miss}!`
+                : `The ${monster_name(mtmp)} ${miss}!`;
             if (hitMessages.length
                 && `${hitMessages.join('  ')}  ${line}`.length >= (game.nhDisplay?.cols || 80)) {
                 if (await latch_monster_attack_more_frame(hitMessages.join('  ')))
@@ -1081,7 +1099,8 @@ async function physical_melee_attacks(mtmp, attacks, toHit) {
 function monster_attack_verb(attack, counts) {
     const [aatyp] = attack || [];
     let verb = 'hits';
-    if (aatyp === 'AT_BITE') verb = 'bites';
+    if (aatyp === 'AT_WEAP') verb = 'weapon';
+    else if (aatyp === 'AT_BITE') verb = 'bites';
     else if (aatyp === 'AT_STNG') verb = 'stings';
     else if (aatyp === 'AT_KICK') verb = 'kicks';
     else if (aatyp === 'AT_BUTT') verb = 'butts';
@@ -1091,6 +1110,11 @@ function monster_attack_verb(attack, counts) {
     const seen = counts.get(verb) || 0;
     counts.set(verb, seen + 1);
     return seen > 0 && verb === 'hits' ? 'hits again' : verb;
+}
+
+function monster_weapon_damage(obj) {
+    if (obj?.otyp === ORCISH_DAGGER) return rnd(3);
+    return 0;
 }
 
 async function mattacku_basic(mtmp, state) {
@@ -1110,7 +1134,7 @@ async function mattacku_basic(mtmp, state) {
         return true;
     }
     const engulf = basic_engulf_attack(mtmp);
-    const physical = engulf ? null : basic_physical_attacks(mtmp);
+    const physical = engulf ? null : basic_physical_attacks(mtmp, !rangeWeapon);
     if (!engulf && !physical && !rangeWeapon) return false;
     const toHit = mattacku_to_hit(mtmp);
     if (game._hero_melee_message_pending && game._pending_message) queue_more_prompt();

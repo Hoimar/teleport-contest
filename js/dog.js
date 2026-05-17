@@ -438,6 +438,15 @@ async function append_topline_message(line) {
             game._pet_combat_more_latched = true;
             return;
         }
+        if (/^The .+ thrusts .+\.  The .+ (?:hits|misses|just misses)!$/.test(game._pending_message)) {
+            queue_more_prompt();
+            game._after_more_message = game._after_more_message
+                ? `${game._after_more_message}  ${line}`
+                : line;
+            game._after_more_needs_prompt = false;
+            game._pet_combat_more_latched = true;
+            return;
+        }
         game._pending_message = `${game._pending_message}  ${line}`;
         queue_more_prompt();
         game._pet_combat_more_latched = true;
