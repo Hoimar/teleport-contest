@@ -373,10 +373,19 @@ export async function advanceTurn() {
     }
 
     if (!resumeTurnTailOnly) {
-        while (await movemon()) {
-            // Keep moving monsters until all out of movement.
-        }
+        const firstScanCanMove = await movemon();
         if (g._monster_turn_paused_for_more) return;
+        if (g._fast_extra_action_pending) {
+            g._fast_extra_action_pending = false;
+            g._pet_combat_resume_active = false;
+            g._savelife_resume_active = false;
+            return;
+        }
+        let monscanmove = firstScanCanMove;
+        while (monscanmove) {
+            monscanmove = await movemon();
+            if (g._monster_turn_paused_for_more) return;
+        }
     }
 
     mcalcdistress();
@@ -386,7 +395,7 @@ export async function advanceTurn() {
     }
 
     await maybe_generate_rnd_mon();
-    if (g.u?.uprops?.fast) rn2(3);
+    if (g.u?.uprops?.fast) g._fast_extra_action_pending = rn2(3) !== 0;
     settrack();
 
     regen_hp();

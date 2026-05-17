@@ -3503,7 +3503,12 @@ export async function rhack(key) {
         game.context.move = 0;
         game._forcefight_pending = true;
     } else if (ch === '.') {
-        game.context.move = 1;
+        if (!forceCommandPrefix && await cmdSafetyPrevention('Waiting', 'a no-op (to rest)',
+            'Are you waiting to get hit?', '_did_nothing_flag')) {
+            game.context.move = 0;
+        } else {
+            game.context.move = 1;
+        }
     } else if (ch === 's') {
         if (!forceCommandPrefix && await cmdSafetyPrevention('Searching', 'another search',
             'You already found a monster.', '_already_found_flag')) {
