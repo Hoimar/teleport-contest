@@ -133,6 +133,7 @@ const ELVEN_SHIELD = 153;
 const ELVEN_BOOTS = 169;
 const FUMBLE_BOOTS = 171;
 const LEVITATION_BOOTS = 172;
+const ROBE = 149;
 const TIN_WHISTLE = 245;
 const SKELETON_KEY = 221;
 const FIGURINE = 241;
@@ -178,6 +179,7 @@ const POT_GAIN_ENERGY = 313;
 const POT_SLEEPING = 314;
 const POT_POLYMORPH = 316;
 const POT_ACID = 320;
+const POT_WATER = 322;
 const SCR_ENCHANT_WEAPON = 328;
 const SCR_ENCHANT_ARMOR = 323;
 const SCR_CONFUSE_MONSTER = 325;
@@ -1562,6 +1564,14 @@ function init_mon_gender_for(ptr) {
 function m_initinv_for(ptr, mon = null) {
     if (!ptr) return;
     const monLevel = adj_lev_for(ptr);
+    if (ptr.name === 'PRIEST' && ptr.difficulty >= 15) {
+        if (rn2(7)) mksobj(ROBE, true, false);
+        mksobj(SMALL_SHIELD, true, false);
+        if (!rn2(10)) {
+            const water = mksobj(POT_WATER, true, false);
+            bless(water);
+        }
+    }
     if (ptr.mlet === 'S_GNOME' && !rn2(60)) {
         mksobj(rn2(4) ? 370 : 371, true, false);
     }
@@ -1867,6 +1877,11 @@ function m_initweap_general_for(ptr) {
 function m_initweap_for(ptr) {
     if (!ptr) return;
     if (ptr.name === 'SHOPKEEPER') {
+        maybe_init_offensive_item_for(ptr);
+        return;
+    }
+    if (ptr.name === 'PRIEST' && ptr.difficulty >= 15) {
+        mksobj(MACE, true, false);
         maybe_init_offensive_item_for(ptr);
         return;
     }
@@ -3516,6 +3531,41 @@ function valleyAddFillRoom(x1, y1, x2, y2, lit, rtype) {
     }
 }
 
+function templeAltarInRoom(croom) {
+    for (let x = croom.lx; x <= croom.hx; x++)
+        for (let y = croom.ly; y <= croom.hy; y++)
+            if (game.level?.at(x, y)?.typ === ALTAR) return { x, y };
+    return {
+        x: Math.trunc((croom.lx + croom.hx) / 2),
+        y: Math.trunc((croom.ly + croom.hy) / 2),
+    };
+}
+
+function priestini(croom) {
+    // C ref: priest.c:priestini() fills temple rooms after special fixup.
+    const altar = templeAltarInRoom(croom);
+    const spots = [];
+    for (let dy = -1; dy <= 1; dy++)
+        for (let dx = -1; dx <= 1; dx++) {
+            if (!dx && !dy) continue;
+            const x = altar.x + dx, y = altar.y + dy;
+            const loc = game.level?.at(x, y);
+            if (loc && SPACE_POS(loc.typ)) spots.push({ x, y });
+        }
+    const pos = spots.length ? spots[rn2(spots.length)] : altar;
+    const priest = MONSTERS.find(m => m.name === 'PRIEST' && m.difficulty >= 15)
+        || MONSTERS.find(m => m.name === 'PRIEST');
+    makemon(priest, pos.x, pos.y, MM_ASLEEP | MM_NOGRP);
+    const mon = game.level?.monsters?.[0];
+    if (mon && mon.mx === pos.x && mon.my === pos.y) mon.ispriest = 1;
+    rn2(3);
+    for (let i = 0; i < 2; i++) {
+        const book = rnd_class(class_base(SPBOOK_CLASS), 407);
+        mksobj(book, true, false);
+    }
+    rn2(2);
+}
+
 function flipRectForBounds(rect, flp, minx, miny, maxx, maxy) {
     let { x1, y1, x2, y2 } = rect;
     if (flp & 1) {
@@ -3548,6 +3598,9 @@ function registerValleyLregions(flp, bounds) {
 
 function loadValleySpecial() {
     // C ref: dat/valley.lua loaded through sp_lev.c:lspo_map().
+    rn2(3); // getbones()
+    rn2(3); rn2(2); // nhlib shuffle()
+    rn2(2); // splev_initlev()
     for (let y = 0; y < ROWNO; y++)
         for (let x = 1; x < COLNO; x++)
             game.level.at(x, y).typ = STONE;
@@ -6032,6 +6085,9 @@ function fill_special_room(croom) {
         fill_zoo(croom);
         if (croom.rtype === ZOO) game.level.flags.has_zoo = true;
         if (croom.rtype === MORGUE) game.level.flags.has_morgue = true;
+    } else if (croom.rtype === TEMPLE) {
+        priestini(croom);
+        game.level.flags.has_temple = true;
     } else if (croom.rtype >= SHOPBASE) {
         stock_room(croom);
     }
