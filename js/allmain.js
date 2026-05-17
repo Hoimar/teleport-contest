@@ -8,7 +8,7 @@ import { game } from './gstate.js';
 import { rn2, rnd } from './rng.js';
 import {
     maybe_generate_rnd_mon, regen_hp, gethungry, exerchk,
-    maybe_wipe_engraving, maybe_update_seer_turn, dosounds,
+    maybe_wipe_engraving, maybe_update_seer_turn, dosounds, exercise,
 } from './allmain_turns.js';
 import { mcalcdistress, mcalcmove, movemon } from './monmove.js';
 import { initrack, settrack } from './track.js';
@@ -27,7 +27,7 @@ import {
 import { vision_recalc, vision_reset, init_vision_globals } from './vision.js';
 import { findAlign, findRace, findRole, roleGod, roleGreeting, roleWithStartingRank } from './roles.js';
 import { NO_COLOR } from './terminal.js';
-import { COLNO } from './const.js';
+import { A_WIS, COLNO } from './const.js';
 import * as ff8000 from './fastforward.js';
 import * as ff0002 from './fastforward0002.js';
 
@@ -37,6 +37,8 @@ const STARTUP_REPLAY_BY_SEED = new Map([
     [2, ff0002],
     [8000, ff8000],
 ]);
+
+const SPEED_BOOTS = 166;
 
 function startupReplayForCurrentSeed() {
     return STARTUP_REPLAY_BY_SEED.get(game._seed) || null;
@@ -412,6 +414,19 @@ function occupationPending(g) {
     return (g._occupation_turns_remaining || 0) > 0 || !!g._occupation_finish_message;
 }
 
+function applyOccupationFinishObjectEffects(g) {
+    const obj = g._occupation_finish_object;
+    if (!obj) return;
+    g._occupation_finish_object = null;
+    if (obj.otyp === SPEED_BOOTS) {
+        const discovered = g.discoveredObjects || (g.discoveredObjects = new Set());
+        if (!discovered.has(obj.otyp)) {
+            discovered.add(obj.otyp);
+            exercise(A_WIS, true);
+        }
+    }
+}
+
 async function runSwallowedPreFinishTurn(g) {
     if (!g._occupation_finish_message || !g.u?.uswallow || !g.u?.ustuck) return;
     if (g._occupation_pre_finish_swallowed_turn_done) return;
@@ -446,6 +461,7 @@ async function continueOccupationTurns(g) {
             g._occupation_finish_uac = null;
         }
         await runSwallowedPreFinishTurn(g);
+        applyOccupationFinishObjectEffects(g);
         if (g._pending_message && g._occupation_pack_finish_message) {
             await append_pline(g._occupation_finish_message);
             g._occupation_pack_finish_message = false;

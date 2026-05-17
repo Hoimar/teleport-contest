@@ -904,6 +904,7 @@ async function start_wearing_object(obj) {
         game._occupation_turns_remaining = Math.max(0, delay - 1);
         game._occupation_finish_message = armor_finish_message(obj);
         game._occupation_finish_uac = calculated_armor_class();
+        game._occupation_finish_object = obj;
         await pline(`You start putting on ${inventoryObjectName(obj)}.`);
     } else {
         if (obj.oclass === ARMOR_CLASS) game.u.uac = calculated_armor_class();
