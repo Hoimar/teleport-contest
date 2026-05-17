@@ -93,6 +93,8 @@ const OBJECT_BASE_NAMES = new Map([
     [MIRROR, 'mirror'],
     [STETHOSCOPE, 'stethoscope'],
     [MAGIC_MARKER, 'magic marker'],
+    [257, 'drum'],
+    [258, 'drum'],
     [306, 'potion of see invisible'],
     [307, 'potion of healing'],
     [308, 'potion of extra healing'],
@@ -963,6 +965,12 @@ async function attackMonster(mon) {
 
 async function swapWithSafeMonster(mon, x, y) {
     const u = game.u;
+    if (!rn2(7)) {
+        if (mon.mtame) rnd(6);
+        await pline(`You stop.  ${monsterSwapName(mon).replace(/^your /, 'Your ')} is in the way!`);
+        game.context.run = null;
+        return;
+    }
     const oldx = u.ux;
     const oldy = u.uy;
     u.ux = x;

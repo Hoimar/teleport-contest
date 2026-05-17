@@ -16,11 +16,12 @@ and `feature_map.md`.
 - Baseline commit at harness cleanup: `f0fdc38`.
 - Active target: `seed0002-healer-reflection-drummer`.
 - Active hypothesis: seed0002 is now past the legacy tutorial prompt,
-  startup wand color mismatch, floor-look/pickup, and safe pet-displacement
-  message. The next visible blocker is screen 17, key `k`: the message
-  `You swap places with your little dog.` matches, but the displaced dog moves
-  to the wrong adjacent square during the following monster phase. This points
-  at `dog_move()` candidate/goal ordering after displacement.
+  startup wand color mismatch, floor-look/pickup, safe pet-displacement, and
+  the engraving-wipe success amount. The next visible blocker is screen 21/22:
+  JS prints `You see here a drum.` but C packs `You hear a slow drip.` onto the
+  same topline. First RNG evidence points at a missing `obj_resists()` in
+  `dog_goal()`/floor-object scanning, likely retained level-object state rather
+  than a message-packing bug.
 
 ## Latest Verification
 
@@ -32,16 +33,16 @@ npm run verify -- --target seed0002-healer-reflection-drummer
 
 Result:
 
-- Target: `seed0002-healer-reflection-drummer` `S 17/595 R 2597/27158`,
-  first screen `17:char:map:k`, first RNG
-  `2420:rn2(7)=5=>rn2(5)=2`, cursor-only `0`.
-- Sentinel total: `S 340/1063 R 30238/64569`.
+- Target: `seed0002-healer-reflection-drummer` `S 22/595 R 2697/27158`,
+  first screen `21:char:mixed:b`, first RNG
+  `2526:rn2(100)=5=>rn2(1)=0`, cursor-only `0`.
+- Sentinel total: `S 345/1063 R 30325/64569`.
 - Sentinel details:
   - `seed8000-tourist-starter`: `S 23/23 R 3060/3130`, first RNG `3047`.
-  - `seed0002-healer-reflection-drummer`: `S 17/595 R 2597/27158`, first RNG `2420`.
+  - `seed0002-healer-reflection-drummer`: `S 22/595 R 2697/27158`, first RNG `2526`.
   - `seed0013-friday13-save-then-fullmoon-restore`: `S 0/99 R 583/4804`, first RNG `540`.
   - `seed0116-wizard-wear-shop`: `S 127/127 R 12562/12562`, pass.
-  - `seed0383-wizard-hallucinate`: `S 173/219 R 11436/16915`.
+  - `seed0383-wizard-hallucinate`: `S 173/219 R 11423/16915`.
 - Hack-debt audit: hard `0`, suspicious `37` existing replay/override/seed findings.
 - Memory lint: clean after this compaction target.
 - Full suite after the latest pet-combat/death timing change: `S 826/11405 R 102576/792838`.
@@ -102,14 +103,17 @@ Result:
      evidence points at earlier `docrt()`/`newsym()` display-RNG state and
      retained glyph timing rather than core RNG or per-screen forcing.
    - Do not add seed-specific color sequences.
-3. Continue `seed0002-healer-reflection-drummer` movement/pet-goal ordering.
-   - Current state: `S 17/595 R 2597/27158`.
-   - First visible mismatch is map-only on screen 17, key `k`.
-   - First RNG mismatch is `FR 2420` (`rn2(7)` expected vs `rn2(5)` actual).
-   - The swap message matches; before the key screen 16 matches. After the
-     swap, JS places the dog at the hero's old position but the following
-     `dog_move()` chooses up-left while C chooses down-right. Investigate
-     dog candidate list/goal ordering after displacement, not pickup or text.
+3. Continue `seed0002-healer-reflection-drummer` retained-object/dog-goal work.
+   - Current state: `S 22/595 R 2697/27158`.
+   - First visible mismatch is screen 21 (`b`): expected
+     `You see here a drum.  You hear a slow drip.`, actual
+     `You see here a drum.`
+   - First RNG mismatch is `FR 2526` (`rn2(100)` expected vs `rn2(1)` actual).
+   - The previous safe-pet guard and engraving-wipe gaps are fixed. The C log
+     for step 20 shows one more `obj_resists(zap.c:1469)` before `dog_move()`
+     enters its equal-candidate `rn2(1)`; JS appears to have fewer retained
+     floor objects in/near the little dog's search/candidate area. Do not add
+     fake resistance rolls; inspect C/JS object retention for seed0002.
 4. Broaden `o_init`/`objnam`/discovery state away from limited evidence tables.
 5. Broaden sleeping/hider front doors only when current C evidence reaches them.
 
