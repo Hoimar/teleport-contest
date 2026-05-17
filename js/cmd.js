@@ -1941,6 +1941,8 @@ export async function rhack(key) {
     if (game._death_prompt_active) {
         if (ch === 'y' || ch === 'Y') {
             game._death_prompt_active = false;
+            game._fatal_monster_attack_paused = false;
+            game._resume_turn_tail_after_more = false;
             game._latched_status_uhp = null;
             game.program_state = game.program_state || {};
             game.program_state.gameover = true;
@@ -1949,11 +1951,13 @@ export async function rhack(key) {
         }
         if (ch === 'n' || ch === 'N' || ch === ' ' || ch === '\r' || ch === '\n') {
             game._death_prompt_active = false;
+            const resumeTailOnly = !!game._resume_turn_tail_after_more;
+            game._fatal_monster_attack_paused = false;
             game._prompt_cursor = null;
             if (game.u && typeof game.u.uhp === 'number')
                 game.u.uhp = Math.max(1, game.u.uhpmax || game.u.uhp);
             game._latched_status_uhp = null;
-            if (game._monster_turn_paused_for_more) {
+            if (game._monster_turn_paused_for_more && !resumeTailOnly) {
                 game._nomovemsg = 'You survived that attempt on your life.';
                 await pline("OK, so you don't die.");
                 game._monster_turn_paused_for_more = false;
@@ -1962,7 +1966,13 @@ export async function rhack(key) {
                 game.context.move = 1;
             } else {
                 await pline("OK, so you don't die.  You survived that attempt on your life.");
-                game.context.move = 0;
+                if (resumeTailOnly) {
+                    game._monster_turn_paused_for_more = false;
+                    game._savelife_resume_active = true;
+                    game.context.move = 1;
+                } else {
+                    game.context.move = 0;
+                }
             }
             return;
         }

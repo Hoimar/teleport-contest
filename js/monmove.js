@@ -904,9 +904,16 @@ function physical_melee_attacks(mtmp, attacks, toHit) {
             damage = elemental_hit_side_effects(mtmp, adtyp, damage);
             mhitm_knockback_frontdoor();
             damage = reduce_damage_by_negative_ac(damage);
+            const preDamageHp = game.u?.uhp ?? 0;
             apply_hero_damage(damage);
             if ((game.u?.uhp ?? 0) <= 0) {
+                if (!game._pet_combat_resume_active)
+                    game._latched_status_uhp = Math.max(0, preDamageHp);
                 game._monster_death_pending = true;
+                if (!game._pet_combat_resume_active) {
+                    game._fatal_monster_attack_paused = true;
+                    game._monster_turn_paused_for_more = true;
+                }
                 break;
             }
         }
@@ -1255,6 +1262,11 @@ export async function movemon() {
             if ((moveStatus !== MMOVE_MOVED && moveStatus !== MMOVE_DONE)
                 || (moveStatus === MMOVE_MOVED && can_attack_after_move_basic(mtmp, postMoveState))) {
                 await mattacku_basic(mtmp, postMoveState);
+                if (g._fatal_monster_attack_paused && g._monster_turn_paused_for_more
+                    && g._more && !hallucinating()) {
+                    g._resume_turn_tail_after_more = true;
+                    return false;
+                }
                 if (g._pet_combat_resume_active && g._more && !hallucinating()) {
                     g._pet_combat_resume_active = false;
                     g._resume_movemon_after_mon = mtmp;

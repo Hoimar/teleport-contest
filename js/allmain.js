@@ -329,6 +329,8 @@ export async function newgame() {
 
 export async function advanceTurn() {
     const g = game;
+    const resumeTurnTailOnly = !!g._resume_turn_tail_after_more;
+    g._resume_turn_tail_after_more = false;
 
     // C ref: hack.c:domove_core() and monmove.c keep a swallowed hero's
     // coordinates pinned to the engulfing monster.  Command paths in this
@@ -339,10 +341,12 @@ export async function advanceTurn() {
         g.u.uy = g.u.ustuck.my;
     }
 
-    while (await movemon()) {
-        // Keep moving monsters until all out of movement.
+    if (!resumeTurnTailOnly) {
+        while (await movemon()) {
+            // Keep moving monsters until all out of movement.
+        }
+        if (g._monster_turn_paused_for_more) return;
     }
-    if (g._monster_turn_paused_for_more) return;
 
     mcalcdistress();
 

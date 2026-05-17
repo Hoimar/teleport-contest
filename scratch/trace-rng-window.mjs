@@ -8,7 +8,7 @@ import { game } from '../js/gstate.js';
 import { resolveSessionRef } from '../scripts/triage-lib.mjs';
 
 function parseArgs(argv) {
-    const opts = { ref: null, moves: null, rng: null, monmove: false, traceFilter: null };
+    const opts = { ref: null, moves: null, rng: null, monmove: false, traceFilter: null, segment: null };
     for (let i = 0; i < argv.length; i++) {
         const arg = argv[i];
         if (arg === '--moves') {
@@ -19,6 +19,8 @@ function parseArgs(argv) {
             opts.monmove = true;
         } else if (arg === '--trace-filter') {
             opts.traceFilter = argv[++i];
+        } else if (arg === '--segment') {
+            opts.segment = Number(argv[++i]);
         } else if (!opts.ref) {
             opts.ref = arg;
         } else {
@@ -26,8 +28,10 @@ function parseArgs(argv) {
         }
     }
     if (!opts.ref || !opts.rng) {
-        throw new Error('Usage: node scratch/trace-rng-window.mjs <session> --moves <n> --rng <start>:<end> [--monmove] [--trace-filter <text>]');
+        throw new Error('Usage: node scratch/trace-rng-window.mjs <session> --moves <n> --rng <start>:<end> [--segment <n>] [--monmove] [--trace-filter <text>]');
     }
+    if (opts.segment != null && (!Number.isInteger(opts.segment) || opts.segment < 0))
+        throw new Error('--segment must be a zero-based integer');
     return opts;
 }
 
@@ -83,22 +87,31 @@ async function main() {
     const opts = parseArgs(process.argv.slice(2));
     const sessionPath = resolveSessionRef(opts.ref);
     const session = normalizeSession(JSON.parse(readFileSync(sessionPath, 'utf8')));
-    const seg = session.segments[0];
-    const moves = opts.moves == null ? seg.moves : seg.moves.slice(0, opts.moves);
+    const targetSegment = opts.segment ?? 0;
+    if (!session.segments[targetSegment]) throw new Error(`segment ${targetSegment} not found`);
     const window = parseWindow(opts.rng);
 
     globalThis.__teleportTraceMonMove = opts.monmove;
-    const nhGame = await runSegment({
-        seed: seg.seed,
-        datetime: seg.datetime,
-        nethackrc: seg.nethackrc,
-        moves,
-    }, null);
+    let nhGame = null;
+    let targetMoves = [];
+    for (let i = 0; i <= targetSegment; i++) {
+        const seg = session.segments[i];
+        const moves = i === targetSegment && opts.moves != null
+            ? seg.moves.slice(0, opts.moves)
+            : seg.moves;
+        if (i === targetSegment) targetMoves = moves;
+        nhGame = await runSegment({
+            seed: seg.seed,
+            datetime: seg.datetime,
+            nethackrc: seg.nethackrc,
+            moves,
+        }, nhGame);
+    }
     globalThis.__teleportTraceMonMove = false;
 
     const expected = expectedRngCalls(session);
     const fullLog = nhGame.getRngLog?.() || [];
-    console.log(`session ${path.relative(process.cwd(), sessionPath)} moves ${moves.length}/${seg.moves.length}`);
+    console.log(`session ${path.relative(process.cwd(), sessionPath)} segment ${targetSegment} moves ${targetMoves.length}/${session.segments[targetSegment].moves.length}`);
     console.log(`screens ${nhGame.getScreens?.().length ?? 0} fullLog ${fullLog.length}`);
     console.log('hero', JSON.stringify({ ux: game.u?.ux, uy: game.u?.uy, uswallow: game.u?.uswallow, ustuck: game.u?.ustuck?.data?.name }));
     console.log('monsters', JSON.stringify((game.level?.monsters || []).map(monsterSummary)));

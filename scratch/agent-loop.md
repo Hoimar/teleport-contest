@@ -14,8 +14,6 @@ and `feature_map.md`.
 
 - Current branch in this workspace: `main`.
 - Baseline commit at harness cleanup: `f0fdc38`.
-- Pre-existing dirty gameplay/docs from prior Spark work:
-  `feature_map.md`, `js/cmd.js`, `js/display.js`, this checkpoint.
 - Active target: `seed5002-wizard-coverage-pair`.
 - Active hypothesis: the first segment is now past the wizard wish namedesc
   denominator, the fire-wand destruction/death RNG chain, the first
@@ -25,10 +23,9 @@ and `feature_map.md`.
   death confirmation/default `savelife()` prompt, the following `nomovemsg`,
   hostile `ALLOW_U` movement candidate denominator, generated inventory menu,
   item-action menu, read-prompt invalid-object loop, and `m` search prefix.
-  The remaining visible blocker is the small mimic being one map square off at
-  screen 363, while the first RNG boundary is `FR 11970` (`rn2(20)` expected
-  vs `rn2(100)` actual), pointing at the next post-pet-death
-  monster-pass/turn-tail ordering gap.
+  The remaining visible blocker is the final small mimic hit at screen 407,
+  while the first RNG boundary is `FR 12117` (`rn2(5)` expected vs `rn2(8)`
+  actual), pointing at a late monster movement candidate-order gap.
 
 ## Latest Verification
 
@@ -40,9 +37,9 @@ npm run verify -- --target seed5002-wizard-coverage-pair
 
 Result:
 
-- Target: `seed5002-wizard-coverage-pair` `S 370/410 R 12039/12167`,
-  first screen `363:char:map:y`, first RNG
-  `11970:rn2(20)=6=>rn2(100)=6`, cursor-only `1`.
+- Target: `seed5002-wizard-coverage-pair` `S 407/410 R 12127/12167`,
+  first screen `407:char:mixed:n`, first RNG
+  `12117:rn2(5)=3=>rn2(8)=7`, cursor-only `1`.
 - Sentinel total: `S 338/1063 R 35995/64569`.
 - Sentinel details:
   - `seed8000-tourist-starter`: `S 23/23 R 3060/3130`, first RNG `3047`.
@@ -58,9 +55,9 @@ Result:
 
 1. Continue `seed5002-wizard-coverage-pair` post-fire/restart boundary.
    - Use `npm run triage -- seed5002-wizard-coverage-pair` and
-     `node scratch/trace-rng-window.mjs seed5002-wizard-coverage-pair --moves 123 --rng 8796:8830`
-     or the second segment equivalent after checking the flattened index.
-   - Current state: `S 370/410 R 12039/12167`.
+     `node scratch/trace-rng-window.mjs seed5002-wizard-coverage-pair --segment 1 --moves 285 --rng 12105:12145`
+     for the current second-segment tail.
+   - Current state: `S 407/410 R 12127/12167`.
    - Search safety now prints the expected `You already found a monster...`
      zero-time warning, `m` prefixes force the following search, close/open and
      inventory-action throw use `In what direction?` plus cmdassist
@@ -85,9 +82,12 @@ Result:
      `You survived...` message onto the OK line. `e` with no food now prints
      `You don't have anything to eat.`. Hero melee now prints the kill line
      before `xkilled()` side effects for the current lethal giant-bat hit.
-   - First visible mismatch is screen 363: a small mimic is one square off
-     (`m` at `[17,40]` in JS vs `[18,41]` in C).
-   - First RNG mismatch is `FR 11970` (`rn2(20)` expected vs `rn2(100)` actual),
+     Fatal non-pet monster hits now pause before turn-tail `regen_hp()`/hunger
+     and resume only the pending tail after wizard-mode `savelife()`, while the
+     pet-combat savelife path still resumes combat after the OK line.
+   - First visible mismatch is screen 407: C prints `The small mimic hits!`
+     and drops HP to 4, while JS has no message and remains at HP 12.
+   - First RNG mismatch is `FR 12117` (`rn2(5)` expected vs `rn2(8)` actual),
      after fire-wand destruction, nested `--More--` messages, wizard-mode death
      prompt handling, Storeroom mimic shape/default inventory/explicit chest
      appearance, niche `mkclass(S_HUMAN)`, sorted `mongen_order`, post-teleport
@@ -95,11 +95,8 @@ Result:
      reveal/status, search safety, close/open/throw prompts, magic-marker write
      prompt, inventory/action/read menus, `m` search prefix, the first
      pet-combat More split, wizard-mode death confirmation, and savelife resume.
-   - Immediate hypothesis: the later death prompt should latch the pre-savelife
-     HP/status/cursor while the following RNG gap indicates the resumed monster
-     pass or turn-tail is entering a random object-resistance path too early.
-   - Implement general restart/object/level-generation truth; do not pin the
-     level-teleport room or cursor.
+   - Immediate hypothesis: late `m_move()` candidate ordering leaves the final
+     small mimic outside attack range.
 2. Continue `seed0383` post-expulsion visible-map hallucination redraw ownership.
    - Use `npm run screen:diff -- seed0383-wizard-hallucinate --first`.
    - Current diff is hallucinated visible-map glyphs on screen 172 (`Space`)
