@@ -89,6 +89,18 @@ const M1 = {
     M1_METALLIVORE: 0x80000000,
 };
 
+const MR = {
+    MR_NONE: 0x00,
+    MR_FIRE: 0x01,
+    MR_COLD: 0x02,
+    MR_SLEEP: 0x04,
+    MR_DISINT: 0x08,
+    MR_ELEC: 0x10,
+    MR_POISON: 0x20,
+    MR_ACID: 0x40,
+    MR_STONE: 0x80,
+};
+
 const MS = {
     MS_SILENT: 0,
     MS_BARK: 1,
@@ -168,7 +180,7 @@ const CLR = {
     DRAGON_SILVER: 14,
 };
 
-const CONSTS = { ...GEN, ...M1, ...M2, ...MS, ...CLR };
+const CONSTS = { ...GEN, ...M1, ...M2, ...MR, ...MS, ...CLR };
 CONSTS.A_NONE = 0;
 
 const ATTACK_MACROS = {
@@ -272,6 +284,8 @@ function collectMonsters(text) {
         const maligntyp = CONSTS[lvl[4]?.trim()] ?? Number(lvl[4]);
         const geno = evalMask(args[3]);
         const msound = evalMask(siz[2]);
+        const mresists = evalMask(args[6]);
+        const mconveys = evalMask(args[7]);
         const mflags1 = evalMask(args[8]);
         const mflags2 = evalMask(args[9]);
         const difficulty = Number(args[11]);
@@ -281,7 +295,7 @@ function collectMonsters(text) {
         const female = (mflags2 & M2.M2_FEMALE) !== 0 ? 1 : 0;
         rows.push([
             name, mlet, mlevel, mmove, maligntyp, geno, difficulty, color,
-            neuter, male, female, msound, mflags1, mflags2, mattk,
+            neuter, male, female, msound, mresists, mconveys, mflags1, mflags2, mattk,
         ]);
     }
     return rows;
@@ -294,7 +308,7 @@ const rows = collectMonsters(source);
 const lines = [
     '// Generated from nethack-c/upstream/include/monsters.h (NetHack 5.0).',
     '// C refs: include/monsters.h MON() rows, include/monflag.h G_* flags, makemon.c:rndmonst_adj().',
-    '// Fields: name, mlet, mlevel, mmove, maligntyp, geno, difficulty, color, neuter, male, female, msound, mflags1, mflags2, mattk.',
+    '// Fields: name, mlet, mlevel, mmove, maligntyp, geno, difficulty, color, neuter, male, female, msound, mresists, mconveys, mflags1, mflags2, mattk.',
     'export const MONSTER_DATA = [',
     ...rows.map((row) => `    ${JSON.stringify(row)},`),
     '];',

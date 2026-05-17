@@ -230,6 +230,8 @@ const G_NOHELL = 0x0800;
 const G_UNIQ = 0x1000;
 const G_IGNORE = 0x8000;
 const G_NOCORPSE = 0x0010;
+const MR_FIRE = 0x01;
+const MR_COLD = 0x02;
 const G_LGROUP = 0x0040;
 const G_SGROUP = 0x0080;
 const CORPSTAT_HISTORIC = 0x04;
@@ -375,8 +377,8 @@ const TRAPPED_CHEST = 25;
 function is_hole(t) { return t === HOLE || t === TRAPDOOR; }
 function is_pit(t) { return t === PIT || t === SPIKED_PIT; }
 
-const MONSTERS = MONSTER_DATA.map(([name, mlet, mlevel, mmove, maligntyp, geno, difficulty, color, neuter, male, female, msound = 0, mflags1 = 0, mflags2 = 0, mattk = []]) => ({
-    name, mlet, mlevel, mmove, maligntyp, geno, difficulty, color, msound, mflags1, mflags2, mattk,
+const MONSTERS = MONSTER_DATA.map(([name, mlet, mlevel, mmove, maligntyp, geno, difficulty, color, neuter, male, female, msound = 0, mresists = 0, mconveys = 0, mflags1 = 0, mflags2 = 0, mattk = []]) => ({
+    name, mlet, mlevel, mmove, maligntyp, geno, difficulty, color, msound, mresists, mconveys, mflags1, mflags2, mattk,
     neuter: !!neuter, male: !!male, female: !!female,
 }));
 
@@ -1497,6 +1499,17 @@ function align_shift(ptr) {
     return Math.trunc((-(ptr.maligntyp - 20)) / (2 * 4));
 }
 
+function pm_resistance(ptr, mask) {
+    return !!((ptr?.mresists ?? 0) & mask);
+}
+
+function temperature_shift(ptr) {
+    const temperature = game.level?.flags?.temperature ?? 0;
+    if (temperature && pm_resistance(ptr, temperature > 0 ? MR_FIRE : MR_COLD))
+        return 3;
+    return 0;
+}
+
 function uncommon_monster(ptr) {
     if (!ptr) return true;
     if (ptr.geno & (G_NOGEN | G_UNIQ)) return true;
@@ -1516,7 +1529,7 @@ function rndmonst_adj(minadj = 0, maxadj = 0) {
     for (const ptr of MONSTERS) {
         if (ptr.difficulty < minmlev || ptr.difficulty > maxmlev) continue;
         if (uncommon_monster(ptr)) continue;
-        const weight = (ptr.geno & G_FREQ) + align_shift(ptr);
+        const weight = (ptr.geno & G_FREQ) + align_shift(ptr) + temperature_shift(ptr);
         if (weight <= 0) continue;
         totalweight += weight;
         if (rn2(totalweight) < weight) selected = ptr;
@@ -2624,7 +2637,9 @@ function make_engr_at(x, y, text, pristine, epoch, engr_type) {
 function wipe_engr_at(x, y, cnt, perm) { /* stub */ }
 function make_grave(x, y, text) {
     const loc = game.level?.at(x, y);
-    if (loc) loc.typ = GRAVE;
+    if (!loc || (loc.typ !== ROOM && loc.typ !== GRAVE)) return;
+    if ((game.level?.traps || []).some(trap => trap.tx === x && trap.ty === y)) return;
+    loc.typ = GRAVE;
     if (text == null) randomEpitaph();
 }
 
@@ -3926,6 +3941,17 @@ function registerValleyLregions(flp, bounds) {
     ];
 }
 
+function registerSanctumLregions(flp, bounds) {
+    const down = flipRectForBounds({
+        x1: 54, y1: 1, x2: 79, y2: 18,
+    }, flp, bounds.minx, bounds.miny, bounds.maxx, bounds.maxy);
+    game._special_lregions.push({
+        rtype: LR_DOWNTELE,
+        inarea: down,
+        delarea: { x1: -1, y1: -1, x2: -1, y2: -1 },
+    });
+}
+
 function loadValleySpecial() {
     // C ref: dat/valley.lua loaded through sp_lev.c:lspo_map().
     rn2(3); rn2(2); // nhlib shuffle()
@@ -4661,7 +4687,17 @@ function loadSanctumSpecial() {
         altar.altarmask = A_NONE;
     }
     if (temple) priestini(temple, true);
-    sanctumCreateRoomRegion(41, 6, 48, 11, 0, MORGUE, FILL_NORMAL);
+    const morgue = createIrregularRoomFromSeed(sanctumX(41), sanctumY(6), MORGUE, false, FILL_NORMAL);
+    if (morgue) {
+        const rmno = morgue.roomnoidx + ROOMOFFSET;
+        for (let x = morgue.lx - 1; x <= morgue.hx + 1; x++)
+            for (let y = morgue.ly - 1; y <= morgue.hy + 1; y++) {
+                const loc = game.level?.at(x, y);
+                if (loc && (IS_DOOR(loc.typ) || loc.typ === SDOOR)
+                    && (loc.roomno === rmno || loc.roomno === SHARED))
+                    add_door(x, y, morgue);
+            }
+    }
 
     for (const [x, y, mask] of [
         [40, 6, D_CLOSED],
@@ -4705,11 +4741,16 @@ function loadSanctumSpecial() {
     for (const id of ['L', 'L', 'V', 'V', 'V']) sanctumCreateMonster(id);
 
     placeSpecialStair(sanctumX(63), sanctumY(15), true);
-    game._special_lregions.push({
-        rtype: LR_DOWNTELE,
-        inarea: { x1: 54, y1: 1, x2: 79, y2: 18 },
-        delarea: { x1: -1, y1: -1, x2: -1, y2: -1 },
-    });
+    const ext = get_level_extends();
+    const bounds = {
+        minx: Math.max(1, ext.xmin),
+        maxx: Math.min(COLNO - 1, ext.xmax),
+        miny: Math.max(0, ext.ymin),
+        maxy: Math.min(ROWNO - 1, ext.ymax),
+    };
+    wallification(1, 0, COLNO - 1, ROWNO - 1);
+    const flp = flip_level_rnd(3);
+    registerSanctumLregions(flp, bounds);
     fixup_special();
 }
 
