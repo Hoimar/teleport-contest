@@ -1568,10 +1568,9 @@ function m_initinv_for(ptr, mon = null) {
     if (ptr.name === 'PRIEST' && ptr.difficulty >= 15) {
         if (rn2(7)) mksobj(ROBE, true, false);
         mksobj(SMALL_SHIELD, true, false);
-        if (!rn2(10)) {
-            const water = mksobj(POT_WATER, true, false);
-            bless(water);
-        }
+        const amount = rn1(10, 20);
+        const gold = mksobj(GOLD_PIECE, false, false);
+        gold.quan = amount;
     }
     if (ptr.mlet === 'S_GNOME' && !rn2(60)) {
         mksobj(rn2(4) ? 370 : 371, true, false);
@@ -1882,7 +1881,9 @@ function m_initweap_for(ptr) {
         return;
     }
     if (ptr.name === 'PRIEST' && ptr.difficulty >= 15) {
-        mksobj(MACE, true, false);
+        const mace = mksobj(MACE, false, false);
+        mace.spe = rnd(3);
+        if (!rn2(2)) curse(mace);
         maybe_init_offensive_item_for(ptr);
         return;
     }
@@ -3526,11 +3527,11 @@ function valleyMonster(ref) {
     makemon(ptr, loc.x, loc.y, 0);
 }
 
-function valleyAddFillRoom(x1, y1, x2, y2, lit, rtype) {
+function valleyAddFillRoom(x1, y1, x2, y2, lit, rtype, needfill = FILL_NORMAL) {
     add_room(valleyX(x1), valleyY(y1), valleyX(x2), valleyY(y2), lit, rtype, true);
     const room = game.level.rooms[(game.level.nroom || 1) - 1];
     if (room) {
-        room.needfill = FILL_NORMAL;
+        room.needfill = needfill;
         room.irregular = true;
         const rmno = room.roomnoidx + ROOMOFFSET;
         for (let x = room.lx; x <= room.hx; x++)
@@ -3555,7 +3556,7 @@ function templeAltarInRoom(croom) {
 }
 
 function priestini(croom) {
-    // C ref: priest.c:priestini() fills temple rooms after special fixup.
+    // C ref: priest.c:priestini(), called by sp_lev.c:create_altar() for shrines.
     const altar = templeAltarInRoom(croom);
     const spots = [];
     for (let dy = -1; dy <= 1; dy++)
@@ -3639,7 +3640,7 @@ function loadValleySpecial() {
         valleyLine(9, 13, 14, 13, 'B');
     }
 
-    valleyAddFillRoom(1, 6, 5, 14, true, TEMPLE);
+    valleyAddFillRoom(1, 6, 5, 14, true, TEMPLE, FILL_LVFLAGS);
     valleyAddFillRoom(19, 1, 24, 8, false, MORGUE);
     valleyAddFillRoom(9, 14, 16, 18, false, MORGUE);
     valleyAddFillRoom(37, 9, 43, 14, false, MORGUE);
@@ -3653,6 +3654,13 @@ function loadValleySpecial() {
     game.level.at(valleyX(6), valleyY(6)).doormask = D_LOCKED;
     const altar = game.level.at(valleyX(3), valleyY(10));
     if (altar) altar.typ = ALTAR;
+    const templeRoom = game.level.rooms?.find(r => r.rtype === TEMPLE
+        && valleyX(3) >= r.lx && valleyX(3) <= r.hx
+        && valleyY(10) >= r.ly && valleyY(10) <= r.hy);
+    if (templeRoom) {
+        priestini(templeRoom);
+        game.level.flags.has_temple = true;
+    }
 
     for (const name of [
         'ARCHEOLOGIST', 'ARCHEOLOGIST', 'BARBARIAN', 'BARBARIAN',
@@ -6100,24 +6108,28 @@ function squadmon() {
 }
 
 function fill_special_room(croom) {
-    if (!croom || croom.needfill !== FILL_NORMAL) return;
-    if (croom.rtype === VAULT) {
+    if (!croom || croom.needfill === FILL_NONE) return;
+    if (croom.needfill === FILL_NORMAL && croom.rtype === VAULT) {
         const amountRange = Math.abs(depth_of_level(game.u?.uz)) * 100;
         for (let x = croom.lx; x <= croom.hx; x++)
             for (let y = croom.ly; y <= croom.hy; y++)
                 mkgold(rn1(amountRange, 51), x, y);
         game.level.flags.has_vault = true;
-    } else if (croom.rtype === ZOO || croom.rtype === LEPREHALL
-               || croom.rtype === BARRACKS || croom.rtype === MORGUE) {
+    } else if (croom.needfill === FILL_NORMAL
+               && (croom.rtype === ZOO || croom.rtype === LEPREHALL
+               || croom.rtype === BARRACKS || croom.rtype === MORGUE)) {
         fill_zoo(croom);
         if (croom.rtype === ZOO) game.level.flags.has_zoo = true;
         if (croom.rtype === MORGUE) game.level.flags.has_morgue = true;
-    } else if (croom.rtype === TEMPLE) {
-        priestini(croom);
-        game.level.flags.has_temple = true;
-    } else if (croom.rtype >= SHOPBASE) {
+    } else if (croom.needfill === FILL_NORMAL && croom.rtype >= SHOPBASE) {
         stock_room(croom);
     }
+    if (croom.rtype === VAULT) game.level.flags.has_vault = true;
+    if (croom.rtype === ZOO) game.level.flags.has_zoo = true;
+    if (croom.rtype === COURT) game.level.flags.has_court = true;
+    if (croom.rtype === MORGUE) game.level.flags.has_morgue = true;
+    if (croom.rtype === BARRACKS) game.level.flags.has_barracks = true;
+    if (croom.rtype === TEMPLE) game.level.flags.has_temple = true;
 }
 
 // ============================================================
