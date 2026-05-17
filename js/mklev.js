@@ -3611,7 +3611,6 @@ function registerValleyLregions(flp, bounds) {
 
 function loadValleySpecial() {
     // C ref: dat/valley.lua loaded through sp_lev.c:lspo_map().
-    rn2(3); // getbones()
     rn2(3); rn2(2); // nhlib shuffle()
     rn2(2); // splev_initlev()
     for (let y = 0; y < ROWNO; y++)
