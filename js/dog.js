@@ -8,7 +8,7 @@ import { newsym, pline, queue_more_prompt, flush_screen, clear_pending_message }
 import { nhgetch } from './input.js';
 import {
     ACCFOOD, APPORT, CADAVER, DOGFOOD, MANFOOD, TABU, UNDEF,
-    D_CLOSED, D_LOCKED, GP_AVOID_MONPOS, GP_CHECKSCARY, IS_DOOR, IS_OBSTRUCTED,
+    D_BROKEN, D_CLOSED, D_LOCKED, GP_AVOID_MONPOS, GP_CHECKSCARY, IS_DOOR, IS_OBSTRUCTED,
     IS_LAVA, IS_POOL, IS_ROOM, LADDER, MM_EDOG, MTSZ, NO_MINVENT, SPACE_POS, STAIRS,
     W_WEP, isok,
 } from './const.js';
@@ -646,8 +646,17 @@ function pet_ranged_attk(mtmp, forced = false) {
     return 0;
 }
 
+function door_blocks_diagonal(x, y) {
+    const loc = game.level?.at(x, y);
+    return loc && IS_DOOR(loc.typ) && (loc.doormask & ~D_BROKEN);
+}
+
 function pet_can_enter_square(mtmp, x, y, { ignoreMonster = false } = {}) {
     if (!isok(x, y)) return false;
+    if (x !== mtmp.mx && y !== mtmp.my
+        && (door_blocks_diagonal(mtmp.mx, mtmp.my) || door_blocks_diagonal(x, y))) {
+        return false;
+    }
     if (x === game.u?.ux && y === game.u?.uy) return false;
     if (!ignoreMonster && mon_at(x, y, mtmp)) return false;
     if (is_boulder_at(x, y)) return false;
@@ -851,6 +860,7 @@ export async function dog_move(mtmp, after = true) {
     const maxy = Math.min(mtmp.my + 1, 20);
     let uncursedcnt = 0;
     let mfndposcnt = 0;
+    let doEat = false;
 
     for (let nx = Math.max(1, mtmp.mx - 1); nx <= maxx; nx++) {
         for (let ny = Math.max(0, mtmp.my - 1); ny <= maxy; ny++) {
@@ -862,6 +872,7 @@ export async function dog_move(mtmp, after = true) {
         }
     }
 
+    searchCandidates:
     for (let nx = Math.max(1, mtmp.mx - 1); nx <= maxx; nx++) {
         for (let ny = Math.max(0, mtmp.my - 1); ny <= maxy; ny++) {
             if (nx === mtmp.mx && ny === mtmp.my) continue;
@@ -888,9 +899,12 @@ export async function dog_move(mtmp, after = true) {
                 } else if (canReachFood) {
                     const foodType = dogfood(mtmp, obj);
                     if (foodType < MANFOOD
-                        && (foodType < ACCFOOD || init_edog(mtmp).hungrytime <= (game.moves || 1))) {
-                        // Eating/fetching the object is still future work;
-                        // this preserves the candidate-square dogfood probe.
+                        && (foodType < ACCFOOD || edog.hungrytime <= (game.moves || 1))) {
+                        nix = nx;
+                        niy = ny;
+                        doEat = true;
+                        cursedOnCandidate = false;
+                        break searchCandidates;
                     }
                 }
             }
@@ -926,7 +940,7 @@ export async function dog_move(mtmp, after = true) {
         }
     }
 
-    pet_ranged_attk(mtmp, false);
+    if (!doEat) pet_ranged_attk(mtmp, false);
 
     if (nix === mtmp.mx && niy === mtmp.my) return 0;
     const oldx = mtmp.mx;
