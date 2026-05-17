@@ -7379,6 +7379,101 @@ function loadJuiblexSpecial() {
     fixup_special();
 }
 
+const BAALZ_X = 29;
+const BAALZ_Y = 5;
+const BAALZ_MAP = [
+    '-------------------------------------------------',
+    '|                   ----               ----      ',
+    '|          ----     |     -----------  |         ',
+    '| ------      |  ---------|.........|--P         ',
+    '| F....|  -------|...........--------------      ',
+    '---....|--|..................S............|----  ',
+    '+...--....S..----------------|............S...|  ',
+    '---....|--|..................|............|----  ',
+    '| F....|  -------|...........-----S--------      ',
+    '| ------      |  ---------|.........|--P         ',
+    '|          ----     |     -----------  |         ',
+    '|                   ----               ----      ',
+    '-------------------------------------------------',
+];
+
+function baalzSetTerrain(x, y, ch) {
+    if (ch === ' ') return;
+    const loc = game.level?.at(BAALZ_X + x, BAALZ_Y + y);
+    if (!loc) return;
+    loc.lit = false;
+    switch (ch) {
+    case '.': loc.typ = ROOM; break;
+    case '-': loc.typ = HWALL; break;
+    case '|': loc.typ = VWALL; break;
+    case '+': loc.typ = DOOR; set_door_mask(loc, D_CLOSED); break;
+    case 'S': loc.typ = SDOOR; set_door_mask(loc, D_CLOSED); break;
+    case 'P': loc.typ = POOL; break;
+    case 'F': loc.typ = IRONBARS; break;
+    default: loc.typ = STONE; break;
+    }
+}
+
+function loadBaalzTerrain() {
+    game._special_touched = new Set();
+    for (let x = 1; x < COLNO; x++) {
+        for (let y = 0; y < ROWNO; y++) {
+            const loc = game.level?.at(x, y);
+            if (!loc) continue;
+            loc.typ = STONE;
+            loc.lit = false;
+        }
+    }
+    for (let y = 0; y < BAALZ_MAP.length; y++)
+        for (let x = 0; x < BAALZ_MAP[y].length; x++)
+            baalzSetTerrain(x, y, BAALZ_MAP[y][x]);
+    markSpecialTouchedRect(BAALZ_X, BAALZ_Y,
+        BAALZ_X + BAALZ_MAP[0].length - 1, BAALZ_Y + BAALZ_MAP.length - 1);
+    game.level.flags.is_maze_lev = true;
+    game.level.flags.corrmaze = true;
+}
+
+function registerBaalzLregions(flp) {
+    const bounds = get_level_extends();
+    const minx = Math.max(1, bounds.xmin);
+    const maxx = Math.min(COLNO - 1, bounds.xmax);
+    const miny = Math.max(0, bounds.ymin);
+    const maxy = Math.min(ROWNO - 1, bounds.ymax);
+    const inarea = { x1: 1, y1: 0, x2: 15, y2: 20 };
+    const exclude = { x1: 15, y1: 1, x2: 70, y2: 16 };
+    const area = flipRectForBounds(inarea, flp, minx, miny, maxx, maxy);
+    const delarea = flipRectForBounds(exclude, flp, minx, miny, maxx, maxy);
+    game._special_lregions = [
+        { rtype: LR_UPSTAIR, inarea: area, delarea },
+        { rtype: LR_BRANCH, inarea: area, delarea },
+        { rtype: LR_TELE, inarea: area, delarea },
+    ];
+}
+
+function loadBaalzSpecial() {
+    rn2(3); rn2(2); // nhlib shuffle()
+    loadBaalzTerrain();
+    asmoMazeWalk(0, 6, 'west', BAALZ_X, BAALZ_Y);
+    placeSpecialStair(BAALZ_X + 44, BAALZ_Y + 6, false);
+    baalzSetTerrain(0, 6, '+');
+    set_door_mask(game.level.at(BAALZ_X, BAALZ_Y + 6), D_LOCKED);
+    asmoCreateMonster('Baalzebub', 35, 6, BAALZ_MAP, BAALZ_X, BAALZ_Y);
+    for (const ch of ['[', '[', ')', ')', '*', '!', '!', '?', '?', '?'])
+        asmoObject(ch, BAALZ_MAP, BAALZ_X, BAALZ_Y);
+    for (const kind of [SPIKED_PIT, FIRE_TRAP, SLP_GAS_TRAP, ANTI_MAGIC,
+        FIRE_TRAP, MAGIC_TRAP, MAGIC_TRAP])
+        asmoTrap(kind, null, null, BAALZ_MAP, BAALZ_X, BAALZ_Y);
+    asmoCreateMonster('ghost', 37, 7, BAALZ_MAP, BAALZ_X, BAALZ_Y);
+    asmoCreateMonster('horned devil', 32, 5, BAALZ_MAP, BAALZ_X, BAALZ_Y);
+    asmoCreateMonster('barbed devil', 38, 7, BAALZ_MAP, BAALZ_X, BAALZ_Y);
+    for (const id of ['L', 'V', 'V', 'V'])
+        asmoCreateMonster(id, null, null, BAALZ_MAP, BAALZ_X, BAALZ_Y);
+    wallification(1, 0, COLNO - 1, ROWNO - 1);
+    const flp = flip_level_rnd(3);
+    registerBaalzLregions(flp);
+    fixup_special();
+}
+
 function makemaz_special(slev) {
     const proto = slev?.proto || '';
     if (proto && slev?.rndlevs) {
@@ -7441,6 +7536,10 @@ function makemaz_special(slev) {
     }
     if (game._last_special_protofile === 'juiblex') {
         loadJuiblexSpecial();
+        return;
+    }
+    if (game._last_special_protofile === 'baalz') {
+        loadBaalzSpecial();
         return;
     }
     if (game._last_special_protofile === 'tower1') {
@@ -7581,7 +7680,6 @@ async function makelevel() {
         makemaz_special(slev);
         return;
     }
-
     // C ref: mklev.c:1295 — check for below-Medusa maze level
     // This rn2(5) is consumed even when the condition fails (short-circuit)
     const medusa = g.medusa_level;
