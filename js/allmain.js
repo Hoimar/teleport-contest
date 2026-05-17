@@ -20,7 +20,7 @@ import { makedog } from './dog.js';
 import { continueRunStep, finish_pending_eaten_corpse, rhack } from './cmd.js';
 import { nhgetch } from './input.js';
 import {
-    docrt, cls, bot, flush_screen, pline, newsym, serialize_terminal_grid,
+    docrt, cls, bot, flush_screen, pline, append_pline, newsym, serialize_terminal_grid,
     refresh_warning_monsters, refresh_swallowed_overlay, clear_pending_message,
     queue_more_prompt, see_monsters, see_objects, see_traps,
 } from './display.js';
@@ -406,6 +406,11 @@ async function continueOccupationTurns(g) {
     while ((g._occupation_turns_remaining || 0) > 0) {
         g._occupation_turns_remaining--;
         applyOccupationFinalTurnState(g);
+        if ((g._occupation_turns_remaining || 0) === 0
+            && g._occupation_finish_removes_eaten_corpse) {
+            finish_pending_eaten_corpse();
+            g._occupation_finish_removes_eaten_corpse = false;
+        }
         await advanceTurn();
         if (g._more && occupationPending(g)) {
             g._occupation_paused_for_more = true;
@@ -418,13 +423,22 @@ async function continueOccupationTurns(g) {
             g._occupation_finish_uac = null;
         }
         await runSwallowedPreFinishTurn(g);
-        if (g._pending_message) {
-            if (!g._more) queue_more_prompt();
-            await flush_screen(1);
-            await nhgetch();
-            clear_pending_message();
+        if (g._pending_message && g._occupation_pack_finish_message) {
+            await append_pline(g._occupation_finish_message);
+            g._occupation_pack_finish_message = false;
+        } else {
+            if (g._pending_message) {
+                if (!g._more) queue_more_prompt();
+                await flush_screen(1);
+                await nhgetch();
+                clear_pending_message();
+            }
+            await pline(g._occupation_finish_message);
         }
-        await pline(g._occupation_finish_message);
+        if (g._occupation_finish_removes_eaten_corpse) {
+            finish_pending_eaten_corpse();
+            g._occupation_finish_removes_eaten_corpse = false;
+        }
         g._occupation_finish_message = null;
         g._occupation_pre_finish_swallowed_turn_done = false;
     }
@@ -495,7 +509,7 @@ export async function moveloop_core() {
         } else {
             applyOccupationFinalTurnState(g);
             await advanceTurn();
-            finish_pending_eaten_corpse();
+            if (!occupationPending(g)) finish_pending_eaten_corpse();
             if (g._more && occupationPending(g)) {
                 g._occupation_paused_for_more = true;
                 return;

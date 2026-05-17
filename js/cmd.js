@@ -413,6 +413,13 @@ function eatLetters() {
         .join('');
 }
 
+function drinkLetters() {
+    ensureInventoryLetters();
+    return compressLetters((game.inventory || [])
+        .filter((obj) => obj?.oclass === POTION_CLASS)
+        .map((obj) => obj.invlet));
+}
+
 function stethoscopeSelfStatusLine() {
     const role = String(game.urole?.name?.m || game.u?.role || 'character').toLowerCase();
     const align = game.u?.ualign?.type === 1 ? 'lawful'
@@ -964,6 +971,29 @@ function floorCorpseAtHero() {
         obj?.otyp === CORPSE && obj.ox === u.ux && obj.oy === u.uy);
 }
 
+function corpseEatingReqtime(obj) {
+    // C ref: eat.c:eatcorpse(); corpse delay is weight-dependent:
+    // victual.reqtime = 3 + (mons[mnum].cwt >> 6), then start_eating()
+    // records the first bite without consuming an input boundary.
+    const cwt = obj?.corpse_cwt || (obj?.corpsenm === 21 ? 650 : 0);
+    return 3 + (cwt >> 6);
+}
+
+async function drinkPotion(obj, idx) {
+    if (!obj || obj.oclass !== POTION_CLASS) {
+        game.context.move = 0;
+        await pline('Never mind.');
+        return;
+    }
+    const appearance = getObjectDescription(obj.otyp) || 'ruby';
+    if ((obj.quan || 1) > 1) obj.quan--;
+    else if (idx >= 0) game.inventory.splice(idx, 1);
+    game._drink_call_after_more = appearance;
+    await pline('This tastes like slime mold juice.');
+    queue_more_prompt();
+    game.context.move = 0;
+}
+
 async function handleFloorCorpseEatKey(ch) {
     const obj = game._floor_corpse_eat_obj;
     game._awaiting_floor_corpse_eat = false;
@@ -979,7 +1009,11 @@ async function handleFloorCorpseEatKey(ch) {
     const damage = rnd(8);
     if (typeof game.u?.uhp === 'number') game.u.uhp = Math.max(0, game.u.uhp - damage);
     if (obj) game._pending_eaten_corpse_remove = obj;
-    await pline('You feel sick.  You finish eating the gnome corpse.');
+    game._occupation_turns_remaining = corpseEatingReqtime(obj);
+    game._occupation_finish_message = 'You finish eating the gnome corpse.';
+    game._occupation_pack_finish_message = true;
+    game._occupation_finish_removes_eaten_corpse = true;
+    await pline('You feel sick.');
     game.context.move = 1;
     return true;
 }
@@ -1675,6 +1709,14 @@ async function handleQueuedMore(ch) {
             game.context.move = 0;
             return true;
         }
+        if (game._drink_call_after_more) {
+            const appearance = game._drink_call_after_more;
+            game._drink_call_after_more = '';
+            game._awaiting_potion_call_name = { appearance, text: '' };
+            await showPromptLine(`Call a ${appearance} potion:`);
+            game.context.move = 0;
+            return true;
+        }
         if (game._after_more_message) {
             const msg = game._after_more_message;
             const needsPrompt = !!game._after_more_needs_prompt;
@@ -1792,6 +1834,36 @@ async function showInventoryMenu() {
     const screen = serialize_terminal_grid(display);
     game._inventory_menu_screen = screen;
     showOverride(screen, [Math.min(cursorCol, COLNO - 1), lastRow]);
+}
+
+function buildPotionMenuLines() {
+    ensureInventoryLetters();
+    const rows = [{ text: 'Potions', heading: true }];
+    for (const obj of game.inventory || []) {
+        if (obj?.oclass === POTION_CLASS) rows.push({ text: inventoryListing(obj), heading: false });
+    }
+    rows.push({ text: '(end)', heading: false });
+    return rows;
+}
+
+async function showPotionMenu() {
+    await flush_screen(1);
+    const display = game.nhDisplay;
+    if (!display?.putstr) return;
+    const lines = buildPotionMenuLines();
+    const menuCol = 39;
+    for (let row = 0; row < lines.length; row++) {
+        display.putstr(menuCol, row, ' '.repeat(COLNO - menuCol), NO_COLOR, 0);
+    }
+    for (let row = 0; row < lines.length; row++) {
+        const line = lines[row];
+        display.putstr(menuCol, row, line.text, NO_COLOR, line.heading ? ATR_INVERSE : 0);
+    }
+    const lastRow = lines.length - 1;
+    const cursorCol = menuCol + '(end)'.length + 1;
+    const screen = serialize_terminal_grid(display);
+    game._potion_menu_screen = screen;
+    showOverride(screen, [cursorCol, lastRow]);
 }
 
 function actionMenuItemType(obj) {
@@ -2660,6 +2732,44 @@ export async function rhack(key) {
         return;
     }
 
+    if (game._awaiting_potion_call_name) {
+        const state = game._awaiting_potion_call_name;
+        const prompt = `Call a ${state.appearance} potion:`;
+        if (ch === '\r' || ch === '\n') {
+            clear_pending_message();
+            game._awaiting_potion_call_name = null;
+            game.context.move = 1;
+            return;
+        }
+        if (ch === '\x7f' || ch === '\b') {
+            state.text = state.text.slice(0, -1);
+        } else if (ch !== '\x1b') {
+            state.text = `${state.text}${ch}`;
+        }
+        await showPromptLine(`${prompt}${state.text ? ` ${state.text}` : ''}`);
+        game.context.move = 0;
+        return;
+    }
+
+    if (game._awaiting_drink_item) {
+        clear_pending_message();
+        if (ch === '?' || ch === '*') {
+            await showPotionMenu();
+            game.context.move = 0;
+            return;
+        }
+        game._awaiting_drink_item = false;
+        if (ch === ' ' || ch === '\x1b') {
+            game.context.move = 0;
+            await pline('Never mind.');
+            return;
+        }
+        const idx = inventoryIndexForLetter(ch);
+        const obj = idx >= 0 ? game.inventory?.[idx] : null;
+        await drinkPotion(obj, idx);
+        return;
+    }
+
     if (game._awaiting_wear_item) {
         clear_pending_message();
         game._awaiting_wear_item = false;
@@ -3012,6 +3122,17 @@ export async function rhack(key) {
             game.context.move = 0;
             return;
         }
+        if (prev === game._potion_menu_screen) {
+            clear_pending_message();
+            game._override_prev = null;
+            game._potion_menu_screen = null;
+            game._awaiting_drink_item = false;
+            const idx = inventoryIndexForLetter(ch);
+            const obj = idx >= 0 ? game.inventory?.[idx] : null;
+            if (obj?.oclass === POTION_CLASS) await drinkPotion(obj, idx);
+            else game.context.move = 0;
+            return;
+        }
         if (prev === game._inventory_action_menu_screen) {
             const obj = game._inventory_action_menu_obj;
             if (ch === 't' && obj) {
@@ -3217,6 +3338,15 @@ export async function rhack(key) {
         game.context.move = 0;
         await showPromptLine(`What do you want to read? [${readLetters()} or ?*] `);
         game._awaiting_read_item = true;
+    } else if (ch === 'q') {
+        game.context.move = 0;
+        const letters = drinkLetters();
+        if (letters) {
+            await showPromptLine(`What do you want to drink? [${letters} or ?*]`);
+            game._awaiting_drink_item = true;
+        } else {
+            await pline('You have nothing to drink.');
+        }
     } else if (ch === 'e') {
         const corpse = floorCorpseAtHero();
         if (corpse) {

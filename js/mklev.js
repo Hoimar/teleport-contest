@@ -5111,6 +5111,13 @@ function mktrap_victim(trap) {
     } while (!rn2(5));
     // Victim type
     const PM_ELF = 18, PM_DWARF = 19, PM_ORC = 20, PM_GNOME = 21, PM_HUMAN = 22;
+    const victimCorpseStats = new Map([
+        [PM_ELF, { cwt: 800, cnutrit: 350 }],
+        [PM_DWARF, { cwt: 900, cnutrit: 300 }],
+        [PM_ORC, { cwt: 850, cnutrit: 350 }],
+        [PM_GNOME, { cwt: 650, cnutrit: 100 }],
+        [PM_HUMAN, { cwt: 1450, cnutrit: 400 }],
+    ]);
     // C consumes rn2(PM_WIZARD - PM_ARCHEOLOGIST) here. Local monster ids
     // are still placeholders, so keep the upstream role-monster range shape.
     const PM_ARCHEOLOGIST = 0, ROLE_MONSTER_RANGE_BEFORE_WIZARD = 12;
@@ -5135,7 +5142,14 @@ function mktrap_victim(trap) {
     if (victim_mnum === PM_HUMAN && rn2(25))
         victim_mnum = rn1(ROLE_MONSTER_RANGE_BEFORE_WIZARD, PM_ARCHEOLOGIST);
     const corpse = mkcorpstat(CORPSE, null, victim_mnum, x, y, 8); // CORPSTAT_INIT
-    if (corpse) corpse.trap_victim = true;
+    if (corpse) {
+        corpse.trap_victim = true;
+        const stats = victimCorpseStats.get(victim_mnum);
+        if (stats) {
+            corpse.corpse_cwt = stats.cwt;
+            corpse.corpse_cnutrit = stats.cnutrit;
+        }
+    }
 }
 
 async function mktrap_room(croom) {
