@@ -3611,15 +3611,17 @@ function templeAltarInRoom(croom) {
 function priestini(croom) {
     // C ref: priest.c:priestini(), called by sp_lev.c:create_altar() for shrines.
     const altar = templeAltarInRoom(croom);
-    const spots = [];
-    for (let dy = -1; dy <= 1; dy++)
-        for (let dx = -1; dx <= 1; dx++) {
-            if (!dx && !dy) continue;
-            const x = altar.x + dx, y = altar.y + dy;
-            const loc = game.level?.at(x, y);
-            if (loc && SPACE_POS(loc.typ)) spots.push({ x, y });
+    const si = rn2(8);
+    let pos = altar;
+    for (let i = 0; i < 8; i++) {
+        const dir = (i + si) % 8;
+        const x = altar.x + xdir[dir], y = altar.y + ydir[dir];
+        const loc = game.level?.at(x, y);
+        if (loc && SPACE_POS(loc.typ)) {
+            pos = { x, y };
+            break;
         }
-    const pos = spots.length ? spots[rn2(spots.length)] : altar;
+    }
     const priest = MONSTERS.find(m => m.name === 'PRIEST' && m.difficulty >= 15)
         || MONSTERS.find(m => m.name === 'PRIEST');
     makemon(priest, pos.x, pos.y, MM_EPRI);
