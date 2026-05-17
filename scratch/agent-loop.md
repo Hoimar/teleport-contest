@@ -15,10 +15,12 @@ and `feature_map.md`.
 - Current branch in this workspace: `main`.
 - Baseline commit at harness cleanup: `f0fdc38`.
 - Active target: `seed0002-healer-reflection-drummer`.
-- Active hypothesis: the legacy seed0002 startup tutorial override needs to
-  participate in the same blocking prompt cleanup as the generated tutorial
-  prompt. The stale welcome topline at screen 11 is prompt lifecycle state, not
-  a map or pet-movement subsystem boundary.
+- Active hypothesis: seed0002 is now past the legacy tutorial prompt and
+  startup wand color mismatch. Replacing the replayed `o_init` prefix with
+  real `init_objects()` fixed the screen-11 attr-only wand cell without moving
+  core RNG. The next visible blocker is the first `l` turn, where JS emits
+  `You hear a slow drip.` and the pet display is one cell off, pointing at
+  live turn-tail sound/pet movement timing.
 
 ## Latest Verification
 
@@ -30,13 +32,13 @@ npm run verify -- --target seed0002-healer-reflection-drummer
 
 Result:
 
-- Target: `seed0002-healer-reflection-drummer` `S 11/595 R 2880/27158`,
-  first screen `11:attr:map:n`, first RNG
+- Target: `seed0002-healer-reflection-drummer` `S 12/595 R 2880/27158`,
+  first screen `12:char:mixed:l`, first RNG
   `2375:rn2(5)=0=>rn2(100)=20`, cursor-only `0`.
-- Sentinel total: `S 338/1063 R 35995/64569`.
+- Sentinel total: `S 339/1063 R 35995/64569`.
 - Sentinel details:
   - `seed8000-tourist-starter`: `S 23/23 R 3060/3130`, first RNG `3047`.
-  - `seed0002-healer-reflection-drummer`: `S 11/595 R 2880/27158`, first RNG `2375`.
+  - `seed0002-healer-reflection-drummer`: `S 12/595 R 2880/27158`, first RNG `2375`.
   - `seed0013-friday13-save-then-fullmoon-restore`: `S 0/99 R 578/4804`, first RNG `540`.
   - `seed0116-wizard-wear-shop`: `S 127/127 R 12562/12562`, pass.
   - `seed0383-wizard-hallucinate`: `S 177/219 R 16915/16915`.

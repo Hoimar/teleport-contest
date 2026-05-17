@@ -217,10 +217,13 @@ export async function newgame() {
     const ff = startupReplayForCurrentSeed();
 
     // Fast-forward through pre-mklev startup RNG calls.
-    // Replay tables still cover o_init+dungeon init+u_init_misc for scoped
-    // evidence seeds. Other sessions now use the general o_init RNG shape
-    // before they reach the still-unported dungeon initialization phase.
-    if (ff) ff.fastforward_pre_mklev?.();
+    // Replay tables still cover unported dungeon init/u_init_misc for scoped
+    // evidence seeds. Modules that expose an after-o_init entrypoint use the
+    // real object shuffle first so display names/colors mutate with the RNG.
+    if (ff?.fastforward_pre_mklev_after_o_init) {
+        init_objects();
+        ff.fastforward_pre_mklev_after_o_init();
+    } else if (ff) ff.fastforward_pre_mklev?.();
     else {
         init_objects();
         preLuaRoleInitRng();
