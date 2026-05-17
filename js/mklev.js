@@ -3362,8 +3362,8 @@ function loadMinend2Special() {
         'DWARF', 'DWARF', 'DWARF',
         'h',
     ]) minend2Monster(ref);
-    flip_level_rnd(3);
     wallification(1, 0, COLNO - 1, ROWNO - 1);
+    flip_level_rnd(3);
 }
 
 function loadMinetown5Special() {
