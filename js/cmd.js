@@ -1877,6 +1877,15 @@ async function handleQueuedMore(ch) {
             game.context.move = next.move ? 1 : 0;
             return true;
         }
+        if (game._more_message_queue?.length) {
+            const next = game._more_message_queue.shift();
+            await pline(next.text);
+            game._more_next_message_row = false;
+            if (next.more) queue_more_prompt();
+            else game._more = false;
+            game.context.move = next.move ? 1 : 0;
+            return true;
+        }
         clear_pending_message();
         game._hallucination_warning_rng_active = false;
         if (game._direction_help_screen) {
@@ -2298,6 +2307,17 @@ function dlevelForProto(proto) {
     return lev?.dlevel || null;
 }
 
+function isHellLevel(uz) {
+    return !!game.dungeons?.[uz?.dnum ?? 0]?.flags?.hellish;
+}
+
+function isSpecialProtoLevel(uz, proto) {
+    return !!game.specialLevels?.some((lev) =>
+        lev?.proto === proto
+        && lev?.dlevel?.dnum === uz?.dnum
+        && lev?.dlevel?.dlevel === uz?.dlevel);
+}
+
 function displayDepth(dlevel) {
     const dun = game.dungeons?.[dlevel?.dnum ?? 0];
     return (dun?.depth_start ?? 1) + (dlevel?.dlevel ?? 1) - 1;
@@ -2415,7 +2435,7 @@ function buildLevelTeleportMenu() {
         ` s - ${currentLevelMarker(levels.s)} wizard3: ${dlevelOf('wizard3', gehStart + 16)}`,
         ' (1 of 3)',
     ];
-    return { screen: lines.join('\n'), choices };
+    return { screen: lines.join('\n'), choices: levels };
 }
 
 function buildLevelTeleportMenuPage2() {
@@ -2502,6 +2522,7 @@ function enqueueLevelchangePostMessages(oldLevel, newLevel) {
 
 export async function performLevelTeleport(target) {
     const oldUz = { ...(game.u?.uz || { dnum: 0, dlevel: 1 }) };
+    const wasInHell = isHellLevel(oldUz);
     const migratingPet = (game.level?.monsters || []).find(m =>
         m.mtame && dist2(m.mx, m.my, game.u?.ux ?? m.mx, game.u?.uy ?? m.my) < 3);
     game._migrating_pet = migratingPet ? {
@@ -2529,6 +2550,15 @@ export async function performLevelTeleport(target) {
     await docrt();
     if (game.u?.uhallucination || game.u?.uprops?.hallucination) see_objects();
     await pline('You materialize on a different level!');
+    if (!wasInHell && isHellLevel(game.u?.uz)
+        && (isSpecialProtoLevel(game.u?.uz, 'valley') || game._last_special_protofile === 'valley')) {
+        queue_more_prompt();
+        game._more_message_queue = [
+            { text: 'You arrive at the Valley of the Dead...', more: true },
+            { text: 'The odor of burnt flesh and decay pervades the air.', more: true },
+            { text: 'You hear groans and moans everywhere.', more: false },
+        ];
+    }
     // C ref: do.c:goto_level() performs docrt()/flush before the deferred
     // materialize pline; the following input boundary does not immediately
     // rerandomize the hallucinated new-level map.
