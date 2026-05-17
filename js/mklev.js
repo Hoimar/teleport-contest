@@ -319,6 +319,22 @@ const GHOST_NAMES = [
     'Stephan', 'Lance Braccus', 'Shadowhawk', 'Murphy',
 ];
 
+const NASTY_MONSTER_NAMES = [
+    'COCKATRICE', 'ETTIN', 'STALKER', 'MINOTAUR',
+    'OWLBEAR', 'PURPLE_WORM', 'XAN', 'UMBER_HULK',
+    'XORN', 'ZRUTY', 'LEOCROTTA', 'BALUCHITHERIUM',
+    'CARNIVOROUS_APE', 'FIRE_ELEMENTAL', 'JABBERWOCK',
+    'IRON_GOLEM', 'OCHRE_JELLY', 'GREEN_SLIME',
+    'DISPLACER_BEAST', 'GENETIC_ENGINEER',
+    'BLACK_DRAGON', 'RED_DRAGON', 'ARCH_LICH', 'VAMPIRE_LEADER',
+    'MASTER_MIND_FLAYER', 'DISENCHANTER', 'WINGED_GARGOYLE',
+    'STORM_GIANT', 'OLOG_HAI', 'ELF_NOBLE', 'ELVEN_MONARCH',
+    'OGRE_TYRANT', 'CAPTAIN', 'GREMLIN',
+    'SILVER_DRAGON', 'ORANGE_DRAGON', 'GREEN_DRAGON',
+    'YELLOW_DRAGON', 'GUARDIAN_NAGA', 'FIRE_GIANT',
+    'ALEAX', 'COUATL', 'HORNED_DEVIL', 'BARBED_DEVIL',
+];
+
 // Direction deltas
 const xdir = [-1, -1, 0, 1, 1, 1, 0, -1];
 const ydir = [0, -1, -1, -1, 0, 1, 1, 1];
@@ -1639,6 +1655,27 @@ function pick_vamp_shape_for(mon) {
     return null;
 }
 
+function big_to_little_shape_ptr(ptr) {
+    if (!ptr) return null;
+    const mapped = ({
+        ARCH_LICH: 'MASTER_LICH',
+        MASTER_MIND_FLAYER: 'MIND_FLAYER',
+    })[ptr.name];
+    return mapped ? monsterPtr(mapped) : ptr;
+}
+
+function pick_nasty_for(difcap = 0) {
+    let ptr = monsterPtr(NASTY_MONSTER_NAMES[rn2(NASTY_MONSTER_NAMES.length)]);
+    if (!ptr) return null;
+    if (difcap > 0 && ptr.difficulty >= difcap) ptr = big_to_little_shape_ptr(ptr);
+    return ptr;
+}
+
+function pick_sandestin_shape_for() {
+    if (rn2(7)) return pick_nasty_for((monsterPtr('ARCHON')?.difficulty ?? 0) - 1);
+    return null;
+}
+
 function mgender_from_permonst_for(mon, ptr) {
     if (!mon || !ptr) return;
     if (ptr.male) {
@@ -1654,11 +1691,15 @@ function mgender_from_permonst_for(mon, ptr) {
     }
 }
 
-function initial_vampshift(mon, ptr) {
+function initial_shapeshift(mon, ptr) {
     const cham = pm_to_cham_for(ptr);
-    if (!cham || !is_vampire_shifter_base(cham) || cham.name === 'VLAD_THE_IMPALER') return false;
+    if (!cham || cham.name === 'VLAD_THE_IMPALER') return false;
     mon.cham = cham;
-    const shape = pick_vamp_shape_for(mon);
+    const shape = cham.name === 'SANDESTIN'
+        ? pick_sandestin_shape_for(mon)
+        : is_vampire_shifter_base(cham)
+            ? pick_vamp_shape_for(mon)
+            : null;
     if (!shape || shape.name === ptr.name) return false;
     mgender_from_permonst_for(mon, shape);
     const monLevel = adj_lev_for(shape);
@@ -2471,12 +2512,6 @@ export async function makemon(mdat, x, y, mmflags = 0) {
         && rn2(5) && !game.u?.uhave?.amulet) {
         mon.msleeping = 1;
     }
-    if (game.in_mklev && !game.u?.uhave?.amulet
-        && (ptr.mlet === 'S_DEMON' || ptr.name === 'WUMPUS'
-            || ptr.name === 'LONG_WORM' || ptr.name === 'GIANT_EEL')
-        && rn2(5)) {
-        mon.msleeping = 1;
-    }
     if (ptr.name === 'LONG_WORM') {
         const tailCount = (mmflags & MM_NOTAIL) ? 0 : rn2(5);
         for (let seg = 0; seg < tailCount; seg++) {
@@ -2485,8 +2520,14 @@ export async function makemon(mdat, x, y, mmflags = 0) {
     }
     mon.cham = null;
     let allow_minvent = true;
-    if (initial_vampshift(mon, ptr)) allow_minvent = false;
+    if (initial_shapeshift(mon, ptr)) allow_minvent = false;
     if (ptr.name === 'GHOST' && !(mmflags & MM_NONAME)) mon.mgivenname = rndghostname();
+    if (game.in_mklev && !game.u?.uhave?.amulet
+        && (((ptr.mflags2 & M2_DEMON) && !(ptr.mflags2 & (M2_LORD | M2_PRINCE))) || ptr.name === 'WUMPUS'
+            || ptr.name === 'LONG_WORM' || ptr.name === 'GIANT_EEL')
+        && rn2(5)) {
+        mon.msleeping = 1;
+    }
     const anymon = mdat === null;
     if (anymon && !(mmflags & MM_NOGRP)) {
         if ((ptr.geno & G_SGROUP) && rn2(2)) {
