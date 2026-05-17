@@ -300,10 +300,13 @@ function warning_glyph(mon) {
     // display_warning(). Warning floats over unseen hostile monsters.
     if (!game.u?.uprops?.warning || mon?.mpeaceful) return null;
     if (dist2(game.u?.ux ?? 0, game.u?.uy ?? 0, mon.mx, mon.my) >= 100) return null;
-    const level = (game._hallucination_warning_rng_active
-            && (game.u?.uprops?.hallucination || game.u?.uhallucination))
-        ? rn2Display(WARNCOUNT - 1) + 1
-        : Math.trunc((mon.m_lev ?? mon.data?.mlevel ?? 0) / 4);
+    let level;
+    if ((game.u?.uprops?.hallucination || game.u?.uhallucination)
+        && (game._hallucination_warning_rng_active || game._monster_move_warning_rng_active)) {
+        level = rn2Display(WARNCOUNT - 1) + 1;
+    } else {
+        level = Math.trunc((mon.m_lev ?? mon.data?.mlevel ?? 0) / 4);
+    }
     if (level < (game.context?.warnlevel ?? 1)) return null;
     return def_warnsyms[Math.min(WARNCOUNT - 1, Math.max(0, level))] || null;
 }

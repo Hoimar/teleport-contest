@@ -15,13 +15,12 @@ and `feature_map.md`.
 - Current branch in this workspace: `main`.
 - Baseline commit at harness cleanup: `f0fdc38`.
 - Active target: `seed0383-wizard-hallucinate`.
-- Active hypothesis: seed0383 is now narrowed to monster-turn multiattack
-  topline boundaries after full flat core RNG parity. Non-side-effect packed
-  monster-hit Mores now remain queued while later monster movement redraws behind
-  them, and physical multiattack overflow now latches the pre-tail terminal
-  frame with hallucinated display-name RNG already consumed. Strict keys for the
-  latched follow-up More and immediate cold side-effect packing are now aligned;
-  the next blocker is hallucinated map redraw ownership after that More resumes.
+- Active hypothesis: seed0383 is now narrowed to hallucinated map redraw
+  ownership after full flat core RNG parity. Non-side-effect packed monster-hit
+  Mores remain queued while later movement redraws happen behind them; physical
+  multiattack overflow, strict follow-up More keys, immediate cold side-effect
+  packing, and monster postmove warning display-RNG ownership are aligned. The
+  next blocker is the later screen 188 map-only redraw drift.
 
 ## Latest Verification
 
@@ -33,15 +32,15 @@ npm run verify -- --target seed0383-wizard-hallucinate
 
 Result:
 
-- Target: `seed0383-wizard-hallucinate` `S 185/219 R 16915/16915`,
-  first screen `184:char+attr:map:Space`, first RNG `-`, cursor-only `1`.
-- Sentinel total: `S 388/1063 R 37186/64569`.
+- Target: `seed0383-wizard-hallucinate` `S 189/219 R 16915/16915`,
+  first screen `188:char+attr:map:Space`, first RNG `-`, cursor-only `1`.
+- Sentinel total: `S 392/1063 R 37186/64569`.
 - Sentinel details:
   - `seed8000-tourist-starter`: `S 23/23 R 3060/3130`, first RNG `3047`.
   - `seed0002-healer-reflection-drummer`: `S 53/595 R 4066/27158`, first RNG `3880`.
   - `seed0013-friday13-save-then-fullmoon-restore`: `S 0/99 R 583/4804`, first RNG `540`.
   - `seed0116-wizard-wear-shop`: `S 127/127 R 12562/12562`, pass.
-  - `seed0383-wizard-hallucinate`: `S 185/219 R 16915/16915`, first screen 184.
+  - `seed0383-wizard-hallucinate`: `S 189/219 R 16915/16915`, first screen 188.
 - Hack-debt audit: hard `0`, suspicious `37` existing replay/override/seed findings.
 - Memory lint: clean after this compaction target.
 
@@ -49,12 +48,11 @@ Result:
 
 1. Continue `seed0383` hallucinated monster-turn display timing.
    - Use `npm run screen:diff -- seed0383-wizard-hallucinate --first`.
-   - Current diff is screen 184 (`Space`): C and JS both show
-     `The chickatrice touches you!  You're covered in frost!`, but the
-     hallucinated map glyphs differ.
+   - Current diff is screen 188 (`Space`): C and JS both show the movement-tip
+     message exactly, but the hallucinated map glyphs differ.
    - Core RNG is complete (`R 16915/16915`). Do not change combat RNG for this
-     blocker; compare display-RNG redraw ownership around internal `topl.c:more()`
-     resume and monster `newsym()` calls.
+     blocker; compare display-RNG redraw ownership around later `newsym()` and
+     input-boundary Hallucination refresh calls.
 2. Continue `seed0002-healer-reflection-drummer` dog-move candidate work.
    - Current state: `S 53/595 R 4066/27158`.
    - First visible mismatch is screen 53 (`y`): exact RNG through the floor

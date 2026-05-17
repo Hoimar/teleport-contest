@@ -1262,13 +1262,24 @@ async function m_move_basic(mtmp) {
         game.vision_full_recalc = 1;
     }
     mon_track_add(mtmp, omx, omy);
-    newsym(omx, omy);
-    if (game._swallowed_expulsion_paused_for_more) {
-        game._swallowed_expulsion_paused_for_more = false;
-    } else {
-        newsym(nix, niy);
+    const previousWarningRng = game._monster_move_warning_rng_active;
+    game._monster_move_warning_rng_active = true;
+    let doorStatus;
+    try {
+        newsym(omx, omy);
+        doorStatus = postmove_door_basic(mtmp);
+        if (doorStatus !== MMOVE_DIED) {
+            if (game._swallowed_expulsion_paused_for_more) {
+                game._swallowed_expulsion_paused_for_more = false;
+            } else {
+                // C ref: monmove.c:postmov() redraws the moved monster's
+                // current square after trap/door handling, before pickup.
+                newsym(mtmp.mx, mtmp.my);
+            }
+        }
+    } finally {
+        game._monster_move_warning_rng_active = previousWarningRng;
     }
-    const doorStatus = postmove_door_basic(mtmp);
     if (doorStatus === MMOVE_DIED) return MMOVE_DIED;
     if (await mpickstuff_basic(mtmp)) return MMOVE_DONE;
     return doorStatus;
