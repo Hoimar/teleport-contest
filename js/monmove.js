@@ -8,7 +8,8 @@ import {
     DOOR, ROOM,
     IS_DOOR, IS_LAVA, IS_OBSTRUCTED, IS_POOL, IS_STWALL, IS_WALL, IS_WATERWALL,
     I_SPECIAL, M_AP_FURNITURE, M_AP_OBJECT,
-    MON_POLE_DIST, NEED_HTH_WEAPON, NEED_RANGED_WEAPON, NEED_WEAPON, W_WEP,
+    MON_POLE_DIST, NEED_AXE, NEED_HTH_WEAPON, NEED_PICK_AXE, NEED_PICK_OR_AXE,
+    NEED_RANGED_WEAPON, NEED_WEAPON, W_ARMS, W_WEP,
     GP_CHECKSCARY, SDOOR, W_NONPASSWALL,
     isok, SPACE_POS,
 } from './const.js';
@@ -62,6 +63,8 @@ const WAND_CLASS = 11;
 const GEM_CLASS = 13;
 const ROCK = 474;
 const BOULDER = 475;
+const AXE = 44;
+const BATTLE_AXE = 45;
 const DWARVISH_MATTOCK = 71;
 const PICK_AXE = 259;
 const RAY = 3;
@@ -210,6 +213,11 @@ function non_tame_movement_opportunity(mtmp, state) {
 }
 
 function can_tunnel_basic(mtmp) {
+    const targetX = mtmp.mux ?? game.u?.ux ?? mtmp.mx;
+    const targetY = mtmp.muy ?? game.u?.uy ?? mtmp.my;
+    // C ref: mon.c:mon_allowflags().  Hostile pick-using tunnellers near
+    // their target prefer a weapon instead of digging.
+    if (!mtmp.mpeaceful && dist2(mtmp.mx, mtmp.my, targetX, targetY) <= 8) return false;
     return !!(mtmp.data?.mflags2 & M2_DWARF)
         && (mtmp.inventory || []).some((obj) => obj?.otyp === PICK_AXE || obj?.otyp === DWARVISH_MATTOCK);
 }
@@ -220,6 +228,34 @@ function can_tunnel_at_basic(mtmp, x, y) {
     if (!loc) return false;
     if (IS_WALL(loc.typ) || loc.typ === SDOOR) return true;
     return loc.typ === DOOR && !!(loc.doormask & (D_CLOSED | D_LOCKED));
+}
+
+function is_pick_weapon_basic(obj) {
+    return obj?.otyp === PICK_AXE || obj?.otyp === DWARVISH_MATTOCK;
+}
+
+function is_axe_weapon_basic(obj) {
+    return obj?.otyp === AXE || obj?.otyp === BATTLE_AXE;
+}
+
+function m_digweapon_check_basic(mtmp, x, y) {
+    // C ref: monmove.c:m_digweapon_check().  Pick-using tunnellers spend a
+    // move wielding the needed tool before entering rock/tree/door terrain.
+    if (!(mtmp.data?.mflags2 & M2_DWARF)) return false;
+    const loc = game.level?.at(x, y);
+    if (!loc) return false;
+    const closedDoor = loc.typ === DOOR && !!(loc.doormask & (D_CLOSED | D_LOCKED));
+    const diggableWall = IS_STWALL(loc.typ) && !(loc.wall_info & W_NONPASSWALL);
+    if (!closedDoor && !diggableWall) return false;
+    const mw = mtmp.mw || null;
+    if (closedDoor) {
+        if (!mw || (!is_pick_weapon_basic(mw) && !is_axe_weapon_basic(mw))) {
+            mtmp.weapon_check = NEED_PICK_OR_AXE;
+        }
+    } else if (!mw || !is_pick_weapon_basic(mw)) {
+        mtmp.weapon_check = NEED_PICK_AXE;
+    }
+    return mtmp.weapon_check >= NEED_PICK_AXE && mon_wield_item_basic(mtmp);
 }
 
 function mon_at(x, y, self) {
@@ -406,6 +442,27 @@ function hth_weapon_candidate(mtmp) {
     return (mtmp.inventory || []).find((obj) => object_class(obj) === WEAPON_CLASS);
 }
 
+function pick_weapon_candidate(mtmp) {
+    return (mtmp.inventory || []).find((obj) => obj?.otyp === PICK_AXE)
+        || (!(mtmp.misc_worn_check & W_ARMS)
+            ? (mtmp.inventory || []).find((obj) => obj?.otyp === DWARVISH_MATTOCK)
+            : null);
+}
+
+function axe_weapon_candidate(mtmp) {
+    return (mtmp.inventory || []).find((obj) => obj?.otyp === BATTLE_AXE)
+        || (mtmp.inventory || []).find((obj) => obj?.otyp === AXE);
+}
+
+function pick_or_axe_weapon_candidate(mtmp) {
+    return (!(mtmp.misc_worn_check & W_ARMS)
+        ? ((mtmp.inventory || []).find((obj) => obj?.otyp === DWARVISH_MATTOCK)
+            || (mtmp.inventory || []).find((obj) => obj?.otyp === BATTLE_AXE))
+        : null)
+        || (mtmp.inventory || []).find((obj) => obj?.otyp === PICK_AXE)
+        || (mtmp.inventory || []).find((obj) => obj?.otyp === AXE);
+}
+
 function mon_wield_item_basic(mtmp) {
     let obj = null;
     if (mtmp.weapon_check === NEED_HTH_WEAPON) {
@@ -415,6 +472,12 @@ function mon_wield_item_basic(mtmp) {
         // select_rwep()'s launcher result. Ranged selection is not modeled
         // yet, so failed selection only resets weapon_check below.
         obj = null;
+    } else if (mtmp.weapon_check === NEED_PICK_AXE) {
+        obj = pick_weapon_candidate(mtmp);
+    } else if (mtmp.weapon_check === NEED_AXE) {
+        obj = axe_weapon_candidate(mtmp);
+    } else if (mtmp.weapon_check === NEED_PICK_OR_AXE) {
+        obj = pick_or_axe_weapon_candidate(mtmp);
     }
     if (!obj) {
         mtmp.weapon_check = NEED_WEAPON;
@@ -1316,6 +1379,7 @@ async function m_move_basic(mtmp) {
         mtmp.muy = game.u.uy;
         return MMOVE_NOTHING;
     }
+    if (digTunnel && m_digweapon_check_basic(mtmp, nix, niy)) return MMOVE_DONE;
     const engulfingHero = game.u?.uswallow && game.u?.ustuck === mtmp;
     mtmp.mx = nix;
     mtmp.my = niy;
