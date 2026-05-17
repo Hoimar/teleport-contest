@@ -6841,7 +6841,10 @@ function hellTweaksProtectedOk(x, y) {
 }
 
 function hellTweaksRandomPoint() {
-    return { x: 1 + rn2(COLNO - 1), y: rn2(ROWNO) };
+    // C ref: sp_lev.c:get_location() for this Lua selection context uses
+    // the current gx.xstart/gx.xsize area; Asmodeus evidence has xstart 0,
+    // xsize COLNO-1, giving x = rn2(79), y = rn2(21).
+    return { x: rn2(COLNO - 1), y: rn2(ROWNO) };
 }
 
 function hellTweaksSetRandom(set) {
@@ -6950,7 +6953,8 @@ function hellTweaksAsmodeus() {
         if (rn2(100) < 80) {
             const poolground = hellTweaksFilterProtected(hellTweaksGrow(new Set(pools), 'all'));
             const pval = (1 + rn2(8)) * 10;
-            applyTerrainSelection(hellTweaksPercentage(poolground, pval), ROOM);
+            const pct = hellTweaksPercentage(poolground, pval);
+            applyTerrainSelection(pct, ROOM);
         }
         applyTerrainSelection(pools, LAVAPOOL);
     }
