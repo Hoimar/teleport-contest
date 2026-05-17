@@ -5134,7 +5134,8 @@ function mktrap_victim(trap) {
     }
     if (victim_mnum === PM_HUMAN && rn2(25))
         victim_mnum = rn1(ROLE_MONSTER_RANGE_BEFORE_WIZARD, PM_ARCHEOLOGIST);
-    mkcorpstat(CORPSE, null, victim_mnum, x, y, 8); // CORPSTAT_INIT
+    const corpse = mkcorpstat(CORPSE, null, victim_mnum, x, y, 8); // CORPSTAT_INIT
+    if (corpse) corpse.trap_victim = true;
 }
 
 async function mktrap_room(croom) {

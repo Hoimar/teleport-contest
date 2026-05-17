@@ -589,6 +589,11 @@ async function show_blocking_monster_message(line) {
         game._pending_message = `${game._pending_message}  ${line}`;
         return;
     }
+    if (/^You (miss|hit) /.test(game._pending_message || '') && !game._more
+        && `${game._pending_message}  ${line}`.length < 80) {
+        game._pending_message = `${game._pending_message}  ${line}`;
+        return;
+    }
     if (game._pending_message && !game._more && `${game._pending_message}  ${line}`.length < 80) {
         const appendToKillMessage = /^The .+ is killed!$/.test(game._pending_message);
         game._pending_message = `${game._pending_message}  ${line}`;
@@ -687,7 +692,7 @@ function attack_is_basic_physical(attack) {
     if (!attack) return true;
     const [aatyp, adtyp, damn, damd] = attack;
     return BASIC_MELEE_ATTACKS.has(aatyp)
-        && adtyp === 'AD_PHYS'
+        && ['AD_PHYS', 'AD_ELEC', 'AD_COLD', 'AD_FIRE', 'AD_ACID'].includes(adtyp)
         && damn > 0
         && damd > 0;
 }
@@ -899,7 +904,8 @@ function physical_melee_attacks(mtmp, attacks, toHit) {
         const [, adtyp, damn, damd] = attack;
         if (toHit > rnd(20 + i)) {
             const verb = monster_attack_verb(attack, attackVerbCounts);
-            hitMessages.push(`The ${monster_name(mtmp)} ${verb}!`);
+            const extra = adtyp === 'AD_ELEC' ? '  You get zapped!' : '';
+            hitMessages.push(`The ${monster_name(mtmp)} ${verb}!${extra}`);
             let damage = d(damn, damd);
             damage = elemental_hit_side_effects(mtmp, adtyp, damage);
             mhitm_knockback_frontdoor();
@@ -916,6 +922,8 @@ function physical_melee_attacks(mtmp, attacks, toHit) {
                 }
                 break;
             }
+        } else {
+            hitMessages.push(`The ${monster_name(mtmp)} misses!`);
         }
     }
     return hitMessages;

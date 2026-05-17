@@ -17,7 +17,7 @@ import { init_objects } from './o_init.js';
 import { init_dungeons } from './dungeon.js';
 import { apply_startup_role_state, u_init_misc_rng, u_init_role_inventory } from './u_init.js';
 import { makedog } from './dog.js';
-import { continueRunStep, rhack } from './cmd.js';
+import { continueRunStep, finish_pending_eaten_corpse, rhack } from './cmd.js';
 import { nhgetch } from './input.js';
 import {
     docrt, cls, bot, flush_screen, pline, newsym, serialize_terminal_grid,
@@ -475,6 +475,11 @@ export async function moveloop_core() {
     // Advance turn; run/rush movement may consume multiple turns before
     // returning to the input boundary.
     if (g.context?.move) {
+        if (g._floor_list_pauses_turn && g._more) {
+            g._floor_list_pauses_turn = false;
+            g._resume_floor_list_turn = true;
+            return;
+        }
         if (g._resume_monster_turn) {
             g._resume_monster_turn = false;
             await advanceTurn();
@@ -484,6 +489,7 @@ export async function moveloop_core() {
         } else {
             applyOccupationFinalTurnState(g);
             await advanceTurn();
+            finish_pending_eaten_corpse();
             if (g._more && occupationPending(g)) {
                 g._occupation_paused_for_more = true;
                 return;

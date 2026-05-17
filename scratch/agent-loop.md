@@ -18,10 +18,12 @@ and `feature_map.md`.
 - Active hypothesis: seed0002 is now past the legacy tutorial prompt,
   startup wand color mismatch, floor-look/pickup, safe pet-displacement,
   engraving-wipe success amount, carried Healer money object, startup
-  `seer_turn`, ambient sound packing, and startup discovery naming. The next
-  visible blocker is screen 31 (`l`): C misses the grid bug and receives its
-  passive shock attack, while JS hits it. First RNG evidence points at hero
-  combat hit/miss and grid-bug retaliation, not the earlier dog-object scan.
+  `seer_turn`, ambient sound packing, startup discovery naming, the first
+  grid-bug melee sequence, doorway run stop, multi-object floor/pickup menus,
+  dart trap, and floor-corpse eating. The next visible blocker is screen 53
+  (`y`): RNG is exact through the eat turn, but the little dog chooses the
+  wrong equal-candidate square after `dog_move()`; first later RNG mismatch is
+  in the following dog-goal scan.
 
 ## Latest Verification
 
@@ -33,19 +35,18 @@ npm run verify -- --target seed0002-healer-reflection-drummer
 
 Result:
 
-- Target: `seed0002-healer-reflection-drummer` `S 31/595 R 3197/27158`,
-  first screen `31:char:mixed:l`, first RNG
-  `3044:rn2(3)=2=>rn2(19)=15`, cursor-only `0`.
-- Sentinel total: `S 354/1063 R 30825/64569`.
+- Target: `seed0002-healer-reflection-drummer` `S 53/595 R 4066/27158`,
+  first screen `53:char:map:y`, first RNG
+  `3880:rn2(100)=2=>rn2(4)=2`, cursor-only `1`.
+- Sentinel total: `S 376/1063 R 31694/64569`.
 - Sentinel details:
   - `seed8000-tourist-starter`: `S 23/23 R 3060/3130`, first RNG `3047`.
-  - `seed0002-healer-reflection-drummer`: `S 31/595 R 3197/27158`, first RNG `3044`.
+  - `seed0002-healer-reflection-drummer`: `S 53/595 R 4066/27158`, first RNG `3880`.
   - `seed0013-friday13-save-then-fullmoon-restore`: `S 0/99 R 583/4804`, first RNG `540`.
   - `seed0116-wizard-wear-shop`: `S 127/127 R 12562/12562`, pass.
   - `seed0383-wizard-hallucinate`: `S 173/219 R 11423/16915`.
 - Hack-debt audit: hard `0`, suspicious `37` existing replay/override/seed findings.
 - Memory lint: clean after this compaction target.
-- Full suite after the latest pet-combat/death timing change: `S 826/11405 R 102576/792838`.
 
 ## Current Queue
 

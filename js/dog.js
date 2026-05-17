@@ -13,7 +13,7 @@ import {
     isok,
 } from './const.js';
 import { d, rn2, rnd } from './rng.js';
-import { clear_path } from './vision.js';
+import { cansee, clear_path } from './vision.js';
 
 const FOOD_CLASS = 7;
 const ROCK_CLASS = 14;
@@ -270,6 +270,7 @@ function dogfood(mtmp, obj) {
         case ENORMOUS_MEATBALL:
             return carni ? DOGFOOD : MANFOOD;
         case CORPSE:
+            if (obj.trap_victim) return MANFOOD;
             return carni ? CADAVER : MANFOOD;
         case EGG:
             return carni ? CADAVER : MANFOOD;
@@ -324,6 +325,7 @@ function can_reach_location(mtmp, mx, my, fx, fy, depth = 0) {
 function can_carry(mtmp, obj) {
     if (mtmp === game.u?.usteed) return 0;
     if (obj.cursed) return 0;
+    if (obj.otyp === CORPSE) return 0;
     if (object_class(obj.otyp) === ROCK_CLASS && obj.otyp === BOULDER && !mtmp.data?.throws_rocks) return 0;
     if (current_mon_load(mtmp) + object_weight(obj) > max_mon_load(mtmp)) return 0;
     return Math.max(1, obj.quan || 1);
@@ -475,7 +477,7 @@ function dog_invent(mtmp, udist) {
                 if (idx >= 0) game.level.objects.splice(idx, 1);
                 mtmp.inventory = mtmp.inventory || [];
                 mtmp.inventory.unshift(obj);
-                pline(`The kitten picks up ${object_name(obj)}.`);
+                if (cansee(omx, omy)) pline(`The kitten picks up ${object_name(obj)}.`);
                 newsym(omx, omy);
             }
         }

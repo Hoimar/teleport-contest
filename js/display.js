@@ -489,18 +489,22 @@ export function newsym(x, y) {
         const tr = trap_glyph(trap);
         draw_ch = tr.ch; draw_color = tr.color; draw_dec = tr.dec;
     }
+    if (obj && !covered) {
+        const og = object_glyph_for_display(obj, x, y, visible);
+        draw_ch = og.ch; draw_color = og.color; draw_dec = false;
+    }
+    const memory_ch = draw_ch;
+    const memory_color = draw_color;
+    const memory_dec = draw_dec;
     if (mon) {
         const mg = monster_glyph(mon);
         draw_ch = mg.ch; draw_color = mg.color; draw_dec = mg.dec;
-    } else if (obj && !covered) {
-        const og = object_glyph_for_display(obj, x, y, visible);
-        draw_ch = og.ch; draw_color = og.color; draw_dec = false;
     }
 
     // Only update display/memory if cell is IN_SIGHT (lit and visible)
     show_glyph_cell(x, y, draw_ch, draw_color, draw_dec);
     if (game.level?.flags?.hero_memory) {
-        loc.remembered_glyph = { ch: draw_ch, color: draw_color, decgfx: draw_dec };
+        loc.remembered_glyph = { ch: memory_ch, color: memory_color, decgfx: memory_dec };
     }
 }
 
@@ -738,9 +742,10 @@ function _buildScreenOutput() {
         return;
     }
 
+    const floorListActive = Array.isArray(game._floor_list_lines) && game._floor_list_lines.length > 0;
     let output = '';
     // Row 0: message
-    output += (game._pending_message || '') + (game._more ? '--More--' : '') + '\n';
+    output += (game._pending_message || '') + (game._more && !floorListActive ? '--More--' : '') + '\n';
 
     // Rows 1-21: map (rendered with DEC + ANSI, per-row SO/SI)
     for (let y = 0; y < ROWNO; y++) {
@@ -757,7 +762,7 @@ function _buildScreenOutput() {
     if (display.grid) {
         display.clearScreen();
         // Message line
-        const msg = (game._pending_message || '') + (game._more ? '--More--' : '');
+        const msg = (game._pending_message || '') + (game._more && !floorListActive ? '--More--' : '');
         const pending = game._pending_message || '';
         if (game._more && game._more_next_message_row) {
             for (let c = 0; c < Math.min(pending.length, display.cols); c++)
@@ -765,6 +770,11 @@ function _buildScreenOutput() {
         } else {
             for (let c = 0; c < Math.min(msg.length, display.cols); c++)
                 display.setCell(c, 0, msg[c], NO_COLOR, 0);
+        }
+        if (floorListActive && game._floor_list_show_more === false) {
+            const col = game._floor_list_col ?? 41;
+            for (let c = col; c < Math.min(msg.length, display.cols); c++)
+                display.setCell(c, 0, msg[c], NO_COLOR, ATR_INVERSE);
         }
         // Map — write characters to grid (DEC → Unicode for browser display)
         if (!game._swallowed_map_active && !game._swallowed_latched_overlay) {
@@ -793,6 +803,27 @@ function _buildScreenOutput() {
         const s2 = _statusLine2();
         for (let c = 0; c < Math.min(s2.length, display.cols); c++)
             display.setCell(c, 23, s2[c], NO_COLOR, 0);
+        if (floorListActive) {
+            const col = game._floor_list_col ?? 41;
+            for (let i = 0; i < game._floor_list_lines.length; i++) {
+                const line = game._floor_list_lines[i] || '';
+                const row = i + 1;
+                const inverse = game._floor_list_show_more === false
+                    && line
+                    && line !== '(end)'
+                    && !/^[a-z] [+-] /.test(line);
+                for (let c = 0; c < display.cols - col; c++)
+                    display.setCell(col + c, row, ' ', NO_COLOR, 0);
+                for (let c = 0; c < Math.min(line.length, display.cols - col); c++)
+                    display.setCell(col + c, row, line[c], NO_COLOR, inverse ? ATR_INVERSE : 0);
+            }
+            if (game._floor_list_show_more !== false) {
+                const more = '--More--';
+                const row = Math.min(21, game._floor_list_lines.length + 1);
+                for (let c = 0; c < more.length; c++)
+                    display.setCell(col + c, row, more[c], NO_COLOR, 0);
+            }
+        }
         if (game._more && game._more_next_message_row) {
             const more = '--More--';
             for (let c = 0; c < more.length; c++) display.setCell(c, 1, more[c], NO_COLOR, 0);
@@ -853,4 +884,8 @@ export function clear_pending_message() {
     game._pet_combat_more_latched = false;
     game._prompt_cursor = null;
     game._packed_monster_more_candidate = false;
+    game._floor_list_lines = null;
+    game._floor_list_col = null;
+    game._floor_list_show_more = true;
+    game._floor_list_pauses_turn = false;
 }
