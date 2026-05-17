@@ -336,7 +336,8 @@ export function see_objects() {
 
 export function see_traps() {
     for (const trap of game.level?.traps || []) {
-        if (!trap.tseen) continue;
+        const loc = game.level?.at(trap.tx, trap.ty);
+        if (!trap.tseen || loc?.disp_ch !== '^') continue;
         newsym(trap.tx, trap.ty);
     }
 }
