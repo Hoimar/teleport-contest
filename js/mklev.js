@@ -145,6 +145,7 @@ const GRAPPLING_HOOK = 260;
 const UNICORN_HORN = 261;
 const GOLD_PIECE = 438;
 const DILITHIUM_CRYSTAL = 439;
+const RUBY = 441;
 const LUCKSTONE = 470;
 const LOADSTONE = 471;
 const TOUCHSTONE = 472;
@@ -3666,7 +3667,7 @@ function loadValleySpecial() {
         WEAPON_CLASS, WEAPON_CLASS, WEAPON_CLASS, WEAPON_CLASS]) {
         valleyObject(cls);
     }
-    for (const cls of [GEM_CLASS, GEM_CLASS, GEM_CLASS,
+    for (const cls of [-RUBY, GEM_CLASS, GEM_CLASS,
         POTION_CLASS, POTION_CLASS, POTION_CLASS,
         SCROLL_CLASS, SCROLL_CLASS, SCROLL_CLASS,
         WAND_CLASS, WAND_CLASS, RING_CLASS, RING_CLASS,
