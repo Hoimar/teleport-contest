@@ -2333,6 +2333,14 @@ function buildLevelTeleportMenu() {
         i: branchFromDoom('Gehennom', doomMax),
         j: dlevelOf('castle', doomMax),
     };
+    const demonTargets = [
+        { name: 'juiblex', fallback: gehStart + 3 },
+        { name: 'asmodeus', fallback: gehStart + 5 },
+    ].map((entry) => ({
+        ...entry,
+        dlevel: dlevelForProto(entry.name),
+        depth: dlevelOf(entry.name, entry.fallback),
+    })).sort((a, b) => a.depth - b.depth);
     const levels = {
         a: { dnum: 0, dlevel: 1 },
         b: branchFromDoomLevel('The Gnomish Mines'),
@@ -2345,8 +2353,8 @@ function buildLevelTeleportMenu() {
         i: branchFromDoomLevel('Gehennom'),
         j: dlevelForProto('castle'),
         k: dlevelForProto('valley'),
-        l: dlevelForProto('juiblex'),
-        m: dlevelForProto('asmodeus'),
+        l: demonTargets[0]?.dlevel || null,
+        m: demonTargets[1]?.dlevel || null,
         n: dlevelForProto('baalz'),
         o: branchEntranceLevel("Vlad's Tower"),
         p: dlevelForProto('orcus'),
@@ -2372,8 +2380,8 @@ function buildLevelTeleportMenu() {
         ` j - ${currentLevelMarker(levels.j)} castle: ${choices.j} (tune ${tune})`,
         ` \x1b[7mGehennom: levels ${gehStart} to ${gehEnd}\x1b[0m`,
         ` k - ${currentLevelMarker(levels.k)} valley: ${dlevelOf('valley', gehStart)}`,
-        ` l - ${currentLevelMarker(levels.l)} juiblex: ${dlevelOf('juiblex', gehStart + 3)}`,
-        ` m - ${currentLevelMarker(levels.m)} asmodeus: ${dlevelOf('asmodeus', gehStart + 5)}`,
+        ` l - ${currentLevelMarker(levels.l)} ${demonTargets[0].name}: ${demonTargets[0].depth}`,
+        ` m - ${currentLevelMarker(levels.m)} ${demonTargets[1].name}: ${demonTargets[1].depth}`,
         ` n - ${currentLevelMarker(levels.n)} baalz: ${dlevelOf('baalz', gehStart + 6)}`,
         ` o - ${currentLevelMarker(levels.o)} Stair to Vlad's Tower: ${branchEntranceDepth("Vlad's Tower", gehStart + 9)}`,
         ` p - ${currentLevelMarker(levels.p)} orcus: ${dlevelOf('orcus', gehStart + 9)}`,
