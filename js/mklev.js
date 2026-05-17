@@ -31,7 +31,7 @@ import {
     SPACE_POS, isok, W_NONDIGGABLE, FILL_NORMAL, FILL_NONE, FILL_LVFLAGS,
     ICE, MOAT, POOL, WATER, LAVAPOOL, LAVAWALL, DBWALL, DRAWBRIDGE_UP, THRONE,
     A_LAWFUL, A_NONE, Align2amask,
-    LR_DOWNSTAIR, LR_UPSTAIR, LR_BRANCH, LR_TELE, LR_UPTELE, LR_DOWNTELE, NO_MINVENT, MM_IGNOREWATER, MM_IGNORELAVA, MM_ANGRY, MM_ASLEEP, MM_NOGRP, MM_NOTAIL, GP_CHECKSCARY, GP_AVOID_MONPOS,
+    LR_DOWNSTAIR, LR_UPSTAIR, LR_BRANCH, LR_TELE, LR_UPTELE, LR_DOWNTELE, NO_MINVENT, MM_IGNOREWATER, MM_IGNORELAVA, MM_ANGRY, MM_EPRI, MM_ASLEEP, MM_NOGRP, MM_NOTAIL, GP_CHECKSCARY, GP_AVOID_MONPOS,
     MARK as ENGR_MARK, N_ENGRAVE,
     M_AP_OBJECT, M_AP_FURNITURE,
 } from './const.js';
@@ -3569,9 +3569,13 @@ function priestini(croom) {
     const pos = spots.length ? spots[rn2(spots.length)] : altar;
     const priest = MONSTERS.find(m => m.name === 'PRIEST' && m.difficulty >= 15)
         || MONSTERS.find(m => m.name === 'PRIEST');
-    makemon(priest, pos.x, pos.y, MM_ASLEEP | MM_NOGRP);
+    makemon(priest, pos.x, pos.y, MM_EPRI);
     const mon = game.level?.monsters?.[0];
-    if (mon && mon.mx === pos.x && mon.my === pos.y) mon.ispriest = 1;
+    if (mon && mon.mx === pos.x && mon.my === pos.y) {
+        mon.ispriest = 1;
+        mon.msleeping = 0;
+        mon.mpeaceful = 1;
+    }
     rn2(3);
     for (let i = 0; i < 2; i++) {
         const book = rnd_class(class_base(SPBOOK_CLASS), 407);
