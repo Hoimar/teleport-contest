@@ -14,28 +14,26 @@ and `feature_map.md`.
 
 - Current branch in this workspace: `main`.
 - Baseline commit at harness cleanup: `f0fdc38`.
-- Active target: `seed0383-wizard-hallucinate`.
-- Active hypothesis: seed0383 is now at the debug level-teleport arrival frame.
-  The target advanced to `S 195/219 R 16915/16915` after porting
-  `hliquid()` display RNG, suppressing prompt-time Hallucination refreshes, and
-  preventing the immediate post-`goto_level()` boundary rerandomization. The
-  remaining mismatch is screen 195 (`c`): the materialize message and cursor
-  are exact, but the hallucinated soldier/object glyphs near the new-level
-  arrival are offset. Next step is `display.c:docrt()`/vision redraw ordering
-  for visible objects versus monster overlay, not core level-generation RNG.
+- Active target: `seed1800-tourist-eat-throw`.
+- Active hypothesis: configured Tourist startup is now past the wrong-pantheon
+  lore blocker. Adding the Tourist Discworld gods and the Tourist-specific
+  legacy lore overlay reduced screen 0 to 15 residual cells with exact
+  Book-of-The-Lady text and cursor. Remaining seed1800 startup mismatch is a
+  right-side map/status residue, plus first RNG `FR 1045`, so the next safe
+  step is startup map/status state rather than more role text.
 
 ## Latest Verification
 
 Run:
 
 ```bash
-npm run verify -- --target seed0383-wizard-hallucinate
+npm run verify -- --target seed1800-tourist-eat-throw
 ```
 
 Result:
 
-- Target: `seed0383-wizard-hallucinate` `S 195/219 R 16915/16915`,
-  first screen `195:char:map:c`, first RNG `-`, cursor-only `1`.
+- Target: `seed1800-tourist-eat-throw` `S 0/26 R 2188/2458`,
+  first screen `0:char:mixed:init`, first RNG `1045`, cursor-only `0`.
 - Sentinel total: `S 428/1063 R 38622/64569`.
 - Sentinel details:
   - `seed8000-tourist-starter`: `S 23/23 R 3060/3130`, first RNG `3047`.
@@ -48,7 +46,14 @@ Result:
 
 ## Current Queue
 
-1. Continue `seed0383` hallucinated monster-turn display timing.
+1. Continue `seed1800-tourist-eat-throw` configured Tourist startup.
+   - Use `npm run screen:diff -- seed1800-tourist-eat-throw --index 0 --all-cells`.
+   - Current diff is screen 0 only 15 cells: pet glyph one column off in the
+     right-side map and status HP/Pw/gold/Xp text still reflect generic
+     hardcoded Tourist startup state. Role text and cursor are exact.
+   - First RNG mismatch remains `FR 1045`, so startup identity text is not the
+     RNG blocker; inspect C role startup stats/gold/status and map placement.
+2. Continue `seed0383` hallucinated monster-turn display timing.
    - Use `npm run screen:diff -- seed0383-wizard-hallucinate --first`.
    - Current diff is screen 195 (`c`): C and JS both show the materialize
      message and cursor exactly, but the hallucinated arrival-level soldier and
@@ -56,7 +61,7 @@ Result:
    - Core RNG is complete (`R 16915/16915`). Do not change combat RNG for this
      blocker; compare `goto_level()` display ordering: `vision_reset()`,
      `reset_glyphmap()`, `docrt()`, visible object redraws, and monster overlay.
-2. Continue `seed0002-healer-reflection-drummer` monster/pet ordering work.
+3. Continue `seed0002-healer-reflection-drummer` monster/pet ordering work.
    - Current state: `S 83/595 R 5502/27158`.
    - First visible mismatch is screen 83 (`Enter`): expected dog display at
      `[74,12]`, JS at `[73,12]`, and status turn count differs (`5` vs `6`).
@@ -65,8 +70,8 @@ Result:
      pet object scan. The next safe step is to explain why C reaches a pet
      object-goal scan before the next monster `distfleeck()` during the eating
      occupation without adding a full extra hidden turn.
-3. Broaden `o_init`/`objnam`/discovery state away from limited evidence tables.
-4. Broaden sleeping/hider front doors only when current C evidence reaches them.
+4. Broaden `o_init`/`objnam`/discovery state away from limited evidence tables.
+5. Broaden sleeping/hider front doors only when current C evidence reaches them.
 
 ## Regression Notes
 

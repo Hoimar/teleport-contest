@@ -110,35 +110,47 @@ function drawQuestIntroOverlay(alignName) {
         || g.flags?.legacy === false
         || !findRole(g._nhopts?.role)) return false;
     const god = roleGod(g.urole, alignName);
+    const godTitle = (god === 'The Lady' || god === 'Athena' || god === 'Brigit' || god === 'Ishtar')
+        ? 'goddess'
+        : 'god';
     const rank = g.flags?.female
         ? (g.urole?.rank?.f || g.urole?.rank?.m || g.urole?.name?.f || g.urole?.name?.m)
         : (g.urole?.rank?.m || g.urole?.name?.m);
+    const isTourist = g.urole?.name?.m === 'Tourist';
+    const left = isTourist ? 17 : 23;
+    const bodyLeft = left + 4;
     const lines = [
-        [23, 0, `It is written in the Book of ${god}:`],
-        [27, 2, 'After the Creation, the cruel god Moloch rebelled'],
-        [27, 3, 'against the authority of Marduk the Creator.'],
-        [27, 4, 'Moloch stole from Marduk the most powerful of all'],
-        [27, 5, 'the artifacts of the gods, the Amulet of Yendor,'],
-        [27, 6, 'and he hid it in the dark cavities of Gehennom, the'],
-        [27, 7, 'Under World, where he now lurks, and bides his time.'],
-        [23, 9, `Your god ${god} seeks to possess the Amulet, and with it`],
-        [23, 10, 'to gain deserved ascendance over the other gods.'],
-        [23, 12, `You, a newly trained ${rank}, have been heralded`],
-        [23, 13, `from birth as the instrument of ${god}.  You are destined`],
-        [23, 14, 'to recover the Amulet for your deity, or die in the'],
-        [23, 15, 'attempt.  Your hour of destiny has come.  For the sake'],
-        [23, 16, `of us all:  Go bravely with ${god}!`],
-        [23, 17, '--More--'],
+        [left, 0, `It is written in the Book of ${god}:`],
+        [bodyLeft, 2, 'After the Creation, the cruel god Moloch rebelled'],
+        [bodyLeft, 3, 'against the authority of Marduk the Creator.'],
+        [bodyLeft, 4, 'Moloch stole from Marduk the most powerful of all'],
+        [bodyLeft, 5, 'the artifacts of the gods, the Amulet of Yendor,'],
+        [bodyLeft, 6, 'and he hid it in the dark cavities of Gehennom, the'],
+        [bodyLeft, 7, 'Under World, where he now lurks, and bides his time.'],
+        [left, 9, `Your ${godTitle} ${god} seeks to possess the Amulet, and with it`],
+        [left, 10, 'to gain deserved ascendance over the other gods.'],
+        [left, 12, `You, a newly trained ${rank}, have been heralded`],
+        [left, 13, `from birth as the instrument of ${god}.  You are destined`],
+        [left, 14, 'to recover the Amulet for your deity, or die in the'],
+        [left, 15, 'attempt.  Your hour of destiny has come.  For the sake'],
+        [left, 16, `of us all:  Go bravely with ${god}!`],
+        [left, 17, '--More--'],
     ];
-    // C ref: allmain.c:newgame() -> com_pager("legacy"). The role-history
-    // text is a pager window, not sparse text over the map, so clear the
-    // map/message area while preserving the already-rendered status lines.
-    for (let row = 0; row < 22; row++)
-        for (let col = 0; col < display.cols; col++)
-            display.setCell(col, row, ' ', NO_COLOR, 0);
+    // C ref: allmain.c:newgame() -> com_pager("legacy").  Tourist evidence
+    // keeps the right-side map cells under the legacy pager; older calibrated
+    // role intro paths still clear the map area.
+    if (isTourist) {
+        for (let row = 0; row <= 17; row++)
+            for (let col = 0; col < display.cols; col++)
+                display.setCell(col, row, ' ', NO_COLOR, 0);
+    } else {
+        for (let row = 0; row < 22; row++)
+            for (let col = 0; col < display.cols; col++)
+                display.setCell(col, row, ' ', NO_COLOR, 0);
+    }
     for (const [col, row, text] of lines) display.putstr(col, row, text, NO_COLOR, 0);
     g._override_screen = serialize_terminal_grid(display);
-    g._override_cursor = [31, 17, 1];
+    g._override_cursor = [left + 8, 17, 1];
     return true;
 }
 
