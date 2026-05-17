@@ -13,7 +13,7 @@ import {
 } from './const.js';
 import {
     newsym, queue_more_prompt, pline, flush_screen, clear_pending_message,
-    docrt, refresh_swallowed_overlay, serialize_terminal_grid,
+    docrt, refresh_swallowed_overlay, serialize_terminal_grid, append_pline,
 } from './display.js';
 import { nhgetch } from './input.js';
 import { clear_path, cansee, couldsee } from './vision.js';
@@ -589,6 +589,11 @@ function hallucinating() {
     return !!(game.u?.uhallucination || game.u?.uprops?.hallucination);
 }
 
+function is_more_dismiss_key(ch) {
+    if (typeof ch === 'number') ch = String.fromCharCode(ch);
+    return ch === ' ' || ch === '\r' || ch === '\n' || ch === '\x1b';
+}
+
 async function flush_pending_more_before_monster_message() {
     if (!game._more || !game._pending_message) return;
     if (game._pet_combat_more_latched && !hallucinating()) return;
@@ -603,13 +608,18 @@ async function flush_pending_more_before_monster_message() {
     if (game._after_more_message) {
         const msg = game._after_more_message;
         const needsPrompt = !!game._after_more_needs_prompt;
+        const strictPromptKeys = !!game._after_more_strict_keys;
         game._after_more_message = '';
         game._after_more_needs_prompt = false;
+        game._after_more_strict_keys = false;
         await pline(msg);
         if (needsPrompt) {
             queue_more_prompt();
-            await flush_screen(1);
-            await nhgetch();
+            let ch;
+            do {
+                await flush_screen(1);
+                ch = await nhgetch();
+            } while (strictPromptKeys && !is_more_dismiss_key(ch));
             clear_pending_message();
         }
     }
@@ -681,6 +691,13 @@ async function show_blocking_monster_message(line) {
     }
     await pline(line);
     if (game._monster_death_pending || game._fatal_monster_attack_paused) queue_more_prompt();
+}
+
+async function flush_visible_monster_attack_side_effect() {
+    if (!game._pending_monster_attack_side_effect || game._more) return;
+    const msg = game._pending_monster_attack_side_effect;
+    game._pending_monster_attack_side_effect = '';
+    await append_pline(msg);
 }
 
 async function append_swallowed_damage_message(line) {
@@ -1056,6 +1073,7 @@ async function physical_melee_attacks(mtmp, attacks, toHit) {
     if (latchedTailStart != null && !game._after_more_message) {
         game._after_more_message = hitMessages.slice(latchedTailStart).join('  ');
         game._after_more_needs_prompt = true;
+        game._after_more_strict_keys = true;
     }
     return hitMessages;
 }
@@ -1088,6 +1106,7 @@ async function mattacku_basic(mtmp, state) {
         await flush_pending_more_before_monster_message();
         const messages = await physical_melee_attacks(mtmp, [cooldownAttack], mattacku_to_hit(mtmp));
         if (messages.length) await show_blocking_monster_message(messages.join('  '));
+        await flush_visible_monster_attack_side_effect();
         return true;
     }
     const engulf = basic_engulf_attack(mtmp);
@@ -1109,6 +1128,7 @@ async function mattacku_basic(mtmp, state) {
     const messages = await physical_melee_attacks(mtmp, physical, toHit);
     if (messages.length) mtmp.mlstmv = game.moves || 0;
     if (messages.length) await show_blocking_monster_message(messages.join('  '));
+    await flush_visible_monster_attack_side_effect();
     return true;
 }
 

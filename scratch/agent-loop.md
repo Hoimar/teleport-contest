@@ -19,8 +19,9 @@ and `feature_map.md`.
   topline boundaries after full flat core RNG parity. Non-side-effect packed
   monster-hit Mores now remain queued while later monster movement redraws behind
   them, and physical multiattack overflow now latches the pre-tail terminal
-  frame with hallucinated display-name RNG already consumed. The next blocker is
-  invalid-key handling for that latched follow-up More.
+  frame with hallucinated display-name RNG already consumed. Strict keys for the
+  latched follow-up More and immediate cold side-effect packing are now aligned;
+  the next blocker is hallucinated map redraw ownership after that More resumes.
 
 ## Latest Verification
 
@@ -32,29 +33,28 @@ npm run verify -- --target seed0383-wizard-hallucinate
 
 Result:
 
-- Target: `seed0383-wizard-hallucinate` `S 184/219 R 16915/16915`,
-  first screen `183:char+attr:mixed:b`, first RNG `-`, cursor-only `1`.
-- Sentinel total: `S 387/1063 R 37186/64569`.
+- Target: `seed0383-wizard-hallucinate` `S 185/219 R 16915/16915`,
+  first screen `184:char+attr:map:Space`, first RNG `-`, cursor-only `1`.
+- Sentinel total: `S 388/1063 R 37186/64569`.
 - Sentinel details:
   - `seed8000-tourist-starter`: `S 23/23 R 3060/3130`, first RNG `3047`.
   - `seed0002-healer-reflection-drummer`: `S 53/595 R 4066/27158`, first RNG `3880`.
   - `seed0013-friday13-save-then-fullmoon-restore`: `S 0/99 R 583/4804`, first RNG `540`.
   - `seed0116-wizard-wear-shop`: `S 127/127 R 12562/12562`, pass.
-  - `seed0383-wizard-hallucinate`: `S 184/219 R 16915/16915`, first screen 183.
+  - `seed0383-wizard-hallucinate`: `S 185/219 R 16915/16915`, first screen 184.
 - Hack-debt audit: hard `0`, suspicious `37` existing replay/override/seed findings.
 - Memory lint: clean after this compaction target.
 
 ## Current Queue
 
-1. Continue `seed0383` monster-turn More display timing.
+1. Continue `seed0383` hallucinated monster-turn display timing.
    - Use `npm run screen:diff -- seed0383-wizard-hallucinate --first`.
-   - Current diff is screen 183 (`b`): C keeps
-     `The guardian naga hatchling hits!  The fox just misses!--More--`
-     visible on an invalid key, while JS dismisses the internal follow-up More
-     and reaches the later chickatrice line too early.
+   - Current diff is screen 184 (`Space`): C and JS both show
+     `The chickatrice touches you!  You're covered in frost!`, but the
+     hallucinated map glyphs differ.
    - Core RNG is complete (`R 16915/16915`). Do not change combat RNG for this
-     blocker; scope any invalid-key validation to this latched follow-up More so
-     the earlier engulf/cold More sequence around screen 142 does not regress.
+     blocker; compare display-RNG redraw ownership around internal `topl.c:more()`
+     resume and monster `newsym()` calls.
 2. Continue `seed0002-healer-reflection-drummer` dog-move candidate work.
    - Current state: `S 53/595 R 4066/27158`.
    - First visible mismatch is screen 53 (`y`): exact RNG through the floor
