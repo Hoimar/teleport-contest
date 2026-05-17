@@ -594,6 +594,19 @@ async function flush_pending_more_before_monster_message() {
     await flush_screen(1);
     await nhgetch();
     clear_pending_message();
+    if (game._after_more_message) {
+        const msg = game._after_more_message;
+        const needsPrompt = !!game._after_more_needs_prompt;
+        game._after_more_message = '';
+        game._after_more_needs_prompt = false;
+        await pline(msg);
+        if (needsPrompt) {
+            queue_more_prompt();
+            await flush_screen(1);
+            await nhgetch();
+            clear_pending_message();
+        }
+    }
     if (game._swallowed_display_pending) {
         // C ref: mhitu.c:gulpmu() calls vision_recalc(2)/swallowed(1) after
         // the initial engulf message is serviced, so later swallowed damage
@@ -882,7 +895,9 @@ async function engulf_attack(mtmp, attack, toHit) {
         mtmp.my = game.u.uy;
         game.u.uswldtim = Math.max(2, rnd(monster_level(mtmp) + 5));
         newsym(mtmp.mx, mtmp.my);
+        game._pet_combat_more_latched = false;
         await show_blocking_monster_message(`The ${monster_name(mtmp)} engulfs you!`);
+        if (!game._more) queue_more_prompt();
         game._swallowed_display_pending = true;
     }
     if ((game.u.uswldtim || 0) > 0) {
@@ -1279,7 +1294,8 @@ export async function movemon() {
             if (is_wanderer(mtmp) && monnear_hero(mtmp)) rn2(4);
             await dog_move(mtmp, false);
             if (g._more && g._pet_combat_more_latched && !g._savelife_resume_active && !hallucinating()) {
-                if (!g._after_more_message || !g._after_more_message.includes('  '))
+                if ((!g._after_more_message || !g._after_more_message.includes('  '))
+                    && !/ engulfs you!$/.test(g._after_more_message || ''))
                     g._after_more_needs_prompt = false;
                 g._resume_tame_post_distfleeck = mtmp;
                 g._resume_movemon_after_mon = mtmp;

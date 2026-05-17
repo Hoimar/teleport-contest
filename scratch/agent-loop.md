@@ -14,31 +14,32 @@ and `feature_map.md`.
 
 - Current branch in this workspace: `main`.
 - Baseline commit at harness cleanup: `f0fdc38`.
-- Active target: `seed5002-wizard-coverage-pair`.
-- Active hypothesis: seed5002 is now a full pass. The last blocker was ordinary
-  `mfndpos()` candidate shape: non-`ALLOW_ROCK` monsters must not count boulder
-  squares, and short standalone monster-to-hero hit plines defer `--More--`
-  until a later monster pline would overwrite them.
+- Active target: `seed0383-wizard-hallucinate`.
+- Active hypothesis: seed0383 is back to the post-expulsion visible-map
+  hallucination redraw blocker. Internal More flushing now services queued
+  engulf messages, and `docrt()` uses C's remembered-map plus monster-overlay
+  redraw shape. Next inspect display-RNG ownership before screen 172.
 
 ## Latest Verification
 
 Run:
 
 ```bash
-npm run verify -- --target seed5002-wizard-coverage-pair
+npm run verify -- --target seed0383-wizard-hallucinate
 ```
 
 Result:
 
-- Target: `seed5002-wizard-coverage-pair` `S 410/410 R 12167/12167`,
-  first screen/RNG clear, cursor-only `1`.
-- Sentinel total: `S 371/1063 R 31694/64569`.
+- Target: `seed0383-wizard-hallucinate` `S 173/219 R 11423/16915`,
+  first screen `172:char+attr:map:Space`, first RNG
+  `11367:rn2(20)=8=>rn2(7)=4`, cursor-only `1`.
+- Sentinel total: `S 376/1063 R 31694/64569`.
 - Sentinel details:
   - `seed8000-tourist-starter`: `S 23/23 R 3060/3130`, first RNG `3047`.
   - `seed0002-healer-reflection-drummer`: `S 53/595 R 4066/27158`, first RNG `3880`.
   - `seed0013-friday13-save-then-fullmoon-restore`: `S 0/99 R 583/4804`, first RNG `540`.
   - `seed0116-wizard-wear-shop`: `S 127/127 R 12562/12562`, pass.
-  - `seed0383-wizard-hallucinate`: `S 168/219 R 11423/16915`, first screen 141.
+  - `seed0383-wizard-hallucinate`: `S 173/219 R 11423/16915`, first screen 172.
 - Hack-debt audit: hard `0`, suspicious `37` existing replay/override/seed findings.
 - Memory lint: clean after this compaction target.
 
@@ -48,7 +49,7 @@ Result:
    - Use `npm run screen:diff -- seed0383-wizard-hallucinate --first`.
    - Current diff is hallucinated visible-map glyphs on screen 172 (`Space`)
      after expulsion More is dismissed; screen 171 message/cursor/status now
-     match `You get expelled!--More--`, and core RNG remains exact.
+     match `You get expelled!--More--`; first RNG mismatch is `FR 11367`.
    - Stay on the remaining display-RNG ownership inside the post-expulsion
      visible-map refresh. The duplicate Warning refresh is gone; remaining
      evidence points at earlier `docrt()`/`newsym()` display-RNG state and

@@ -519,9 +519,7 @@ export async function docrt() {
                     loc.remembered_glyph.color, loc.remembered_glyph.decgfx);
             }
         }
-    for (let y = 0; y < ROWNO; y++)
-        for (let x = 1; x < COLNO; x++)
-            if (cansee(x, y)) newsym(x, y);
+    see_monsters();
     show_premapped_mimics();
     if (game.u?.ux > 0) show_glyph_cell(game.u.ux, game.u.uy, '@', CLR_WHITE, false);
 }
