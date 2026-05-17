@@ -2589,12 +2589,6 @@ export async function makemon(mdat, x, y, mmflags = 0) {
         && rn2(5) && !game.u?.uhave?.amulet) {
         mon.msleeping = 1;
     }
-    if (ptr.name === 'LONG_WORM') {
-        const tailCount = (mmflags & MM_NOTAIL) ? 0 : rn2(5);
-        for (let seg = 0; seg < tailCount; seg++) {
-            for (let i = 8; i > 0; i--) rn2(i);
-        }
-    }
     mon.cham = null;
     let allow_minvent = true;
     if (initial_shapeshift(mon, ptr)) allow_minvent = false;
@@ -2604,6 +2598,12 @@ export async function makemon(mdat, x, y, mmflags = 0) {
             || ptr.name === 'LONG_WORM' || ptr.name === 'GIANT_EEL')
         && rn2(5)) {
         mon.msleeping = 1;
+    }
+    if (ptr.name === 'LONG_WORM') {
+        const tailCount = (mmflags & MM_NOTAIL) ? 0 : rn2(5);
+        for (let seg = 0; seg < tailCount; seg++) {
+            for (let i = 8; i > 0; i--) rn2(i);
+        }
     }
     const anymon = mdat === null;
     if (anymon && !(mmflags & MM_NOGRP)) {
