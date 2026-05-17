@@ -65,6 +65,7 @@ const GOLD_PIECE = 438;
 const SCALPEL = 39;
 const DART = 23;
 const CORPSE = 265;
+const BOULDER = 475;
 const FORTUNE_COOKIE = 289;
 const LEATHER_GLOVES = 159;
 const ARMOR_CLASS = 3;
@@ -1259,6 +1260,46 @@ function blocksMove(x, y) {
     if (IS_WALL(loc.typ)) return true;
     if (loc.typ === DOOR && (loc.doormask & (D_CLOSED | D_LOCKED))) return true;
     return false;
+}
+
+function sobj_at_basic(otyp, x, y) {
+    return (game.level?.objects || []).find(o => o.otyp === otyp && o.ox === x && o.oy === y) || null;
+}
+
+function boulderDestinationBlocked(x, y) {
+    const loc = game.level?.at(x, y);
+    if (!loc) return true;
+    if (IS_OBSTRUCTED(loc.typ) || IS_WALL(loc.typ)) return true;
+    if (loc.typ === DOOR && (loc.doormask & (D_CLOSED | D_LOCKED))) return true;
+    return !!sobj_at_basic(BOULDER, x, y);
+}
+
+async function tryPushBoulder(boulder, sx, sy, dx, dy) {
+    const rx = sx + dx;
+    const ry = sy + dy;
+    if (boulderDestinationBlocked(rx, ry)) {
+        await pline('You try to move the boulder, but in vain.');
+        game.context.move = 0;
+        return false;
+    }
+
+    await pline('With great effort you move the boulder.');
+    exercise(A_STR, true);
+    boulder.ox = rx;
+    boulder.oy = ry;
+    vision_reset();
+
+    const u = game.u;
+    const oldx = u.ux, oldy = u.uy;
+    u.ux0 = oldx;
+    u.uy0 = oldy;
+    u.ux = sx;
+    u.uy = sy;
+    newsym(oldx, oldy);
+    newsym(rx, ry);
+    vision_recalc(1);
+    newsym(sx, sy);
+    return true;
 }
 
 function mon_at(x, y) {
@@ -3791,6 +3832,29 @@ export async function domove(dx, dy) {
     const newx = u.ux + dx;
     const newy = u.uy + dy;
     const target = game.level.at(newx, newy);
+    const is_diag = dx !== 0 && dy !== 0;
+
+    if (is_diag && !blocksMove(newx, newy)) {
+        const side1x = u.ux + dx, side1y = u.uy;
+        const side2x = u.ux, side2y = u.uy + dy;
+        const side1Blocked = blocksMove(side1x, side1y) || sobj_at_basic(BOULDER, side1x, side1y);
+        const side2Blocked = blocksMove(side2x, side2y) || sobj_at_basic(BOULDER, side2x, side2y);
+        if (side1Blocked && side2Blocked) {
+            await pline('You cannot pass that way.');
+            game.context.move = 0;
+            return false;
+        }
+    }
+
+    if (is_diag && game.level?.flags?.sokoban_rules && sobj_at_basic(BOULDER, newx, newy)) {
+        await pline('You try to move the boulder, but in vain.');
+        game.context.move = 0;
+        return false;
+    }
+    const boulder = sobj_at_basic(BOULDER, newx, newy);
+    if (boulder && !is_diag) {
+        return tryPushBoulder(boulder, newx, newy, dx, dy);
+    }
 
     if (target?.typ === DOOR && (target.doormask & (D_CLOSED | D_LOCKED))) {
         if (await tryAutoOpenDoor(newx, newy)) return false;
@@ -3822,7 +3886,6 @@ export async function domove(dx, dy) {
         return true;
     }
 
-    const is_diag = dx !== 0 && dy !== 0;
     if (is_diag) {
         const source = game.level.at(u.ux, u.uy);
         if (doorwayBlocksDiagonalForHero(target) || doorwayBlocksDiagonalForHero(source)) {

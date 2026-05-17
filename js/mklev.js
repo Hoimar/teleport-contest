@@ -2974,7 +2974,38 @@ const SOKO1_2_MAP = [
     '     -------     -------  ',
 ];
 
-const SOKO1_LEVELS = {
+const SOKO2_1_MAP = [
+    '--------------------',
+    '|........|...|.....|',
+    '|.....-..|.-.|.....|',
+    '|..|.....|...|.....|',
+    '|-.|..-..|.-.|.....|',
+    '|...--.......|.....|',
+    '|...|...-...-|.....|',
+    '|...|..|...--|.....|',
+    '|-..|..|----------+|',
+    '|..................|',
+    '|...|..|------------',
+    '--------            ',
+];
+
+const SOKO2_2_MAP = [
+    '  --------            ',
+    '--|.|....|            ',
+    '|........|----------  ',
+    '|.-...-..|.|.......|  ',
+    '|...-......|.......|  ',
+    '|.-....|...|.......|  ',
+    '|....-.--.-|.......|  ',
+    '|..........|.......|  ',
+    '|.--...|...|.......---',
+    '|....-.|---|.......+.|',
+    '--|....|------------.|',
+    '  |................+.|',
+    '  --------------------',
+];
+
+const SOKO_LEVELS = {
     'soko1-1': {
         map: SOKO1_1_MAP,
         stair: [1, 1],
@@ -3020,6 +3051,48 @@ const SOKO1_LEVELS = {
         zooRegion: [18, 9, 22, 15],
         doors: [[23, 12, D_LOCKED], [17, 10, D_CLOSED], [17, 12, D_CLOSED], [17, 14, D_CLOSED]],
     },
+    'soko2-1': {
+        map: SOKO2_1_MAP,
+        xstart: 31,
+        ystart: 5,
+        stairs: [[false, 6, 10], [true, 16, 4]],
+        boulders: [
+            [2, 2], [3, 2],
+            [5, 3], [7, 3], [7, 2], [8, 2],
+            [10, 3], [11, 3],
+            [2, 7], [2, 8], [3, 9],
+            [5, 7], [6, 6],
+        ],
+        traps: [
+            [ROLLING_BOULDER_TRAP, 7, 9],
+            [HOLE, 8, 9], [HOLE, 9, 9], [HOLE, 10, 9],
+            [HOLE, 11, 9], [HOLE, 12, 9], [HOLE, 13, 9],
+            [HOLE, 14, 9], [HOLE, 15, 9], [HOLE, 16, 9],
+            [HOLE, 17, 9],
+        ],
+        randomObjects: [FOOD_CLASS, FOOD_CLASS, FOOD_CLASS, FOOD_CLASS, RING_CLASS, WAND_CLASS],
+        doors: [[18, 8, D_LOCKED]],
+    },
+    'soko2-2': {
+        map: SOKO2_2_MAP,
+        xstart: 29,
+        ystart: 5,
+        stairs: [[false, 6, 11], [true, 15, 6]],
+        boulders: [
+            [4, 2], [4, 3], [5, 3], [7, 3], [8, 3],
+            [2, 4], [3, 4], [5, 5], [6, 6], [9, 6],
+            [3, 7], [4, 7], [7, 7], [6, 9], [5, 10], [5, 11],
+        ],
+        traps: [
+            [ROLLING_BOULDER_TRAP, 7, 11],
+            [HOLE, 8, 11], [HOLE, 9, 11], [HOLE, 10, 11],
+            [HOLE, 11, 11], [HOLE, 12, 11], [HOLE, 13, 11],
+            [HOLE, 14, 11], [HOLE, 15, 11], [HOLE, 16, 11],
+            [HOLE, 17, 11], [HOLE, 18, 11],
+        ],
+        randomObjects: [FOOD_CLASS, FOOD_CLASS, FOOD_CLASS, FOOD_CLASS, RING_CLASS, WAND_CLASS],
+        doors: [[19, 9, D_LOCKED], [19, 11, D_LOCKED]],
+    },
 };
 
 function bigrm12TerrainAt(x, y) {
@@ -3030,8 +3103,11 @@ function bigrm2TerrainAt(x, y) {
     return BIGRM_2_MAP[y]?.[x] || ' ';
 }
 
-function sokoAbs(x, y) {
-    return { x: x + SOKO1_XSTART, y: y + SOKO1_YSTART };
+function sokoXStart(spec) { return spec.xstart ?? SOKO1_XSTART; }
+function sokoYStart(spec) { return spec.ystart ?? SOKO1_YSTART; }
+
+function sokoAbs(spec, x, y) {
+    return { x: x + sokoXStart(spec), y: y + sokoYStart(spec) };
 }
 
 function sokoTerrainAt(spec, x, y) {
@@ -3551,9 +3627,11 @@ function loadMinetown5Special() {
 }
 
 function loadSokoTerrain(spec) {
+    const xstart = sokoXStart(spec);
+    const ystart = sokoYStart(spec);
     for (let y = 0; y < spec.map.length; y++) {
         for (let x = 0; x < spec.map[y].length; x++) {
-            const loc = game.level.at(x + SOKO1_XSTART, y + SOKO1_YSTART);
+            const loc = game.level.at(x + xstart, y + ystart);
             if (!loc) continue;
             switch (spec.map[y][x]) {
             case '.':
@@ -3585,12 +3663,14 @@ function loadSokoTerrain(spec) {
 
 function sokoDryLocation(spec) {
     let x, y, loc;
+    const xstart = sokoXStart(spec);
+    const ystart = sokoYStart(spec);
     do {
         x = rn2(spec.map[0].length);
         y = rn2(spec.map.length);
-        loc = game.level?.at(x + SOKO1_XSTART, y + SOKO1_YSTART);
-    } while (!loc || !SPACE_POS(loc.typ) || sobj_at(BOULDER, x + SOKO1_XSTART, y + SOKO1_YSTART));
-    return { x: x + SOKO1_XSTART, y: y + SOKO1_YSTART };
+        loc = game.level?.at(x + xstart, y + ystart);
+    } while (!loc || !SPACE_POS(loc.typ) || sobj_at(BOULDER, x + xstart, y + ystart));
+    return { x: x + xstart, y: y + ystart };
 }
 
 function loadBigrm12Terrain() {
@@ -4019,7 +4099,7 @@ function sokoRandomObject(spec, oclass) {
 function createSokoReward(spec) {
     const idx = rn2(spec.rewardPlaces.length);
     const [rx, ry] = spec.rewardPlaces[idx];
-    const loc = sokoAbs(rx, ry);
+    const loc = sokoAbs(spec, rx, ry);
     const prize = (rn2(100) < spec.rewardBagPercent) ? BAG_OF_HOLDING : AMULET_OF_REFLECTION;
     const prizeObj = mksobj_at(prize, loc.x, loc.y, true, false);
     if (prizeObj) {
@@ -4036,7 +4116,7 @@ function createSokoReward(spec) {
 
 function createSokoZooRoom(spec) {
     const [x1, y1] = spec.zooRegion || [];
-    const room = createIrregularRoomFromSeed(SOKO1_XSTART + x1, SOKO1_YSTART + y1,
+    const room = createIrregularRoomFromSeed(sokoXStart(spec) + x1, sokoYStart(spec) + y1,
         ZOO, true, FILL_NORMAL);
     if (!room) return null;
     for (let x = room.lx - 1; x <= room.hx + 1; x++)
@@ -4047,8 +4127,8 @@ function createSokoZooRoom(spec) {
     return room;
 }
 
-function loadSoko1Special(protofile) {
-    const spec = SOKO1_LEVELS[protofile];
+function loadSokoSpecial(protofile) {
+    const spec = SOKO_LEVELS[protofile];
     if (!spec) return false;
     loadSokoTerrain(spec);
     const align = [0, 0, 0];
@@ -4058,29 +4138,39 @@ function loadSoko1Special(protofile) {
     }
     rn2(2); // splev_initlev lit state for solidfill.
 
-    let loc = sokoAbs(spec.stair[0], spec.stair[1]);
-    placeSpecialStair(loc.x, loc.y, false);
+    let loc;
+    if (spec.stairs) {
+        for (const [up, x, y] of spec.stairs) {
+            loc = sokoAbs(spec, x, y);
+            placeSpecialStair(loc.x, loc.y, up);
+        }
+    } else {
+        loc = sokoAbs(spec, spec.stair[0], spec.stair[1]);
+        placeSpecialStair(loc.x, loc.y, false);
+    }
 
     for (const [x, y] of spec.boulders) {
-        loc = sokoAbs(x, y);
+        loc = sokoAbs(spec, x, y);
         mksobj_at(BOULDER, loc.x, loc.y, true, false);
     }
 
     for (const [kind, x, y] of spec.traps) {
-        loc = sokoAbs(x, y);
+        loc = sokoAbs(spec, x, y);
         const trap = maketrap(loc.x, loc.y, kind);
         maybeTrapVictim(trap);
     }
 
-    createSokoGiantMimic(spec);
-    createSokoGiantMimic(spec);
+    if (spec.rewardPlaces) {
+        createSokoGiantMimic(spec);
+        createSokoGiantMimic(spec);
+    }
 
-    for (const cls of [FOOD_CLASS, FOOD_CLASS, FOOD_CLASS, FOOD_CLASS, RING_CLASS, WAND_CLASS]) {
+    for (const cls of spec.randomObjects || [FOOD_CLASS, FOOD_CLASS, FOOD_CLASS, FOOD_CLASS, RING_CLASS, WAND_CLASS]) {
         sokoRandomObject(spec, cls);
     }
 
     for (const [x, y, mask] of spec.doors) {
-        loc = sokoAbs(x, y);
+        loc = sokoAbs(spec, x, y);
         const door = game.level?.at(loc.x, loc.y);
         if (door) {
             door.typ = DOOR;
@@ -4088,12 +4178,12 @@ function loadSoko1Special(protofile) {
         }
     }
 
-    const zooRoom = createSokoZooRoom(spec);
-    createSokoReward(spec);
+    const zooRoom = spec.zooRegion ? createSokoZooRoom(spec) : null;
+    if (spec.rewardPlaces) createSokoReward(spec);
     wallification(1, 0, COLNO - 1, ROWNO - 1);
     flip_level_rnd(3);
     premapSokoban();
-    fill_special_room(zooRoom);
+    if (zooRoom) fill_special_room(zooRoom);
     return true;
 }
 
@@ -5436,7 +5526,7 @@ function makemaz_special(slev) {
             BIGRM_2_YSTART + BIGRM_2_MAP.length - 1);
         return;
     }
-    if (loadSoko1Special(game._last_special_protofile)) {
+    if (loadSokoSpecial(game._last_special_protofile)) {
         return;
     }
     if (game._last_special_protofile === 'minetn-5') {
