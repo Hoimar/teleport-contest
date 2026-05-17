@@ -3508,8 +3508,20 @@ function valleyTrap(kind, x = null, y = null) {
 }
 
 function valleyMonster(ref) {
+    const cls = String(ref || '').length === 1 ? castleMonsterClass(ref) : null;
+    let ptr = cls ? null : monster_ptr(ref);
+    if (!cls && ptr && !ptr.neuter && !ptr.male && !ptr.female) rn2(2);
+    induced_align_80();
+    if (cls) ptr = mkclass_aligned(cls, G_NOGEN);
     const loc = valleyDryLocation();
-    const ptr = castleMonsterClass(ref) ? mkclass_aligned(castleMonsterClass(ref), 0) : monster_ptr(ref);
+    if (m_at(loc.x, loc.y)) {
+        const cc = enexto_core(loc.x, loc.y, ptr, GP_CHECKSCARY)
+            || enexto_core(loc.x, loc.y, ptr, 0);
+        if (cc) {
+            loc.x = cc.x;
+            loc.y = cc.y;
+        }
+    }
     makemon(ptr, loc.x, loc.y, 0);
 }
 
