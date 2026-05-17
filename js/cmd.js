@@ -23,7 +23,7 @@ import { initrack } from './track.js';
 import { roleGod } from './roles.js';
 import { d, rn1, rn2, rnd, rnz } from './rng.js';
 import { getObjectDescription } from './o_init.js';
-import { randomHallucinatedMonsterName } from './random_text.js';
+import { hallucinatedLiquidName, randomHallucinatedMonsterName } from './random_text.js';
 import { finish_pending_swallowed_expulsion } from './monmove.js';
 import { ATR_INVERSE, NO_COLOR } from './terminal.js';
 import * as C from './const.js';
@@ -2317,6 +2317,10 @@ async function performLevelTeleport(target) {
     vision_recalc(0);
     await docrt();
     await pline('You materialize on a different level!');
+    // C ref: do.c:goto_level() performs docrt()/flush before the deferred
+    // materialize pline; the following input boundary does not immediately
+    // rerandomize the hallucinated new-level map.
+    game.context.mv = 1;
 }
 
 async function applyPendingLevelChange() {
@@ -3435,7 +3439,7 @@ export async function domove(dx, dy) {
     if (target && IS_POOL(target.typ)) {
         // C ref: hack.c:domove_core(); paranoid movement into known liquid
         // is a zero-time prompt gate.
-        await pline('You avoid stepping into the pool of purified water.');
+        await pline(`You avoid stepping into the pool of ${hallucinatedLiquidName('water')}.`);
         game._more = true;
         game._avoid_pool_tip_pending = true;
         game.context.move = 0;

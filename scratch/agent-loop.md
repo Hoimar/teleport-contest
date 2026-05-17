@@ -14,33 +14,35 @@ and `feature_map.md`.
 
 - Current branch in this workspace: `main`.
 - Baseline commit at harness cleanup: `f0fdc38`.
-- Active target: `seed0002-healer-reflection-drummer`.
-- Active hypothesis: seed0002 is narrowed to C `dogmove.c:dog_move()` candidate
-  eligibility/order after the corpse-eat turn. JS and C consume the same
-  dog-goal/object and equal-candidate RNG through the first visible mismatch,
-  but the little dog lands on the wrong equal-choice square. A source-backed
-  pet `mtrack` implementation was added and verified neutral; the next blocker
-  is still the adjacent candidate list/effective filtering, not core RNG.
+- Active target: `seed0383-wizard-hallucinate`.
+- Active hypothesis: seed0383 is now at the debug level-teleport arrival frame.
+  The target advanced to `S 195/219 R 16915/16915` after porting
+  `hliquid()` display RNG, suppressing prompt-time Hallucination refreshes, and
+  preventing the immediate post-`goto_level()` boundary rerandomization. The
+  remaining mismatch is screen 195 (`c`): the materialize message and cursor
+  are exact, but the hallucinated soldier/object glyphs near the new-level
+  arrival are offset. Next step is `display.c:docrt()`/vision redraw ordering
+  for visible objects versus monster overlay, not core level-generation RNG.
 
 ## Latest Verification
 
 Run:
 
 ```bash
-npm run verify -- --target seed0002-healer-reflection-drummer
+npm run verify -- --target seed0383-wizard-hallucinate
 ```
 
 Result:
 
-- Target: `seed0002-healer-reflection-drummer` `S 53/595 R 4066/27158`,
-  first screen `53:char:map:y`, first RNG `3880`, cursor-only `1`.
-- Sentinel total: `S 392/1063 R 37186/64569`.
+- Target: `seed0383-wizard-hallucinate` `S 195/219 R 16915/16915`,
+  first screen `195:char:map:c`, first RNG `-`, cursor-only `1`.
+- Sentinel total: `S 428/1063 R 38622/64569`.
 - Sentinel details:
   - `seed8000-tourist-starter`: `S 23/23 R 3060/3130`, first RNG `3047`.
-  - `seed0002-healer-reflection-drummer`: `S 53/595 R 4066/27158`, first RNG `3880`.
+  - `seed0002-healer-reflection-drummer`: `S 83/595 R 5502/27158`, first RNG `4518`.
   - `seed0013-friday13-save-then-fullmoon-restore`: `S 0/99 R 583/4804`, first RNG `540`.
   - `seed0116-wizard-wear-shop`: `S 127/127 R 12562/12562`, pass.
-  - `seed0383-wizard-hallucinate`: `S 189/219 R 16915/16915`, first screen 188.
+  - `seed0383-wizard-hallucinate`: `S 195/219 R 16915/16915`, first screen 195.
 - Hack-debt audit: hard `0`, suspicious `37` existing replay/override/seed findings.
 - Memory lint: clean after this compaction target.
 
@@ -48,19 +50,21 @@ Result:
 
 1. Continue `seed0383` hallucinated monster-turn display timing.
    - Use `npm run screen:diff -- seed0383-wizard-hallucinate --first`.
-   - Current diff is screen 188 (`Space`): C and JS both show the movement-tip
-     message exactly, but the hallucinated map glyphs differ.
+   - Current diff is screen 195 (`c`): C and JS both show the materialize
+     message and cursor exactly, but the hallucinated arrival-level soldier and
+     two nearby object glyphs differ.
    - Core RNG is complete (`R 16915/16915`). Do not change combat RNG for this
-     blocker; compare display-RNG redraw ownership around later `newsym()` and
-     input-boundary Hallucination refresh calls.
-2. Continue `seed0002-healer-reflection-drummer` dog-move candidate work.
-   - Current state: `S 53/595 R 4066/27158`.
-   - First visible mismatch is screen 53 (`y`): exact RNG through the floor
-     corpse eat turn, but the little dog chooses the wrong equal-candidate
-     square after `dog_move()`. Later first RNG mismatch is `FR 3880` in the
-     following dog-goal scan.
-   - Compare `dogmove.c:dog_move()`/`mfndpos()` effective candidates against
-     JS before changing pet position; do not force the screen.
+     blocker; compare `goto_level()` display ordering: `vision_reset()`,
+     `reset_glyphmap()`, `docrt()`, visible object redraws, and monster overlay.
+2. Continue `seed0002-healer-reflection-drummer` monster/pet ordering work.
+   - Current state: `S 83/595 R 5502/27158`.
+   - First visible mismatch is screen 83 (`Enter`): expected dog display at
+     `[74,12]`, JS at `[73,12]`, and status turn count differs (`5` vs `6`).
+   - First RNG mismatch is `FR 4518`, after the corpse-eating turn tail.
+     Recorder traces show C removes the eaten corpse before the final hidden
+     pet object scan. The next safe step is to explain why C reaches a pet
+     object-goal scan before the next monster `distfleeck()` during the eating
+     occupation without adding a full extra hidden turn.
 3. Broaden `o_init`/`objnam`/discovery state away from limited evidence tables.
 4. Broaden sleeping/hider front doors only when current C evidence reaches them.
 
@@ -70,6 +74,10 @@ Result:
   they are classified dehack fallout.
 - Prior broad corpse-timer changes regressed startup sentinels; keep corpse
   timing caller-aware.
+- Two pet-order probes were tested and reverted: a global dog-inventory-before-
+  `distfleeck()` reorder regressed seed0002 to screen 27, and an
+  occupation-scoped variant had no effect at FR4518 because the relevant pet
+  pass occurs after JS occupation flags have already cleared.
 - Recorder rebuild for display RNG was blocked by network fetching Lua. Use
   source reasoning or existing recorded evidence until recorder dependencies are
   available.
