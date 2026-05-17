@@ -1,7 +1,15 @@
 # Agent Harness
 
 This repo ports NetHack 5.0 C behavior to JavaScript. The target is exact
-parity: PRNG sequence and terminal output must match upstream frame by frame.
+parity: PRNG sequence and terminal output must match the local NetHack source
+in `nethack-c/upstream` frame by frame.
+
+## Source Authority
+
+In this repo, "upstream", "C source", and "NetHack source" mean the local
+submodule at `nethack-c/upstream`. Use local breadcrumbs such as
+`C ref: src/foo.c:function()` for behavior claims that guide implementation or
+memory updates.
 
 ## Hard Law
 
@@ -42,8 +50,8 @@ the `node scripts/*.mjs` commands listed in `package.json`.
 | File | Role | Default access |
 |---|---|---|
 | `scratch/agent-loop.md` | live checkpoint | read fully, keep compact |
-| `feature_map.md` | subsystem truth | search by session/subsystem/C ref/JS path |
-| `lessons.md` | durable lessons | search by tag/C ref/JS path/session |
+| `feature_map.md` | subsystem truth | search by session/subsystem/C ref/JS path, try to avoid full reads |
+| `lessons.md` | durable lessons | search by tag/C ref/JS path/session, try to avoid full reads |
 | `scratch/divergence-inventory.md` | generated corpus index | search or regenerate |
 | Git history | chronology | use `git log`, `git show`, `git log -S` |
 
@@ -70,7 +78,7 @@ For sustained work, follow `docs/agent/loop-contract.md`. Required cycle:
 
 1. Triage first mismatch.
 2. State a subsystem hypothesis.
-3. Check relevant C source, JS files, feature-map rows, lessons, and git history.
+3. Check relevant local C source, JS files, feature-map rows, lessons, and git history.
 4. Implement or dehack a general subsystem behavior.
 5. Run `npm run verify -- --target <session>`.
 6. Classify regressions.
@@ -102,7 +110,7 @@ Only stop when one is true:
 1. The user asked for a bounded pass or explicitly told the agent to stop.
 2. Tests cannot run after retrying and any required escalation request.
 3. Continuing needs a project-direction decision not answerable from repo docs
-   or upstream C sources.
+   or local C sources.
 4. No safe structural next step exists after checking queue, feature map,
    visible hack debt, git history, and role runbooks.
 

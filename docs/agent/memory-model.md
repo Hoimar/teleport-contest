@@ -4,14 +4,7 @@ The harness should retrieve context, not preload history.
 
 ## Files
 
-| File | Role | Default access |
-|---|---|---|
-| `AGENTS.md` | Policy router and hard constraints | Read fully |
-| `scratch/agent-loop.md` | Live checkpoint only | Read fully, keep under 140 lines |
-| `feature_map.md` | Subsystem truth | Search by session, subsystem, C ref, or JS path |
-| `lessons.md` | Durable subsystem lessons | Search by tags, C ref, JS path, or session |
-| `scratch/divergence-inventory.md` | Generated corpus index | Regenerate or search |
-| Git history | Chronology | Use `git log`, `git show`, and `git log -S` |
+See `AGENTS.md` under "## Memory Routing"
 
 ## Budgets
 

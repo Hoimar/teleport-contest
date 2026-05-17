@@ -16,13 +16,16 @@ the optimization target.
 
 1. Triage the first mismatch with compact tools.
 2. State a subsystem hypothesis.
-3. Check relevant C refs, JS files, feature-map rows, lessons, and git history.
+3. Check relevant local C refs, JS files, feature-map rows, lessons, and git history.
 4. Implement general subsystem behavior or remove hack debt.
 5. Run `npm run verify -- --target <session>`.
 6. Classify regressions.
 7. Update `feature_map.md`, `lessons.md`, and checkpoint only if truth changed.
 8. Commit the coherent truth or harness change after verification.
 9. Continue to the next queue item unless a valid stop condition applies.
+
+If a behavior claim came from outside `nethack-c/upstream`, re-derive it from
+the local submodule before editing code or durable memory.
 
 ## Queue Order
 

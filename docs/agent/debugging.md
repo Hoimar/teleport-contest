@@ -18,7 +18,7 @@ Use the first mismatch to form a subsystem hypothesis:
 
 ## C Source
 
-Search upstream by function, message text, RNG call, or file:
+Search the local upstream submodule by function, message text, RNG call, or file:
 
 ```bash
 rg -n "function_or_message" nethack-c/upstream
