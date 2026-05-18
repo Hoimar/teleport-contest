@@ -5993,6 +5993,7 @@ function fixup_special() {
         place_lregion(0, 0, 0, 0, 0, 0, 0, 0, LR_BRANCH, null);
     }
     if (game._last_special_protofile === 'medusa-3') medusa3FixupSpecial();
+    if (game._last_special_protofile === 'baalz') baalzFixup();
 }
 
 function castleMonsterClass(ch) {
@@ -7429,8 +7430,79 @@ function loadBaalzTerrain() {
             baalzSetTerrain(x, y, BAALZ_MAP[y][x]);
     markSpecialTouchedRect(BAALZ_X, BAALZ_Y,
         BAALZ_X + BAALZ_MAP[0].length - 1, BAALZ_Y + BAALZ_MAP.length - 1);
+    // C ref: dat/baalz.lua des.non_diggable(selection.area(00,00,47,12)).
+    // The final map column is intentionally left diggable.
+    for (let y = BAALZ_Y; y <= BAALZ_Y + 12; y++) {
+        for (let x = BAALZ_X; x <= BAALZ_X + 47; x++) {
+            const loc = game.level?.at(x, y);
+            if (loc) loc.wall_info = (loc.wall_info || 0) | W_NONDIGGABLE;
+        }
+    }
     game.level.flags.is_maze_lev = true;
     game.level.flags.corrmaze = true;
+}
+
+function baalzFixup() {
+    const map = game.level;
+    if (!map) return;
+    const midy = Math.trunc(ROWNO / 2);
+    let x1 = 0, lastx = 0;
+    for (let x = 0; x < COLNO; x++) {
+        if ((map.at(x, midy)?.wall_info & W_NONDIGGABLE) !== 0) {
+            if (!lastx) x1 = x + 1;
+            lastx = x;
+        }
+    }
+    const x2 = ((lastx > x1) ? lastx : COLNO) - 1;
+    let y1 = 0, lasty = 0;
+    for (let y = 0; y < ROWNO; y++) {
+        if ((map.at(x1, y)?.wall_info & W_NONDIGGABLE) !== 0) {
+            if (!lasty) y1 = y + 1;
+            lasty = y;
+        }
+    }
+    const y2 = ((lasty > y1) ? lasty : ROWNO) - 1;
+    const fakePools = [];
+    for (let x = x1; x <= x2; x++) {
+        for (let y = y1; y <= y2; y++) {
+            const loc = map.at(x, y);
+            if (!loc) continue;
+            if (loc.typ === POOL) {
+                loc.typ = HWALL;
+                fakePools.push({ x, y });
+            } else if (loc.typ === IRONBARS) {
+                for (const dx of [-1, 1]) {
+                    if (isok(x + dx, y)
+                        && (map.at(x + dx, y)?.wall_info & W_NONDIGGABLE) !== 0) {
+                        map.at(x + dx, y).wall_info &= ~W_NONDIGGABLE;
+                        if (isok(x + 2 * dx, y))
+                            map.at(x + 2 * dx, y).wall_info &= ~W_NONDIGGABLE;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    wallification(Math.max(x1 - 2, 1), Math.max(y1 - 2, 0),
+        Math.min(x2 + 2, COLNO - 1), Math.min(y2 + 2, ROWNO - 1));
+
+    const [first, second] = fakePools;
+    if (first) {
+        const loc = map.at(first.x, first.y);
+        const below = map.at(first.x, first.y + 1);
+        if ((loc?.typ === TLWALL || loc?.typ === TRWALL) && below?.typ === TUWALL) {
+            loc.typ = loc.typ === TLWALL ? BRCORNER : BLCORNER;
+            below.typ = HWALL;
+        }
+    }
+    if (second) {
+        const loc = map.at(second.x, second.y);
+        const above = map.at(second.x, second.y - 1);
+        if ((loc?.typ === TLWALL || loc?.typ === TRWALL) && above?.typ === TDWALL) {
+            loc.typ = loc.typ === TLWALL ? TRCORNER : TLCORNER;
+            above.typ = HWALL;
+        }
+    }
 }
 
 function registerBaalzLregions(flp) {
