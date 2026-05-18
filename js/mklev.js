@@ -1426,6 +1426,29 @@ export function monster_by_user_name(name) {
     return MONSTERS.find((mon) => mon.name === key) || null;
 }
 
+function monster_name_gender(name) {
+    switch (String(name || '').trim().toLowerCase()) {
+    case 'vampire lord':
+        return 'male';
+    case 'vampire lady':
+        return 'female';
+    default:
+        return null;
+    }
+}
+
+function monster_name_needs_find_gender_roll(name, ptr) {
+    if (!ptr || ptr.neuter || ptr.male || ptr.female) return false;
+    return monster_name_gender(name) == null;
+}
+
+function apply_monster_name_gender(mon, name) {
+    const gender = monster_name_gender(name);
+    if (!mon || gender == null) return mon;
+    mon.female = gender === 'female' ? 1 : 0;
+    return mon;
+}
+
 function is_rider_ref(ref) {
     const name = monster_ptr(ref)?.name;
     return name === 'DEATH' || name === 'FAMINE' || name === 'PESTILENCE';
@@ -1741,18 +1764,27 @@ export function adj_lev_for(ptr) {
     return tmp > limit ? limit : (tmp > 0 ? tmp : 0);
 }
 
-export function newmonhp_for(ptr, monLevel = adj_lev_for(ptr)) {
-    if (!ptr) return 0;
+export function newmonhp_state_for(ptr, monLevel = adj_lev_for(ptr)) {
+    if (!ptr) return { hp: 0, level: 0 };
     const lev = monLevel;
-    if (ptr.mlet === 'S_GOLEM') return lev;
-    if ((ptr.mlevel ?? 0) > 49) return 2 * (ptr.mlevel - 6);
-    if (ptr.mlet === 'S_DRAGON' && !String(ptr.name || '').startsWith('BABY_')) {
-        return 4 * lev + d(lev, 4);
+    if (ptr.mlet === 'S_GOLEM') return { hp: lev, level: monLevel };
+    if ((ptr.mlevel ?? 0) > 49) {
+        const hp = 2 * (ptr.mlevel - 6);
+        // C ref: makemon.c:newmonhp() stores fixed-HP special monsters
+        // at an approximate level for later m_initinv() item gates.
+        return { hp, level: Math.trunc(hp / 4) };
     }
-    if (!lev) return rnd(4);
+    if (ptr.mlet === 'S_DRAGON' && !String(ptr.name || '').startsWith('BABY_')) {
+        return { hp: 4 * lev + d(lev, 4), level: monLevel };
+    }
+    if (!lev) return { hp: rnd(4), level: monLevel };
     let hp = d(lev, 8);
     if (hp === lev) hp++;
-    return hp;
+    return { hp, level: monLevel };
+}
+
+export function newmonhp_for(ptr, monLevel = adj_lev_for(ptr)) {
+    return newmonhp_state_for(ptr, monLevel).hp;
 }
 
 function init_mon_gender_for(ptr) {
@@ -1901,14 +1933,13 @@ function initial_shapeshift(mon, ptr) {
             : null;
     if (!shape || shape.name === ptr.name) return false;
     mgender_from_permonst_for(mon, shape);
-    const monLevel = adj_lev_for(shape);
-    const hp = newmonhp_for(shape, monLevel);
+    const monState = newmonhp_state_for(shape);
     mon.data = { ...shape, mmove: shape.mmove ?? 12 };
     mon.ch = MONSTER_SYMBOLS[shape.mlet] ?? 'm';
     mon.color = shape.color ?? 15;
-    mon.m_lev = monLevel;
-    mon.mhp = hp;
-    mon.mhpmax = hp;
+    mon.m_lev = monState.level;
+    mon.mhp = monState.hp;
+    mon.mhpmax = monState.hp;
     return true;
 }
 
@@ -1927,7 +1958,7 @@ function roguename() {
 function m_initinv_for(ptr, mon = null) {
     if (!ptr) return;
     if (rogue_level_active()) return;
-    const monLevel = adj_lev_for(ptr);
+    const monLevel = mon?.m_lev ?? adj_lev_for(ptr);
     if (ptr.msound === MS_PRIEST) {
         if (rn2(7)) mksobj(ROBE, true, false);
         mksobj(SMALL_SHIELD, true, false);
@@ -2738,8 +2769,7 @@ export function makemon(mdat, x, y, mmflags = 0) {
         } while (++tryct <= 50 && !goodpos(x, y, gpflags, ptr));
     }
     next_ident();
-    const monLevel = adj_lev_for(ptr);
-    const hp = newmonhp_for(ptr, monLevel);
+    const monState = newmonhp_state_for(ptr);
     const female = init_mon_gender_for(ptr);
     const peaceful = (mmflags & MM_ANGRY) ? false : peace_minded_for(ptr);
     const display = {
@@ -2752,9 +2782,9 @@ export function makemon(mdat, x, y, mmflags = 0) {
         ch: display.ch,
         color: display.color,
         data: { ...ptr, mmove: ptr.mmove ?? display.mmove },
-        m_lev: monLevel,
-        mhp: hp,
-        mhpmax: hp,
+        m_lev: monState.level,
+        mhp: monState.hp,
+        mhpmax: monState.hp,
         female,
         msleeping: (mmflags & MM_ASLEEP) ? 1 : 0,
         mpeaceful: peaceful ? 1 : 0,
@@ -4773,7 +4803,7 @@ function towerCreateMonster(id, x, y, opts = {}) {
     const ystart = opts.ystart ?? TOWER1_Y;
     const cls = String(id || '').length === 1 ? towerMonsterClass(id) : null;
     let ptr = cls ? null : monster_by_user_name(id);
-    if (!cls && !opts.waiting && ptr && !ptr.neuter && !ptr.male && !ptr.female) rn2(2);
+    if (!cls && !opts.waiting && monster_name_needs_find_gender_roll(id, ptr)) rn2(2);
     rn2(3); // C ref: dungeon.c:induced_align() on unaligned Vlad's Tower levels.
     if (cls) ptr = mkclass_aligned(cls, G_NOGEN);
     const mon = makemon(ptr, towerX(x, xstart), towerY(y, ystart), opts.mmflags || 0);
@@ -4782,14 +4812,13 @@ function towerCreateMonster(id, x, y, opts = {}) {
         mon.mstrategy_waiting = 1;
         if (ptr && mon.data?.name !== ptr.name) {
             mgender_from_permonst_for(mon, ptr);
-            const monLevel = adj_lev_for(ptr);
-            const hp = newmonhp_for(ptr, monLevel);
+            const monState = newmonhp_state_for(ptr);
             mon.data = { ...ptr, mmove: ptr.mmove ?? 12 };
             mon.ch = MONSTER_SYMBOLS[ptr.mlet] ?? mon.ch;
             mon.color = ptr.color ?? mon.color;
-            mon.m_lev = monLevel;
-            mon.mhp = hp;
-            mon.mhpmax = hp;
+            mon.m_lev = monState.level;
+            mon.mhp = monState.hp;
+            mon.mhpmax = monState.hp;
             mon.cham = null;
         }
     }
@@ -5188,7 +5217,7 @@ function medusa3Trap(kind = null) {
 
 function medusa3Monster(id, x = null, y = null, mmflags = 0) {
     const ptr = monster_ptr(id);
-    if (ptr && !ptr.neuter && !ptr.male && !ptr.female) rn2(2);
+    if (monster_name_needs_find_gender_roll(id, ptr)) rn2(2);
     induced_align_80();
     const loc = x == null ? medusa3MonsterLocation(ptr) : { x, y };
     if (m_at(loc.x, loc.y)) {
@@ -5667,7 +5696,7 @@ function valleyMonsterLocation(ptr) {
 function valleyMonster(ref) {
     const cls = String(ref || '').length === 1 ? castleMonsterClass(ref) : null;
     let ptr = cls ? null : monster_ptr(ref);
-    if (!cls && ptr && !ptr.neuter && !ptr.male && !ptr.female) rn2(2);
+    if (!cls && monster_name_needs_find_gender_roll(ref, ptr)) rn2(2);
     induced_align_80();
     if (cls) ptr = mkclass_aligned(cls, G_NOGEN);
     const loc = valleyMonsterLocation(ptr);
@@ -6025,7 +6054,7 @@ function castleCreateMonster(id, x, y, mmflags = 0) {
     let ptr = cls ? null : castleMonsterPtr(id);
     // C ref: sp_lev.c:find_montype() resolves a gender value for named
     // special monsters before create_monster() applies random alignment.
-    if (!cls && ptr && !ptr.neuter && !ptr.male && !ptr.female) rn2(2);
+    if (!cls && monster_name_needs_find_gender_roll(id, ptr)) rn2(2);
     induced_align_80();
     if (cls) ptr = mkclass_aligned(cls, G_NOGEN);
     return makemon(ptr, castleX(x), castleY(y), mmflags);
@@ -6530,7 +6559,7 @@ function sanctumCreateMonster(id, x = null, y = null, peaceful = null) {
     const cls = String(id || '').length === 1 ? castleMonsterClass(id) : null;
     let ptr = cls ? null : sanctumMonsterPtr(id);
     const alignedCleric = String(id || '').toLowerCase() === 'aligned cleric';
-    if (!cls && ptr && !ptr.neuter && !ptr.male && !ptr.female) rn2(2);
+    if (!cls && monster_name_needs_find_gender_roll(id, ptr)) rn2(2);
     if (!alignedCleric) induced_align_80();
     if (cls) ptr = mkclass_aligned(cls, G_NOGEN);
     const loc = x == null ? sanctumDryLocation() : { x: sanctumX(x), y: sanctumY(y) };
@@ -6762,7 +6791,7 @@ function asmoCreateMonster(id, x = null, y = null,
     mapRows = ASMO1_MAP, xstart = ASMO1_X, ystart = ASMO1_Y) {
     const cls = String(id || '').length === 1 ? asmoMonsterClass(id) : null;
     let ptr = cls ? null : monster_by_user_name(id);
-    if (!cls && ptr && !ptr.neuter && !ptr.male && !ptr.female) rn2(2);
+    if (!cls && monster_name_needs_find_gender_roll(id, ptr)) rn2(2);
     induced_align_80();
     if (cls) ptr = mkclass_aligned(cls, G_NOGEN);
     const loc = x == null ? asmoMonsterLocation(ptr, mapRows, xstart, ystart)
@@ -6775,7 +6804,7 @@ function asmoCreateMonster(id, x = null, y = null,
             loc.y = cc.y;
         }
     }
-    return makemon(ptr, loc.x, loc.y, 0);
+    return apply_monster_name_gender(makemon(ptr, loc.x, loc.y, 0), id);
 }
 
 function asmoMazeWalk(x, y, dirName, xstart = ASMO2_X, ystart = ASMO2_Y) {
@@ -7288,7 +7317,7 @@ function juibCreateSwampRegion() {
 function juibCreateMonster(id, x, y) {
     let ptr = monster_by_user_name(id);
     if (String(id || '').toLowerCase() === 'lemure') rn2(2);
-    else if (ptr && !ptr.neuter && !ptr.male && !ptr.female) rn2(2);
+    else if (monster_name_needs_find_gender_roll(id, ptr)) rn2(2);
     induced_align_80();
     const loc = juibAbs(x, y);
     return makemon(ptr, loc.x, loc.y, 0);
