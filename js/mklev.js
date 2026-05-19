@@ -2941,6 +2941,8 @@ function holeDestination() {
 
 // maketrap stub
 function maketrap(x, y, typ) {
+    // C ref: trap.c:maketrap() - these are door/chest states, not map traps.
+    if (typ === TRAPPED_DOOR || typ === TRAPPED_CHEST) return null;
     const trap = { ttyp: typ, tx: x, ty: y, tseen: false, once: false, launch: { x: 0, y: 0 } };
     if (typ === SQKY_BOARD) {
         const used = new Set((game.level?.traps || [])
