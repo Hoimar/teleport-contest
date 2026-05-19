@@ -15,7 +15,7 @@ import {
     D_NODOOR, D_ISOPEN, D_CLOSED, D_LOCKED,
     HOLE, TRAPDOOR, M_AP_OBJECT, IS_POOL,
     SV0, SV1, SV2, SV3, SV4, SV5, SV6, SV7, WM_MASK,
-    WARNCOUNT, def_warnsyms,
+    WARNCOUNT, def_warnsyms, Is_rogue_level,
 } from './const.js';
 import { depth, distmin, dist2 } from './hacklib.js';
 import {
@@ -87,6 +87,14 @@ const OBJECT_CLASS_CHARS = {
     17: '.',
 };
 
+const ROGUE_OBJECT_CLASS_CHARS = {
+    ...OBJECT_CLASS_CHARS,
+    3: ']',
+    5: ',',
+    7: ':',
+    12: '*',
+};
+
 const MONSTER_SYMBOLS = {
     S_ANT: 'a', S_BLOB: 'b', S_COCKATRICE: 'c', S_DOG: 'd',
     S_EYE: 'e', S_FELINE: 'f', S_GREMLIN: 'g', S_HUMANOID: 'h',
@@ -107,6 +115,20 @@ const MONSTER_SYMBOLS = {
 
 function tty_color(color) {
     return color === CLR_GRAY || color === CLR_BLACK ? NO_COLOR : color;
+}
+
+function rogue_level_display() {
+    return Is_rogue_level(game.u?.uz);
+}
+
+function hell_level_display() {
+    const uz = game.u?.uz;
+    return !!game.dungeons?.[uz?.dnum ?? 0]?.flags?.hellish;
+}
+
+function object_class_char(oclass) {
+    const table = rogue_level_display() ? ROGUE_OBJECT_CLASS_CHARS : OBJECT_CLASS_CHARS;
+    return table[oclass] || '?';
 }
 
 function obj_is_generic(obj) {
@@ -141,7 +163,7 @@ function random_object_glyph_for_display() {
     }
     const oclass = OBJECT_CLASS[otyp];
     return {
-        ch: OBJECT_CLASS_CHARS[oclass] || '?',
+        ch: object_class_char(oclass),
         color: getObjectColor(otyp) ?? NO_COLOR,
     };
 }
@@ -194,7 +216,44 @@ function is_known_branch_stair(x, y) {
 // ── Terrain to display character + color + DEC flag ──
 function terrain_glyph(loc, x, y) {
     const typ = display_wall_type(loc);
-    const wallColor = game.level?.flags?.red_walls
+    if (rogue_level_display()) {
+        switch (typ) {
+        case STONE:     return { ch: ' ', color: NO_COLOR, dec: false };
+        case ROOM:      return { ch: '.', color: NO_COLOR, dec: false };
+        case CORR:      return { ch: '#', color: NO_COLOR, dec: false };
+        case DOOR:      return { ch: '+', color: NO_COLOR, dec: false };
+        case SDOOR:     return loc.horizontal
+            ? { ch: '-', color: NO_COLOR, dec: false }
+            : { ch: '|', color: NO_COLOR, dec: false };
+        case STAIRS:    return { ch: '%', color: NO_COLOR, dec: false };
+        case HWALL:
+        case TLCORNER:
+        case TRCORNER:
+        case BLCORNER:
+        case BRCORNER:
+        case CROSSWALL:
+        case TUWALL:
+        case TDWALL:
+            return { ch: '-', color: NO_COLOR, dec: false };
+        case VWALL:
+        case TLWALL:
+        case TRWALL:
+            return { ch: '|', color: NO_COLOR, dec: false };
+        case FOUNTAIN:  return { ch: '{', color: NO_COLOR, dec: false };
+        case SINK:      return { ch: '#', color: NO_COLOR, dec: false };
+        case ALTAR:     return { ch: '_', color: NO_COLOR, dec: false };
+        case GRAVE:     return { ch: '|', color: NO_COLOR, dec: false };
+        case TREE:      return { ch: '#', color: NO_COLOR, dec: false };
+        case POOL:
+        case MOAT:
+        case WATER:
+        case LAVAPOOL:
+        case LAVAWALL:
+            return { ch: '`', color: NO_COLOR, dec: false };
+        default:        return { ch: '?', color: NO_COLOR, dec: false };
+        }
+    }
+    const wallColor = (game.level?.flags?.red_walls || hell_level_display())
         ? CLR_RED
         : game.level?.flags?.sokoban_rules ? CLR_BLUE
             : game.level?.flags?.mines_walls ? CLR_BROWN : NO_COLOR;
@@ -312,7 +371,7 @@ function monster_glyph(mon) {
         const otyp = mon.mappearance;
         const oclass = OBJECT_CLASS[otyp];
         return {
-            ch: OBJECT_CLASS_CHARS[oclass] || '?',
+            ch: object_class_char(oclass),
             color: getObjectColor(otyp) ?? NO_COLOR,
             dec: false,
         };
@@ -401,8 +460,8 @@ export function show_glyph_cell(x, y, ch, color = NO_COLOR, decgfx = false, attr
     const loc = game.level?.at(x, y);
     if (!loc) return;
     loc.disp_ch = ch;
-    loc.disp_color = tty_color(color);
-    loc.disp_decgfx = !!decgfx;
+    loc.disp_color = rogue_level_display() ? NO_COLOR : tty_color(color);
+    loc.disp_decgfx = rogue_level_display() ? false : !!decgfx;
     loc.disp_attr = attr | 0;
     loc.gnew = 1;
 }
@@ -504,9 +563,9 @@ export function newsym(x, y) {
     const visible = cansee(x, y);
 
     if (!visible) {
-        if (mon) {
-            const wg = warning_glyph(mon);
-            if (wg) show_glyph_cell(x, y, wg.ch, wg.color, false);
+        const wg = mon ? warning_glyph(mon) : null;
+        if (wg) {
+            show_glyph_cell(x, y, wg.ch, wg.color, false);
         } else if (loc.remembered_glyph) {
             // Out of sight but remembered - show remembered glyph.
             show_glyph_cell(x, y, loc.remembered_glyph.ch,
@@ -695,7 +754,8 @@ function _statusLine2() {
     const hp = game._latched_status_uhp != null && (game._more || game._death_prompt_active)
         ? game._latched_status_uhp
         : (u.uhp || 0);
-    return `Dlvl:${depth(u.uz)} $:${game._goldCount || 0} HP:${hp}(${u.uhpmax || 0}) Pw:${u.uen || 0}(${u.uenmax || 0}) AC:${u.uac ?? 10} ${xp}${turn}${conditionText}`;
+    const goldSymbol = rogue_level_display() ? '*' : '$';
+    return `Dlvl:${depth(u.uz)} ${goldSymbol}:${game._goldCount || 0} HP:${hp}(${u.uhpmax || 0}) Pw:${u.uen || 0}(${u.uenmax || 0}) AC:${u.uac ?? 10} ${xp}${turn}${conditionText}`;
 }
 
 // ── Serialize terminal grid for screen comparison ──

@@ -325,6 +325,7 @@ const MS_PRIEST = 41;
 const MM_EMIN = 0x00000400;
 const MM_NOCOUNTBIRTH = 0x00000004;
 const MM_NOMSG = 0x00020000;
+const MM_MINVIS = 0x00100000;
 
 const LIQUID = 1;
 const WOOD = 8;
@@ -2795,6 +2796,18 @@ function m_initgrp(mon, x, y, n, mmflags) {
     }
 }
 
+function pm_invisible_ptr(ptr) {
+    // C ref: mondata.h:pm_invisible().
+    return ptr?.name === 'STALKER' || ptr?.name === 'BLACK_LIGHT';
+}
+
+function mon_set_minvis(mon, cursedPotion = false) {
+    // C ref: worn.c:mon_set_minvis().
+    if (!mon) return;
+    mon.perminvis = cursedPotion ? 0 : 1;
+    if (!mon.invis_blkd) mon.minvis = mon.perminvis;
+}
+
 // makemon stub
 export function makemon(mdat, x, y, mmflags = 0) {
     let ptr = (mdat === null) ? null : mdat;
@@ -2851,14 +2864,19 @@ export function makemon(mdat, x, y, mmflags = 0) {
         mpeaceful: peaceful ? 1 : 0,
         mtame: (mmflags & 0x00000800) ? 10 : 0,
         movement: 0,
+        minvis: 0,
+        perminvis: 0,
+        invis_blkd: 0,
     };
     // C makemon() inserts at the head of fmon. Movement allocation and
     // action order depend on this list order because each monster consumes
     // its own speed-rounding roll.
     if (game.level?.monsters) game.level.monsters.unshift(mon);
+    if (mmflags & MM_MINVIS) mon_set_minvis(mon, false);
     if (ptr.mlet === 'S_MIMIC') {
         set_mimic_sym(mon);
     }
+    if (pm_invisible_ptr(ptr)) mon_set_minvis(mon, false);
     if ((ptr.mlet === 'S_SPIDER' || ptr.mlet === 'S_SNAKE') && game.in_mklev && x && y) {
         mkobj_at(RANDOM_CLASS, x, y, true);
         mon.mundetected = 1;
@@ -4474,6 +4492,22 @@ function rememberWallsInRect(x1, y1, x2, y2) {
             const ch = WALL_MEMORY_GLYPHS[loc?.typ];
             if (!ch) continue;
             loc.remembered_glyph = { ch, color: 8, decgfx: true };
+        }
+    }
+}
+
+function lightWallsAdjacentToLitCells(x1, y1, x2, y2) {
+    // C ref: vision.c:vision_recalc() one-sided lit wall handling.
+    for (let y = y1; y <= y2; y++) {
+        for (let x = x1; x <= x2; x++) {
+            const loc = game.level?.at(x, y);
+            if (!loc || loc.lit || !IS_WALL(loc.typ)) continue;
+            for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+                if (game.level?.at(x + dx, y + dy)?.lit) {
+                    loc.lit = true;
+                    break;
+                }
+            }
         }
     }
 }
@@ -7060,7 +7094,11 @@ function hellTweaksMatchPattern(rows) {
 function applyTerrainSelection(set, typ) {
     for (const { x, y } of selCoords(set)) {
         const loc = game.level?.at(x, y);
-        if (loc) loc.typ = typ;
+        if (loc) {
+            loc.typ = typ;
+            // C ref: mkmap.c:finish_map() and sp_lev.c region lighting.
+            if (typ === LAVAPOOL) loc.lit = true;
+        }
     }
 }
 
@@ -8260,6 +8298,9 @@ function makemaz_special(slev) {
     if (game._last_special_protofile === 'bigrm-4') {
         loadBigrm4Special();
         wallification(1, 0, COLNO - 1, ROWNO - 1);
+        lightWallsAdjacentToLitCells(BIGRM_4_XSTART, BIGRM_4_YSTART,
+            BIGRM_4_XSTART + BIGRM_4_MAP[0].length - 1,
+            BIGRM_4_YSTART + BIGRM_4_MAP.length - 1);
         return;
     }
     if (loadSokoSpecial(game._last_special_protofile)) {

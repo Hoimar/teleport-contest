@@ -11,7 +11,7 @@ import {
     newsym, show_glyph_cell, flush_screen, pline, append_pline, clear_pending_message, docrt,
     serialize_terminal_grid, queue_more_prompt,
     apply_hallucination_display_transition, refresh_swallowed_overlay,
-    see_monsters, see_objects, see_traps,
+    see_monsters, see_objects, see_traps, refresh_warning_monsters,
 } from './display.js';
 import { cansee, vision_recalc, vision_reset } from './vision.js';
 import { makemon, mklev, mksobj, monster_by_user_name, next_ident, place_lregion, place_object } from './mklev.js';
@@ -32,6 +32,12 @@ import {
     COLNO, ROWNO, STONE, CORR, DOOR, D_NODOOR, D_CLOSED, D_LOCKED,
     SDOOR, SCORR, IS_WALL, IS_OBSTRUCTED, IS_POOL, LR_UPTELE, LR_DOWNTELE, A_STR, A_DEX, A_CON, A_WIS,
 } from './const.js';
+
+function refreshWarningAfterHeroMove() {
+    if (!game.u?.uprops?.warning) return;
+    if (game.u?.uhallucination || game.u?.uprops?.hallucination) return;
+    refresh_warning_monsters();
+}
 
 // Direction deltas: y u k
 //                   h . l
@@ -1299,6 +1305,7 @@ async function tryPushBoulder(boulder, sx, sy, dx, dy) {
     newsym(oldx, oldy);
     newsym(rx, ry);
     vision_recalc(1);
+    refreshWarningAfterHeroMove();
     newsym(sx, sy);
     return true;
 }
@@ -1499,6 +1506,7 @@ async function swapWithSafeMonster(mon, x, y) {
     mon.my = oldy;
     newsym(oldx, oldy);
     vision_recalc(1);
+    refreshWarningAfterHeroMove();
     newsym(x, y);
     await pline(`You swap places with ${monsterSwapName(mon)}.`);
 }
@@ -2629,6 +2637,12 @@ export async function performLevelTeleport(target) {
             { text: 'You arrive at the Valley of the Dead...', more: true },
             { text: 'The odor of burnt flesh and decay pervades the air.', more: true },
             { text: 'You hear groans and moans everywhere.', more: false },
+        ];
+    }
+    if (C.Is_rogue_level(game.u?.uz)) {
+        queue_more_prompt();
+        game._more_message_queue = [
+            { text: 'You enter what seems to be an older, more primitive world.', more: false },
         ];
     }
     // C ref: do.c:goto_level() performs docrt()/flush before the deferred
@@ -3910,6 +3924,9 @@ export async function domove(dx, dy) {
     // Update display
     newsym(oldx, oldy);
     vision_recalc(1);
+    // C ref: hack.c:domove() post-move vision redraw clears warning glyphs
+    // whose mdisdu() range changed when the hero moved.
+    refreshWarningAfterHeroMove();
     newsym(newx, newy);
     await lookHereAfterMove();
     return true;
