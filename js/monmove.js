@@ -12,7 +12,7 @@ import {
     MON_POLE_DIST, NEED_AXE, NEED_HTH_WEAPON, NEED_PICK_AXE, NEED_PICK_OR_AXE,
     NEED_RANGED_WEAPON, NEED_WEAPON, W_ARMS, W_NONDIGGABLE, W_WEP,
     GP_CHECKSCARY, SDOOR, W_NONPASSWALL,
-    isok, SPACE_POS,
+    isok, SPACE_POS, is_pit,
 } from './const.js';
 import {
     newsym, queue_more_prompt, pline, flush_screen, clear_pending_message,
@@ -38,6 +38,7 @@ const M1_WALLWALK = 0x00000008;
 const M1_TUNNEL = 0x00000020;
 const M1_NEEDPICK = 0x00000040;
 const M1_HIDE = 0x00000100;
+const M1_CONCEAL = 0x00000080;
 const M1_NOEYES = 0x00001000;
 const M1_NOHANDS = 0x00002000;
 const M1_MINDLESS = 0x00010000;
@@ -235,6 +236,13 @@ function monster_should_see_target(mtmp, omx, omy, ggx, ggy) {
 
 function is_hider(mtmp) {
     return !!(mtmp.data?.mflags1 & M1_HIDE);
+}
+
+function can_hide_under_object_basic(x, y) {
+    const obj = (game.level?.objects || []).find((item) => item.ox === x && item.oy === y);
+    if (!obj) return false;
+    const trap = (game.level?.traps || []).find((ttmp) => ttmp.tx === x && ttmp.ty === y);
+    return !trap || is_pit(trap.ttyp);
 }
 
 function non_tame_movement_opportunity(mtmp, state) {
@@ -1447,6 +1455,11 @@ async function m_move_basic(mtmp) {
         // the altar-offset RNG without falling into ordinary peaceful m_move().
         rn2(3);
         rn2(3);
+        return MMOVE_NOTHING;
+    }
+    if ((mtmp.data?.mflags1 & M1_CONCEAL)
+        && can_hide_under_object_basic(mtmp.mx, mtmp.my)
+        && rn2(10)) {
         return MMOVE_NOTHING;
     }
     if (mtmp.mconf) {

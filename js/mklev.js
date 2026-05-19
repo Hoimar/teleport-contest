@@ -8352,7 +8352,10 @@ export async function mklev() {
         || game._last_special_protofile === 'valley'
         || game._last_special_protofile === 'sanctum'
         || game._last_special_protofile === 'orcus'
-        || game._last_special_protofile === 'minetn-5') {
+        || game._last_special_protofile === 'minetn-5'
+        || game._last_special_protofile === 'wizard1'
+        || game._last_special_protofile === 'wizard2'
+        || game._last_special_protofile === 'wizard3') {
         for (let i = 0; i < (g.level?.nroom ?? 0); i++) {
             fill_special_room(g.level.rooms[i]);
         }
