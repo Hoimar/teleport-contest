@@ -2863,6 +2863,11 @@ export function makemon(mdat, x, y, mmflags = 0) {
         mkobj_at(RANDOM_CLASS, x, y, true);
         mon.mundetected = 1;
     }
+    if (ptr.mlet === 'S_EEL' && game.in_mklev && IS_POOL(game.level?.at(x, y)?.typ)) {
+        // C ref: makemon.c:makemon() calls hideunder() for sea monsters
+        // during level creation, which hides them under water without RNG.
+        mon.mundetected = 1;
+    }
     if (ptr.mlet === 'S_LEPRECHAUN') mon.msleeping = 1;
     if ((ptr.mlet === 'S_NYMPH' || ptr.mlet === 'S_JABBERWOCK')
         && rn2(5) && !game.u?.uhave?.amulet) {

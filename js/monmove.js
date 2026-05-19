@@ -238,11 +238,41 @@ function is_hider(mtmp) {
     return !!(mtmp.data?.mflags1 & M1_HIDE);
 }
 
+function hides_under_basic(mtmp) {
+    return !!(mtmp.data?.mflags1 & M1_CONCEAL);
+}
+
 function can_hide_under_object_basic(x, y) {
     const obj = (game.level?.objects || []).find((item) => item.ox === x && item.oy === y);
     if (!obj) return false;
     const trap = (game.level?.traps || []).find((ttmp) => ttmp.tx === x && ttmp.ty === y);
     return !trap || is_pit(trap.ttyp);
+}
+
+function hideunder_basic(mtmp) {
+    // C ref: mon.c:hideunder().  Keep the side effect conservative: eels hide
+    // in pool squares; concealers hide under eligible floor objects.
+    let undetected = false;
+    const loc = game.level?.at(mtmp.mx, mtmp.my);
+    if (mtmp.data?.mlet === 'S_EEL') {
+        undetected = !!loc && IS_POOL(loc.typ);
+    } else if (hides_under_basic(mtmp) && can_hide_under_object_basic(mtmp.mx, mtmp.my)
+               && !IS_POOL(loc?.typ) && !IS_LAVA(loc?.typ)) {
+        undetected = true;
+    }
+    const old = !!mtmp.mundetected;
+    mtmp.mundetected = undetected ? 1 : 0;
+    if (old !== !!mtmp.mundetected) newsym(mtmp.mx, mtmp.my);
+    return undetected;
+}
+
+function postmove_hide_under_or_eel_basic(mtmp) {
+    if (!hides_under_basic(mtmp) && mtmp.data?.mlet !== 'S_EEL') return;
+    // C ref: monmove.c:postmov() re-hide gate after moved/done monsters.
+    if (mtmp.mundetected || ((mtmp.mcanmove !== 0 && !mtmp.msleeping) && rn2(5))) {
+        hideunder_basic(mtmp);
+    }
+    newsym(mtmp.mx, mtmp.my);
 }
 
 function non_tame_movement_opportunity(mtmp, state) {
@@ -1608,9 +1638,11 @@ async function m_move_basic(mtmp) {
     if (doorStatus === MMOVE_DIED) return MMOVE_DIED;
     if (await mpickstuff_basic(mtmp)) {
         maybe_spin_web_basic(mtmp);
+        postmove_hide_under_or_eel_basic(mtmp);
         return MMOVE_DONE;
     }
     maybe_spin_web_basic(mtmp);
+    postmove_hide_under_or_eel_basic(mtmp);
     return doorStatus;
 }
 
