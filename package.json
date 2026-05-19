@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "The Teleport Coding Challenge — Port NetHack C to JavaScript",
   "type": "module",
+  "packageManager": "npm@11.14.0",
   "scripts": {
     "score": "bash frozen/score.sh",
     "score:live-public": "node scripts/fetch-live-public-sessions.mjs && bash frozen/score.sh .cache/live-sessions",
@@ -12,10 +13,12 @@
     "verify": "node scripts/verify-change.mjs",
     "hack:audit": "node scripts/hack-debt-audit.mjs",
     "memory:lint": "node scripts/memory-lint.mjs",
+    "deps:audit": "npm audit --audit-level=moderate",
     "screen:diff": "node scripts/screen-diff.mjs",
     "play": "echo 'Open index.html in a browser to play'"
   },
   "engines": {
-    "node": ">=22.0.0"
+    "node": ">=22.0.0",
+    "npm": ">=11.10.0"
   }
 }

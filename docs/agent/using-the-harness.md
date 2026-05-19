@@ -12,16 +12,19 @@ No MCP server, repo plugin, or installed skill package is required.
 
 ## Setup
 
-Use Node 22+. From a checkout:
+Use Node 22+ and npm 11.10+. From a checkout:
 
 ```bash
-npm install
+npm ci
+npm run deps:audit
 npm run memory:lint
 npm run verify -- --target seed0383-wizard-hallucinate
 ```
 
-`npm install` is only needed when dependencies are absent. The npm commands are
-aliases for direct `node scripts/*.mjs` commands in `package.json`.
+The repo defaults to disabling dependency lifecycle scripts in `.npmrc`; see
+`docs/npm-supply-chain.md` before adding or updating npm dependencies. The npm
+commands are aliases for direct `node scripts/*.mjs` commands in
+`package.json`.
 
 ## What To Ask An Agent
 
