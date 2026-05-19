@@ -10414,6 +10414,8 @@ function fill_zoo(croom) {
     let goldlim = (type === ZOO || type === LEPREHALL) ? 500 * level_difficulty() : 0;
     const rmno = game.level.rooms.indexOf(croom) + ROOMOFFSET;
     const door = croom.doorct ? game.level.doors?.[croom.fdoor] : null;
+    const beehiveQueenX = type === BEEHIVE ? croom.lx + Math.trunc((croom.hx - croom.lx + 1) / 2) : 0;
+    const beehiveQueenY = type === BEEHIVE ? croom.ly + Math.trunc((croom.hy - croom.ly + 1) / 2) : 0;
     for (let sx = croom.lx; sx <= croom.hx; sx++)
         for (let sy = croom.ly; sy <= croom.hy; sy++) {
             const loc = game.level.at(sx, sy);
@@ -10433,6 +10435,11 @@ function fill_zoo(croom) {
             if (type === LEPREHALL) mdat = MONSTERS.find(m => m.name === 'LEPRECHAUN');
             else if (type === BARRACKS) mdat = squadmon();
             else if (type === MORGUE) mdat = morguemon();
+            else if (type === BEEHIVE) {
+                mdat = MONSTERS.find(m => m.name === (sx === beehiveQueenX && sy === beehiveQueenY
+                    ? 'QUEEN_BEE'
+                    : 'KILLER_BEE'));
+            }
             makemon(mdat, sx, sy, MM_ASLEEP | MM_NOGRP);
             const mon = game.level.monsters?.[0];
             if (mon && mon.mx === sx && mon.my === sy) mon.msleeping = 1;
@@ -10509,10 +10516,12 @@ function fill_special_room(croom) {
         game.level.flags.has_vault = true;
     } else if (croom.needfill === FILL_NORMAL
                && (croom.rtype === ZOO || croom.rtype === LEPREHALL
-               || croom.rtype === BARRACKS || croom.rtype === MORGUE)) {
+               || croom.rtype === BARRACKS || croom.rtype === MORGUE
+               || croom.rtype === BEEHIVE)) {
         fill_zoo(croom);
         if (croom.rtype === ZOO) game.level.flags.has_zoo = true;
         if (croom.rtype === MORGUE) game.level.flags.has_morgue = true;
+        if (croom.rtype === BEEHIVE) game.level.flags.has_beehive = true;
     } else if (croom.needfill === FILL_NORMAL && croom.rtype >= SHOPBASE) {
         stock_room(croom);
     }
@@ -10520,6 +10529,7 @@ function fill_special_room(croom) {
     if (croom.rtype === ZOO) game.level.flags.has_zoo = true;
     if (croom.rtype === COURT) game.level.flags.has_court = true;
     if (croom.rtype === MORGUE) game.level.flags.has_morgue = true;
+    if (croom.rtype === BEEHIVE) game.level.flags.has_beehive = true;
     if (croom.rtype === BARRACKS) game.level.flags.has_barracks = true;
     if (croom.rtype === TEMPLE) game.level.flags.has_temple = true;
 }
