@@ -1688,7 +1688,12 @@ function apply_newcham_basic(mon, ptr) {
 }
 
 function decide_to_shapeshift_basic(mon) {
-    if (!vampire_shifter_base(mon?.cham)) return;
+    if (!vampire_shifter_base(mon?.cham)) {
+        // C ref: mon.c:decide_to_shapeshift() regular shapeshifter gate.
+        // Full runtime newcham() target selection remains future work.
+        if (!mon?.mspec_used && !rn2(6)) mon.mspec_used = 3 + rn2(10);
+        return;
+    }
     if (mon.data?.mlet !== 'S_VAMPIRE') {
         let ptr = null;
         let change = false;
