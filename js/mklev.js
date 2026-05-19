@@ -7860,6 +7860,21 @@ const WIZARD1_MAP = [
     '|..|.......S...............|x',
     '----------------------------x',
 ];
+const WIZARD2_MAP = [
+    '----------------------------x',
+    '|.....|.S....|.............|x',
+    '|.....|.-------S--------S--|x',
+    '|.....|.|.........|........|x',
+    '|..-S--S|.........|........|x',
+    '|..|....|.........|------S-|x',
+    '|..|....|.........|.....|..|x',
+    '|-S-----|.........|.....|..|x',
+    '|.......|.........|S--S--..|x',
+    '|.......|.........|.|......|x',
+    '|-----S----S-------.|......|x',
+    '|............|....S.|......|x',
+    '----------------------------x',
+];
 const WIZARD3_MAP = [
     '----------------------------x',
     '|..|............S..........|x',
@@ -8133,6 +8148,39 @@ function wizardSetDoor(x, y, mask) {
     set_door_mask(loc, mask);
 }
 
+function loadWizard2Special() {
+    // C ref: dat/wizard2.lua loaded through sp_lev.c:lspo_map().
+    rn2(3); rn2(2); // nhlib shuffle()
+    loadWizardMazegridTerrain(WIZARD2_MAP);
+
+    createWizardRoomRegion(1, 1, 26, 11, 0, OROOM, FILL_NONE, true);
+    createWizardRoomRegion(9, 3, 17, 9, 0, ZOO, FILL_NORMAL);
+    wizardSetDoor(15, 2, D_CLOSED);
+    wizardSetDoor(11, 10, D_CLOSED);
+    asmoMazeWalk(28, 5, 'east', WIZARD1_X, WIZARD1_Y);
+    placeSpecialLadder(wizardX(12), wizardY(1), true);
+    placeSpecialLadder(wizardX(14), wizardY(11), false);
+
+    for (const kind of [SPIKED_PIT, SLP_GAS_TRAP, ANTI_MAGIC, MAGIC_TRAP])
+        wizardTrap(kind, null, null, WIZARD2_MAP);
+    for (const ref of ['!', '!', '?', '?', '+'])
+        wizardObject(ref, null, null, WIZARD2_MAP);
+    wizardObject('"', 4, 6, WIZARD2_MAP);
+
+    const ext = get_level_extends();
+    const bounds = {
+        minx: Math.max(1, ext.xmin),
+        maxx: Math.min(COLNO - 1, ext.xmax),
+        miny: Math.max(0, ext.ymin),
+        maxy: Math.min(ROWNO - 1, ext.ymax),
+    };
+    hellTweaksWizardMap(WIZARD2_MAP);
+    wallification(1, 0, COLNO - 1, ROWNO - 1);
+    const flp = flip_level_rnd(3);
+    registerWizardMapLregions(WIZARD2_MAP, flp, bounds);
+    fixup_special();
+}
+
 function loadWizard3Special() {
     // C ref: dat/wizard3.lua loaded through sp_lev.c:lspo_map().
     rn2(3); rn2(2); // nhlib shuffle()
@@ -8252,6 +8300,10 @@ function makemaz_special(slev) {
     }
     if (game._last_special_protofile === 'wizard1') {
         loadWizard1Special();
+        return;
+    }
+    if (game._last_special_protofile === 'wizard2') {
+        loadWizard2Special();
         return;
     }
     if (game._last_special_protofile === 'wizard3') {
