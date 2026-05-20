@@ -581,10 +581,6 @@ function dog_invent(mtmp, udist) {
     if (mtmp.inventory?.length) {
         if ((!rn2(udist + 1) || !rn2(edog.apport)) && rn2(10) < edog.apport) {
             const obj = mtmp.inventory.shift();
-            if (obj?._pet_keep_projectile) {
-                mtmp.inventory.unshift(obj);
-                return 0;
-            }
             place_object(obj, mtmp.mx, mtmp.my);
             pet_inventory_pline(`${pet_subject(mtmp)} drops ${object_name(obj)}.`);
             if (edog.apport > 1) edog.apport--;
