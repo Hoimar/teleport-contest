@@ -20,6 +20,7 @@ const FOOD_CLASS = 7;
 const WEAPON_CLASS = 2;
 const ROCK_CLASS = 14;
 const ORCISH_DAGGER = 36;
+const JAVELIN = 32;
 const QUARTERSTAFF = 79;
 const TRIPE_RATION = 264;
 const BOULDER = 475;
@@ -408,6 +409,7 @@ function max_mon_load(mtmp) {
 }
 
 function object_name(obj) {
+    if (obj?.otyp === JAVELIN) return 'a throwing spear';
     if (obj?.otyp === ORCISH_DAGGER) return 'a crude dagger';
     if (obj?.otyp === QUARTERSTAFF) {
         const buc = obj.blessed ? 'blessed ' : obj.cursed ? 'cursed ' : 'uncursed ';
@@ -475,7 +477,13 @@ function pet_inventory_pline(line) {
     if (typeof game._pending_message === 'string'
         && (game._pending_message.startsWith('You see here ')
             || game._pending_message.startsWith('Blecch!  Rotten food!'))) return;
-    pline(line);
+    if (game._pending_message) {
+        const packed = `${game._pending_message}  ${line}`;
+        game._pending_message = packed;
+        if (packed.length >= (game.nhDisplay?.cols || COLNO)) queue_more_prompt();
+    } else {
+        pline(line);
+    }
 }
 
 function monster_article_name(mon) {
@@ -582,7 +590,11 @@ function dog_invent(mtmp, udist) {
         if ((!rn2(udist + 1) || !rn2(edog.apport)) && rn2(10) < edog.apport) {
             const obj = mtmp.inventory.shift();
             place_object(obj, mtmp.mx, mtmp.my);
-            pet_inventory_pline(`${pet_subject(mtmp)} drops ${object_name(obj)}.`);
+            // C ref: steal.c:mdrop_obj().  Pet inventory drops are only
+            // announced when the drop square is visible.
+            if (cansee(mtmp.mx, mtmp.my)) {
+                pet_inventory_pline(`${pet_subject(mtmp)} drops ${object_name(obj)}.`);
+            }
             if (edog.apport > 1) edog.apport--;
             newsym(mtmp.mx, mtmp.my);
         }

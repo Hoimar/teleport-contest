@@ -292,11 +292,13 @@ export async function newgame() {
     g.u.uz = { dnum: 0, dlevel: 1 };
     g.flags = g.flags || {};
     // Branch placement scaffolding. The exact dungeon init still lives in
-    // fastforward_pre_mklev; branch-specific behavior must check dnum names
-    // instead of assuming this placeholder is the Mines.
+    // fastforward_pre_mklev; keep enough topology for later level generation
+    // to recognize the dungeon-exit and Mines-entrance branch levels.
     if (!g.branches) g.branches = [
-        { end1: { dnum: 0, dlevel: 1 }, end2: { dnum: 2, dlevel: 1 }, end1_up: true },
+        { end1: { dnum: 0, dlevel: 1 }, end2: { dnum: 7, dlevel: 1 }, end1_up: true },
+        { end1: { dnum: 0, dlevel: 2 }, end2: { dnum: 2, dlevel: 1 }, end1_up: false },
     ];
+    if (g.mines_dnum == null) g.mines_dnum = 2;
 
     // Real mklev generates the level with correct room positions
     // Structural phase consumes RNG for rooms/corridors/doors/stairs
@@ -521,6 +523,20 @@ function creditEncumberedExtraTurn(g) {
     g._encumbered_move_debt -= encumberedMoveAmount(enc);
 }
 
+function creditEncumberedNomulFinish(g) {
+    const enc = g.u?.uencumber || 0;
+    if (!enc || g._encumbered_move_debt == null) return;
+    const moveamt = encumberedMoveAmount(enc);
+    const shortfall = NORMAL_SPEED - moveamt;
+    g._encumbered_move_debt -= Math.max(0, moveamt - shortfall);
+}
+
+function creditEncumberedShortfallTurn(g) {
+    const enc = g.u?.uencumber || 0;
+    if (!enc || g._encumbered_move_debt == null) return;
+    g._encumbered_move_debt -= NORMAL_SPEED - encumberedMoveAmount(enc);
+}
+
 function applyOccupationFinishObjectEffects(g) {
     const obj = g._occupation_finish_object;
     if (!obj) return;
@@ -569,6 +585,7 @@ async function runOccupationPreFinishTurn(g) {
         // movement, the monster catch-up pass happens before `nomovemsg`.
         g._occupation_pre_finish_turn_done = true;
         await advanceTurn();
+        creditEncumberedShortfallTurn(g);
     }
 }
 
@@ -586,6 +603,10 @@ async function continueNomulTurns(g) {
     if (g._nomul_finish_message) {
         const msg = g._nomul_finish_message;
         g._nomul_finish_message = null;
+        // C ref: allmain.c:moveloop_core()/u_calc_moveamt().  Helpless
+        // negative-multi turns still use the movement accumulator; by the time
+        // unmul() prints nomovemsg, a burdened hero has only partly recovered.
+        creditEncumberedNomulFinish(g);
         if (g._pending_message) await append_pline(msg);
         else await pline(msg);
     }
@@ -760,8 +781,10 @@ export async function moveloop_core() {
     // performs deferred_goto() after rhack() returns.
     if (g._pending_level_teleport_target) {
         const target = g._pending_level_teleport_target;
+        const flags = g._pending_level_change_flags || {};
         g._pending_level_teleport_target = null;
-        await performLevelTeleport(target);
+        g._pending_level_change_flags = null;
+        await performLevelTeleport(target, flags);
     }
 
     // Advance turn; run/rush movement may consume multiple turns before

@@ -24,7 +24,7 @@ import {
     show_glyph_cell,
 } from './display.js';
 import { nhgetch } from './input.js';
-import { clear_path, cansee, couldsee } from './vision.js';
+import { clear_path, cansee, couldsee, vision_reset, vision_recalc } from './vision.js';
 import { m_dowear_basic } from './mon_wear.js';
 import { gettrack } from './track.js';
 import { randomHallucinatedMonsterName } from './random_text.js';
@@ -1238,6 +1238,15 @@ function set_door_mask_basic(loc, mask) {
     loc.doormask = mask;
 }
 
+function refresh_monster_door_vision(mtmp) {
+    // C ref: monmove.c:UnblockDoor().  A monster opening or removing a door
+    // updates vision immediately, before later monsters in this same turn move.
+    newsym(mtmp.mx, mtmp.my);
+    vision_reset();
+    vision_recalc(0);
+    game.vision_full_recalc = 0;
+}
+
 function remove_dead_monster(mtmp) {
     const monsters = game.level?.monsters || [];
     const idx = monsters.indexOf(mtmp);
@@ -1846,11 +1855,11 @@ async function postmove_door_basic(mtmp) {
     const loc = game.level?.at(mtmp.mx, mtmp.my);
     if (!loc || !IS_DOOR(loc.typ) || mon_passes_walls(mtmp)) return MMOVE_MOVED;
     const trapped = !!(loc.doormask & D_TRAPPED);
-    const canseeit = cansee(mtmp.mx, mtmp.my);
+    let canseeit = cansee(mtmp.mx, mtmp.my);
     if ((loc.doormask & D_LOCKED) && trapped) {
         set_door_mask_basic(loc, D_NODOOR);
-        newsym(mtmp.mx, mtmp.my);
-        game.vision_full_recalc = 1;
+        refresh_monster_door_vision(mtmp);
+        canseeit = canseeit || cansee(mtmp.mx, mtmp.my);
         return await mb_trapped_basic(mtmp, canseeit) ? MMOVE_DIED : MMOVE_MOVED;
     }
     if (loc.doormask === D_CLOSED && mon_can_open_doors(mtmp)) {
@@ -1858,14 +1867,14 @@ async function postmove_door_basic(mtmp) {
         // C ref: monmove.c:postmov().  The monster has already moved to the
         // door square, but an unseen opener is reported as the door changing.
         mtmp._opened_unseen_door = true;
-        newsym(mtmp.mx, mtmp.my);
-        game.vision_full_recalc = 1;
+        refresh_monster_door_vision(mtmp);
+        canseeit = canseeit || cansee(mtmp.mx, mtmp.my);
         if (canseeit) await append_pline('You see a door open.');
         else await append_pline('You hear a door open.');
     } else if ((loc.doormask & D_CLOSED) && trapped) {
         set_door_mask_basic(loc, D_NODOOR);
-        newsym(mtmp.mx, mtmp.my);
-        game.vision_full_recalc = 1;
+        refresh_monster_door_vision(mtmp);
+        canseeit = canseeit || cansee(mtmp.mx, mtmp.my);
         return await mb_trapped_basic(mtmp, canseeit) ? MMOVE_DIED : MMOVE_MOVED;
     }
     return MMOVE_MOVED;

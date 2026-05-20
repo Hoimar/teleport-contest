@@ -848,6 +848,15 @@ export function u_on_upstairs() {
     place_lregion(0, 0, 0, 0, 0, 0, 0, 0, LR_UPTELE, null);
 }
 
+// C ref: stairs.c:u_on_dnstairs().
+export function u_on_dnstairs() {
+    const stway = stairway_find_dir(false);
+    if (stway) { u_on_newpos(stway.sx, stway.sy); return; }
+    const special = stairway_find_special_dir(true);
+    if (special) { u_on_newpos(special.sx, special.sy); return; }
+    place_lregion(0, 0, 0, 0, 0, 0, 0, 0, LR_DOWNTELE, null);
+}
+
 // oinit stub (level-dependent object probability reset)
 function oinit() { /* no-op for contest */ }
 
@@ -9324,8 +9333,7 @@ async function makelevel() {
                 const vaultRoom = g.level.rooms[g.level.nroom - 1];
                 if (vaultRoom) vaultRoom.needfill = FILL_NORMAL;
                 fill_special_room(vaultRoom);
-                if (!is_branchlev()) rn2(3);
-                if (!rn2(3)) await makeniche(TELEP_TRAP);
+                if (!g.level.flags.noteleport && !rn2(3)) await makeniche(TELEP_TRAP);
             } else if (rnd_rect() && create_vault()) {
                 g.vault_x = g.level.rooms[g.level.nroom]?.lx ?? -1;
                 g.vault_y = g.level.rooms[g.level.nroom]?.ly ?? -1;
@@ -9338,8 +9346,7 @@ async function makelevel() {
                     const vaultRoom = g.level.rooms[g.level.nroom - 1];
                     if (vaultRoom) vaultRoom.needfill = FILL_NORMAL;
                     fill_special_room(vaultRoom);
-                    if (!is_branchlev()) rn2(3);
-                    if (!rn2(3)) await makeniche(TELEP_TRAP);
+                    if (!g.level.flags.noteleport && !rn2(3)) await makeniche(TELEP_TRAP);
                 } else if (g.level.rooms[g.level.nroom]) {
                     g.level.rooms[g.level.nroom].hx = -1;
                 }
