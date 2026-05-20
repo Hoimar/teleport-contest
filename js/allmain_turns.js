@@ -87,10 +87,10 @@ export function maybe_wipe_engraving() {
     if (!rn2(40 + dex * 3)) rnd(3);
 }
 
-export function maybe_update_seer_turn() {
+export function maybe_update_seer_turn(moveNumber = null) {
     const context = game.context || (game.context = {});
     if (context.seer_turn == null) return;
-    const moves = (game.moves || 1) + 1;
+    const moves = moveNumber ?? ((game.moves || 1) + 1);
     if (moves >= context.seer_turn) {
         context.seer_turn = moves + rn2(31) + 15;
     }

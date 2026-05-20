@@ -879,8 +879,16 @@ function level_difficulty() {
 
 let _nextObjId = 1;
 
-// C ref: mkobj.c next_ident — rnd(2) for item identification
-export function next_ident() { rnd(2); }
+// C ref: mkobj.c:next_ident().  Object and monster ids share the same
+// incrementing counter; the caller receives the old value, then rnd(2)
+// advances the next id by one or two.
+export function next_ident() {
+    if (!game.context) game.context = {};
+    const res = game.context.ident ?? 2;
+    game.context.ident = res + rnd(2);
+    if (!game.context.ident) game.context.ident = rnd(2) + 1;
+    return res;
+}
 
 function bless(otmp) {
     if (otmp) {
@@ -1123,7 +1131,7 @@ export function mksobj(otyp, init, artif) {
         spe: 0,
         corpsenm: null,
     };
-    next_ident();
+    otmp.o_id = next_ident();
     if (init) {
         mksobj_init(otmp, otyp, artif);
     }
@@ -1424,12 +1432,13 @@ function mkgold(amount, x, y) {
         return;
     }
     // mksobj_at(GOLD_PIECE) calls next_ident
-    next_ident();
+    const o_id = next_ident();
     if (game.level?.objects) {
         const gold = {
             otyp: GOLD_PIECE,
             oclass: COIN_CLASS,
             ox: x, oy: y,
+            o_id,
             quan: amount,
             ch: '$',
         };
@@ -2950,7 +2959,7 @@ export function makemon(mdat, x, y, mmflags = 0) {
             if (!ptr) return null;
         } while (++tryct <= 50 && !goodpos(x, y, gpflags, ptr));
     }
-    next_ident();
+    const m_id = next_ident();
     const monState = newmonhp_state_for(ptr);
     const female = init_mon_gender_for(ptr);
     const peaceful = (mmflags & MM_ANGRY) ? false : peace_minded_for(ptr);
@@ -2961,6 +2970,7 @@ export function makemon(mdat, x, y, mmflags = 0) {
     };
     const mon = {
         mx: x, my: y,
+        m_id,
         // C ref: makemon.c:makemon().  `zeromonst` clears mux/muy to 0;
         // set_apparxy() must not treat a new monster as already knowing
         // the current hero square.
@@ -11059,6 +11069,86 @@ async function make_niches() {
 
 const SHOP_TYPE_PROBS = [42, 14, 10, 10, 5, 5, 3, 3, 3, 2];
 const SHKTOOLS_NAME_COUNT = 40;
+const SHOP_TYPE_NAMES = [
+    'general store',
+    'used armor dealership',
+    'second-hand bookstore',
+    'liquor emporium',
+    'antique weapons outlet',
+    'delicatessen',
+    'jewelers',
+    'quality apparel and accessories',
+    'hardware store',
+    'rare books',
+    'health food store',
+    'lighting store',
+];
+const SHOPKEEPER_NAMES = [
+    null,
+    [
+        'Demirci', 'Kalecik', 'Boyabai', 'Yildizeli', 'Gaziantep',
+        'Siirt', 'Akhalataki', 'Tirebolu', 'Aksaray', 'Ermenak',
+        'Iskenderun', 'Kadirli', 'Siverek', 'Pervari', 'Malasgirt',
+        'Bayburt', 'Ayancik', 'Zonguldak', 'Balya', 'Tefenni',
+        'Artvin', 'Kars', 'Makharadze', 'Malazgirt', 'Midyat',
+        'Birecik', 'Kirikkale', 'Alaca', 'Polatli', 'Nallihan',
+    ],
+];
+
+export function shopTypeName(shoptype) {
+    return SHOP_TYPE_NAMES[(shoptype ?? 0) - SHOPBASE] || 'shop';
+}
+
+function fixedDatetimeEpochSeconds() {
+    const t = game._lt;
+    if (!t) return 0;
+    const y = t.year;
+    const offsetHours = isNewYorkDst(t) ? -4 : -5;
+    return Math.trunc(Date.UTC(y, t.month - 1, t.day, t.hour - offsetHours, t.minute, t.second) / 1000);
+}
+
+function isNewYorkDst(t) {
+    const y = t.year;
+    if (y >= 2007) {
+        if (t.month > 3 && t.month < 11) return true;
+        if (t.month === 3 && t.day >= nthWeekdayOfMonth(y, 3, 0, 2)) return true;
+        if (t.month === 11 && t.day < nthWeekdayOfMonth(y, 11, 0, 1)) return true;
+        return false;
+    }
+    if (t.month > 4 && t.month < 10) return true;
+    if (t.month === 4 && t.day >= nthWeekdayOfMonth(y, 4, 0, 1)) return true;
+    if (t.month === 10 && t.day < lastWeekdayOfMonth(y, 10, 0)) return true;
+    return false;
+}
+
+function nthWeekdayOfMonth(year, month, weekday, nth) {
+    const first = new Date(Date.UTC(year, month - 1, 1)).getUTCDay();
+    return 1 + ((weekday - first + 7) % 7) + (nth - 1) * 7;
+}
+
+function lastWeekdayOfMonth(year, month, weekday) {
+    const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    const last = new Date(Date.UTC(year, month - 1, lastDay)).getUTCDay();
+    return lastDay - ((last - weekday + 7) % 7);
+}
+
+function ledger_no(uz = game.u?.uz) {
+    const dungeon = game.dungeons?.[uz?.dnum ?? 0];
+    return (uz?.dlevel ?? 1) + (dungeon?.ledger_start ?? 0);
+}
+
+function shopkeeperName(shopIndex, shk) {
+    const names = SHOPKEEPER_NAMES[shopIndex];
+    if (!names?.length) return '';
+    // C ref: shknam.c:nameshk().  Non-tool shop names are deterministic from
+    // m_id, ledger_no(), and ubirthday; only tool shops randomize here.
+    const nseed = Math.trunc(fixedDatetimeEpochSeconds() / 257);
+    let wanted = (shk?.m_id ?? 0) + ledger_no() + (nseed % 13) - (nseed % 5);
+    if (wanted < 0) wanted += 18;
+    shk.female = !!(wanted & 1);
+    wanted %= names.length;
+    return names[wanted];
+}
 const SHOP_ITEM_PROBS = [
     [{ iprob: 100, itype: RANDOM_CLASS }],
     [{ iprob: 90, itype: ARMOR_CLASS }, { iprob: 10, itype: WEAPON_CLASS }],
@@ -11194,6 +11284,7 @@ function shkinit(shopIndex, sroom) {
             shoproom: roomIndex >= 0 ? roomIndex + ROOMOFFSET : 0,
             shoptype: sroom.rtype,
             shoplevel: { ...(game.u?.uz || { dnum: 0, dlevel: 1 }) },
+            shknam: shopkeeperName(shopIndex, shk),
             shd: door ? { x: door.x, y: door.y } : { x: pos.x, y: pos.y },
             shk: { x: pos.x, y: pos.y },
             robbed: 0,
@@ -11208,7 +11299,7 @@ function shkinit(shopIndex, sroom) {
         };
     }
     rnd(100); // C ref: shknam.c:mkmonmoney() initial capital amount.
-    next_ident();
+    next_ident(); // C ref: mkobj.c:mksobj(GOLD_PIECE) for shopkeeper capital.
     if (shopIndex === 6) mksobj(TOUCHSTONE, true, false);
     if (shopIndex === 7 || shopIndex === 8 || (shopIndex === 6 && rn2(2))
         || (shopIndex === 0 && rn2(5))) {
@@ -11281,6 +11372,22 @@ function stock_room(croom) {
     const shopIndex = croom.rtype - SHOPBASE;
     const sh = shkinit(shopIndex, croom);
     if (sh < 0) return;
+    const door = croom.doorct ? game.level.doors?.[sh] : null;
+    if (door) {
+        const loc = game.level.at(door.x, door.y);
+        if (loc?.doormask === D_NODOOR) {
+            // C ref: shknam.c:stock_room().  Shop doorways without doors are
+            // promoted to open doors before the room is stocked.
+            set_door_mask(loc, D_ISOPEN);
+        }
+        if (loc?.typ === SDOOR) {
+            loc.typ = DOOR;
+            if (!(loc.doormask & (D_ISOPEN | D_CLOSED | D_LOCKED))) {
+                set_door_mask(loc, D_CLOSED);
+            }
+        }
+        if (loc?.doormask & D_TRAPPED) set_door_mask(loc, D_LOCKED);
+    }
     let stockcount = 0;
     for (let sx = croom.lx; sx <= croom.hx; sx++)
         for (let sy = croom.ly; sy <= croom.hy; sy++)

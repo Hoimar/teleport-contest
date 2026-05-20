@@ -22,6 +22,8 @@ import { cansee, clear_path, couldsee } from './vision.js';
 const FOOD_CLASS = 7;
 const WEAPON_CLASS = 2;
 const ROCK_CLASS = 14;
+const BALL_CLASS = 15;
+const CHAIN_CLASS = 16;
 const ORCISH_DAGGER = 36;
 const JAVELIN = 32;
 const QUARTERSTAFF = 79;
@@ -30,7 +32,21 @@ const FOOD_RATION = 293;
 const BOULDER = 475;
 const CORPSE = 265;
 const EGG = 266;
+const PLATE_MAIL = 121;
+const CRYSTAL_PLATE_MAIL = 122;
+const BRONZE_PLATE_MAIL = 123;
+const SPLINT_MAIL = 124;
+const BANDED_MAIL = 125;
+const DWARVISH_MITHRIL_COAT = 126;
+const ELVEN_MITHRIL_COAT = 127;
 const CHAIN_MAIL = 128;
+const ORCISH_CHAIN_MAIL = 129;
+const SCALE_MAIL = 130;
+const STUDDED_LEATHER_ARMOR = 131;
+const RING_MAIL = 132;
+const ORCISH_RING_MAIL = 133;
+const LEATHER_ARMOR = 134;
+const LEATHER_JACKET = 135;
 const MEATBALL = 267;
 const MEAT_STICK = 268;
 const ENORMOUS_MEATBALL = 269;
@@ -55,10 +71,24 @@ const M2_STRONG = 0x04000000;
 const OBJECT_WEIGHT_OVERRIDES = new Map([
     [LARGE_BOX, 350],
     [CHEST, 600],
-    // C refs: objects.h ARMOR("chain mail"), mon.c:can_carry().
+    // C refs: objects.h ARMOR(...), mon.c:can_carry().
     // Generated armor objects can lack owt in the JS state; pets must still
-    // reject heavy mail.
+    // use their table weights before dog_invent() rolls for pickup.
+    [PLATE_MAIL, 450],
+    [CRYSTAL_PLATE_MAIL, 415],
+    [BRONZE_PLATE_MAIL, 450],
+    [SPLINT_MAIL, 400],
+    [BANDED_MAIL, 350],
+    [DWARVISH_MITHRIL_COAT, 150],
+    [ELVEN_MITHRIL_COAT, 150],
     [CHAIN_MAIL, 300],
+    [ORCISH_CHAIN_MAIL, 300],
+    [SCALE_MAIL, 250],
+    [STUDDED_LEATHER_ARMOR, 200],
+    [RING_MAIL, 250],
+    [ORCISH_RING_MAIL, 250],
+    [LEATHER_ARMOR, 150],
+    [LEATHER_JACKET, 30],
     [EXPENSIVE_CAMERA, 200],
     [MIRROR, 10],
     [STETHOSCOPE, 75],
@@ -355,6 +385,13 @@ function dogfood(mtmp, obj) {
     return obj.cursed ? UNDEF : APPORT;
 }
 
+function dog_nofetch(obj) {
+    const oclass = object_class(obj?.otyp);
+    // C ref: src/dogmove.c:nofetch.  dog_invent() skips these classes
+    // before calling dogfood(); dog_goal() still scans them normally.
+    return oclass === BALL_CLASS || oclass === CHAIN_CLASS || oclass === ROCK_CLASS;
+}
+
 function could_reach_item(mtmp, x, y) {
     const loc = game.level?.at(x, y);
     if (!loc) return false;
@@ -630,6 +667,7 @@ async function dog_invent(mtmp, udist) {
     const omy = mtmp.my;
     const obj = game.level.objects.find((item) => item.ox === omx && item.oy === omy);
     if (!obj || typeof obj.otyp !== 'number') return 0;
+    if (dog_nofetch(obj)) return 0;
 
     dogfood(mtmp, obj);
     const carryamt = can_carry(mtmp, obj);
@@ -932,7 +970,9 @@ function pet_goal(mtmp, after, udist, whappr) {
         return { abort: false, gx: goalX, gy: goalY, appr: 1 };
     }
 
-    if (after && udist <= 4) return { abort: true, gx, gy, appr };
+    if (after && udist <= 4) {
+        return { abort: true, gx, gy, appr };
+    }
     if (udist > 1 && (!loc || !IS_ROOM(loc.typ) || !rn2(4) || whappr
         || (dogHasMinvent && rn2(edog.apport)))) appr = 1;
     if (appr === 0) {

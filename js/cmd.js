@@ -15,13 +15,16 @@ import {
     object_glyph_for_menu,
 } from './display.js';
 import { cansee, couldsee, vision_recalc, vision_reset } from './vision.js';
-import { makemon, mklev, mkobj, mkcorpstat, mksobj, monster_by_user_name, monsterPtr, next_ident, place_lregion, place_object, u_on_dnstairs, u_on_upstairs } from './mklev.js';
+import {
+    makemon, mklev, mkobj, mkcorpstat, mksobj, monster_by_user_name, monsterPtr,
+    next_ident, place_lregion, place_object, shopTypeName, u_on_dnstairs, u_on_upstairs,
+} from './mklev.js';
 import { OBJECT_CHARGED, OBJECT_CLASS, OBJECT_DELAY, OBJECT_MATERIAL } from './object_data.js';
 import { finish_pet_kill, obj_resists, pet_arrive_with_you } from './dog.js';
 import { merge_inventory_object, newuexp, pluslvl } from './u_init.js';
 import { adjalign, exercise, gethungry } from './allmain_turns.js';
 import { initrack } from './track.js';
-import { roleGod } from './roles.js';
+import { roleGod, roleGreeting } from './roles.js';
 import { d, rn1, rn2, rnd, rnl, rnz } from './rng.js';
 import { dist2 } from './hacklib.js';
 import { getObjectDescription } from './o_init.js';
@@ -71,6 +74,15 @@ const M1_CONCEAL = 0x00000080;
 const M1_HIDE = 0x00000100;
 const M2_STALK = 0x01000000;
 const CLOAK_OF_DISPLACEMENT = 149;
+const SMALL_SHIELD = 150;
+const SHIELD_OF_DRAIN_RESISTANCE = 151;
+const SHIELD_OF_SHOCK_RESISTANCE = 152;
+const ELVEN_SHIELD = 153;
+const URUK_HAI_SHIELD = 154;
+const ORCISH_SHIELD = 155;
+const LARGE_SHIELD = 156;
+const DWARVISH_ROUNDSHIELD = 157;
+const SHIELD_OF_REFLECTION = 158;
 const SPEED_BOOTS = 166;
 const LEVITATION_BOOTS = 172;
 const RIN_TELEPORT_CONTROL = 195;
@@ -121,6 +133,8 @@ const SPBOOK_CLASS = 10;
 const WAND_CLASS = 11;
 const COIN_CLASS = 12;
 const GEM_CLASS = 13;
+const BALL_CLASS = 15;
+const CHAIN_CLASS = 16;
 const FIRST_SPELL = 366;
 const LAST_SPELL = 407;
 const SPE_NOVEL = 408;
@@ -227,6 +241,95 @@ const OBJECT_BASE_NAMES = new Map([
     [277, 'apple'],
     [BOULDER, 'boulder'],
     [461, 'white gem'],
+]);
+
+const ARMOR_XNAMES = new Map([
+    // C ref: include/objects.h armor entries plus objnam.c:xname_flags().
+    // nameKnown mirrors the object table's `kn` flag.
+    [89, { name: 'elven leather helm', desc: 'leather hat', nameKnown: false, cost: 8 }],
+    [90, { name: 'orcish helm', desc: 'iron skull cap', nameKnown: false, cost: 10 }],
+    [91, { name: 'dwarvish iron helm', desc: 'hard hat', nameKnown: false, cost: 20 }],
+    [92, { name: 'fedora', nameKnown: true, cost: 1 }],
+    [93, { name: 'cornuthaum', desc: 'conical hat', nameKnown: false, cost: 80 }],
+    [94, { name: 'dunce cap', desc: 'conical hat', nameKnown: false, cost: 1 }],
+    [95, { name: 'dented pot', nameKnown: true, cost: 8 }],
+    [96, { name: 'helm of brilliance', desc: 'crystal helmet', nameKnown: false, cost: 50 }],
+    [97, { name: 'helmet', desc: 'plumed helmet', nameKnown: false, cost: 10 }],
+    [98, { name: 'helm of caution', desc: 'etched helmet', nameKnown: false, cost: 50 }],
+    [99, { name: 'helm of opposite alignment', desc: 'crested helmet', nameKnown: false, cost: 50 }],
+    [100, { name: 'helm of telepathy', desc: 'visored helmet', nameKnown: false, cost: 50 }],
+    [101, { name: 'gray dragon scale mail', nameKnown: true, cost: 1200 }],
+    [102, { name: 'gold dragon scale mail', nameKnown: true, cost: 900 }],
+    [103, { name: 'silver dragon scale mail', nameKnown: true, cost: 1200 }],
+    [104, { name: 'red dragon scale mail', nameKnown: true, cost: 900 }],
+    [105, { name: 'white dragon scale mail', nameKnown: true, cost: 900 }],
+    [106, { name: 'orange dragon scale mail', nameKnown: true, cost: 900 }],
+    [107, { name: 'black dragon scale mail', nameKnown: true, cost: 1200 }],
+    [108, { name: 'blue dragon scale mail', nameKnown: true, cost: 900 }],
+    [109, { name: 'green dragon scale mail', nameKnown: true, cost: 900 }],
+    [110, { name: 'yellow dragon scale mail', nameKnown: true, cost: 900 }],
+    [111, { name: 'gray dragon scales', nameKnown: true, cost: 700, scales: true }],
+    [112, { name: 'gold dragon scales', nameKnown: true, cost: 500, scales: true }],
+    [113, { name: 'silver dragon scales', nameKnown: true, cost: 700, scales: true }],
+    [114, { name: 'red dragon scales', nameKnown: true, cost: 500, scales: true }],
+    [115, { name: 'white dragon scales', nameKnown: true, cost: 500, scales: true }],
+    [116, { name: 'orange dragon scales', nameKnown: true, cost: 500, scales: true }],
+    [117, { name: 'black dragon scales', nameKnown: true, cost: 700, scales: true }],
+    [118, { name: 'blue dragon scales', nameKnown: true, cost: 500, scales: true }],
+    [119, { name: 'green dragon scales', nameKnown: true, cost: 500, scales: true }],
+    [120, { name: 'yellow dragon scales', nameKnown: true, cost: 500, scales: true }],
+    [121, { name: 'plate mail', nameKnown: true, cost: 600 }],
+    [122, { name: 'crystal plate mail', nameKnown: true, cost: 820 }],
+    [123, { name: 'bronze plate mail', nameKnown: true, cost: 400 }],
+    [124, { name: 'splint mail', nameKnown: true, cost: 80 }],
+    [125, { name: 'banded mail', nameKnown: true, cost: 90 }],
+    [126, { name: 'dwarvish mithril-coat', nameKnown: true, cost: 240 }],
+    [127, { name: 'elven mithril-coat', nameKnown: true, cost: 240 }],
+    [128, { name: 'chain mail', nameKnown: true, cost: 75 }],
+    [129, { name: 'orcish chain mail', desc: 'crude chain mail', nameKnown: false, cost: 75 }],
+    [130, { name: 'scale mail', nameKnown: true, cost: 45 }],
+    [131, { name: 'studded leather armor', nameKnown: true, cost: 15 }],
+    [132, { name: 'ring mail', nameKnown: true, cost: 100 }],
+    [133, { name: 'orcish ring mail', desc: 'crude ring mail', nameKnown: false, cost: 80 }],
+    [134, { name: 'leather armor', nameKnown: true, cost: 5 }],
+    [135, { name: 'leather jacket', nameKnown: true, cost: 10 }],
+    [136, { name: 'Hawaiian shirt', nameKnown: true, cost: 3 }],
+    [137, { name: 'T-shirt', nameKnown: true, cost: 2 }],
+    [138, { name: 'mummy wrapping', nameKnown: true, cost: 2 }],
+    [139, { name: 'elven cloak', desc: 'faded pall', nameKnown: false, cost: 60 }],
+    [140, { name: 'orcish cloak', desc: 'coarse mantelet', nameKnown: false, cost: 40 }],
+    [141, { name: 'dwarvish cloak', desc: 'hooded cloak', nameKnown: false, cost: 50 }],
+    [142, { name: 'oilskin cloak', desc: 'slippery cloak', nameKnown: false, cost: 50 }],
+    [143, { name: 'robe', nameKnown: true, cost: 50 }],
+    [144, { name: 'alchemy smock', desc: 'apron', nameKnown: false, cost: 50 }],
+    [145, { name: 'leather cloak', nameKnown: true, cost: 40 }],
+    [146, { name: 'cloak of protection', desc: 'tattered cape', nameKnown: false, cost: 50 }],
+    [147, { name: 'cloak of invisibility', desc: 'opera cloak', nameKnown: false, cost: 60 }],
+    [148, { name: 'cloak of magic resistance', desc: 'ornamental cope', nameKnown: false, cost: 60 }],
+    [149, { name: 'cloak of displacement', desc: 'piece of cloth', nameKnown: false, cost: 50 }],
+    [150, { name: 'small shield', desc: 'wooden shield', nameKnown: false, cost: 3 }],
+    [151, { name: 'shield of drain resistance', desc: 'wooden shield', nameKnown: false, cost: 50 }],
+    [152, { name: 'shield of shock resistance', desc: 'wooden shield', nameKnown: false, cost: 50 }],
+    [153, { name: 'elven shield', desc: 'blue and green shield', nameKnown: false, cost: 7 }],
+    [154, { name: 'Uruk-hai shield', desc: 'white-handed shield', nameKnown: false, cost: 7 }],
+    [155, { name: 'orcish shield', desc: 'red-eyed shield', nameKnown: false, cost: 7 }],
+    [156, { name: 'large shield', nameKnown: true, cost: 10 }],
+    [157, { name: 'dwarvish roundshield', desc: 'large round shield', nameKnown: false, cost: 10 }],
+    [158, { name: 'shield of reflection', desc: 'polished silver shield', nameKnown: false, cost: 50 }],
+    [159, { name: 'leather gloves', desc: 'old gloves', nameKnown: false, cost: 8 }],
+    [160, { name: 'gauntlets of fumbling', desc: 'padded gloves', nameKnown: false, cost: 50 }],
+    [161, { name: 'gauntlets of power', desc: 'riding gloves', nameKnown: false, cost: 50 }],
+    [162, { name: 'gauntlets of dexterity', desc: 'fencing gloves', nameKnown: false, cost: 50 }],
+    [163, { name: 'low boots', desc: 'walking shoes', nameKnown: false, cost: 8 }],
+    [164, { name: 'iron shoes', desc: 'hard shoes', nameKnown: false, cost: 16 }],
+    [165, { name: 'high boots', desc: 'jackboots', nameKnown: false, cost: 12 }],
+    [166, { name: 'speed boots', desc: 'combat boots', nameKnown: false, cost: 50 }],
+    [167, { name: 'water walking boots', desc: 'jungle boots', nameKnown: false, cost: 50 }],
+    [168, { name: 'jumping boots', desc: 'hiking boots', nameKnown: false, cost: 50 }],
+    [169, { name: 'elven boots', desc: 'mud boots', nameKnown: false, cost: 8 }],
+    [170, { name: 'kicking boots', desc: 'buckled boots', nameKnown: false, cost: 8 }],
+    [171, { name: 'fumble boots', desc: 'riding boots', nameKnown: false, cost: 30 }],
+    [172, { name: 'levitation boots', desc: 'snow boots', nameKnown: false, cost: 30 }],
 ]);
 
 const ARMOR_MAGIC_CANCELLATION = new Map([
@@ -994,12 +1097,39 @@ function knownObjectType(otyp) {
         && game.discoveredObjects.has(otyp);
 }
 
+function objectTypeNameKnown(obj) {
+    if (!obj) return false;
+    if (obj.oclass === ARMOR_CLASS) {
+        // C refs: obj.h fields, do_wear.c:Shield_on().  Armor `known`
+        // exposes enchantment/AC, not magical armor type identity.
+        return !!(obj.knownName || knownObjectType(obj.otyp) || ARMOR_XNAMES.get(obj.otyp)?.nameKnown);
+    }
+    if (obj.known || obj.knownName || knownObjectType(obj.otyp)) return true;
+    return false;
+}
+
+function armorObjectName(obj) {
+    const def = ARMOR_XNAMES.get(obj?.otyp);
+    if (!def) return '';
+    if (def.scales) return `set of ${def.name}`;
+    if (!obj.dknown) {
+        if (obj.otyp >= 153 && obj.otyp <= 155) return 'shield';
+        if (obj.otyp === 158) return 'smooth shield';
+    }
+    if (objectTypeNameKnown(obj)) return def.name;
+    return getObjectDescription(obj.otyp) || def.desc || def.name;
+}
+
 function baseObjectName(obj) {
     if (obj?.otyp === CORPSE) {
         return `${corpseMonsterDisplayName(obj)} corpse`;
     }
     if (obj?.otyp === STATUE) {
         return statueObjectName(obj);
+    }
+    if (obj?.oclass === ARMOR_CLASS) {
+        const armorName = armorObjectName(obj);
+        if (armorName) return armorName;
     }
     if ((obj?.knownName || knownObjectType(obj?.otyp)) && OBJECT_BASE_NAMES.has(obj.otyp)) return OBJECT_BASE_NAMES.get(obj.otyp);
     const appearanceName = unknownAppearanceName(obj);
@@ -1042,6 +1172,24 @@ function toplineWouldOverflowWithPrevious(line) {
     // C ref: win/tty/topl.c:update_topl().  A new topline can be packed
     // after the previous one only if there remains room for a later --More--.
     return line.length + prev.length + 3 >= cols - 8;
+}
+
+async function plineWithMorePrompt(msg) {
+    const cols = game.nhDisplay?.cols || COLNO;
+    if (msg.length > cols) {
+        let split = msg.lastIndexOf(' ', cols);
+        if (split <= 0) split = cols;
+        await pline(msg.slice(0, split));
+        game._message_continuation_row = msg.slice(split).trimStart();
+        game._more_next_message_row = true;
+    } else {
+        await pline(msg);
+        if (msg.length + LEVELCHANGE_MORE_LEN > cols) {
+            game._message_continuation_row = '';
+            game._more_next_message_row = true;
+        }
+    }
+    queue_more_prompt();
 }
 
 function shouldShowBuc(obj) {
@@ -1096,6 +1244,91 @@ function chargeSuffix(obj, opts = {}) {
     return ` (0:${obj.spe})`;
 }
 
+function floorObjectBaseCost(obj) {
+    if (obj?.oclass === ARMOR_CLASS) return ARMOR_XNAMES.get(obj.otyp)?.cost ?? null;
+    return null;
+}
+
+function shopPriceCurrency(price) {
+    return `zorkmid${price === 1 ? '' : 's'}`;
+}
+
+function shopUnitCost(obj, shkp) {
+    let tmp = floorObjectBaseCost(obj);
+    if (tmp == null) return null;
+    if (!tmp) tmp = 5;
+    let multiplier = 1;
+    let divisor = 1;
+
+    // C ref: shk.c:get_cost()/oid_price_adjustment().
+    if ((!obj.dknown || !objectTypeNameKnown(obj))
+        && (obj?.o_id ?? 0) % 4 === 0) {
+        multiplier *= 4;
+        divisor *= 3;
+    }
+
+    const cha = game.u?.acurr?.a?.[C.A_CHA] ?? 10;
+    if (cha > 18) {
+        divisor *= 2;
+    } else if (cha === 18) {
+        multiplier *= 2;
+        divisor *= 3;
+    } else if (cha >= 16) {
+        multiplier *= 3;
+        divisor *= 4;
+    } else if (cha <= 5) {
+        multiplier *= 2;
+    } else if (cha <= 7) {
+        multiplier *= 3;
+        divisor *= 2;
+    } else if (cha <= 10) {
+        multiplier *= 4;
+        divisor *= 3;
+    }
+
+    tmp *= multiplier;
+    if (divisor > 1) {
+        tmp = Math.trunc(tmp * 10 / divisor);
+        tmp = Math.trunc((tmp + 5) / 10);
+    }
+    if (tmp <= 0) tmp = 1;
+    if (shkp?.mextra?.eshk?.surcharge) tmp += Math.trunc((tmp + 2) / 3);
+    return tmp;
+}
+
+function floorShopPriceQuote(obj) {
+    if (!obj || obj.oclass === COIN_CLASS || obj.oclass === BALL_CLASS || obj.oclass === CHAIN_CLASS) return null;
+    const shops = Array.isArray(game.u?.ushops) ? game.u.ushops : [];
+    if (!shops.length) return null;
+    const objRooms = inRoomsAt(obj.ox, obj.oy).filter(isShopRoomNo);
+    const roomno = objRooms.find((shopRoom) => shops.includes(shopRoom));
+    if (!roomno) return null;
+    const shkp = shopKeeperForRoom(roomno);
+    const eshk = shkp?.mextra?.eshk;
+    if (!shkp || !eshk) return null;
+    const freeSpot = obj.ox === eshk.shk?.x && obj.oy === eshk.shk?.y;
+    if (obj.no_charge || freeSpot) return { noCharge: true };
+    const unitCost = shopUnitCost(obj, shkp);
+    if (unitCost == null) return null;
+    const price = (obj.quan || 1) * unitCost;
+    return price > 0 ? { price, roomno, shkp } : null;
+}
+
+function shopPriceSuffix(obj, opts = {}) {
+    if (!opts.includePrice) return '';
+    const quote = floorShopPriceQuote(obj);
+    if (!quote) return '';
+    if (quote.noCharge) return ' (no charge)';
+    return ` (for sale, ${quote.price} ${shopPriceCurrency(quote.price)})`;
+}
+
+function unpaidSuffix(obj) {
+    if (!obj?.unpaid) return '';
+    const price = obj.unpaidPrice || obj.shopPrice || 0;
+    if (!price) return ' (unpaid)';
+    return ` (unpaid, ${price} ${shopPriceCurrency(price)})`;
+}
+
 function wornSuffix(obj) {
     if (obj?.wornSide) return ` (on ${obj.wornSide} hand)`;
     if (obj?.wielded || ((obj?.owornmask || 0) & C.W_WEP)) {
@@ -1106,8 +1339,15 @@ function wornSuffix(obj) {
     return '';
 }
 
+function observeObjectForNaming(obj, opts = {}) {
+    if (!opts.observe || !obj) return;
+    if (game.u?.ublind || game.u?.blind || game.u?.uprops?.blinded) return;
+    obj.dknown = true;
+}
+
 function inventoryObjectName(obj, opts = {}) {
     if (obj?.menuName) return obj.menuName;
+    observeObjectForNaming(obj, opts);
     const quan = obj?.quan || 1;
     if (obj?.otyp === GOLD_PIECE) return `${quan} gold ${quan === 1 ? 'piece' : 'pieces'}`;
     const rawBase = baseObjectName(obj);
@@ -1118,7 +1358,7 @@ function inventoryObjectName(obj, opts = {}) {
     const oname = C.ONAME(obj);
     const namedBase = oname ? `${base} named ${oname}` : base;
     const parts = [bucPrefix(obj), enchantmentPrefix(obj), namedBase].filter(Boolean);
-    const body = parts.join(' ') + chargeSuffix(obj, opts);
+    const body = parts.join(' ') + chargeSuffix(obj, opts) + unpaidSuffix(obj) + shopPriceSuffix(obj, opts);
     const worn = opts.includeWorn ? wornSuffix(obj) : '';
     if (quan > 1) return `${quan} ${body}${worn}`;
     return `${indefiniteArticle(body)} ${body}${worn}`;
@@ -1279,7 +1519,17 @@ function armor_base_bonus(obj) {
     case CLOAK_OF_DISPLACEMENT:
     case LEATHER_GLOVES:
     case GAUNTLETS_OF_POWER:
+    case SMALL_SHIELD:
+    case SHIELD_OF_DRAIN_RESISTANCE:
+    case SHIELD_OF_SHOCK_RESISTANCE:
+    case URUK_HAI_SHIELD:
+    case ORCISH_SHIELD:
         return 1;
+    case ELVEN_SHIELD:
+    case LARGE_SHIELD:
+    case DWARVISH_ROUNDSHIELD:
+    case SHIELD_OF_REFLECTION:
+        return 2;
     default:
         if (obj?.otyp >= SPEED_BOOTS && obj.otyp <= LEVITATION_BOOTS) return 1;
         return 0;
@@ -1310,6 +1560,13 @@ function armor_finish_message(obj) {
     return `You finish your dressing maneuver.  You feel yourself speed up${alreadyFast ? ' a bit more' : ''}.`;
 }
 
+function wornArmorMessageName(name) {
+    if (/\b(?:boots|gloves)$/.test(name) || name.startsWith('gauntlets of ')) {
+        return `a pair of ${name}`;
+    }
+    return `${indefiniteArticle(name)} ${name}`;
+}
+
 function takeoff_worn_cloak() {
     const cloak = (game.inventory || []).find((obj) => obj?.otyp === CLOAK_OF_MAGIC_RESISTANCE && obj.worn);
     if (cloak) {
@@ -1332,6 +1589,7 @@ async function start_wearing_object(obj) {
         return;
     }
 
+    const armorWearName = obj.oclass === ARMOR_CLASS ? baseObjectName(obj) : '';
     obj.worn = true;
     if (obj.otyp === CLOAK_OF_DISPLACEMENT) {
         // C ref: do_wear.c:Cloak_on()/toggle_displacement().  The property
@@ -1360,8 +1618,10 @@ async function start_wearing_object(obj) {
         if (obj.oclass === ARMOR_CLASS) {
             obj.known = true;
             game.u.uac = calculated_armor_class();
+            await pline(`You are now wearing ${wornArmorMessageName(armorWearName)}.`);
+        } else {
+            await pline(`${inventoryListing(obj)} (being worn).`);
         }
-        await pline(`${inventoryListing(obj)} (being worn).`);
     }
     game.context.move = 1;
 }
@@ -1389,8 +1649,23 @@ async function lookHereAfterMove() {
         .filter(o => o.ox === u.ux && o.oy === u.uy);
     if (!objects.length) return;
     if (objects.length === 1) {
-        const line = `You see here ${inventoryObjectName(objects[0])}.`;
+        const line = `You see here ${inventoryObjectName(objects[0], { includePrice: true, observe: true })}.`;
         const overflow = toplineWouldOverflowWithPrevious(line);
+        if (game._more && game._run_sound_more_defer_floor_look) {
+            // C refs: sounds.c:dosounds(), topl.c:more().  During a run, a
+            // blocking ambient sound can remain the captured topline while the
+            // run advances far enough to discover a floor object.  Defer that
+            // floor-look line until the sound More is dismissed instead of
+            // overwriting the visible sound frame.
+            const cols = game.nhDisplay?.cols || COLNO;
+            game._deferred_run_floor_look = { line, overflow: line.length >= cols - 8 };
+            if (game._run_sound_more_screen) {
+                game._latched_more_screen = game._run_sound_more_screen;
+                game._latched_more_cursor = game._run_sound_more_cursor || null;
+                game._latched_more_keep_until_dismiss = true;
+            }
+            return;
+        }
         await pline(line);
         if (overflow) {
             game._floor_list_pauses_turn = true;
@@ -1399,7 +1674,7 @@ async function lookHereAfterMove() {
         return;
     }
     game._pending_message = `${' '.repeat(41)}Things that are here:`;
-    game._floor_list_lines = objects.map(obj => inventoryObjectName(obj));
+    game._floor_list_lines = objects.map(obj => inventoryObjectName(obj, { includePrice: true, observe: true }));
     game._floor_list_col = 41;
     game._prompt_cursor = [49, Math.min(21, objects.length + 1)];
     game._floor_list_pauses_turn = true;
@@ -1479,6 +1754,212 @@ function pickupInventoryObject(obj) {
     return carried;
 }
 
+function shopPickupHonorific() {
+    // C ref: shk.c:append_honorific().  Non-demigod heroes pick among the
+    // first four honorifics using ordinary game RNG.
+    const honored = ['good', 'honored', 'most gracious', 'esteemed'];
+    let title = honored[rn2(honored.length)];
+    const raceName = String(game.urace?.name || game.urace?.adj || game._nhopts?.race || 'human').toLowerCase();
+    if (raceName === 'elf' || raceName === 'elven') title += game.flags?.female ? ' hiril' : ' hir';
+    else if (raceName !== 'human') title += ' creature';
+    else title += game.flags?.female ? ' lady' : ' sir';
+    return title;
+}
+
+function markShopItemUnpaid(obj, quote) {
+    if (!obj || !quote?.price) return;
+    obj.unpaid = true;
+    obj.unpaidPrice = quote.price;
+    obj.shopPrice = quote.price;
+    obj.shopRoom = quote.roomno;
+    const eshk = quote.shkp?.mextra?.eshk;
+    if (eshk && !obj._bill_recorded) {
+        eshk.billct = (eshk.billct || 0) + 1;
+        obj._bill_recorded = true;
+    }
+}
+
+function shopPickupQuoteMessage(obj, quote) {
+    const shkp = quote?.shkp;
+    const eshk = shkp?.mextra?.eshk;
+    let intro = '"For you,';
+    if (!shkp?.mpeaceful) {
+        intro += ' scum;';
+    } else if (!eshk?.surcharge) {
+        intro += ` ${shopPickupHonorific()}; only`;
+    }
+    const name = baseObjectName(obj);
+    return `${intro} ${quote.price} ${shopPriceCurrency(quote.price)} for this ${name}."`;
+}
+
+function shopPickupQuote(obj) {
+    observeObjectForNaming(obj, { observe: true });
+    const quote = floorShopPriceQuote(obj);
+    if (!quote?.price) return null;
+    markShopItemUnpaid(obj, quote);
+    return quote;
+}
+
+function payMenuObjectName(obj) {
+    const copy = { ...obj, unpaid: false, unpaidPrice: 0, shopPrice: 0 };
+    return inventoryObjectName(copy, { includeCharges: false });
+}
+
+function payMenuEntriesForShopkeeper(shkp) {
+    const roomno = shkp?.mextra?.eshk?.shoproom;
+    return (game.inventory || [])
+        .filter((obj) => obj?.unpaid && (!roomno || obj.shopRoom === roomno))
+        .map((obj, idx) => ({
+            selector: MENU_SELECTOR_CHARS[idx] || '?',
+            obj,
+            selected: false,
+            price: obj.unpaidPrice || obj.shopPrice || 0,
+        }));
+}
+
+function renderPayMenu(menu) {
+    const display = game.nhDisplay;
+    if (!display?.putstr) return false;
+    const menuCol = 41;
+    const lines = [
+        { text: 'Pay for which items?', heading: true },
+        { text: '', heading: false },
+        ...menu.entries.map((entry) => ({
+            text: `${entry.selector} ${entry.selected ? '+' : '-'} ${entry.price} Zm, ${payMenuObjectName(entry.obj)}`,
+            heading: false,
+        })),
+        { text: '(end)', heading: false },
+    ];
+    for (let row = 0; row < lines.length; row++) {
+        display.putstr(0, row, ' '.repeat(COLNO), NO_COLOR, 0);
+    }
+    for (let row = 0; row < lines.length; row++) {
+        const line = lines[row];
+        display.putstr(menuCol, row, line.text, NO_COLOR, line.heading ? ATR_INVERSE : 0);
+    }
+    const lastRow = lines.length - 1;
+    const cursorCol = menuCol + '(end)'.length + 1;
+    const screen = serialize_terminal_grid(display);
+    game._pay_menu_screen = screen;
+    showOverride(screen, [cursorCol, lastRow]);
+    return true;
+}
+
+function shopThankYouMessage(shkp) {
+    const eshk = shkp?.mextra?.eshk || {};
+    const shopName = shopTypeName(roomForNo(eshk.shoproom)?.rtype);
+    return `"Thank you for shopping in ${sSuffix(shkname(shkp))} ${shopName}${!eshk.surcharge ? '!' : '.'}"`;
+}
+
+function payGoldToMonster(shkp, amount) {
+    const carried = (game.inventory || []).find((obj) => obj?.otyp === GOLD_PIECE);
+    const current = game._goldCount || carried?.quan || 0;
+    if (current <= 0 || amount <= 0) return;
+    let paidId = carried?.o_id;
+    if (current > amount) paidId = next_ident();
+    game._goldCount = Math.max(0, current - amount);
+    if (carried) {
+        if (game._goldCount > 0) carried.quan = game._goldCount;
+        else removeInventoryObject(carried);
+    }
+    shkp.inventory = shkp.inventory || [];
+    shkp.inventory.push({
+        otyp: GOLD_PIECE,
+        oclass: COIN_CLASS,
+        quan: amount,
+        o_id: paidId,
+    });
+}
+
+async function commitPayMenuSelection(menu) {
+    const selected = (menu?.entries || []).filter((entry) => entry.selected);
+    const shkp = menu?.shkp;
+    game._pay_menu = null;
+    game._pay_menu_screen = null;
+    await redrawAfterFullScreenMenuDismiss();
+    if (!selected.length || !shkp) {
+        game.context.move = 0;
+        return;
+    }
+
+    const entry = selected[0];
+    const obj = entry.obj;
+    const price = entry.price || 0;
+    payGoldToMonster(shkp, price);
+    obj.unpaid = false;
+    obj.unpaidPrice = 0;
+    obj.shopPrice = 0;
+    const eshk = shkp.mextra?.eshk;
+    if (eshk) eshk.billct = Math.max(0, (eshk.billct || 0) - 1);
+
+    await pline(`You bought ${payMenuObjectName(obj)} for ${price} gold piece${price === 1 ? '' : 's'}.`);
+    queue_more_prompt();
+    game._more_message_queue = [
+        ...(game._more_message_queue || []),
+        { text: shopThankYouMessage(shkp), move: true },
+    ];
+    game.context.move = 0;
+}
+
+async function showPayMenu(shkp) {
+    await flush_screen(1);
+    const menu = { shkp, entries: payMenuEntriesForShopkeeper(shkp) };
+    game._pay_menu = menu;
+    if (!menu.entries.length || !renderPayMenu(menu)) {
+        game._pay_menu = null;
+        game._pay_menu_screen = null;
+        await pline(`You do not owe ${shkname(shkp)} anything.`);
+    }
+    game.context.move = 0;
+}
+
+async function doPayCommand() {
+    game.context.move = 0;
+    const heroShopRooms = (Array.isArray(game.u?.ushops) && game.u.ushops.length)
+        ? game.u.ushops
+        : inRoomsAt(game.u?.ux, game.u?.uy).filter(isShopRoomNo);
+    let shkp = null;
+    for (const roomno of heroShopRooms) {
+        const candidate = shopKeeperForRoom(roomno);
+        if (candidate && shopkeeperInHisShop(candidate)) {
+            shkp = candidate;
+            break;
+        }
+    }
+    if (!shkp) {
+        const adjacent = (game.level?.monsters || []).filter((mon) =>
+            mon?.isshk && dist2(mon.mx, mon.my, game.u?.ux ?? 0, game.u?.uy ?? 0) <= 2);
+        if (adjacent.length === 1) shkp = adjacent[0];
+    }
+    if (!shkp) {
+        await pline('There appears to be no shopkeeper here to receive your payment.');
+        return;
+    }
+    const eshk = shkp.mextra?.eshk || {};
+    if ((eshk.billct || 0) > 0 || payMenuEntriesForShopkeeper(shkp).length) {
+        await showPayMenu(shkp);
+        return;
+    }
+    await pline(`You do not owe ${shkname(shkp)} anything.`);
+}
+
+function heavyPickupTrouble(obj) {
+    return obj?.otyp === CHAIN_MAIL || obj?.otyp === 158;
+}
+
+async function finishShopQuotedPickup(obj) {
+    const carried = pickupInventoryObject(obj);
+    game.context.move = 1;
+    if (!heavyPickupTrouble(carried)) {
+        await pline(`${carried.invlet} - ${inventoryObjectName(carried)}.`);
+        return;
+    }
+    if (game.u) game.u.uencumber = Math.max(game.u.uencumber || 0, 1);
+    await plineWithMorePrompt(`You have a little trouble lifting ${carried.invlet} - ${inventoryObjectName(carried)}.`);
+    game._finish_pickup_turn_after_more = true;
+    game.context.move = 0;
+}
+
 async function finishHeavyPickup(obj) {
     pickupInventoryObject(obj);
     if (game.u) game.u.uencumber = Math.max(game.u.uencumber || 0, 1);
@@ -1487,6 +1968,7 @@ async function finishHeavyPickup(obj) {
 }
 
 async function triggerSpotEffectsAtHero() {
+    await checkSpecialRoomAfterMove();
     const u = game.u || {};
     const trap = (game.level?.traps || []).find(t => t.tx === u.ux && t.ty === u.uy);
     if (!trap) return false;
@@ -1503,6 +1985,76 @@ async function triggerSpotEffectsAtHero() {
         return true;
     }
     return false;
+}
+
+function roomForNo(roomno) {
+    const idx = (roomno ?? 0) - C.ROOMOFFSET;
+    return idx >= 0 ? game.level?.rooms?.[idx] : null;
+}
+
+function isShopRoomNo(roomno) {
+    return (roomForNo(roomno)?.rtype ?? 0) >= C.SHOPBASE;
+}
+
+function inRoomsAt(x, y) {
+    const loc = game.level?.at(x, y);
+    const roomno = loc?.roomno ?? 0;
+    if (roomno >= C.ROOMOFFSET) return [roomno];
+    return [];
+}
+
+function shopKeeperForRoom(roomno) {
+    return (game.level?.monsters || []).find((mon) =>
+        mon?.isshk && mon.mextra?.eshk?.shoproom === roomno) || null;
+}
+
+function shopkeeperInHisShop(mon) {
+    const roomno = mon?.mextra?.eshk?.shoproom;
+    return !!roomno && inRoomsAt(mon.mx, mon.my).includes(roomno);
+}
+
+function shkname(mon) {
+    return String(mon?.mextra?.eshk?.shknam || 'shopkeeper').replace(/^[_+\-|]/, '');
+}
+
+function sSuffix(name) {
+    return /s$/i.test(name) ? `${name}'` : `${name}'s`;
+}
+
+async function uEnteredShop(roomno) {
+    const shkp = shopKeeperForRoom(roomno);
+    const eshk = shkp?.mextra?.eshk;
+    if (!shkp || !eshk || eshk.following) return;
+    const customer = game.plname || 'Hero';
+    if ((!eshk.visitct || eshk.customer)
+        && String(eshk.customer || '').toLowerCase() !== String(customer).toLowerCase()) {
+        eshk.visitct = 0;
+        eshk.following = false;
+        eshk.customer = customer;
+        shkp.mpeaceful = 1;
+    }
+    const name = shkname(shkp);
+    const shopName = shopTypeName(roomForNo(roomno)?.rtype);
+    const again = eshk.visitct++ ? ' again' : '';
+    const hello = roleGreeting(game.urole, 'shopkeeper');
+    // C ref: shk.c:u_entered_shop().  verbalize() wraps shopkeeper speech in
+    // quotes; the common peaceful, audible path is enough for current evidence.
+    await pline(`"${hello}, ${customer}!  Welcome${again} to ${sSuffix(name)} ${shopName}!"`);
+}
+
+async function checkSpecialRoomAfterMove() {
+    const u = game.u || {};
+    const rooms = inRoomsAt(u.ux, u.uy);
+    const prevShops = Array.isArray(u.ushops) ? u.ushops.slice() : [];
+    const shops = rooms.filter(isShopRoomNo);
+    const entered = shops.filter((roomno) => !prevShops.includes(roomno));
+    u.urooms0 = Array.isArray(u.urooms) ? u.urooms.slice() : [];
+    u.ushops0 = prevShops;
+    u.urooms = rooms;
+    u.ushops = shops;
+    u.ushops_entered = entered;
+    u.ushops_left = prevShops.filter((roomno) => !shops.includes(roomno));
+    if (entered.length) await uEnteredShop(entered[0]);
 }
 
 function pickupMenuEntries(objects) {
@@ -1869,6 +2421,13 @@ async function pickupHere() {
     game.context.move = 1;
     if (obj.otyp === GOLD_PIECE) {
         await pline(pickupGoldObject(obj));
+        return;
+    }
+    const quote = shopPickupQuote(obj);
+    if (quote) {
+        game._pending_shop_pickup = obj;
+        await plineWithMorePrompt(shopPickupQuoteMessage(obj, quote));
+        game.context.move = 0;
         return;
     }
     if (obj.otyp === CHAIN_MAIL) {
@@ -3541,6 +4100,21 @@ async function handleQueuedMore(ch) {
             game.context.move = 0;
             return true;
         }
+        if (game._deferred_run_floor_look) {
+            const deferred = game._deferred_run_floor_look;
+            game._deferred_run_floor_look = null;
+            game._run_sound_more_defer_floor_look = false;
+            game._run_sound_more_screen = null;
+            game._run_sound_more_cursor = null;
+            clear_pending_message();
+            await pline(deferred.line);
+            if (deferred.overflow) queue_more_prompt();
+            game.context.move = 0;
+            return true;
+        }
+        game._run_sound_more_defer_floor_look = false;
+        game._run_sound_more_screen = null;
+        game._run_sound_more_cursor = null;
         if (game._post_arrival_pager_screen) {
             const screen = game._post_arrival_pager_screen;
             const cursor = game._post_arrival_pager_cursor || [8, C.TERMINAL_ROWS - 1];
@@ -3572,6 +4146,17 @@ async function handleQueuedMore(ch) {
             return true;
         }
         clear_pending_message();
+        if (game._finish_pickup_turn_after_more) {
+            game._finish_pickup_turn_after_more = false;
+            game.context.move = 1;
+            return true;
+        }
+        if (game._pending_shop_pickup) {
+            const obj = game._pending_shop_pickup;
+            game._pending_shop_pickup = null;
+            await finishShopQuotedPickup(obj);
+            return true;
+        }
         await finishPendingStairArrivalRedraw();
         if (game._restore_message_after_more) {
             const msg = game._restore_message_after_more;
@@ -6122,6 +6707,26 @@ export async function rhack(key) {
             game.context.move = 0;
             return;
         }
+        if (prev === game._pay_menu_screen) {
+            const menu = game._pay_menu;
+            if (ch === '\x1b') {
+                game._pay_menu = null;
+                game._pay_menu_screen = null;
+                await redrawAfterFullScreenMenuDismiss();
+                game.context.move = 0;
+                return;
+            }
+            if (ch === '\r' || ch === '\n') {
+                await commitPayMenuSelection(menu);
+                game.context.move = 0;
+                return;
+            }
+            const entry = menu?.entries?.find((item) => item.selector === ch);
+            if (entry) entry.selected = !entry.selected;
+            if (menu) renderPayMenu(menu);
+            game.context.move = 0;
+            return;
+        }
         if (prev === game._level_teleport_menu_screen) {
             if (ch === ' ') {
                 const menu = buildLevelTeleportMenuPage2();
@@ -6491,8 +7096,7 @@ export async function rhack(key) {
     } else if (ch === ',') {
         await pickupHere();
     } else if (ch === 'p') {
-        game.context.move = 0;
-        await pline('There appears to be no shopkeeper here to receive your payment.');
+        await doPayCommand();
     } else if (ch === 'P') {
         game.context.move = 0;
         const letters = putonLetters();
@@ -6749,6 +7353,7 @@ export async function domove(dx, dy) {
     // whose mdisdu() range changed when the hero moved.
     refreshWarningAfterHeroMove();
     newsym(newx, newy);
+    await checkSpecialRoomAfterMove();
     await lookHereAfterMove();
     return true;
 }

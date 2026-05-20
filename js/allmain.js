@@ -450,11 +450,29 @@ function finishPostDosoundsTurnTail(g) {
     gethungry();
     exerchk();
     maybe_wipe_engraving();
-    maybe_update_seer_turn();
+    if (shouldDeferSeerTurnUpdate(g)) {
+        g._seer_turn_update_pending = true;
+    } else {
+        maybe_update_seer_turn();
+    }
 
     g._pet_combat_resume_active = false;
     g._savelife_resume_active = false;
     g.moves = (g.moves || 1) + 1;
+}
+
+function shouldDeferSeerTurnUpdate(g) {
+    // C ref: allmain.c:moveloop_core().  The seer-turn check belongs to the
+    // once-per-hero-took-time section after the "hero can't move" loop.  When
+    // burdened movement leaves the hero short of NORMAL_SPEED, defer the RNG
+    // until any catch-up monster turn has run.
+    return !!(g.u?.uencumber || g._extra_encumbered_turn_pending);
+}
+
+function finishDeferredSeerTurnUpdate(g) {
+    if (!g._seer_turn_update_pending) return;
+    g._seer_turn_update_pending = false;
+    maybe_update_seer_turn(g.moves || 1);
 }
 
 function applyOccupationFinalTurnState(g) {
@@ -732,21 +750,30 @@ async function continueRunTail(g) {
         await advanceTurn();
         if (g._more) {
             if (g.context?.run) g._run_paused_for_more = true;
+            g._run_paused_before_encumbered_check = true;
             return false;
         }
-        if (encumberedDebtNeedsExtraTurn(g) && !g._monster_turn_paused_for_more) {
-            // C ref: allmain.c:moveloop_core()/u_calc_moveamt().  Automatic
-            // run repeats still obey the hero movement-point accumulator; a
-            // burdened runner can have monster movement catch up before the
-            // next repeated domove().
-            await advanceTurn();
-            if (g._more || g._monster_turn_paused_for_more) {
-                if (g.context?.run) g._run_paused_for_more = true;
-                return false;
-            }
-            creditEncumberedExtraTurn(g);
-        }
+        if (!await continueRunPostTurnChecks(g)) return false;
     }
+    return true;
+}
+
+async function continueRunPostTurnChecks(g) {
+    if (encumberedDebtNeedsExtraTurn(g) && !g._monster_turn_paused_for_more) {
+        // C ref: allmain.c:moveloop_core()/u_calc_moveamt().  Automatic
+        // run repeats still obey the hero movement-point accumulator; a
+        // burdened runner can have monster movement catch up before the
+        // next repeated domove().
+        await advanceTurn();
+        if (g._more || g._monster_turn_paused_for_more) {
+            if (g.context?.run) g._run_paused_for_more = true;
+            g._run_paused_before_encumbered_check = true;
+            return false;
+        }
+        creditEncumberedExtraTurn(g);
+    }
+    finishDeferredSeerTurnUpdate(g);
+    g._run_paused_before_encumbered_check = false;
     return true;
 }
 
@@ -800,7 +827,11 @@ export async function moveloop_core() {
     if (g.context?.move) {
         if (g._resume_run_after_more) {
             g._resume_run_after_more = false;
-            if (!g._more) await continueRunTail(g);
+            if (!g._more) {
+                if (g._run_paused_before_encumbered_check
+                    && !await continueRunPostTurnChecks(g)) return;
+                await continueRunTail(g);
+            }
             return;
         }
         if (g._monster_turn_paused_for_more && g._more) return;
@@ -848,6 +879,7 @@ export async function moveloop_core() {
             g._prayer_turns_remaining--;
             await advanceTurn();
         }
+        finishDeferredSeerTurnUpdate(g);
         if (g.u?.uinvulnerable && g._pending_message === 'You are surrounded by a shimmering light.') {
             g._pending_message = 'You are surrounded by a shimmering light.  You finish your prayer.';
             g._more = true;

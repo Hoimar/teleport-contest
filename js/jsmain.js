@@ -100,7 +100,7 @@ export class NethackGame {
 
         // Initialize hero struct
         g.u = { ux: 0, uy: 0, ux0: 0, uy0: 0 };
-        g.context = { move: 0 };
+        g.context = { move: 0, ident: 2 };
         g.discoveredObjects = new Set();
         g.program_state = {};
         g.moves = 1;
