@@ -985,6 +985,19 @@ function trap_mon_visible(mtmp) {
     return true;
 }
 
+async function wake_nearto_basic(x, y, distance) {
+    // C ref: mon.c:wake_nearto_core().  Noise wakes indeterminate sleep
+    // without angering monsters; temporary paralysis/frozen timers remain.
+    for (const mon of game.level?.monsters || []) {
+        if (distance !== 0 && dist2(mon.mx, mon.my, x, y) >= distance) continue;
+        if (mon.msleeping && trap_mon_visible(mon)) {
+            const extra = mon.data?.name === 'FLESH_GOLEM' ? " It's alive!" : '';
+            await append_monster_topline(`The ${monster_name(mon)} wakes up.${extra}`);
+        }
+        mon.msleeping = 0;
+    }
+}
+
 async function mintrap_squeaky_board_basic(mtmp, trap) {
     // C ref: trap.c:trapeffect_sqky_board().
     if (mon_in_air(mtmp)) return MMOVE_MOVED;
@@ -999,6 +1012,7 @@ async function mintrap_squeaky_board_basic(mtmp, trap) {
             ? 'nearby' : 'in the distance';
         await append_monster_topline(`You hear ${note} squeak ${where}.`);
     }
+    await wake_nearto_basic(mtmp.mx, mtmp.my, 40);
     return MMOVE_MOVED;
 }
 
