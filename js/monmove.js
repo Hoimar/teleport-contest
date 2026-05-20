@@ -6,7 +6,7 @@ import { OBJECT_CLASS, OBJECT_DIR } from './object_data.js';
 import {
     BURN, DUST, ENGR_BLOOD, HEADSTONE,
     D_BROKEN, D_CLOSED, D_ISOPEN, D_LOCKED, D_NODOOR, D_TRAPPED,
-    DOOR, IRONBARS, LADDER, ROOM, STAIRS, WEB,
+    DOOR, IRONBARS, LADDER, ROOM, SQKY_BOARD, STAIRS, WEB,
     IS_DOOR, IS_LAVA, IS_OBSTRUCTED, IS_POOL, IS_STWALL, IS_TREE, IS_WALL, IS_WATERWALL,
     I_SPECIAL, M_AP_FURNITURE, M_AP_OBJECT,
     MON_POLE_DIST, NEED_AXE, NEED_HTH_WEAPON, NEED_PICK_AXE, NEED_PICK_OR_AXE,
@@ -55,6 +55,11 @@ const MMOVE_NOTHING = 0;
 const MMOVE_MOVED = 1;
 const MMOVE_DIED = 2;
 const MMOVE_DONE = 3;
+const TRAP_NOTE_NAMES = [
+    'C note', 'D flat', 'D note', 'E flat',
+    'E note', 'F note', 'F sharp', 'G note',
+    'G sharp', 'A note', 'B flat', 'B note',
+];
 const MCF_INDIRECT = 0x0001;
 const MCF_SIGHT = 0x0002;
 const MCF_HOSTILE = 0x0004;
@@ -264,6 +269,14 @@ function hideunder_basic(mtmp) {
     mtmp.mundetected = undetected ? 1 : 0;
     if (old !== !!mtmp.mundetected) newsym(mtmp.mx, mtmp.my);
     return undetected;
+}
+
+function maybe_unhide_at_basic(mtmp) {
+    if (!mtmp.mundetected) return;
+    const loc = game.level?.at(mtmp.mx, mtmp.my);
+    const shouldRecheck = (hides_under_basic(mtmp) && !can_hide_under_object_basic(mtmp.mx, mtmp.my))
+        || (mtmp.data?.mlet === 'S_EEL' && !IS_POOL(loc?.typ));
+    if (shouldRecheck) hideunder_basic(mtmp);
 }
 
 function postmove_hide_under_or_eel_basic(mtmp) {
@@ -959,6 +972,71 @@ async function append_monster_topline(line) {
     }
 }
 
+function trap_note_name(trap, withArticle = true) {
+    const name = TRAP_NOTE_NAMES[trap?.tnote] || TRAP_NOTE_NAMES[0];
+    if (!withArticle) return name;
+    return /^[AEF]/.test(name) ? `an ${name}` : `a ${name}`;
+}
+
+function trap_mon_visible(mtmp) {
+    if (!cansee(mtmp.mx, mtmp.my)) return false;
+    if (mtmp.minvis && !(game.u?.usee_invisible || game.u?.uprops?.see_invisible)) return false;
+    if (mtmp.mundetected) return false;
+    return true;
+}
+
+async function mintrap_squeaky_board_basic(mtmp, trap) {
+    // C ref: trap.c:trapeffect_sqky_board().
+    if (mon_in_air(mtmp)) return MMOVE_MOVED;
+    const note = trap_note_name(trap, true);
+    if (trap_mon_visible(mtmp)) {
+        trap.tseen = true;
+        newsym(trap.tx, trap.ty);
+        await append_monster_topline(`A board beneath ${monster_name(mtmp)} squeaks ${note} loudly.`);
+    } else {
+        const range = couldsee(mtmp.mx, mtmp.my) ? (BOLT_LIM + 1) : (BOLT_LIM - 3);
+        const where = dist2(mtmp.mx, mtmp.my, game.u?.ux ?? 0, game.u?.uy ?? 0) <= range * range
+            ? 'nearby' : 'in the distance';
+        await append_monster_topline(`You hear ${note} squeak ${where}.`);
+    }
+    return MMOVE_MOVED;
+}
+
+function mon_knows_traps_basic(mtmp, ttyp) {
+    return !!((mtmp.mtrapseen || 0) & (1 << (ttyp - 1)));
+}
+
+function mon_learns_traps_basic(mtmp, ttyp) {
+    mtmp.mtrapseen = (mtmp.mtrapseen || 0) | (1 << (ttyp - 1));
+}
+
+function mons_see_trap_basic(trap) {
+    // C ref: mondata.c:mons_see_trap().
+    const loc = game.level?.at(trap.tx, trap.ty);
+    const maxdist = loc?.lit ? 49 : 2;
+    for (const mon of game.level?.monsters || []) {
+        if (mon.data?.mflags1 & (M1_ANIMAL | M1_MINDLESS | M1_NOEYES)) continue;
+        if (mon.mcansee === 0) continue;
+        if (dist2(mon.mx, mon.my, trap.tx, trap.ty) > maxdist) continue;
+        if (!mon_can_see_square(mon, trap.tx, trap.ty)) continue;
+        mon_learns_traps_basic(mon, trap.ttyp);
+    }
+}
+
+async function mintrap_basic(mtmp) {
+    const trap = trap_at_basic(mtmp.mx, mtmp.my);
+    if (!trap) return MMOVE_MOVED;
+    // C ref: trap.c:mintrap().  Floor traps first check whether the monster
+    // is in the air, then known trap types usually get avoided without the
+    // effect firing.
+    if (mon_in_air(mtmp)) return MMOVE_MOVED;
+    if (mon_knows_traps_basic(mtmp, trap.ttyp) && rn2(4)) return MMOVE_MOVED;
+    mon_learns_traps_basic(mtmp, trap.ttyp);
+    mons_see_trap_basic(trap);
+    if (trap.ttyp === SQKY_BOARD) return mintrap_squeaky_board_basic(mtmp, trap);
+    return MMOVE_MOVED;
+}
+
 function mb_trapped_basic(mtmp) {
     // C ref: monmove.c:mb_trapped(). Messages, wakeup, and trap memory have
     // no RNG in the current evidence; the required ownership is rnd(15).
@@ -1616,12 +1694,15 @@ async function m_move_basic(mtmp) {
         game.u.uy = niy;
         game.vision_full_recalc = 1;
     }
+    maybe_unhide_at_basic(mtmp);
     mon_track_add(mtmp, omx, omy);
     const previousWarningRng = game._monster_move_warning_rng_active;
     game._monster_move_warning_rng_active = true;
     let doorStatus;
     try {
         newsym(omx, omy);
+        const trapStatus = await mintrap_basic(mtmp);
+        if (trapStatus === MMOVE_DIED) return MMOVE_DIED;
         doorStatus = postmove_door_basic(mtmp);
         if (doorStatus !== MMOVE_DIED) {
             if (game._swallowed_expulsion_paused_for_more) {
