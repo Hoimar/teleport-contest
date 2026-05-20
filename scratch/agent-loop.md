@@ -16,7 +16,7 @@ and `feature_map.md`.
 - Baseline commit before the current `seed0002` pass: `ccbf286`.
 - Current target: `seed0002-healer-reflection-drummer` has advanced from
   `S 83/595 R 5690/27158` to focused verification
-  `S 281/595 R 12754/27158` (`frozen/score.sh` cells `281/595`,
+  `S 281/595 R 12877/27158` (`frozen/score.sh` cells `281/595`,
   cursor-inclusive screen score `273/595`).
 - Recently completed targets still full after this pass: `seed0383`,
   `seed5002`, `seed0116`, `seed0360`, and `seed8000`.
@@ -26,9 +26,9 @@ and `feature_map.md`.
 ## Latest Loop Checkpoint
 
 - Target: `seed0002-healer-reflection-drummer`.
-- Current verification: `S 281/595 R 12754/27158`,
-  `FS 279:char:map:H`, `FR 12556:rn2(100)=92=>rn2(5)=2`, `C 8`.
-- Sentinel verification after the pass: total `S 650/1063 R 45949/64569`.
+- Current verification: `S 281/595 R 12877/27158`,
+  `FS 279:char:map:H`, `FR 12676:rn2(12)=5=>rn2(100)=5`, `C 8`.
+- Sentinel verification after the pass: total `S 650/1063 R 46072/64569`.
   `seed8000`, `seed0116`, `seed0383`, and `seed0360` remain full passes;
   `seed0013` remains first-screen blocked with `R 588/4804`.
 - Frozen public score after this pass is `5/44` passing. Current exact
@@ -70,17 +70,22 @@ and `feature_map.md`.
     inventory can be deferred past the projectile frame, but once it is real
     inventory, ordinary `dog_invent()` drop gates must be allowed to drop it;
     suppressing the drop skipped the later dog-goal object scan.
-  - Current `FR 12556` is after the goblin corpse/eating path; the visible
-    frontier is still an ordinary monster/newt movement square one column off
-    after hidden eating turns, with RNG now pointing at object state/monster
-    ordering before `distfleeck()`.
+  - Live goblin corpse eating now distinguishes rotten-food branches that
+    call `start_eating()` from sickness branches that do not, deletes the
+    floor corpse through `delobj_core()`/`obj_resists(obj,0,0)` at the C
+    boundary, and runs the burdened pre-finish catch-up monster pass before
+    the finish line.
+  - Current `FR 12676` is after the goblin corpse/eating path. C's pet
+    apport gate succeeds and proceeds to `dog_move()` selection; JS has
+    `edog.apport=2`, fails the gate, and scans hero inventory via
+    `dog_goal()` instead.
 - Production `js/` has no intentional debug I/O or frozen imports.
-- Coherent commit pending for: `js/dog.js`, `feature_map.md`,
-  `lessons.md`, and this checkpoint.
+- Coherent commit pending for: `js/allmain.js`, `js/cmd.js`,
+  `feature_map.md`, `lessons.md`, and this checkpoint.
 - Next queue:
-  - Continue `seed0002` from cells screen 281 / `FR 12556`. The next
-    structural fix is object state or monster ordering during the hidden
-    goblin-corpse eating turns; current visible drift is a newt one square off
-    near screen row 18.
+  - Continue `seed0002` from cells screen 281 / `FR 12676`. The next
+    structural fix is pet apport state around the thrown/dropped dagger:
+    C accepts the visible non-food apport goal where JS falls through to
+    hero-inventory `dogfood()` scans.
   - Keep `seed0360` in the sentinel queue because the user reported a local
     frozen-score regression; current frozen verification is full.

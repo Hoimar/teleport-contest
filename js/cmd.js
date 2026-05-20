@@ -1564,6 +1564,24 @@ function corpseEatingReqtime(obj) {
     return 3 + (cwt >> 6);
 }
 
+function rottenFoodInterruptsEating() {
+    // C ref: eat.c:rottenfood().  Only the unconsciousness branch prevents
+    // start_eating() from recording the first bite.
+    if (!rn2(4)) {
+        d(2, 4);
+        return false;
+    }
+    if (!rn2(4)) {
+        d(2, 10);
+        return false;
+    }
+    if (!rn2(3)) {
+        rnd(10);
+        return true;
+    }
+    return false;
+}
+
 function discoverObjectType(otyp) {
     const discovered = game.discoveredObjects || (game.discoveredObjects = new Set());
     if (discovered.has(otyp)) return false;
@@ -1674,18 +1692,18 @@ async function handleFloorCorpseEatKey(ch) {
         return true;
     }
     rn2(20);
+    let firstBiteStarted = false;
     if (obj?._live_kill_corpse) {
         rn2(7);
-        rn2(4);
-        rn2(4);
-        rn2(3);
+        firstBiteStarted = !rottenFoodInterruptsEating();
     } else {
         rn2(5);
         const damage = rnd(8);
         if (typeof game.u?.uhp === 'number') game.u.uhp = Math.max(0, game.u.uhp - damage);
     }
     if (obj) game._pending_eaten_corpse_remove = obj;
-    game._occupation_turns_remaining = corpseEatingReqtime(obj);
+    game._occupation_turns_remaining = Math.max(0, corpseEatingReqtime(obj) - (firstBiteStarted ? 1 : 0));
+    game._occupation_pre_finish_catchup = firstBiteStarted;
     game._occupation_finish_message = `You finish eating the ${corpseName}.`;
     game._occupation_pack_finish_message = true;
     game._occupation_finish_removes_eaten_corpse = true;

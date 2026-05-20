@@ -551,15 +551,25 @@ function applyOccupationFinishObjectEffects(g) {
     }
 }
 
-async function runSwallowedPreFinishTurn(g) {
-    if (!g._occupation_finish_message || !g.u?.uswallow || !g.u?.ustuck) return;
-    if (g._occupation_pre_finish_swallowed_turn_done) return;
-    // C ref: allmain.c:moveloop_core().  `unmul()` and `nomovemsg` happen
-    // after the "hero can't move" loop has finished.  A swallowed, slow or
-    // otherwise movement-starved hero can therefore take another monster/turn
-    // pass before the delayed occupation finish line is printed.
-    g._occupation_pre_finish_swallowed_turn_done = true;
-    await advanceTurn();
+async function runOccupationPreFinishTurn(g) {
+    if (!g._occupation_finish_message) return;
+    if (g._occupation_pre_finish_turn_done) return;
+    if (g.u?.uswallow && g.u?.ustuck) {
+        // C ref: allmain.c:moveloop_core().  `unmul()` and `nomovemsg` happen
+        // after the "hero can't move" loop has finished.  A swallowed, slow or
+        // otherwise movement-starved hero can therefore take another monster/turn
+        // pass before the delayed occupation finish line is printed.
+        g._occupation_pre_finish_turn_done = true;
+        await advanceTurn();
+        return;
+    }
+    if (g._occupation_pre_finish_catchup && (g.u?.uencumber || 0) > 0) {
+        // C ref: allmain.c:moveloop_core()/u_calc_moveamt().  When a delayed
+        // occupation finishes while a burdened hero is still short of normal
+        // movement, the monster catch-up pass happens before `nomovemsg`.
+        g._occupation_pre_finish_turn_done = true;
+        await advanceTurn();
+    }
 }
 
 async function continueNomulTurns(g) {
@@ -604,7 +614,7 @@ async function continueOccupationTurns(g) {
             g.u.uac = g._occupation_finish_uac;
             g._occupation_finish_uac = null;
         }
-        await runSwallowedPreFinishTurn(g);
+        await runOccupationPreFinishTurn(g);
         applyOccupationFinishObjectEffects(g);
         if (g._pending_message && g._occupation_pack_finish_message) {
             await append_pline(g._occupation_finish_message);
@@ -623,7 +633,8 @@ async function continueOccupationTurns(g) {
             g._occupation_finish_removes_eaten_corpse = false;
         }
         g._occupation_finish_message = null;
-        g._occupation_pre_finish_swallowed_turn_done = false;
+        g._occupation_pre_finish_turn_done = false;
+        g._occupation_pre_finish_catchup = false;
     }
     return true;
 }
