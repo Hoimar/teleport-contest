@@ -85,6 +85,7 @@ const SCROLL_CLASS = 9;
 const SPBOOK_CLASS = 10;
 const WAND_CLASS = 11;
 const COIN_CLASS = 12;
+const GEM_CLASS = 13;
 const FIRST_SPELL = 366;
 const LAST_SPELL = 407;
 const SPE_NOVEL = 408;
@@ -142,6 +143,7 @@ const OBJECT_BASE_NAMES = new Map([
     [WAN_LIGHTNING, 'wand of lightning'],
     [421, 'wand of undead turning'],
     [277, 'apple'],
+    [BOULDER, 'boulder'],
     [461, 'white gem'],
 ]);
 
@@ -506,9 +508,28 @@ function throwLetters() {
     const letters = [];
     if ((game._goldCount || 0) > 0) letters.push('$');
     for (const obj of game.inventory || []) {
+        if ((obj?.wielded || ((obj?.owornmask || 0) & C.W_WEP)) && (obj.quan || 1) === 1)
+            continue;
         if (obj?.oclass === WEAPON_CLASS) letters.push(obj.invlet);
     }
     return letters.join('');
+}
+
+function hasThrowCandidate() {
+    return (game._goldCount || 0) > 0 || (game.inventory || []).length > 0;
+}
+
+async function showThrowPrompt() {
+    const letters = throwLetters();
+    game._awaiting_throw_item = true;
+    if (letters) {
+        await showPromptLine(`What do you want to throw? [${letters} or ?*] `);
+    } else if (hasThrowCandidate()) {
+        await showPromptLine('What do you want to throw? [*] ');
+    } else {
+        game._awaiting_throw_item = false;
+        await pline("You don't have anything to throw.");
+    }
 }
 
 function stairAtHero() {
@@ -689,6 +710,7 @@ function unknownAppearanceName(obj) {
         }
         if (obj?.oclass === ARMOR_CLASS) return shuffledDescription;
         if (obj?.oclass === WAND_CLASS) return `${shuffledDescription} wand`;
+        if (obj?.oclass === GEM_CLASS) return `${shuffledDescription} gem`;
     }
     return '';
 }
@@ -1938,6 +1960,12 @@ async function handleQueuedMore(ch) {
         }
         clear_pending_message();
         game._hallucination_warning_rng_active = false;
+        if (game._arrival_floor_look_after_more) {
+            game._arrival_floor_look_after_more = false;
+            await lookHereAfterMove();
+            game.context.move = 0;
+            return true;
+        }
         if (game._direction_help_screen) {
             game._direction_help_screen = '';
             game._override_prev = null;
@@ -1958,6 +1986,12 @@ async function handleQueuedMore(ch) {
         if (game._resume_read_prompt_after_more) {
             game._resume_read_prompt_after_more = false;
             await showPromptLine(`What do you want to read? [${readLetters()} or ?*] `);
+            game.context.move = 0;
+            return true;
+        }
+        if (game._resume_throw_prompt_after_more) {
+            game._resume_throw_prompt_after_more = false;
+            await showThrowPrompt();
             game.context.move = 0;
             return true;
         }
@@ -2656,6 +2690,15 @@ export async function performLevelTeleport(target) {
             queue_more_prompt();
         }
     }
+    // C ref: do.c:goto_level() runs pickup(1) after the deferred
+    // materialize pline; if arrival lands on visible floor objects, the
+    // pending object listing forces the materialize line to block first.
+    const arrivalObjects = (game.level?.objects || []).some((obj) =>
+        obj.ox === game.u?.ux && obj.oy === game.u?.uy && obj.otyp !== GOLD_PIECE);
+    if (!game._more && arrivalObjects) {
+        game._arrival_floor_look_after_more = true;
+        queue_more_prompt();
+    }
     game.context.mv = 1;
 }
 
@@ -3201,6 +3244,11 @@ export async function rhack(key) {
     if (game._awaiting_throw_item) {
         clear_pending_message();
         game._awaiting_throw_item = false;
+        if (ch === ' ' || ch === '\x1b') {
+            game.context.move = 0;
+            await pline('Never mind.');
+            return;
+        }
         if (ch === '$') {
             game._awaiting_throw_direction = { otyp: GOLD_PIECE, oclass: COIN_CLASS, quan: game._goldCount || 0 };
             game.context.move = 0;
@@ -3209,7 +3257,14 @@ export async function rhack(key) {
         }
         const idx = inventoryIndexForLetter(ch);
         const obj = idx >= 0 ? game.inventory?.[idx] : null;
-        if (!obj || obj.oclass !== WEAPON_CLASS) {
+        if (!obj) {
+            game.context.move = 0;
+            game._resume_throw_prompt_after_more = true;
+            await pline("You don't have that object.");
+            queue_more_prompt();
+            return;
+        }
+        if (obj.oclass !== WEAPON_CLASS) {
             game.context.move = 0;
             await pline('Never mind.');
             return;
@@ -3784,13 +3839,7 @@ export async function rhack(key) {
         }
     } else if (ch === 't') {
         game.context.move = 0;
-        const letters = throwLetters();
-        if (letters) {
-            game._awaiting_throw_item = true;
-            await showPromptLine(`What do you want to throw? [${letters} or ?*] `);
-        } else {
-            await pline("You don't have anything to throw.");
-        }
+        await showThrowPrompt();
     } else if (ch === 'a') {
         game.context.move = 0;
         const letters = applyLetters();
