@@ -594,6 +594,10 @@ export async function moveloop_core() {
             g._awaiting_prayer_done_more = true;
             g.u.uinvulnerable = false;
         }
+        // C ref: topl.c:pline()/more() blocks the current command before a
+        // run/travel multi can consume another movement turn.  Prayer's
+        // occupation above still reaches gn.nomovemsg in this same command.
+        if (g._more) return;
         while (g.context?.run) {
             if (shouldStopRunForNearbyMonster()) {
                 g.context.run = null;
@@ -601,6 +605,7 @@ export async function moveloop_core() {
             }
             if (!await continueRunStep()) break;
             await advanceTurn();
+            if (g._more) return;
         }
     }
 }

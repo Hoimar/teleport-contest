@@ -8,7 +8,8 @@ import {
     D_BROKEN, D_CLOSED, D_ISOPEN, D_LOCKED, D_NODOOR, D_TRAPPED,
     ARROW_TRAP, DART_TRAP, ROCKTRAP, BEAR_TRAP, LANDMINE, ROLLING_BOULDER_TRAP,
     RUST_TRAP, FIRE_TRAP, PIT, SPIKED_PIT, HOLE, TRAPDOOR,
-    DOOR, IRONBARS, LADDER, LAVAWALL, MAGIC_PORTAL, ROOM, SQKY_BOARD, SLP_GAS_TRAP, STAIRS, WEB,
+    ANTI_MAGIC, DOOR, IRONBARS, LADDER, LAVAWALL, MAGIC_PORTAL, MAGIC_TRAP,
+    ROOM, SQKY_BOARD, SLP_GAS_TRAP, STAIRS, STATUE_TRAP, VIBRATING_SQUARE, WEB,
     ACCESSIBLE, IS_DOOR, IS_LAVA, IS_OBSTRUCTED, IS_POOL, IS_STWALL, IS_TREE, IS_WALL, IS_WATERWALL,
     I_SPECIAL, M_AP_FURNITURE, M_AP_OBJECT,
     MON_POLE_DIST, NEED_AXE, NEED_HTH_WEAPON, NEED_PICK_AXE, NEED_PICK_OR_AXE,
@@ -227,9 +228,25 @@ function move_mon_to_basic(mtmp, x, y) {
     newsym(x, y);
 }
 
-function tele_restrict_basic() {
+async function tele_restrict_basic(mtmp) {
     // C ref: teleport.c:tele_restrict().
-    return !!game.level?.flags?.noteleport;
+    if (!game.level?.flags?.noteleport) return false;
+    if (mtmp && cansee(mtmp.mx, mtmp.my)) {
+        const hadPending = !!game._pending_message;
+        await pline(`A mysterious force prevents the ${monster_name(mtmp)} from teleporting!`);
+        if (hadPending) {
+            queue_more_prompt();
+            if (!game._latched_more_screen) {
+                await flush_screen(1);
+                game._latched_more_screen = serialize_terminal_grid(game.nhDisplay);
+                game._latched_more_cursor = [
+                    game.nhDisplay?.cursorCol ?? Math.min(`${game._pending_message || ''}--More--`.length, 79),
+                    game.nhDisplay?.cursorRow ?? 0,
+                ];
+            }
+        }
+    }
+    return true;
 }
 
 function rloc_pos_ok_basic(x, y, mtmp) {
@@ -526,6 +543,12 @@ function resists_fire_basic(mtmp) {
     return !!((mtmp?.data?.mresists ?? 0) & MR_FIRE);
 }
 
+function resists_magic_missile_basic(mtmp) {
+    return (mtmp?.data?.mattk || []).some((attack) =>
+        attack?.[1] === 'AD_MAGM' || attack?.[1] === 'AD_RBRE')
+        || mtmp?.data?.name === 'BABY_GRAY_DRAGON';
+}
+
 function minliquid_basic(mtmp) {
     const loc = game.level?.at(mtmp.mx, mtmp.my);
     if (!loc || !IS_LAVA(loc.typ)) return false;
@@ -609,7 +632,48 @@ function can_mon_step(mtmp, x, y) {
     // C ref: mon.c:mfndpos()/mon_allowflags(). Boulder squares are not
     // ordinary movement candidates unless the monster has ALLOW_ROCK.
     if (boulder_at(x, y) && !mon_allows_boulder_square(mtmp)) return false;
+    if (!trap_candidate_ok_basic(mtmp, x, y)) return false;
     return mfndpos_terrain_ok(mtmp, x, y);
+}
+
+function trap_candidate_ok_basic(mtmp, x, y) {
+    const trap = trap_at_basic(x, y);
+    if (!trap) return true;
+    // C ref: mon.c:mfndpos(). Tame monsters get ALLOW_TRAPS; ordinary
+    // monsters avoid trap types they have learned unless the trap is harmless.
+    if (mtmp.mtame) return true;
+    if (m_harmless_trap_basic(mtmp, trap)) return true;
+    return !mon_knows_traps_basic(mtmp, trap.ttyp);
+}
+
+function m_harmless_trap_basic(mtmp, trap) {
+    // C ref: trap.c:m_harmless_trap().
+    if (!trap) return true;
+    if (!is_sokoban_level_basic() && floor_trigger_trap_basic(trap.ttyp) && mon_in_air(mtmp))
+        return true;
+    switch (trap.ttyp) {
+    case SLP_GAS_TRAP:
+        return resists_sleep_basic(mtmp);
+    case RUST_TRAP:
+        return mtmp.data?.name !== 'IRON_GOLEM';
+    case FIRE_TRAP:
+        return resists_fire_basic(mtmp);
+    case PIT:
+    case SPIKED_PIT:
+    case HOLE:
+    case TRAPDOOR:
+        return !!(mtmp.data?.mflags1 & M1_CLING) && !is_sokoban_level_basic();
+    case WEB:
+        return webmaker_basic(mtmp);
+    case STATUE_TRAP:
+    case MAGIC_TRAP:
+    case VIBRATING_SQUARE:
+        return true;
+    case ANTI_MAGIC:
+        return resists_magic_missile_basic(mtmp);
+    default:
+        return false;
+    }
 }
 
 function mon_allows_boulder_square(mtmp) {
@@ -1856,7 +1920,7 @@ async function m_move_basic(mtmp) {
     ggx = mtmp.mux ?? ggx;
     ggy = mtmp.muy ?? ggy;
     if (mtmp.data?.name === 'TENGU' && !rn2(5) && !mtmp.mcan
-        && !tele_restrict_basic(mtmp)) {
+        && !(await tele_restrict_basic(mtmp))) {
         // C ref: monmove.c:m_move(); teleporting by nature happens before
         // ordinary path selection.
         if ((mtmp.mhp ?? 0) < 7 || mtmp.mpeaceful || rn2(2)) rloc_basic(mtmp);
@@ -1970,6 +2034,13 @@ async function m_move_basic(mtmp) {
     }
 
     if (!moved || (nix === omx && niy === omy)) return MMOVE_NOTHING;
+    if (nix === (mtmp.mux ?? null) && niy === (mtmp.muy ?? null)
+        && !(nix === game.u?.ux && niy === game.u?.uy)) {
+        // C ref: monmove.c:m_move() delegates moves into the apparent
+        // displaced hero square to m_move_aggress(); with no defender, the
+        // monster spends its move attacking the image and does not relocate.
+        return MMOVE_DONE;
+    }
     if (nix === game.u?.ux && niy === game.u?.uy) {
         mtmp.mux = game.u.ux;
         mtmp.muy = game.u.uy;
@@ -2005,8 +2076,10 @@ async function m_move_basic(mtmp) {
             if (game._swallowed_expulsion_paused_for_more) {
                 game._swallowed_expulsion_paused_for_more = false;
             } else {
-                // C ref: monmove.c:postmov() redraws the moved monster's
-                // current square after trap/door handling, before pickup.
+                // C ref: display.c:see_monsters() warning refreshes moved
+                // off-screen monsters at input boundaries; this movement
+                // skeleton keeps the current JS monster layer in step until
+                // per-layer display state is ported.
                 newsym(mtmp.mx, mtmp.my);
             }
         }

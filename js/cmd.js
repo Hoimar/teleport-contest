@@ -11,7 +11,7 @@ import {
     newsym, show_glyph_cell, flush_screen, pline, append_pline, clear_pending_message, docrt,
     serialize_terminal_grid, queue_more_prompt,
     apply_hallucination_display_transition, refresh_swallowed_overlay,
-    see_monsters, see_objects, see_traps, refresh_warning_monsters,
+    see_monsters, see_objects, see_traps, refresh_warning_monsters, map_level_for_wizard,
 } from './display.js';
 import { cansee, couldsee, vision_recalc, vision_reset } from './vision.js';
 import { makemon, mklev, mksobj, monster_by_user_name, next_ident, place_lregion, place_object } from './mklev.js';
@@ -575,6 +575,34 @@ function stairAtHero() {
         if (st.sx === game.u?.ux && st.sy === game.u?.uy) return st;
     }
     return null;
+}
+
+async function doDownCommand() {
+    // C ref: do.c:dodown().
+    const st = stairAtHero();
+    if (!st || st.up) {
+        await pline("You can't go down here.");
+        game.context.move = 0;
+        return;
+    }
+    game._pending_level_teleport_target = st.tolev
+        ? { ...st.tolev }
+        : { ...(game.u?.uz || { dnum: 0, dlevel: 1 }), dlevel: (game.u?.uz?.dlevel ?? 1) + 1 };
+    game.context.move = 1;
+}
+
+async function doUpCommand() {
+    // C ref: do.c:doup().
+    const st = stairAtHero();
+    if (!st || !st.up) {
+        await pline("You can't go up here.");
+        game.context.move = 0;
+        return;
+    }
+    game._pending_level_teleport_target = st.tolev
+        ? { ...st.tolev }
+        : { ...(game.u?.uz || { dnum: 0, dlevel: 1 }), dlevel: Math.max(1, (game.u?.uz?.dlevel ?? 1) - 1) };
+    game.context.move = 1;
 }
 
 function stethoscopeSelfStatusLine() {
@@ -1307,8 +1335,32 @@ function runDirectionForKey(ch) {
     return RUN_KEY[ch] || null;
 }
 
+function hasWoundedLegs() {
+    return !!game.u?.uprops?.wounded_legs;
+}
+
+function setWoundedLegs(side, timeout) {
+    // C ref: do.c:set_wounded_legs().
+    const u = game.u || (game.u = {});
+    u.uprops = u.uprops || {};
+    if (!u.uprops.wounded_legs && Array.isArray(u.acurr?.a)) {
+        u.acurr.a[A_DEX] = Math.max(0, (u.acurr.a[A_DEX] ?? 0) - 1);
+    }
+    u.uprops.wounded_legs = Math.max(u.uprops.wounded_legs || 0, timeout || 0);
+    u.wounded_legs_side = side || u.wounded_legs_side || 'right';
+}
+
+function woundedLegsKickMessage() {
+    // C ref: do.c:legs_in_no_shape().
+    const side = game.u?.wounded_legs_side || 'right';
+    if (side === 'both') return 'Your legs are in no shape for kicking.';
+    const prefix = side === 'left' ? 'left ' : side === 'right' ? 'right ' : '';
+    return `Your ${prefix}leg is in no shape for kicking.`;
+}
+
 const EXTENDED_AUTOCOMPLETE = [
     { name: 'chat', min: 3 },
+    { name: 'kick', min: 1 },
     { name: 'levelchange', min: 2 },
     { name: 'pray', min: 2 },
     { name: 'wizintrinsic', min: 4 },
@@ -1490,6 +1542,76 @@ function doorwayBlocksDiagonalForHero(loc) {
 
 function currentAttr(index) {
     return game.u?.acurr?.a?.[index] ?? 10;
+}
+
+function kickDamageDie() {
+    return currentAttr(A_CON) > 15 ? 3 : 5;
+}
+
+async function kickOuch(x, y, kickobjnam = '') {
+    // C ref: dokick.c:kick_ouch().
+    await pline('Ouch!  That hurts!');
+    exercise(A_DEX, false);
+    exercise(A_STR, false);
+    if (C.isok(x, y)) {
+        for (const mon of game.level?.monsters || []) {
+            if (dist2(x, y, mon.mx, mon.my) <= 25) mon.msleeping = false;
+        }
+    }
+    if (!rn2(3)) setWoundedLegs('right', 5 + rnd(5));
+    const damage = rnd(kickDamageDie());
+    const halfPhysical = !!game.u?.uprops?.half_physical_damage;
+    const finalDamage = halfPhysical ? Math.trunc((damage + 1) / 2) : damage;
+    if (typeof game.u?.uhp === 'number')
+        game.u.uhp = Math.max(0, game.u.uhp - finalDamage);
+}
+
+async function kickDumb(x, y) {
+    // C ref: dokick.c:kick_dumb().
+    exercise(A_DEX, false);
+    if (currentAttr(A_DEX) >= 16 || rn2(3)) {
+        await pline('You kick at empty space.');
+    } else {
+        await pline('Dumb move!  You strain a muscle.');
+        exercise(A_STR, false);
+        setWoundedLegs('right', 5 + rnd(5));
+    }
+}
+
+async function kickDirection(ch) {
+    // C ref: dokick.c:dokick(), dokick.c:kick_nondoor().
+    const dx = DIR_DX[ch] || 0;
+    const dy = DIR_DY[ch] || 0;
+    if (!dx && !dy) {
+        game.context.move = 0;
+        return;
+    }
+    const x = (game.u?.ux ?? 0) + dx;
+    const y = (game.u?.uy ?? 0) + dy;
+    for (const mon of game.level?.monsters || []) {
+        if (dist2(game.u?.ux ?? 0, game.u?.uy ?? 0, mon.mx, mon.my) <= 25)
+            mon.msleeping = false;
+    }
+    if (!C.isok(x, y)) {
+        await kickOuch(x, y);
+        game.context.move = 1;
+        return;
+    }
+    const loc = game.level?.at(x, y);
+    if (mon_at(x, y)) {
+        game.context.move = 0;
+        await pline('You kick at empty space.');
+        return;
+    }
+    if (loc && (C.IS_DOOR(loc.typ)
+        || loc.typ === SDOOR || loc.typ === SCORR
+        || loc.typ === C.STAIRS || loc.typ === C.LADDER
+        || C.IS_STWALL(loc.typ))) {
+        await kickOuch(x, y);
+    } else {
+        await kickDumb(x, y);
+    }
+    game.context.move = 1;
 }
 
 async function tryAutoOpenDoor(x, y) {
@@ -1875,6 +1997,13 @@ function setTravelTipCursor() {
     }
 }
 
+function getposKeyDisplay(ch) {
+    if (!ch) return '';
+    const code = ch.charCodeAt(0);
+    if (code < 32) return `^${String.fromCharCode(code + 64)}`;
+    return ch;
+}
+
 function defaultTravelPromptTarget() {
     const u = game.u;
     if (!u) return null;
@@ -1904,12 +2033,24 @@ function currentTravelCursor() {
 function travelLocationDescription(x, y) {
     const loc = game.level?.at(x, y);
     if (!loc || !travelSeenOrKnown(x, y)) return 'unexplored area (no travel path)';
+    const noTravelPath = !!(game.u && (game.u.ux !== x || game.u.uy !== y)
+        && !findTravelStepToKnownTarget({ x, y }));
     let desc;
     if (loc.typ === C.CLOUD) desc = 'fog/vapor cloud';
-    else if (loc.typ === C.ROOM && !couldsee(x, y)) desc = 'dark part of a room';
+    else if (IS_WALL(loc.typ)) desc = 'wall (no travel path)';
+    else if (loc.typ === C.STAIRS) {
+        const st = travelFeatureStairAt(x, y);
+        const down = !st?.up;
+        const blocked = noTravelPath;
+        desc = `${blocked ? 'blocked ' : ''}staircase ${down ? 'down' : 'up'}${blocked ? ' (no travel path)' : ''}`;
+    }
+    else if (loc.typ === C.ROOM && !couldsee(x, y)) desc = `dark part of a room${noTravelPath ? ' (no travel path)' : ''}`;
     else if (loc.typ === STONE || loc.typ === SCORR) desc = 'stone (no travel path)';
     else if (loc.typ === CORR) desc = 'corridor';
-    else if (loc.typ === DOOR || loc.typ === SDOOR) desc = 'doorway';
+    else if (loc.typ === DOOR) {
+        const closed = !!(loc.doormask & (D_CLOSED | D_LOCKED));
+        desc = `${closed ? 'closed door' : 'doorway'}${noTravelPath ? ' (no travel path)' : ''}`;
+    } else if (loc.typ === SDOOR) desc = `doorway${noTravelPath ? ' (no travel path)' : ''}`;
     else desc = loc.disp_ch && loc.disp_ch !== ' ' ? String(loc.disp_ch) : 'unexplored area';
     return desc;
 }
@@ -1929,6 +2070,18 @@ function travelSeenOrKnown(x, y) {
     const loc = game.level?.at(x, y);
     if (!loc) return false;
     return !!(loc.seenv || loc.remembered_glyph || (loc.disp_ch && loc.disp_ch !== ' ') || couldsee(x, y));
+}
+
+function travelFeatureStairAt(x, y) {
+    for (let st = game.stairs; st; st = st.next)
+        if (st.sx === x && st.sy === y) return st;
+    return null;
+}
+
+function travelFeatureStair(up) {
+    for (let st = game.stairs; st; st = st.next)
+        if (!!st.up === !!up && travelSeenOrKnown(st.sx, st.sy)) return st;
+    return null;
 }
 
 function travelMoveAllowed(x, y, dx, dy) {
@@ -3362,6 +3515,16 @@ export async function rhack(key) {
                 await showPromptLine('Talk to whom? (in what direction) ');
                 game._awaiting_chat_direction = true;
                 game.context.move = 0;
+            } else if (cmd === 'kick') {
+                if (hasWoundedLegs()) {
+                    await pline(woundedLegsKickMessage());
+                    queue_more_prompt();
+                    game.context.move = 0;
+                } else {
+                    await showPromptLine('In what direction? ');
+                    game._awaiting_kick_direction = true;
+                    game.context.move = 0;
+                }
             } else {
                 await pline(`Unknown extended command: ${cmd || '#'}.`);
             }
@@ -3422,28 +3585,45 @@ export async function rhack(key) {
     }
 
     if (game._awaiting_travel_prompt) {
-        if (ch === '>') {
-            await pline("Can't find dungeon feature '>'.");
-            const cursor = currentTravelCursor();
-            setTravelMapCursorAt(cursor.x, cursor.y);
+        if (ch === '>' || ch === '<') {
+            const st = travelFeatureStair(ch === '<');
+            if (st) {
+                game._travel_cursor = { x: st.sx, y: st.sy };
+                await describeTravelCursor();
+            } else {
+                await pline(`Can't find dungeon feature '${ch}'.`);
+                const cursor = currentTravelCursor();
+                setTravelMapCursorAt(cursor.x, cursor.y);
+            }
         } else if (ch === '\r' || ch === '\n') {
             const cursor = currentTravelCursor();
             cursor.y = Math.max(0, Math.min(ROWNO - 1, cursor.y + 8));
             await describeTravelCursor();
         } else if (ch === ' ') {
             await describeTravelCursor();
-        } else if (ch === '.') {
+        } else if (isMovementKey(ch)) {
+            const cursor = currentTravelCursor();
+            cursor.x = Math.max(1, Math.min(COLNO - 1, cursor.x + (DIR_DX[ch] || 0)));
+            cursor.y = Math.max(0, Math.min(ROWNO - 1, cursor.y + (DIR_DY[ch] || 0)));
+            await describeTravelCursor();
+        } else if (ch === '.' || ch === ',') {
             const cursor = currentTravelCursor();
             setTravelCachedTarget({ x: cursor.x, y: cursor.y });
             game._awaiting_travel_prompt = false;
             game._travel_cursor = null;
-            game.context.move = await beginTravelRunToCachedTarget() ? 1 : 0;
+            const pendingBeforeTravel = game._pending_message || '';
+            const clearGetposError = /^(?:Unknown direction:|Can't find dungeon feature )/.test(pendingBeforeTravel);
+            if (clearGetposError) clear_pending_message();
+            const startedTravel = await beginTravelRunToCachedTarget();
+            if (clearGetposError && !startedTravel && pendingBeforeTravel) await pline(pendingBeforeTravel);
+            game.context.move = startedTravel ? 1 : 0;
             return;
         } else if (ch === '\x1b') {
             game._awaiting_travel_prompt = false;
             game._travel_cursor = null;
             clear_pending_message();
         } else {
+            await pline(`Unknown direction: '${getposKeyDisplay(ch)}' (use 'h', 'j', 'k', 'l' or '.').`);
             const cursor = currentTravelCursor();
             setTravelMapCursorAt(cursor.x, cursor.y);
         }
@@ -3965,6 +4145,25 @@ export async function rhack(key) {
         return;
     }
 
+    if (game._awaiting_kick_direction) {
+        game._awaiting_kick_direction = false;
+        clear_pending_message();
+        if (!'hykulnjb<>.'.includes(ch)) {
+            game.context.move = 0;
+            if (game.iflags?.cmdassist !== false) {
+                game._direction_help_screen = INVALID_DIRECTION_HELP_SCREEN;
+                game._direction_help_after_more_message = '';
+                showSerializedOverride(INVALID_DIRECTION_HELP_SCREEN, [8, 23]);
+                queue_more_prompt();
+            } else {
+                await pline('What a strange direction!');
+            }
+            return;
+        }
+        await kickDirection(ch);
+        return;
+    }
+
     if (game._awaiting_zap_direction) {
         clear_pending_message();
         const obj = game._awaiting_zap_direction;
@@ -4291,6 +4490,16 @@ export async function rhack(key) {
         game._awaiting_open_direction = true;
         game.context.move = 0;
         await showPromptLine('In what direction? ');
+    } else if (key === 4) {
+        if (hasWoundedLegs()) {
+            await pline(woundedLegsKickMessage());
+            queue_more_prompt();
+            game.context.move = 0;
+        } else {
+            game._awaiting_kick_direction = true;
+            game.context.move = 0;
+            await showPromptLine('In what direction? ');
+        }
     } else if (ch === '#') {
         game.context.move = 0;
         game._awaiting_extended_command = true;
@@ -4305,9 +4514,14 @@ export async function rhack(key) {
             game._travel_tip_pending = true;
         } else {
             await showPromptLine("Where do you want to travel to?  (For instructions type a '?')");
-            game._travel_cursor = game._travel_cached_target
-                ? { x: game._travel_cached_target.x, y: game._travel_cached_target.y }
-                : { x: game.u?.ux ?? 1, y: game.u?.uy ?? 0 };
+            if (game._travel_reset_cursor_once) {
+                game._travel_reset_cursor_once = false;
+                game._travel_cursor = { x: game.u?.ux ?? 1, y: game.u?.uy ?? 0 };
+            } else {
+                game._travel_cursor = game._travel_cached_target
+                    ? { x: game._travel_cached_target.x, y: game._travel_cached_target.y }
+                    : { x: game.u?.ux ?? 1, y: game.u?.uy ?? 0 };
+            }
             setTravelMapCursorAt(game._travel_cursor.x, game._travel_cursor.y);
             game._awaiting_travel_prompt = true;
         }
@@ -4364,6 +4578,16 @@ export async function rhack(key) {
         game._attributes_page1_screen = screens.page1;
         game._attributes_page2_screen = screens.page2;
         showOverride(screens.page1, [9, 23]);
+    } else if (key === 6 && (game.wizard || game.flags?.debug)) {
+        // C ref: wizcmds.c:wiz_map() -> detect.c:do_mapping().
+        map_level_for_wizard();
+        exercise(A_WIS, true);
+        game._travel_reset_cursor_once = true;
+        game.context.move = 0;
+    } else if (ch === '>') {
+        await doDownCommand();
+    } else if (ch === '<') {
+        await doUpCommand();
     } else if (ch === ':') {
         game.context.move = 0;
         const st = stairAtHero();

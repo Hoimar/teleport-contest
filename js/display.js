@@ -11,16 +11,17 @@ import {
     COLNO, ROWNO, STONE, ROOM, CORR, DOOR, SDOOR, STAIRS,
     HWALL, VWALL, TLCORNER, TRCORNER, BLCORNER, BRCORNER,
     CROSSWALL, TUWALL, TDWALL, TLWALL, TRWALL,
-    TREE, FOUNTAIN, SINK, ALTAR, GRAVE, POOL, MOAT, WATER, LAVAPOOL, LAVAWALL, CLOUD,
+    TREE, FOUNTAIN, SINK, ALTAR, GRAVE, THRONE, POOL, MOAT, WATER, LAVAPOOL, LAVAWALL, CLOUD,
     D_NODOOR, D_ISOPEN, D_CLOSED, D_LOCKED,
-    HOLE, TRAPDOOR, M_AP_OBJECT, IS_POOL,
+    LANDMINE, SLP_GAS_TRAP, HOLE, TRAPDOOR, MAGIC_PORTAL, MAGIC_TRAP, ANTI_MAGIC,
+    M_AP_OBJECT, IS_POOL, IS_WALL,
     SV0, SV1, SV2, SV3, SV4, SV5, SV6, SV7, WM_MASK,
     WARNCOUNT, def_warnsyms, Is_rogue_level,
 } from './const.js';
 import { depth, distmin, dist2 } from './hacklib.js';
 import {
     NO_COLOR, CLR_BLACK, CLR_BLUE, CLR_GREEN, CLR_GRAY, CLR_BROWN, CLR_RED,
-    CLR_WHITE, CLR_ORANGE, CLR_YELLOW, CLR_BRIGHT_BLUE,
+    CLR_WHITE, CLR_ORANGE, CLR_YELLOW, CLR_BRIGHT_BLUE, CLR_BRIGHT_MAGENTA,
     ATR_INVERSE, ATR_BOLD, ATR_UNDERLINE, DEC_TO_UNICODE,
 } from './terminal.js';
 import { roleRankForLevel } from './roles.js';
@@ -272,7 +273,7 @@ function terrain_glyph(loc, x, y) {
     case SDOOR:
         // C ref: display.c:wall_angle().  Undiscovered secret doors render
         // as their underlying wall orientation until they are revealed.
-        return loc.horizontal
+        return secret_door_horizontal(loc, x, y)
             ? { ch: 'q', color: wallColor, dec: true }
             : { ch: 'x', color: wallColor, dec: true };
     case STAIRS:
@@ -298,6 +299,7 @@ function terrain_glyph(loc, x, y) {
     case SINK:      return { ch: '#', color: CLR_GRAY, dec: false };
     case ALTAR:     return { ch: '_', color: CLR_GRAY, dec: false };
     case GRAVE:     return { ch: '|', color: CLR_GRAY, dec: false };
+    case THRONE:    return { ch: '\\', color: CLR_YELLOW, dec: false };
     case TREE:      return { ch: 'g', color: CLR_GREEN, dec: false };
     case POOL:
     case MOAT:
@@ -352,9 +354,23 @@ function display_wall_type(loc) {
     return row[col];
 }
 
+function secret_door_horizontal(loc, x, y) {
+    if (loc.horizontal) return true;
+    const wallish = (spot) => spot && (IS_WALL(spot.typ) || spot.typ === SDOOR);
+    const leftRight = wallish(game.level?.at(x - 1, y)) && wallish(game.level?.at(x + 1, y));
+    const upDown = wallish(game.level?.at(x, y - 1)) && wallish(game.level?.at(x, y + 1));
+    if (leftRight && !upDown) return true;
+    if (upDown && !leftRight) return false;
+    return !!loc.horizontal;
+}
+
 function trap_glyph(trap) {
     if (!trap) return null;
-    const color = (trap.ttyp === HOLE || trap.ttyp === TRAPDOOR) ? CLR_BROWN : CLR_GRAY;
+    let color = CLR_GRAY;
+    if (trap.ttyp === HOLE || trap.ttyp === TRAPDOOR) color = CLR_BROWN;
+    else if (trap.ttyp === LANDMINE) color = CLR_RED;
+    else if (trap.ttyp === SLP_GAS_TRAP || trap.ttyp === ANTI_MAGIC) color = CLR_BRIGHT_BLUE;
+    else if (trap.ttyp === MAGIC_PORTAL || trap.ttyp === MAGIC_TRAP) color = CLR_BRIGHT_MAGENTA;
     return { ch: '^', color, dec: false };
 }
 
@@ -456,6 +472,36 @@ function terrain_covers_objects(loc) {
     // is underwater; lava always covers objects and traps.
     const underwater = !!(game.u?.uprops?.underwater || game.u?.underwater || game.Underwater);
     return ((IS_POOL(loc.typ) && !underwater) || loc.typ === LAVAPOOL || loc.typ === LAVAWALL);
+}
+
+export function map_level_for_wizard() {
+    // C refs: wizcmds.c:wiz_map(), detect.c:do_mapping().
+    if (!game.level) return;
+    const savedHallucination = game.u?.uprops?.hallucination;
+    const savedUHallucination = game.u?.uhallucination;
+    if (game.u?.uprops) game.u.uprops.hallucination = 0;
+    if (game.u) game.u.uhallucination = 0;
+
+    for (const trap of game.level.traps || []) trap.tseen = true;
+
+    for (let y = 0; y < ROWNO; y++) {
+        for (let x = 1; x < COLNO; x++) {
+            const loc = game.level.at(x, y);
+            if (!loc) continue;
+            if (IS_WALL(loc.typ) || loc.typ === SDOOR) loc.seenv = 0xff;
+            loc.waslit = true;
+            const trap = (game.level.traps || []).find(t => t.tx === x && t.ty === y);
+            const covered = terrain_covers_objects(loc);
+            let glyph = terrain_glyph(loc, x, y);
+            if (trap?.tseen && !covered) glyph = trap_glyph(trap);
+            loc.remembered_glyph = { ch: glyph.ch, color: glyph.color, decgfx: !!glyph.dec };
+            show_glyph_cell(x, y, glyph.ch, glyph.color, !!glyph.dec);
+        }
+    }
+    see_monsters();
+
+    if (game.u?.uprops) game.u.uprops.hallucination = savedHallucination;
+    if (game.u) game.u.uhallucination = savedUHallucination;
 }
 
 // ── show_glyph_cell ──
@@ -953,10 +999,10 @@ function _buildScreenOutput() {
             const more = '--More--';
             for (let c = 0; c < more.length; c++) display.setCell(c, 1, more[c], NO_COLOR, 0);
         }
-        // Cursor at hero
-        if (game._prompt_cursor) display.setCursor(game._prompt_cursor[0], game._prompt_cursor[1]);
-        else if (game._more && game._more_next_message_row) display.setCursor('--More--'.length, 1);
-        else if (msg && game._more) display.setCursor(Math.min(msg.length, display.cols - 1), 0);
+        // Cursor at the active blocking prompt before any map/prompt cursor.
+        if (game._more && game._more_next_message_row) display.setCursor('--More--'.length, 1);
+        else if (msg && game._more && !floorListActive) display.setCursor(Math.min(msg.length, display.cols - 1), 0);
+        else if (game._prompt_cursor) display.setCursor(game._prompt_cursor[0], game._prompt_cursor[1]);
         else if (game.u?.ux > 0)
             display.setCursor(game.u.ux - 1, game.u.uy + 1);
     }
