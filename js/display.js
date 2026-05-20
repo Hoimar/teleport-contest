@@ -13,7 +13,10 @@ import {
     CROSSWALL, TUWALL, TDWALL, TLWALL, TRWALL,
     TREE, FOUNTAIN, SINK, ALTAR, GRAVE, THRONE, POOL, MOAT, WATER, LAVAPOOL, LAVAWALL, CLOUD,
     D_NODOOR, D_ISOPEN, D_CLOSED, D_LOCKED,
-    LANDMINE, SLP_GAS_TRAP, HOLE, TRAPDOOR, MAGIC_PORTAL, MAGIC_TRAP, ANTI_MAGIC,
+    ARROW_TRAP, DART_TRAP, ROCKTRAP, SQKY_BOARD, BEAR_TRAP, LANDMINE,
+    ROLLING_BOULDER_TRAP, SLP_GAS_TRAP, RUST_TRAP, FIRE_TRAP, PIT, SPIKED_PIT,
+    HOLE, TRAPDOOR, TELEP_TRAP, LEVEL_TELEP, MAGIC_PORTAL, WEB, STATUE_TRAP,
+    MAGIC_TRAP, ANTI_MAGIC, POLY_TRAP, VIBRATING_SQUARE, TRAPPED_DOOR, TRAPPED_CHEST,
     M_AP_OBJECT, IS_POOL, IS_WALL,
     SV0, SV1, SV2, SV3, SV4, SV5, SV6, SV7, WM_MASK,
     WM_X_TL, WM_X_TR, WM_X_BL, WM_X_BR, WM_X_TLBR, WM_X_BLTR,
@@ -21,8 +24,9 @@ import {
 } from './const.js';
 import { depth, distmin, dist2 } from './hacklib.js';
 import {
-    NO_COLOR, CLR_BLACK, CLR_BLUE, CLR_GREEN, CLR_GRAY, CLR_BROWN, CLR_RED,
-    CLR_WHITE, CLR_ORANGE, CLR_YELLOW, CLR_BRIGHT_BLUE, CLR_BRIGHT_MAGENTA,
+    NO_COLOR, CLR_BLACK, CLR_BLUE, CLR_GREEN, CLR_CYAN, CLR_GRAY, CLR_BROWN,
+    CLR_RED, CLR_MAGENTA, CLR_WHITE, CLR_ORANGE, CLR_YELLOW, CLR_BRIGHT_GREEN,
+    CLR_BRIGHT_BLUE, CLR_BRIGHT_MAGENTA,
     ATR_INVERSE, ATR_BOLD, ATR_UNDERLINE, DEC_TO_UNICODE,
 } from './terminal.js';
 import { roleRankForLevel } from './roles.js';
@@ -121,6 +125,11 @@ function tty_color(color) {
 
 function rogue_level_display() {
     return Is_rogue_level(game.u?.uz);
+}
+
+function dark_room_color_display() {
+    // C defaults: optlist.h enables dark_room, and tty runs with color.
+    return game.flags?.dark_room !== false && game.flags?.color !== false;
 }
 
 function hell_level_display() {
@@ -278,12 +287,15 @@ function terrain_glyph(loc, x, y) {
     switch (typ) {
     case STONE:     return { ch: ' ', color: NO_COLOR, dec: false };
     case ROOM:      return { ch: '~', color: NO_COLOR, dec: true };  // DEC middle dot
-    case CORR:      return { ch: '#', color: NO_COLOR, dec: false };
+    case CORR:
+        // C ref: display.c:glyph_to_sym().  Normal and lit corridors share
+        // '#', so lit corridors are forced to white to remain distinguishable.
+        return { ch: '#', color: (loc.waslit || game.flags?.lit_corridor) ? CLR_WHITE : NO_COLOR, dec: false };
     case DOOR:
         if (loc.doormask & D_ISOPEN) {
-            return loc.horizontal
-                ? { ch: '|', color: CLR_BROWN, dec: false }
-                : { ch: 'a', color: CLR_BROWN, dec: true };
+            // DECgraphics maps both horizontal and vertical open doors to
+            // the checkerboard open-door glyph.
+            return { ch: 'a', color: CLR_BROWN, dec: true };
         }
         if (loc.doormask & (D_CLOSED | D_LOCKED)) return { ch: '+', color: CLR_BROWN, dec: false };
         return { ch: '~', color: NO_COLOR, dec: true };  // D_NODOOR = floor
@@ -462,12 +474,61 @@ function secret_door_horizontal(loc, x, y) {
 
 function trap_glyph(trap) {
     if (!trap) return null;
+    let ch = '^';
     let color = CLR_GRAY;
-    if (trap.ttyp === HOLE || trap.ttyp === TRAPDOOR) color = CLR_BROWN;
-    else if (trap.ttyp === LANDMINE) color = CLR_RED;
-    else if (trap.ttyp === SLP_GAS_TRAP || trap.ttyp === ANTI_MAGIC) color = CLR_BRIGHT_BLUE;
-    else if (trap.ttyp === MAGIC_PORTAL || trap.ttyp === MAGIC_TRAP) color = CLR_BRIGHT_MAGENTA;
-    return { ch: '^', color, dec: false };
+    // C ref: defsym.h trap PCHAR rows via rm.h:trap_to_defsym().
+    switch (trap.ttyp) {
+    case ARROW_TRAP:
+    case DART_TRAP:
+    case BEAR_TRAP:
+        color = CLR_CYAN;
+        break;
+    case SQKY_BOARD:
+    case HOLE:
+    case TRAPDOOR:
+        color = CLR_BROWN;
+        break;
+    case LANDMINE:
+        color = CLR_RED;
+        break;
+    case SLP_GAS_TRAP:
+    case MAGIC_TRAP:
+    case ANTI_MAGIC:
+        color = CLR_BRIGHT_BLUE;
+        break;
+    case RUST_TRAP:
+        color = CLR_BLUE;
+        break;
+    case FIRE_TRAP:
+    case TRAPPED_DOOR:
+    case TRAPPED_CHEST:
+        color = CLR_ORANGE;
+        break;
+    case PIT:
+    case SPIKED_PIT:
+        color = CLR_BLACK;
+        break;
+    case TELEP_TRAP:
+    case LEVEL_TELEP:
+    case VIBRATING_SQUARE:
+        color = CLR_MAGENTA;
+        break;
+    case MAGIC_PORTAL:
+        color = CLR_BRIGHT_MAGENTA;
+        break;
+    case WEB:
+        ch = '"';
+        break;
+    case POLY_TRAP:
+        color = CLR_BRIGHT_GREEN;
+        break;
+    case ROCKTRAP:
+    case ROLLING_BOULDER_TRAP:
+    case STATUE_TRAP:
+    default:
+        break;
+    }
+    return { ch, color, dec: false };
 }
 
 function monster_glyph(mon) {
@@ -706,12 +767,22 @@ export function newsym(x, y) {
 
     const mon = game.level?.monsters?.find(m => m.mx === x && m.my === y);
     const visible = cansee(x, y);
+    if (visible) loc.waslit = !!loc.lit;
 
     if (!visible) {
         const wg = mon ? warning_glyph(mon) : null;
         if (wg) {
             show_glyph_cell(x, y, wg.ch, wg.color, false);
         } else if (loc.remembered_glyph) {
+            if (loc.typ === CORR && (!loc.waslit || dark_room_color_display())
+                && loc.remembered_glyph.ch === '#'
+                && loc.remembered_glyph.color === CLR_WHITE) {
+                // C ref: display.c:newsym().  With dark_room+color, an
+                // out-of-sight remembered lit corridor is redisplayed dark.
+                const tg = terrain_glyph(loc, x, y);
+                tg.color = NO_COLOR;
+                loc.remembered_glyph = { ch: tg.ch, color: tg.color, decgfx: tg.dec };
+            }
             // Out of sight but remembered - show remembered glyph.
             show_glyph_cell(x, y, loc.remembered_glyph.ch,
                 loc.remembered_glyph.color, loc.remembered_glyph.decgfx);
@@ -1156,6 +1227,7 @@ export function clear_pending_message() {
     game._more_dismissals_remaining = 0;
     game._hero_melee_message_pending = false;
     game._pet_combat_more_latched = false;
+    game._pet_combat_pending_boundary = false;
     game._prompt_cursor = null;
     game._packed_monster_more_candidate = false;
     game._monster_more_accepts_any_key = false;

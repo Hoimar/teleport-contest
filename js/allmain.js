@@ -491,6 +491,26 @@ async function runSwallowedPreFinishTurn(g) {
     await advanceTurn();
 }
 
+async function continueNomulTurns(g) {
+    if ((g._nomul_turns_remaining || 0) <= 0) return true;
+    // C ref: allmain.c:moveloop_core() increments negative `multi` after
+    // each immobile turn, then `unmul()` prints `nomovemsg` on the final turn.
+    g._nomul_turns_remaining--;
+    while ((g._nomul_turns_remaining || 0) > 0) {
+        await advanceTurn();
+        if (g._monster_turn_paused_for_more) return false;
+        if (g._more) return false;
+        g._nomul_turns_remaining--;
+    }
+    if (g._nomul_finish_message) {
+        const msg = g._nomul_finish_message;
+        g._nomul_finish_message = null;
+        if (g._pending_message) await append_pline(msg);
+        else await pline(msg);
+    }
+    return true;
+}
+
 async function continueOccupationTurns(g) {
     // C ref: allmain.c:moveloop_core()/occupation.  Delayed occupations keep
     // consuming turns, but tty --More-- pauses can split them across inputs.
@@ -643,6 +663,7 @@ export async function moveloop_core() {
         } else {
             applyOccupationFinalTurnState(g);
             await advanceTurn();
+            if (!await continueNomulTurns(g)) return;
             if (!occupationPending(g)) finish_pending_eaten_corpse();
             if (g._more && occupationPending(g)) {
                 g._occupation_paused_for_more = true;

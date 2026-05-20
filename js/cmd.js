@@ -15,9 +15,9 @@ import {
     object_glyph_for_menu,
 } from './display.js';
 import { cansee, couldsee, vision_recalc, vision_reset } from './vision.js';
-import { makemon, mklev, mksobj, monster_by_user_name, next_ident, place_lregion, place_object } from './mklev.js';
+import { makemon, mklev, mkobj, mksobj, monster_by_user_name, next_ident, place_lregion, place_object } from './mklev.js';
 import { OBJECT_CHARGED, OBJECT_CLASS, OBJECT_DELAY, OBJECT_MATERIAL } from './object_data.js';
-import { finish_pet_kill, pet_arrive_with_you } from './dog.js';
+import { finish_pet_kill, obj_resists, pet_arrive_with_you } from './dog.js';
 import { merge_inventory_object, newuexp, pluslvl } from './u_init.js';
 import { adjalign, exercise, gethungry } from './allmain_turns.js';
 import { initrack } from './track.js';
@@ -83,6 +83,11 @@ const SCALPEL = 39;
 const DART = 23;
 const ORCISH_DAGGER = 36;
 const CORPSE = 265;
+const G_NOCORPSE = 0x0010;
+const RANDOM_CLASS = 0;
+const POT_PARALYSIS = 301;
+const POT_FRUIT_JUICE = 319;
+const SCR_LIGHT = 332;
 const BOULDER = 475;
 const FORTUNE_COOKIE = 289;
 const LEATHER_GLOVES = 159;
@@ -557,6 +562,45 @@ function readLetters() {
         .join('');
 }
 
+function lightScrollArea(radius = 5) {
+    // C ref: read.c:seffect_light() -> vision.c:do_clear_area().
+    const offsets = {
+        5: [5, 5, 5, 4, 3, 2],
+        9: [9, 9, 9, 9, 8, 8, 7, 6, 5, 3],
+    }[radius];
+    if (!offsets) return;
+    const ux = game.u?.ux ?? 0;
+    const uy = game.u?.uy ?? 0;
+    for (let y = Math.max(0, uy - radius); y <= Math.min(ROWNO - 1, uy + radius); y++) {
+        const offset = offsets[Math.abs(y - uy)];
+        for (let x = Math.max(1, ux - offset); x <= Math.min(COLNO - 1, ux + offset); x++) {
+            if (!couldsee(x, y)) continue;
+            const loc = game.level?.at(x, y);
+            if (loc) loc.lit = true;
+        }
+    }
+    vision_recalc(0);
+}
+
+async function readScrollOfLight(obj, idx) {
+    // C refs: read.c:doread(), read.c:seffects(), read.c:seffect_light().
+    await pline('As you read the scroll, it disappears.');
+    exercise(A_WIS, true);
+    const discovered = game.discoveredObjects || (game.discoveredObjects = new Set());
+    if (!discovered.has(obj.otyp)) {
+        discovered.add(obj.otyp);
+        exercise(A_WIS, true);
+    }
+    if ((obj.quan || 1) > 1) {
+        obj.quan--;
+    } else if (idx >= 0) {
+        game.inventory.splice(idx, 1);
+    }
+    await append_pline('A lit field surrounds you!');
+    lightScrollArea(obj.blessed ? 9 : 5);
+    game.context.move = 1;
+}
+
 function eatLetters() {
     ensureInventoryLetters();
     return (game.inventory || [])
@@ -567,9 +611,11 @@ function eatLetters() {
 
 function drinkLetters() {
     ensureInventoryLetters();
-    return compressLetters((game.inventory || [])
+    const letters = (game.inventory || [])
         .filter((obj) => obj?.oclass === POTION_CLASS)
-        .map((obj) => obj.invlet));
+        .map((obj) => obj.invlet)
+        .filter(validInvlet);
+    return letters.length > 5 ? compressLetters(letters) : letters.join('');
 }
 
 function throwLetters() {
@@ -1323,6 +1369,25 @@ async function drinkPotion(obj, idx) {
     const appearance = getObjectDescription(obj.otyp) || 'ruby';
     if ((obj.quan || 1) > 1) obj.quan--;
     else if (idx >= 0) game.inventory.splice(idx, 1);
+    if (obj.otyp === POT_PARALYSIS) {
+        // C ref: potion.c:peffect_paralysis().
+        const bcsign = obj.blessed ? 1 : (obj.cursed ? -1 : 0);
+        game._nomul_turns_remaining = rn2(10) + 25 - (12 * bcsign);
+        game._nomul_finish_message = 'You can move again.';
+        exercise(A_DEX, false);
+        const discovered = game.discoveredObjects || (game.discoveredObjects = new Set());
+        if (!discovered.has(obj.otyp)) {
+            discovered.add(obj.otyp);
+            exercise(A_WIS, true);
+        }
+        await pline('Your feet are frozen to the floor!');
+        game.context.move = 1;
+        return;
+    }
+    if (obj.otyp !== POT_FRUIT_JUICE) {
+        game.context.move = 1;
+        return;
+    }
     game._drink_call_after_more = appearance;
     await pline('This tastes like slime mold juice.');
     queue_more_prompt();
@@ -1412,6 +1477,8 @@ export function finish_pending_eaten_corpse() {
     const obj = game._pending_eaten_corpse_remove;
     if (!obj) return;
     game._pending_eaten_corpse_remove = null;
+    // C ref: eat.c:done_eating() -> invent.c:delobj_core().
+    obj_resists(obj, 0, 0);
     extractFloorObject(obj);
 }
 
@@ -1626,7 +1693,11 @@ const MONSTER_AC = new Map([
 ]);
 
 const VERY_SMALL_MONSTERS = new Set([
-    'grid bug',
+    'giant ant', 'killer bee', 'soldier ant', 'fire ant', 'queen bee',
+    'acid blob', 'chickatrice', 'homunculus', 'imp', 'leprechaun',
+    'sewer rat', 'giant rat', 'rabid rat', 'wererat', 'cave spider',
+    'centipede', 'grid bug', 'xan', 'bat', 'garter snake',
+    'newt', 'gecko', 'iguana', 'lizard', 'chameleon',
 ]);
 
 const WEAPON_SMALL_DAMAGE_DIE = new Map([
@@ -1749,8 +1820,11 @@ async function tryAutoOpenDoor(x, y) {
         loc.doormask = C.D_ISOPEN;
         loc.flags = C.D_ISOPEN;
         newsym(x, y);
+        vision_reset();
+        vision_recalc(0);
         await pline('The door opens.');
     } else {
+        exercise(A_STR, true);
         await pline('The door resists!');
     }
     game.context.move = 0;
@@ -1944,6 +2018,26 @@ function corpseChance(mon) {
     return !rn2(denom);
 }
 
+function accessibleKillDropSquare(x, y) {
+    const loc = game.level?.at(x, y);
+    if (!loc) return false;
+    if (C.ACCESSIBLE(loc.typ) && !(C.IS_DOOR(loc.typ) && (loc.doormask & (D_CLOSED | D_LOCKED)))) return true;
+    return C.IS_POOL(loc.typ);
+}
+
+function maybeDropKillTreasure(mon) {
+    // C ref: mon.c:xkilled() creates a random extra object before
+    // corpse_chance() when the kill-location and monster filters allow it.
+    if (rn2(6)) return;
+    if ((mon.data?.geno || 0) & G_NOCORPSE) return;
+    if (mon.mx === game.u?.ux && mon.my === game.u?.uy) return;
+    if (mon.data?.mlet === 'S_KOP') return;
+    if (mon.mcloned) return;
+    if (!accessibleKillDropSquare(mon.mx, mon.my)) return;
+    const otmp = mkobj(RANDOM_CLASS, true);
+    place_object(otmp, mon.mx, mon.my);
+}
+
 function monsterExperienceBasic(mon) {
     // C ref: exper.c:experience().  This covers the current xkilled()
     // evidence: base adjusted monster level plus the fast-monster bonus.
@@ -1968,10 +2062,7 @@ function heroKilledMonster(mon) {
         game.u.uluck = (game.u?.uluck || 0) - 1;
         game._pending_tame_kill_reaction = true;
     }
-    if (!rn2(6)) {
-        // Treasure-drop object creation is still future work; current
-        // evidence only needs the C front-door gate.
-    }
+    maybeDropKillTreasure(mon);
     corpseChance(mon);
     if (mon.mpeaceful && !rn2(2)) {
         // Luck adjustment is outside the current scoring surface.
@@ -4738,7 +4829,7 @@ export async function rhack(key) {
         if (ch === '\r' || ch === '\n') {
             clear_pending_message();
             game._awaiting_potion_call_name = null;
-            game.context.move = 0;
+            game.context.move = 1;
             return;
         }
         if (ch === '\x7f' || ch === '\b') {
@@ -4875,6 +4966,10 @@ export async function rhack(key) {
         if (obj.oclass !== SCROLL_CLASS && obj.oclass !== SPBOOK_CLASS) {
             game.context.move = 0;
             await pline('That is a silly thing to read.');
+            return;
+        }
+        if (obj.otyp === SCR_LIGHT) {
+            await readScrollOfLight(obj, idx);
             return;
         }
         game.context.move = 0;

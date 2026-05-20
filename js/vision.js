@@ -8,7 +8,7 @@ import {
     COLNO, ROWNO, DOOR, SDOOR, POOL, WATER, LAVAWALL, CLOUD,
     D_CLOSED, D_LOCKED, D_TRAPPED,
     SV0, SV1, SV2, SV3, SV4, SV5, SV6, SV7,
-    IS_WALL,
+    IS_ROOM, IS_WALL,
 } from './const.js';
 import { newsym } from './display.js';
 
@@ -476,6 +476,8 @@ export function vision_recalc(control = 0) {
     // Compute IN_SIGHT from COULD_SEE + lighting
     const level = game.level;
     const ux = u.ux, uy = u.uy;
+    const heroLoc = level?.at(ux, uy);
+    const heroInRoom = !!heroLoc && IS_ROOM(heroLoc.typ);
 
     for (let row = 0; row < ROWNO; row++) {
         const dy = Math.sign(uy - row);
@@ -484,9 +486,14 @@ export function vision_recalc(control = 0) {
             const loc = level?.at(col, row);
             if (!loc) continue;
 
-            // Night vision: adjacent cells always IN_SIGHT
+            // Night vision promotes adjacent clear terrain and closed doors.
+            // Dark-room walls are visible from inside rooms; corridor endpoint
+            // walls still need the lit-wall check below.
             if (Math.abs(col - ux) <= 1 && Math.abs(row - uy) <= 1) {
-                next[row][col] |= IN_SIGHT;
+                if (viz_clear[row]?.[col] || loc.typ === DOOR
+                    || (heroInRoom && (IS_WALL(loc.typ) || loc.typ === SDOOR))) {
+                    next[row][col] |= IN_SIGHT;
+                }
                 continue;
             }
 

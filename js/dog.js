@@ -7,13 +7,14 @@ import { OBJECT_CLASS } from './object_data.js';
 import { newsym, pline, queue_more_prompt, flush_screen, clear_pending_message } from './display.js';
 import { nhgetch } from './input.js';
 import {
-    ACCFOOD, APPORT, CADAVER, DOGFOOD, MANFOOD, TABU, UNDEF,
+    ACCFOOD, APPORT, CADAVER, COLNO, DOGFOOD, MANFOOD, TABU, UNDEF,
     D_BROKEN, D_CLOSED, D_LOCKED, GP_AVOID_MONPOS, GP_CHECKSCARY, IS_DOOR, IS_OBSTRUCTED,
     IS_LAVA, IS_POOL, IS_ROOM, LADDER, MM_EDOG, MTSZ, NO_MINVENT, SPACE_POS, STAIRS,
     W_WEP, isok,
 } from './const.js';
 import { d, rn2, rnd } from './rng.js';
-import { cansee, clear_path } from './vision.js';
+import { gettrack } from './track.js';
+import { cansee, clear_path, couldsee } from './vision.js';
 
 const FOOD_CLASS = 7;
 const WEAPON_CLASS = 2;
@@ -268,6 +269,10 @@ function cursed_object_at(x, y) {
     return objects_at(x, y).some((obj) => obj.cursed);
 }
 
+function trap_at(x, y) {
+    return (game.level?.traps || []).find((trap) => trap.tx === x && trap.ty === y) || null;
+}
+
 function is_boulder_at(x, y) {
     return objects_at(x, y).some((obj) => obj.otyp === BOULDER);
 }
@@ -287,7 +292,7 @@ function avoid_soko_push_loc(mtmp, nx, ny) {
     return is_boulder_at(nx + sgn(ux - nx), ny + sgn(uy - ny));
 }
 
-function obj_resists(obj, ochance, achance) {
+export function obj_resists(obj, ochance, achance) {
     if (obj.otyp === AMULET_OF_YENDOR
         || obj.otyp === SPE_BOOK_OF_THE_DEAD
         || obj.otyp === CANDELABRUM_OF_INVOCATION
@@ -466,6 +471,11 @@ function occupation_message_boundary_active() {
     return (game._occupation_turns_remaining || 0) > 0 || !!game._occupation_finish_message;
 }
 
+function pending_pet_combat_boundary() {
+    return game._pet_combat_pending_boundary
+        || /^You (?:miss|hit) .+  The (?:kitten|little dog|pony) .+\.$/.test(game._pending_message || '');
+}
+
 async function append_topline_message(line) {
     if (game._pending_message?.startsWith('You start putting on ')) game._pending_message = '';
     if (game._pending_message) {
@@ -486,9 +496,27 @@ async function append_topline_message(line) {
             game._pet_combat_more_latched = true;
             return;
         }
-        game._pending_message = `${game._pending_message}  ${line}`;
-        queue_more_prompt();
-        game._pet_combat_more_latched = true;
+        if (pending_pet_combat_boundary()) {
+            game._pet_combat_pending_boundary = false;
+            queue_more_prompt();
+            game._after_more_message = game._after_more_message
+                ? `${game._after_more_message}  ${line}`
+                : line;
+            game._after_more_needs_prompt = false;
+            game._pet_combat_more_latched = true;
+            return;
+        }
+        const pending = game._pending_message;
+        const packed = `${pending}  ${line}`;
+        const cols = game.nhDisplay?.cols || COLNO;
+        const heroMeleePack = /^You (?:miss|hit) /.test(pending) && packed.length < cols;
+        game._pending_message = packed;
+        if (heroMeleePack) {
+            game._pet_combat_pending_boundary = true;
+        } else {
+            queue_more_prompt();
+            game._pet_combat_more_latched = true;
+        }
         if (occupation_message_boundary_active()) {
             // C ref: tty topline handling via pline()/--More--.  A second
             // visible pet-combat pline can block inside the monster turn,
@@ -794,7 +822,7 @@ function pet_goal(mtmp, after, udist, whappr) {
     const maxY = Math.min(20, mtmp.my + 5);
     // C ref: dogmove.c uses couldsee(omx, omy).  While swallowed, C's
     // gulpmu() disables ordinary hero vision before later pet goal scans.
-    const inMastersSight = !game.u?.uswallow;
+    const inMastersSight = !game.u?.uswallow && couldsee(mtmp.mx, mtmp.my);
     const dogHasMinvent = !!(mtmp.inventory?.length);
 
     for (const obj of game.level?.objects || []) {
@@ -852,7 +880,24 @@ function pet_goal(mtmp, after, udist, whappr) {
             }
         }
     }
-    return { abort: false, gx, gy, appr };
+
+    let followX = gx;
+    let followY = gy;
+    if (!inMastersSight) {
+        const track = gettrack(mtmp.mx, mtmp.my);
+        if (track) {
+            followX = track.x;
+            followY = track.y;
+            edog.ogoal.x = 0;
+        } else if (edog.ogoal?.x && (edog.ogoal.x !== mtmp.mx || edog.ogoal.y !== mtmp.my)) {
+            followX = edog.ogoal.x;
+            followY = edog.ogoal.y;
+            edog.ogoal.x = 0;
+        }
+    } else {
+        edog.ogoal.x = 0;
+    }
+    return { abort: false, gx: followX, gy: followY, appr };
 }
 
 export async function dog_move(mtmp, after = true) {
@@ -905,6 +950,12 @@ export async function dog_move(mtmp, after = true) {
                 continue;
             }
             if (avoid_soko_push_loc(mtmp, nx, ny)) continue;
+
+            // C ref: dogmove.c:dog_move(). Seen traps are retained as
+            // candidates by mfndpos(ALLOW_TRAPS), then pets usually avoid
+            // stepping on them during candidate evaluation.
+            const trap = trap_at(nx, ny);
+            if (trap?.tseen && rn2(40)) continue;
 
             let cursedOnCandidate = false;
             const canReachFood = could_reach_item(mtmp, nx, ny);

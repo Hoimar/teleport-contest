@@ -1461,6 +1461,18 @@ async function show_blocking_monster_message(line) {
         game._pending_message = `${game._pending_message}  ${line}`;
         return;
     }
+    const pendingPetCombatBoundary = game._pet_combat_pending_boundary
+        || /^You (?:miss|hit) .+  The (?:kitten|little dog|pony) .+\.$/.test(game._pending_message || '');
+    if (pendingPetCombatBoundary && game._pending_message && !game._more) {
+        game._pet_combat_pending_boundary = false;
+        queue_more_prompt();
+        game._pet_combat_more_latched = true;
+        game._after_more_message = game._after_more_message
+            ? `${game._after_more_message}  ${line}`
+            : line;
+        game._after_more_needs_prompt = false;
+        return;
+    }
     if (/^You (miss|hit) /.test(game._pending_message || '') && !game._more
         && `${game._pending_message}  ${line}`.length < 80) {
         game._pending_message = `${game._pending_message}  ${line}`;
