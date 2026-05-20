@@ -11,7 +11,7 @@ import {
     COLNO, ROWNO, STONE, ROOM, CORR, DOOR, SDOOR, STAIRS,
     HWALL, VWALL, TLCORNER, TRCORNER, BLCORNER, BRCORNER,
     CROSSWALL, TUWALL, TDWALL, TLWALL, TRWALL,
-    TREE, FOUNTAIN, SINK, ALTAR, GRAVE, POOL, MOAT, WATER, LAVAPOOL, LAVAWALL,
+    TREE, FOUNTAIN, SINK, ALTAR, GRAVE, POOL, MOAT, WATER, LAVAPOOL, LAVAWALL, CLOUD,
     D_NODOOR, D_ISOPEN, D_CLOSED, D_LOCKED,
     HOLE, TRAPDOOR, M_AP_OBJECT, IS_POOL,
     SV0, SV1, SV2, SV3, SV4, SV5, SV6, SV7, WM_MASK,
@@ -310,6 +310,9 @@ function terrain_glyph(loc, x, y) {
         return { ch: '`', color: CLR_RED, dec: false };
     case LAVAWALL:
         return { ch: '`', color: CLR_ORANGE, dec: false };
+    case CLOUD:
+        // C ref: include/defsym.h:S_cloud.
+        return { ch: '#', color: CLR_GRAY, dec: false };
     default:        return { ch: '?', color: NO_COLOR, dec: false };
     }
 }
@@ -755,7 +758,11 @@ function _statusLine2() {
         ? game._latched_status_uhp
         : (u.uhp || 0);
     const goldSymbol = rogue_level_display() ? '*' : '$';
-    return `Dlvl:${depth(u.uz)} ${goldSymbol}:${game._goldCount || 0} HP:${hp}(${u.uhpmax || 0}) Pw:${u.uen || 0}(${u.uenmax || 0}) AC:${u.uac ?? 10} ${xp}${turn}${conditionText}`;
+    // C ref: botl.c:describe_level().
+    const levelDesc = game.quest_dnum != null && u.uz?.dnum === game.quest_dnum
+        ? `Home ${u.uz?.dlevel || 1}`
+        : `Dlvl:${depth(u.uz)}`;
+    return `${levelDesc} ${goldSymbol}:${game._goldCount || 0} HP:${hp}(${u.uhpmax || 0}) Pw:${u.uen || 0}(${u.uenmax || 0}) AC:${u.uac ?? 10} ${xp}${turn}${conditionText}`;
 }
 
 // ── Serialize terminal grid for screen comparison ──

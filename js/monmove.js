@@ -13,7 +13,7 @@ import {
     NEED_RANGED_WEAPON, NEED_WEAPON, W_ARMS, W_NONDIGGABLE, W_WEP,
     GP_CHECKSCARY, SDOOR, W_NONPASSWALL,
     STRAT_WAITFORU, STRAT_WAITMASK,
-    isok, SPACE_POS, is_pit,
+    COLNO, ROWNO, isok, SPACE_POS, is_pit,
 } from './const.js';
 import {
     newsym, queue_more_prompt, pline, flush_screen, clear_pending_message,
@@ -36,6 +36,7 @@ const M2_ROCKTHROW = 0x08000000;
 const M1_FLY = 0x00000001;
 const M1_SWIM = 0x00000002;
 const M1_WALLWALK = 0x00000008;
+const M1_CLING = 0x00000010;
 const M1_TUNNEL = 0x00000020;
 const M1_NEEDPICK = 0x00000040;
 const M1_HIDE = 0x00000100;
@@ -48,6 +49,7 @@ const M1_ANIMAL = 0x00040000;
 const M2_STRONG = 0x04000000;
 const M2_COLLECT = 0x40000000;
 const M2_MAGIC = 0x80000000;
+const MR_FIRE = 0x01;
 const MR_SLEEP = 0x04;
 const MTSZ = 4;
 const MS_RIDER = 35;
@@ -211,6 +213,64 @@ function monnear_hero(mtmp) {
     // C ref: mon.c:monnear().  dochug() short-circuits before the
     // is_wanderer() RNG gate when the pet is not near its target.
     return dist2(mtmp.mx, mtmp.my, game.u?.ux ?? mtmp.mx, game.u?.uy ?? mtmp.my) < 3;
+}
+
+function move_mon_to_basic(mtmp, x, y) {
+    const omx = mtmp.mx;
+    const omy = mtmp.my;
+    mtmp.mx = x;
+    mtmp.my = y;
+    newsym(omx, omy);
+    newsym(x, y);
+}
+
+function tele_restrict_basic() {
+    // C ref: teleport.c:tele_restrict().
+    return !!game.level?.flags?.noteleport;
+}
+
+function rloc_pos_ok_basic(x, y, mtmp) {
+    if (!isok(x, y)) return false;
+    return can_mon_step(mtmp, x, y);
+}
+
+function rloc_basic(mtmp) {
+    // C ref: teleport.c:rloc(). Try random level positions before a
+    // randomized exhaustive fallback.
+    for (let trycount = 0; trycount < 50; trycount++) {
+        const x = rnd(COLNO - 1);
+        const y = rn2(ROWNO);
+        if (rloc_pos_ok_basic(x, y, mtmp)) {
+            move_mon_to_basic(mtmp, x, y);
+            return true;
+        }
+    }
+
+    const candidates = [];
+    for (let x = 1; x < COLNO; x++) {
+        for (let y = 0; y < ROWNO; y++) {
+            if (rloc_pos_ok_basic(x, y, mtmp)) candidates.push({ x, y });
+        }
+    }
+    for (let i = 0; i < candidates.length; i++) {
+        const j = rn2(candidates.length - i);
+        if (j) [candidates[i], candidates[i + j]] = [candidates[i + j], candidates[i]];
+        const cand = candidates[i];
+        if (rloc_pos_ok_basic(cand.x, cand.y, mtmp)) {
+            move_mon_to_basic(mtmp, cand.x, cand.y);
+            return true;
+        }
+    }
+    return false;
+}
+
+function mnexto_basic(mtmp) {
+    // C ref: mon.c:mnexto().
+    const spot = enexto_core(game.u?.ux ?? mtmp.mx, game.u?.uy ?? mtmp.my, mtmp.data, GP_CHECKSCARY)
+        || enexto_core(game.u?.ux ?? mtmp.mx, game.u?.uy ?? mtmp.my, mtmp.data, 0);
+    if (!spot) return false;
+    move_mon_to_basic(mtmp, spot.x, spot.y);
+    return true;
 }
 
 function set_apparxy_basic(mtmp) {
@@ -377,7 +437,10 @@ function mon_at(x, y, self) {
 }
 
 function mon_in_air(mtmp) {
-    return !!((mtmp.data?.mflags1 ?? 0) & M1_FLY);
+    const flags1 = mtmp.data?.mflags1 ?? 0;
+    return !!(flags1 & M1_FLY)
+        || mon_is_floater(mtmp)
+        || (!!(flags1 & M1_CLING) && !!mtmp.mundetected);
 }
 
 function mon_swims(mtmp) {
@@ -394,6 +457,24 @@ function mon_can_open_doors(mtmp) {
 
 function mon_likes_lava(mtmp) {
     return !!mtmp.data?.likes_lava;
+}
+
+function resists_fire_basic(mtmp) {
+    return !!((mtmp?.data?.mresists ?? 0) & MR_FIRE);
+}
+
+function minliquid_basic(mtmp) {
+    const loc = game.level?.at(mtmp.mx, mtmp.my);
+    if (!loc || !IS_LAVA(loc.typ)) return false;
+    // C ref: mon.c:minliquid() / minliquid_core(). Grounded monsters which
+    // neither cling over nor like lava burn before dochugw()/distfleeck().
+    if (mon_in_air(mtmp) || mon_likes_lava(mtmp)) return false;
+    if (resists_fire_basic(mtmp)) {
+        mtmp.mhp = (mtmp.mhp ?? 1) - 1;
+        if ((mtmp.mhp ?? 0) > 0) return false;
+    }
+    remove_dead_monster(mtmp);
+    return true;
 }
 
 function may_passwall(x, y) {
@@ -1619,10 +1700,17 @@ async function m_move_basic(mtmp) {
         rn2(3);
         return MMOVE_NOTHING;
     }
+    if (mtmp.data?.name === 'TENGU' && !rn2(5) && !mtmp.mcan
+        && !tele_restrict_basic(mtmp)) {
+        // C ref: monmove.c:m_move(); teleporting by nature happens before
+        // ordinary path selection.
+        if ((mtmp.mhp ?? 0) < 7 || mtmp.mpeaceful || rn2(2)) rloc_basic(mtmp);
+        else mnexto_basic(mtmp);
+        return MMOVE_MOVED;
+    }
     if ((mtmp.data?.mflags1 & M1_CONCEAL)
-        && can_hide_under_object_basic(mtmp.mx, mtmp.my)
-        && rn2(10)) {
-        return MMOVE_NOTHING;
+        && can_hide_under_object_basic(mtmp.mx, mtmp.my)) {
+        if (rn2(10)) return MMOVE_NOTHING;
     }
     if (mtmp.mconf) {
         appr = 0;
@@ -2001,6 +2089,8 @@ export async function movemon() {
 
         mtmp.movement -= NORMAL_SPEED;
         if (mtmp.movement >= NORMAL_SPEED) somebody_can_move = true;
+
+        if (minliquid_basic(mtmp)) continue;
 
         if (mtmp.misc_worn_check & I_SPECIAL) {
             const targetX = mtmp.mux ?? game.u?.ux ?? mtmp.mx;

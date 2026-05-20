@@ -19,7 +19,7 @@ import { getObjectColor, getObjectMaterial } from './o_init.js';
 import { MONSTER_DATA } from './monster_data.js';
 import { m_dowear_basic } from './mon_wear.js';
 import {
-    COLNO, ROWNO, STONE, ROOM, CORR, DOOR, STAIRS, LADDER, AIR,
+    COLNO, ROWNO, STONE, ROOM, CORR, DOOR, STAIRS, LADDER, AIR, CLOUD,
     HWALL, VWALL, TLCORNER, TRCORNER, BLCORNER, BRCORNER,
     CROSSWALL, TUWALL, TDWALL, TLWALL, TRWALL,
     D_NODOOR, D_BROKEN, D_CLOSED, D_ISOPEN, D_LOCKED, D_TRAPPED, D_SECRET,
@@ -146,6 +146,7 @@ const BANDED_MAIL = 125;
 const STUDDED_LEATHER_ARMOR = 131;
 const RING_MAIL = 132;
 const LEATHER_ARMOR = 134;
+const LEATHER_JACKET = 135;
 const ORCISH_CLOAK = 140;
 const DWARVISH_CLOAK = 141;
 const DENTED_POT = 95;
@@ -2441,6 +2442,18 @@ function m_initweap_for(ptr) {
         maybe_init_offensive_item_for(ptr);
         return;
     }
+    if (ptr.msound === MS_GUARDIAN) {
+        // C ref: makemon.c:m_initweap(); Wizard quest apprentices use the
+        // generic student/attendant/guide guardian kit.
+        if (ptr.name === 'APPRENTICE') {
+            if (rn2(2)) mksobj(rn2(3) ? DAGGER : KNIFE, true, false);
+            if (rn2(5)) mksobj(rn2(3) ? LEATHER_JACKET : LEATHER_CLOAK, true, false);
+            if (rn2(3)) mksobj(rn2(3) ? LOW_BOOTS : HIGH_BOOTS, true, false);
+            if (rn2(3)) mksobj(POT_HEALING, true, false);
+        }
+        maybe_init_offensive_item_for(ptr);
+        return;
+    }
     if (ptr.name === 'HOBBIT') {
         switch (rn2(3)) {
         case 0:
@@ -3054,6 +3067,17 @@ function maketrap(x, y, typ) {
     let trap = game.level.traps.find((ttmp) => ttmp.tx === x && ttmp.ty === y) || null;
     const oldplace = !!trap;
     if (oldplace && undestroyable_trap(trap.ttyp)) return null;
+    const loc = game.level.at(x, y);
+    const terrain = loc?.typ ?? STONE;
+    if (!oldplace
+        && (terrain === STAIRS || terrain === LADDER
+            || IS_POOL(terrain) || IS_LAVA(terrain)
+            || (IS_FURNITURE(terrain) && typ !== PIT && typ !== HOLE)
+            || ((terrain === AIR || terrain === CLOUD) && typ !== MAGIC_PORTAL)
+            || (typ === LEVEL_TELEP && game.branches?.some((br) =>
+                br.end1?.dnum === game.u?.uz?.dnum && br.end2?.dnum === game.u?.uz?.dnum)))) {
+        return null;
+    }
     if (!trap) trap = { tx: x, ty: y };
     trap.ttyp = typ;
     trap.tseen = unhideable_trap(typ);
@@ -7978,6 +8002,233 @@ function loadOrcusSpecial() {
     fixup_special();
 }
 
+// Bare des.map([[...]]) defaults to centered placement.
+// C ref: sp_lev.c:lspo_map().
+const WIZ_START_X = 3;
+const WIZ_START_Y = 1;
+const WIZ_START_MAP = [
+    '............................................................................',
+    '.....................C....CC.C........................C.....................',
+    '..........CCC.....................CCC.......................................',
+    '........CC........-----------.......C.C...C...C....C........................',
+    '.......C.....---------------------...C..C..C..C.............................',
+    '......C..C...------....\\....------....C.....C...............................',
+    '........C...||....|.........|....||.........................................',
+    '.......C....||....|.........+....||.........................................',
+    '.......C...||---+--.........|....|||........................................',
+    '......C....||...............|--S--||........................................',
+    '...........||--+--|++----|---|..|.SS..........C......C......................',
+    '........C..||.....|..|...|...|--|.||..CC..C.....C..........C................',
+    '.......C...||.....|..|.--|.|.|....||.................C..C...................',
+    '.....C......||....|..|.....|.|.--||..C..C..........C...........}}}..........',
+    '......C.C...||....|..-----.|.....||...C.C.C..............C....}}}}}}........',
+    '.........C...------........|------....C..C.....C..CC.C......}}}}}}}}}}}.....',
+    '.........CC..---------------------...C.C..C.....CCCCC.C.......}}}}}}}}......',
+    '.........C........-----------..........C.C.......CCC.........}}}}}}}}}......',
+    '..........C.C.........................C............C...........}}}}}........',
+    '......................CCC.C.................................................',
+];
+
+function wizStartX(x) { return WIZ_START_X + x; }
+function wizStartY(y) { return WIZ_START_Y + y; }
+
+function wizStartSetTerrain(x, y, ch) {
+    const loc = game.level?.at(wizStartX(x), wizStartY(y));
+    if (!loc) return;
+    loc.lit = false;
+    loc.horizontal = false;
+    switch (ch) {
+    case '.': loc.typ = ROOM; break;
+    case 'C': loc.typ = CLOUD; break;
+    case '}': loc.typ = MOAT; break;
+    case '\\': loc.typ = THRONE; break;
+    case '-': loc.typ = HWALL; break;
+    case '|': loc.typ = VWALL; break;
+    case '+':
+        loc.typ = DOOR;
+        set_door_mask(loc, D_CLOSED);
+        break;
+    case 'S':
+        loc.typ = SDOOR;
+        loc.horizontal = WIZ_START_MAP[y]?.[x - 1] === '-' || WIZ_START_MAP[y]?.[x + 1] === '-';
+        set_door_mask(loc, D_SECRET);
+        break;
+    default:
+        loc.typ = STONE;
+        break;
+    }
+    game._special_touched = game._special_touched || new Set();
+    game._special_touched.add(specialTouchedKey(wizStartX(x), wizStartY(y)));
+}
+
+function loadWizStartTerrain(litRandom) {
+    game._special_touched = new Set();
+    for (let x = 1; x < COLNO; x++) {
+        for (let y = 0; y < ROWNO; y++) {
+            const loc = game.level?.at(x, y);
+            if (!loc) continue;
+            loc.typ = STONE;
+            loc.flags = 0;
+            loc.doormask = 0;
+            loc.lit = !!litRandom;
+        }
+    }
+    for (let y = 0; y < WIZ_START_MAP.length; y++)
+        for (let x = 0; x < WIZ_START_MAP[y].length; x++)
+            wizStartSetTerrain(x, y, WIZ_START_MAP[y][x]);
+    game.level.flags.is_maze_lev = true;
+    game.level.flags.noteleport = true;
+    game.level.flags.hardfloor = true;
+}
+
+function wizStartApplyReplaceTerrain(x1, y1, x2, y2, fromTyp, toTyp, chance) {
+    // C ref: sp_lev.c:lspo_replace_terrain().
+    for (let x = x1; x <= x2; x++) {
+        for (let y = y1; y <= y2; y++) {
+            const loc = game.level?.at(wizStartX(x), wizStartY(y));
+            if (!loc || loc.typ !== fromTyp) continue;
+            if (rn2(100) < chance) loc.typ = toTyp;
+        }
+    }
+}
+
+function wizStartApplyLit(x1, y1, x2, y2, lit) {
+    for (let y = y1; y <= y2; y++)
+        for (let x = x1; x <= x2; x++) {
+            const loc = game.level?.at(wizStartX(x), wizStartY(y));
+            if (loc) loc.lit = !!lit;
+        }
+}
+
+function wizStartSetDoor(x, y, mask) {
+    const loc = game.level?.at(wizStartX(x), wizStartY(y));
+    if (!loc) return;
+    loc.typ = DOOR;
+    loc.horizontal = false;
+    set_door_mask(loc, mask);
+}
+
+function wizStartDryLocation() {
+    return specialRandomDryLocation(WIZ_START_MAP[0].length, WIZ_START_MAP.length,
+        WIZ_START_X, WIZ_START_Y);
+}
+
+function wizStartInventoryObject(mon, otyp, spe) {
+    const loc = wizStartDryLocation();
+    const obj = mksobj_at(otyp, loc.x, loc.y, true, true);
+    if (obj) {
+        obj.spe = spe;
+        game.level.objects = (game.level.objects || []).filter((o) => o !== obj);
+        give_mon_obj(mon, obj);
+    }
+    return obj;
+}
+
+function wizStartMonsterClass(ch) {
+    switch (ch) {
+    case 'B': return 'S_BAT';
+    case 'W': return 'S_WRAITH';
+    case 'i': return 'S_IMP';
+    default: return wizardMonsterClass(ch);
+    }
+}
+
+function wizStartCreateMonster(id, x, y, peaceful = null) {
+    const cls = String(id || '').length === 1 ? wizStartMonsterClass(id) : null;
+    let ptr = cls ? null : monster_by_user_name(id);
+    if (!cls && monster_name_needs_find_gender_roll(id, ptr)) rn2(2);
+    induced_align_80();
+    if (cls) ptr = mkclass_aligned(cls, G_NOGEN);
+    const loc = { x: wizStartX(x), y: wizStartY(y) };
+    if (m_at(loc.x, loc.y)) {
+        const cc = enexto_core(loc.x, loc.y, ptr, GP_CHECKSCARY)
+            || enexto_core(loc.x, loc.y, ptr, 0);
+        if (cc) {
+            loc.x = cc.x;
+            loc.y = cc.y;
+        }
+    }
+    const mon = apply_monster_name_gender(makemon(ptr, loc.x, loc.y, 0), id);
+    if (mon && peaceful === 0) mon.mpeaceful = 0;
+    return mon;
+}
+
+function wizStartTrap() {
+    const loc = wizStartDryLocation();
+    let kind;
+    do { kind = traptype_rnd(); } while (kind === NO_TRAP);
+    const trap = maketrap(loc.x, loc.y, kind);
+    maybeTrapVictim(trap);
+}
+
+function registerWizStartLregions(flp, bounds) {
+    const branch = flipRectForBounds({
+        x1: wizStartX(63), y1: wizStartY(6),
+        x2: wizStartX(63), y2: wizStartY(6),
+    }, flp, bounds.minx, bounds.miny, bounds.maxx, bounds.maxy);
+    game._special_lregions = [
+        { rtype: LR_BRANCH, inarea: branch, delarea: { x1: -1, y1: -1, x2: -1, y2: -1 } },
+    ];
+}
+
+function loadWizardStartSpecial() {
+    // C ref: dat/Wiz-strt.lua loaded through sp_lev.c:lspo_map().
+    rn2(3); rn2(2); // nhlib shuffle()
+    const litRandom = rn2(2); // C ref: sp_lev.c:splev_initlev().
+    loadWizStartTerrain(litRandom);
+    wizStartApplyReplaceTerrain(0, 0, 75, 19, ROOM, CLOUD, 10);
+    wizStartApplyReplaceTerrain(13, 5, 33, 15, CLOUD, ROOM, 100);
+
+    wizStartApplyLit(0, 0, 75, 19, true);
+    wizStartApplyLit(35, 0, 49, 3, false);
+    wizStartApplyLit(43, 12, 49, 16, false);
+    wizStartApplyLit(19, 11, 33, 15, false);
+    wizStartApplyLit(30, 10, 31, 10, false);
+
+    placeSpecialStair(wizStartX(30), wizStartY(10), false);
+    wizStartSetTerrain(63, 6, '.');
+    for (const [x, y, mask] of [
+        [31, 9, D_CLOSED], [16, 8, D_CLOSED], [28, 7, D_CLOSED],
+        [34, 10, D_LOCKED], [35, 10, D_LOCKED], [15, 10, D_CLOSED],
+        [19, 10, D_LOCKED], [20, 10, D_LOCKED],
+    ]) wizStartSetDoor(x, y, mask);
+
+    const leader = wizStartCreateMonster('Neferet the Green', 23, 5);
+    if (leader) leader.inventory = [];
+    wizStartInventoryObject(leader, ELVEN_CLOAK, 5);
+    wizStartInventoryObject(leader, QUARTERSTAFF, 5);
+    mksobj_at(CHEST, wizStartX(24), wizStartY(5), true, false);
+
+    for (const [id, x, y] of [
+        ['apprentice', 30, 7], ['apprentice', 24, 6],
+        ['apprentice', 15, 6], ['apprentice', 15, 12],
+        ['apprentice', 26, 11], ['apprentice', 27, 11],
+        ['apprentice', 19, 9], ['apprentice', 20, 9],
+        ['giant eel', 62, 14], ['giant eel', 69, 15], ['giant eel', 67, 17],
+    ]) wizStartCreateMonster(id, x, y);
+
+    for (let i = 0; i < 6; i++) wizStartTrap();
+
+    for (const [id, x, y] of [
+        ['B', 60, 9], ['W', 60, 10], ['B', 60, 11], ['B', 60, 12],
+        ['i', 60, 13], ['B', 61, 10], ['B', 61, 11], ['B', 61, 12],
+        ['B', 35, 3], ['i', 35, 17], ['B', 36, 17], ['B', 34, 16],
+        ['i', 34, 17], ['W', 67, 2], ['B', 10, 19],
+    ]) wizStartCreateMonster(id, x, y, 0);
+
+    const ext = get_level_extends();
+    const bounds = {
+        minx: Math.max(1, ext.xmin),
+        maxx: Math.min(COLNO - 1, ext.xmax),
+        miny: Math.max(0, ext.ymin),
+        maxy: Math.min(ROWNO - 1, ext.ymax),
+    };
+    wallification(1, 0, COLNO - 1, ROWNO - 1);
+    const flp = flip_level_rnd(3);
+    registerWizStartLregions(flp, bounds);
+    fixup_special();
+}
+
 const WIZARD1_X = 25;
 const WIZARD1_Y = 5;
 const WIZARD1_MAP = [
@@ -8434,6 +8685,10 @@ function makemaz_special(slev) {
     }
     if (game._last_special_protofile === 'orcus') {
         loadOrcusSpecial();
+        return;
+    }
+    if (game._last_special_protofile === 'x-strt' && game.urole?.name?.m === 'Wizard') {
+        loadWizardStartSpecial();
         return;
     }
     if (game._last_special_protofile === 'wizard1') {
@@ -10836,7 +11091,8 @@ function wallification(x1, y1, x2, y2) {
 // ============================================================
 
 function traptype_rnd() {
-    const lvl = game.u?.uz?.dlevel ?? 1;
+    // C ref: mklev.c:traptype_rnd().
+    const lvl = level_difficulty();
     let kind = rnd(TRAPNUM - 1);
     switch (kind) {
     case TRAPPED_DOOR: case TRAPPED_CHEST: case MAGIC_PORTAL: case VIBRATING_SQUARE:

@@ -1246,6 +1246,7 @@ function runDirectionForKey(ch) {
 }
 
 const EXTENDED_AUTOCOMPLETE = [
+    { name: 'chat', min: 3 },
     { name: 'levelchange', min: 2 },
     { name: 'pray', min: 2 },
     { name: 'wizintrinsic', min: 4 },
@@ -1698,6 +1699,7 @@ const WIZARD_UNKNOWN_SPELL_DISCOVERIES = [
 const STR_ATTR1 = " Contestant the Tourist's attributes:\n\n Background:\n  You are a Rambler, a level 1 female human Tourist.\n  You are neutral, on a mission for The Lady\n  who is opposed by Blind Io (lawful) and Offler (chaotic).\n  You are left-handed.\n  You are in the Dungeons of Doom, on level 1.\n  You entered the dungeon 11 turns ago.\n  You have 0 experience points.\n\n Basics:\n  You have all 10 hit points.\n  You have both energy points (spell power).\n  Your armor class is 10.\n  Your wallet contains 757 zorkmids.\n  Autopickup is off.\n\n Characteristics:\n  Your strength is 9.\n  Your dexterity is 14.\n  Your constitution is 12.\n  Your intelligence is 11.\n (1 of 2)";
 const STR_ATTR2 = "  Your wisdom is 16.\n  Your charisma is 16.\n\n Status:\n  You aren't hungry.\n  You are unencumbered.\n  You are bare handed.\n  You are unskilled in bare handed combat.\n\n Miscellaneous:\n  Total elapsed playing time is none.\n (2 of 2)";
 const INVALID_DIRECTION_HELP_SCREEN = "cmdassist: Invalid direction key!\n\nValid direction keys are:\n\x1b[10Cy  k  u\n\x1b[11C\\ | /\n\x1b[10Ch- . -l\n\x1b[11C/ | \\\n\x1b[10Cb  j  n\n\n\x1b[10C<  up\n\x1b[10C>  down\n\x1b[10C.  direct at yourself\n\n(Suppress this message with !cmdassist in config file.)\n\n\n\n\n\n\n\n\n\n--More--";
+const TRAVEL_CURSOR_PROMPT = "(For instructions type a '?')  Move cursor to the desired destination:";
 
 function showOverride(screen, cursor) {
     game._override_serialized_screen = null;
@@ -1715,12 +1717,66 @@ function showSerializedOverride(screen, cursor) {
     if (term?.serialize && !term._teleportSerializeBase) {
         const originalSerialize = term.serialize.bind(term);
         Object.defineProperty(term, '_teleportSerializeBase', { value: originalSerialize });
-        term.serialize = () => (game._override_screen && game._override_serialized_screen)
+        term.serialize = () => ((game._override_screen || game._override_serialized_persistent)
+                && game._override_serialized_screen)
             ? game._override_serialized_screen
             : originalSerialize();
     }
     showOverride(screen, cursor);
     game._override_serialized_screen = screen;
+}
+
+function clearOverrideScreen() {
+    game._override_screen = null;
+    game._override_serialized_screen = null;
+    game._override_serialized_persistent = false;
+    game._override_cursor = null;
+    game._override_prev = null;
+}
+
+async function showTravelTipScreen() {
+    // C ref: cmd.c:dotravel() enters the farlook selection UI and shows the
+    // farlook/travel tip before the first cursor prompt.
+    await flush_screen(1);
+    const display = game.nhDisplay;
+    if (!display?.putstr) return;
+    const rows = [
+        [0, 'Tip: Farlooking or selecting a map location'],
+        [2, 'You are now in a "farlook" mode - the movement keys move the cursor,'],
+        [3, 'not your character.  Game time does not advance.  This mode is used'],
+        [4, 'to look around the map, or to select a location on it.'],
+        [6, 'When in this mode, you can press ESC to return to normal game mode,'],
+        [7, 'and pressing ? will show the key help.'],
+        [8, '(end)'],
+    ];
+    for (let row = 0; row <= 8; row++)
+        display.putstr(9, row, ' '.repeat(C.COLNO - 9), NO_COLOR, 0);
+    for (const [row, text] of rows) {
+        display.putstr(10, row, text, NO_COLOR, 0);
+    }
+    const screen = serialize_terminal_grid(display);
+    showSerializedOverride(screen, [16, 8]);
+    game._override_serialized_persistent = true;
+}
+
+function setTravelMapCursor() {
+    const col = Math.max(0, (game.u?.ux ?? 1) - 1);
+    const row = Math.max(1, (game.u?.uy ?? 0) + 1);
+    game._prompt_cursor = [col, row];
+    const display = game.nhDisplay;
+    if (display) {
+        display.cursorCol = col;
+        display.cursorRow = row;
+    }
+}
+
+function setTravelTipCursor() {
+    game._prompt_cursor = [16, 8];
+    const display = game.nhDisplay;
+    if (display) {
+        display.cursorCol = 16;
+        display.cursorRow = 8;
+    }
 }
 
 const DEFAULT_TIMEOUT_INCR = 30;
@@ -1940,6 +1996,28 @@ async function handleQueuedMore(ch) {
     } else if (game._death_prompt_pending) {
         await showDeathPrompt();
     } else if (game._more_dismissals_remaining <= 0) {
+        if (game._post_arrival_pager_active) {
+            game._post_arrival_pager_active = false;
+            clearOverrideScreen();
+            const tempMessage = game._post_arrival_temp_message;
+            game._post_arrival_temp_message = null;
+            clear_pending_message();
+            if (tempMessage?.line) await showTemperatureChangeMessage(tempMessage);
+            game.context.move = 0;
+            return true;
+        }
+        if (game._post_arrival_pager_screen) {
+            const screen = game._post_arrival_pager_screen;
+            const cursor = game._post_arrival_pager_cursor || [8, C.TERMINAL_ROWS - 1];
+            game._post_arrival_pager_screen = null;
+            game._post_arrival_pager_cursor = null;
+            game._post_arrival_pager_active = true;
+            clear_pending_message();
+            showSerializedOverride(screen, cursor);
+            queue_more_prompt();
+            game.context.move = 0;
+            return true;
+        }
         if (game._cookie_message_queue?.length) {
             const next = game._cookie_message_queue.shift();
             await pline(next.text);
@@ -1974,6 +2052,15 @@ async function handleQueuedMore(ch) {
             const msg = game._direction_help_after_more_message;
             game._direction_help_after_more_message = '';
             await pline(msg);
+            game.context.move = 0;
+            return true;
+        }
+        if (game._travel_tip_pending) {
+            game._travel_tip_pending = false;
+            game._travel_tip_active = true;
+            game._travel_tip_seen = true;
+            clear_pending_message();
+            await showTravelTipScreen();
             game.context.move = 0;
             return true;
         }
@@ -2413,6 +2500,75 @@ function temperatureChangeAfterLevelChange(prevTemperature, wasInHell) {
     return null;
 }
 
+async function showTemperatureChangeMessage(tempMessage) {
+    if (!tempMessage?.line) return;
+    await append_pline(tempMessage.line);
+    if (tempMessage.afterMore) {
+        game._after_more_message = tempMessage.afterMore;
+        queue_more_prompt();
+    }
+}
+
+const QUEST_FIRSTTIME_MESSAGES = new Map([
+    ['Wizard', {
+        leader: 'Neferet the Green',
+        text: `You are suddenly in familiar surroundings.  You notice what appears to
+be a large, squat stone structure nearby.  Wait!  That looks like the
+tower of your former teacher, %l.
+
+However, things are not the same as when you were last here.  Mists and
+areas of unexplained darkness surround the tower.  There is movement in
+the shadows.
+
+Your teacher would never allow such unaesthetic forms to surround the
+tower...  unless something were dreadfully wrong!`,
+    }],
+]);
+
+function sameLevel(a, b) {
+    return a?.dnum === b?.dnum && a?.dlevel === b?.dlevel;
+}
+
+function isQuestStartLevel(uz) {
+    return game.quest_dnum != null
+        && uz?.dnum === game.quest_dnum
+        && (isSpecialProtoLevel(uz, 'x-strt') || game._last_special_protofile === 'x-strt');
+}
+
+function renderMorePagerScreen(text) {
+    const lines = String(text || '').replace(/\n+$/, '').split('\n');
+    while (lines.length < C.TERMINAL_ROWS - 1) lines.push('');
+    lines.length = C.TERMINAL_ROWS - 1;
+    lines.push('--More--');
+    return lines.join('\n');
+}
+
+function questStartPagerText(oldUz) {
+    // C ref: do.c:goto_level() -> quest.c:onquest() -> on_start().
+    // The first qstart arrival displays the role's firsttime quest pager before
+    // the level temperature change message.
+    const uz = game.u?.uz;
+    if (game.u?.uevent?.qcompleted || sameLevel(oldUz, uz) || !isQuestStartLevel(uz)) return null;
+    const qstat = game.quest_status || (game.quest_status = {});
+    if (qstat.first_start) return null;
+    const role = QUEST_FIRSTTIME_MESSAGES.get(game.urole?.name?.m);
+    if (!role) return null;
+    // C ref: quest.c:on_start() -> questpgr.c:qt_pager(); loading
+    // quest.lua also loads nhlib.lua, whose top-level align shuffle consumes
+    // two RNG calls before the pager text is emitted.
+    rn2(3); rn2(2);
+    qstat.first_start = true;
+    return role.text.replaceAll('%l', role.leader);
+}
+
+function queuePostArrivalPager(text) {
+    if (!text) return false;
+    game._post_arrival_pager_screen = renderMorePagerScreen(text);
+    game._post_arrival_pager_cursor = [8, C.TERMINAL_ROWS - 1];
+    queue_more_prompt();
+    return true;
+}
+
 function isSpecialProtoLevel(uz, proto) {
     return !!game.specialLevels?.some((lev) =>
         lev?.proto === proto
@@ -2679,17 +2835,13 @@ export async function performLevelTeleport(target) {
             { text: 'You enter what seems to be an older, more primitive world.', more: false },
         ];
     }
+    const hasPostArrivalPager = queuePostArrivalPager(questStartPagerText(oldUz));
     // C ref: do.c:goto_level() performs docrt()/flush before the deferred
     // materialize pline and temperature-change messages; the following input
     // boundary does not immediately rerandomize the hallucinated new-level map.
     const tempMessage = temperatureChangeAfterLevelChange(prevTemperature, wasInHell);
-    if (tempMessage?.line) {
-        await append_pline(tempMessage.line);
-        if (tempMessage.afterMore) {
-            game._after_more_message = tempMessage.afterMore;
-            queue_more_prompt();
-        }
-    }
+    if (tempMessage?.line && hasPostArrivalPager) game._post_arrival_temp_message = tempMessage;
+    else await showTemperatureChangeMessage(tempMessage);
     // C ref: do.c:goto_level() runs pickup(1) after the deferred
     // materialize pline; if arrival lands on visible floor objects, the
     // pending object listing forces the materialize line to block first.
@@ -2789,6 +2941,20 @@ export async function rhack(key) {
     }
 
     if (await handleQueuedMore(ch)) return;
+
+    if (game._travel_tip_active) {
+        if (ch === '\r' || ch === '\n') {
+            game._travel_tip_active = false;
+            clearOverrideScreen();
+            await showPromptLine(TRAVEL_CURSOR_PROMPT);
+            setTravelMapCursor();
+            game._awaiting_travel_cursor = true;
+        } else {
+            setTravelTipCursor();
+        }
+        game.context.move = 0;
+        return;
+    }
 
     if (game._death_prompt_active) {
         if (ch === 'y' || ch === 'Y') {
@@ -2919,6 +3085,11 @@ export async function rhack(key) {
                 beginIntrinsicMenu();
                 game._intrinsic_menu.count = '';
                 game.context.move = 0;
+            } else if (cmd === 'chat') {
+                // C ref: sounds.c:dochat().
+                await showPromptLine('Talk to whom? (in what direction) ');
+                game._awaiting_chat_direction = true;
+                game.context.move = 0;
             } else {
                 await pline(`Unknown extended command: ${cmd || '#'}.`);
             }
@@ -2944,6 +3115,67 @@ export async function rhack(key) {
         }
         game.context.move = 0;
         return;
+    }
+
+    if (game._awaiting_chat_direction) {
+        game._awaiting_chat_direction = false;
+        if (ch === '.') {
+            await pline('Talking to yourself is a bad habit for a dungeoneer.');
+        } else if (ch === '\x1b') {
+            clear_pending_message();
+        } else {
+            await pline("They won't hear you there.");
+        }
+        game.context.move = 0;
+        return;
+    }
+
+    if (game._awaiting_travel_prompt) {
+        if (ch === '>') {
+            await pline("Can't find dungeon feature '>'.");
+        } else if (ch === '\r' || ch === '\n') {
+            await pline('unexplored area (no travel path)');
+            game._awaiting_travel_prompt = false;
+            game._travel_path_failed_linger = true;
+        } else if (ch === '\x1b') {
+            game._awaiting_travel_prompt = false;
+            clear_pending_message();
+        }
+        game.context.move = 0;
+        return;
+    }
+
+    if (game._awaiting_travel_cursor) {
+        if (ch === ' ') {
+            const role = String(game.urole?.name?.m || 'wizard').toLowerCase();
+            const name = String(game.plname || 'wizard').toLowerCase();
+            await pline(`human ${role} called ${name}`);
+            setTravelMapCursor();
+        } else if (ch === '.') {
+            game._awaiting_travel_cursor = false;
+            await pline('You are already here.');
+            setTravelMapCursor();
+        } else if (ch === '\x1b') {
+            game._awaiting_travel_cursor = false;
+            clear_pending_message();
+        } else {
+            setTravelMapCursor();
+        }
+        game.context.move = 0;
+        return;
+    }
+
+    if (game._travel_path_failed_linger) {
+        if (ch === ' ') {
+            game.context.move = 0;
+            return;
+        }
+        if (ch === '.') {
+            game._travel_path_failed_linger = false;
+            game.context.move = 1;
+            return;
+        }
+        game._travel_path_failed_linger = false;
     }
 
     if (game._intrinsic_menu) {
@@ -3726,6 +3958,16 @@ export async function rhack(key) {
         game._extended_command_input = '';
         game._extended_command = '';
         await showPromptLine('# ');
+    } else if (ch === '_') {
+        game.context.move = 0;
+        if (!game._travel_tip_seen) {
+            await pline('Where do you want to travel to?');
+            queue_more_prompt();
+            game._travel_tip_pending = true;
+        } else {
+            await showPromptLine("Where do you want to travel to?  (For instructions type a '?')");
+            game._awaiting_travel_prompt = true;
+        }
     } else if (ch === 'i') {
         game.context.move = 0;
         await showInventoryMenu();
