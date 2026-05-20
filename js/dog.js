@@ -25,6 +25,7 @@ const TRIPE_RATION = 264;
 const BOULDER = 475;
 const CORPSE = 265;
 const EGG = 266;
+const CHAIN_MAIL = 128;
 const MEATBALL = 267;
 const MEAT_STICK = 268;
 const ENORMOUS_MEATBALL = 269;
@@ -49,6 +50,10 @@ const M2_STRONG = 0x04000000;
 const OBJECT_WEIGHT_OVERRIDES = new Map([
     [LARGE_BOX, 350],
     [CHEST, 600],
+    // C refs: objects.h ARMOR("chain mail"), mon.c:can_carry().
+    // Generated armor objects can lack owt in the JS state; pets must still
+    // reject heavy mail.
+    [CHAIN_MAIL, 300],
     [EXPENSIVE_CAMERA, 200],
     [MIRROR, 10],
     [STETHOSCOPE, 75],
@@ -766,7 +771,16 @@ async function pet_melee_attack(mtmp, target) {
     rn2(3); // mhitm_knockback chance
     rn2(6); // mhitm_knockback distance/side gate
     if (target.mhp < 1) {
-        await finish_pet_kill(mtmp, target);
+        if ((game._more || pending_pet_combat_boundary()) && !hallucinating()) {
+            if (!game._more && pending_pet_combat_boundary()) {
+                game._pet_combat_pending_boundary = false;
+                queue_more_prompt();
+                game._pet_combat_more_latched = true;
+            }
+            game._pet_defender_death_pending = { killer: mtmp, target };
+        } else {
+            await finish_pet_kill(mtmp, target);
+        }
     } else {
         rn2(3);
     }

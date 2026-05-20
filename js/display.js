@@ -220,7 +220,14 @@ function object_glyph_for_display(obj, x, y, visible) {
     }
 
     if (generic) {
-        return GENERIC_OBJECT_GLYPH[obj.oclass] || { ch: obj.ch || '?', color: obj.color ?? NO_COLOR };
+        const base = GENERIC_OBJECT_GLYPH[obj.oclass] || { ch: obj.ch || '?', color: NO_COLOR };
+        const r = Math.max(game.u?.xray_range || 0, 2);
+        const neardist = (r * r) * 2 - r;
+        const nearHero = dist2(x, y, game.u?.ux ?? 0, game.u?.uy ?? 0) <= neardist;
+        return {
+            ch: base.ch,
+            color: nearHero ? (obj.color ?? getObjectColor(obj.otyp) ?? base.color) : base.color,
+        };
     }
     return { ch: obj.ch || '?', color: obj.color ?? NO_COLOR };
 }
@@ -267,7 +274,7 @@ function terrain_glyph(loc, x, y) {
         case TRWALL:
             return { ch: '|', color: NO_COLOR, dec: false };
         case FOUNTAIN:  return { ch: '{', color: NO_COLOR, dec: false };
-        case SINK:      return { ch: '#', color: NO_COLOR, dec: false };
+        case SINK:      return { ch: '{', color: NO_COLOR, dec: false };
         case ALTAR:     return { ch: '_', color: NO_COLOR, dec: false };
         case GRAVE:     return { ch: '|', color: NO_COLOR, dec: false };
         case TREE:      return { ch: '#', color: NO_COLOR, dec: false };
@@ -325,7 +332,7 @@ function terrain_glyph(loc, x, y) {
     case TLWALL:    return { ch: 'u', color: wallColor, dec: true };  // ┤
     case TRWALL:    return { ch: 't', color: wallColor, dec: true };  // ├
     case FOUNTAIN:  return { ch: '{', color: CLR_BRIGHT_BLUE, dec: false };
-    case SINK:      return { ch: '#', color: CLR_GRAY, dec: false };
+    case SINK:      return { ch: '{', color: CLR_WHITE, dec: false };
     case ALTAR:     return { ch: '_', color: CLR_GRAY, dec: false };
     case GRAVE:     return { ch: '|', color: CLR_GRAY, dec: false };
     case THRONE:    return { ch: '\\', color: CLR_YELLOW, dec: false };
@@ -597,6 +604,22 @@ export function see_monsters() {
 export function see_objects() {
     const seen = new Set();
     for (const obj of game.level?.objects || []) {
+        const key = `${obj.ox},${obj.oy}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        newsym(obj.ox, obj.oy);
+    }
+}
+
+export function see_nearby_objects() {
+    if (game.u?.uprops?.hallucination || game.u?.uhallucination) return;
+    const r = Math.max(game.u?.xray_range || 0, 2);
+    const neardist = (r * r) * 2 - r;
+    const seen = new Set();
+    for (const obj of game.level?.objects || []) {
+        if (typeof obj.ox !== 'number' || typeof obj.oy !== 'number') continue;
+        if (obj.ox <= 0 || obj.oy < 0) continue;
+        if (dist2(obj.ox, obj.oy, game.u?.ux ?? 0, game.u?.uy ?? 0) > neardist) continue;
         const key = `${obj.ox},${obj.oy}`;
         if (seen.has(key)) continue;
         seen.add(key);
@@ -994,6 +1017,7 @@ function _statusLine2() {
     const turn = game.flags?.time ? ` T:${game.moves || 1}` : '';
     const conditions = [];
     if (u.uprops?.hallucination || u.uhallucination) conditions.push('Hallu');
+    if ((u.uencumber || 0) > 0) conditions.push('Burdened');
     const conditionText = conditions.length ? ` ${conditions.join(' ')}` : '';
     const hp = game._latched_status_uhp != null && (game._more || game._death_prompt_active)
         ? game._latched_status_uhp

@@ -78,6 +78,10 @@ function mark_visible_range(row, left, right) {
 }
 
 // Simplified blockage check: walls, closed doors, stone
+function has_boulder_at(level, x, y) {
+    return (level.objects || []).some(o => o.otyp === BOULDER && o.ox === x && o.oy === y);
+}
+
 function _blocks(level, x, y) {
     const loc = level.at(x, y);
     if (!loc) return true;
@@ -90,7 +94,7 @@ function _blocks(level, x, y) {
         const mask = loc.doormask ?? 0;
         if (mask & (D_CLOSED | D_LOCKED | D_TRAPPED)) return true;
     }
-    if ((level.objects || []).some(o => o.otyp === BOULDER && o.ox === x && o.oy === y)) return true;
+    if (has_boulder_at(level, x, y)) return true;
     return false;
 }
 
@@ -491,6 +495,7 @@ export function vision_recalc(control = 0) {
             // walls still need the lit-wall check below.
             if (Math.abs(col - ux) <= 1 && Math.abs(row - uy) <= 1) {
                 if (viz_clear[row]?.[col] || loc.typ === DOOR
+                    || has_boulder_at(level, col, row)
                     || (heroInRoomOrDoor && (IS_WALL(loc.typ) || loc.typ === SDOOR))) {
                     next[row][col] |= IN_SIGHT;
                 }

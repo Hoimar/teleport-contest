@@ -671,6 +671,14 @@ export async function moveloop_core() {
             }
             if (!await continueOccupationTurns(g)) return;
         }
+        if (g._extra_encumbered_turn_pending && !g._more && !g._monster_turn_paused_for_more) {
+            // C ref: allmain.c:moveloop_core()/u_calc_moveamt().  Becoming
+            // slightly encumbered can leave u.umovement below NORMAL_SPEED,
+            // so monsters get one more movement allocation before input.
+            g._extra_encumbered_turn_pending = false;
+            await advanceTurn();
+            if (g._more || g._monster_turn_paused_for_more) return;
+        }
         while ((g._prayer_turns_remaining || 0) > 0) {
             g._prayer_turns_remaining--;
             await advanceTurn();
