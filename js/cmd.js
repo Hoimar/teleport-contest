@@ -13,7 +13,7 @@ import {
     apply_hallucination_display_transition, refresh_swallowed_overlay,
     see_monsters, see_objects, see_traps, refresh_warning_monsters,
 } from './display.js';
-import { cansee, vision_recalc, vision_reset } from './vision.js';
+import { cansee, couldsee, vision_recalc, vision_reset } from './vision.js';
 import { makemon, mklev, mksobj, monster_by_user_name, next_ident, place_lregion, place_object } from './mklev.js';
 import { OBJECT_DELAY } from './object_data.js';
 import { finish_pet_kill, pet_arrive_with_you } from './dog.js';
@@ -56,7 +56,9 @@ const WAN_MAKE_INVISIBLE = 418;
 const WAN_DIGGING = 428;
 const WAN_MAGIC_MISSILE = 429;
 const QUARTERSTAFF = 79;
+const WAR_HAMMER = 76;
 const CLOAK_OF_MAGIC_RESISTANCE = 139;
+const CLOAK_OF_DISPLACEMENT = 149;
 const SPEED_BOOTS = 166;
 const LEVITATION_BOOTS = 172;
 const RIN_TELEPORT_CONTROL = 195;
@@ -74,6 +76,7 @@ const CORPSE = 265;
 const BOULDER = 475;
 const FORTUNE_COOKIE = 289;
 const LEATHER_GLOVES = 159;
+const GAUNTLETS_OF_POWER = 161;
 const ARMOR_CLASS = 3;
 const WEAPON_CLASS = 2;
 const RING_CLASS = 4;
@@ -95,11 +98,14 @@ const LEVELCHANGE_MORE_LEN = '--More--'.length;
 const OBJECT_BASE_NAMES = new Map([
     [DART, 'dart'],
     [SCALPEL, 'scalpel'],
+    [WAR_HAMMER, 'war hammer'],
     [QUARTERSTAFF, 'quarterstaff'],
     [GRAY_DRAGON_SCALE_MAIL, 'gray dragon scale mail'],
     [CLOAK_OF_MAGIC_RESISTANCE, 'cloak of magic resistance'],
+    [CLOAK_OF_DISPLACEMENT, 'cloak of displacement'],
     [SPEED_BOOTS, 'speed boots'],
     [LEATHER_GLOVES, 'leather gloves'],
+    [GAUNTLETS_OF_POWER, 'gauntlets of power'],
     [AMULET_OF_LIFE_SAVING, 'amulet of life saving'],
     [178, 'ring of protection'],
     [RIN_INCREASE_ACCURACY, 'ring of increase accuracy'],
@@ -267,6 +273,23 @@ function wishedObjectSpec(name) {
         rn2(13);
         return { ...spec, otyp: SPEED_BOOTS };
     }
+    if (wish.includes('gauntlets of power')) {
+        // C ref: objnam.c:rnd_otyp_by_namedesc() searches the shuffled
+        // gloves description/name pool before readobjnam() creates armor.
+        rn2(9);
+        return { ...spec, otyp: GAUNTLETS_OF_POWER };
+    }
+    if (wish.includes('cloak of displacement')) {
+        // C ref: objnam.c:rnd_otyp_by_namedesc() searches the cloak/armor
+        // description/name pool before mksobj() initializes the cloak.
+        rn2(13);
+        return { ...spec, otyp: CLOAK_OF_DISPLACEMENT };
+    }
+    if (wish.includes('mjollnir')) {
+        // C ref: objnam.c:readobjnam() resolves the artifact name to a
+        // war hammer, then oname() handles artifact naming after mksobj().
+        return { ...spec, otyp: WAR_HAMMER, oname: 'Mjollnir', namedArtifact: true };
+    }
     if (wish.includes('wand of fire')) {
         rn2(41);
         return { ...spec, otyp: WAN_FIRE };
@@ -369,6 +392,13 @@ function make_wish_object(name) {
     if (typeof spec.blessed === 'boolean') otmp.blessed = spec.blessed;
     if (typeof spec.cursed === 'boolean') otmp.cursed = spec.cursed;
     if (spec.appearanceName) otmp.appearanceName = spec.appearanceName;
+    if (spec.oname) {
+        otmp.oextra = { ...(otmp.oextra || {}), oname: spec.oname };
+        if (spec.namedArtifact) {
+            rn2(2); // C ref: objnam.c:readobjnam() artifact wish conduct gate.
+            otmp.oartifact = true;
+        }
+    }
     rn2(100);
     const merged = merge_inventory_object(otmp);
     if (merged) return merged;
@@ -513,6 +543,14 @@ function throwLetters() {
         if (obj?.oclass === WEAPON_CLASS) letters.push(obj.invlet);
     }
     return letters.join('');
+}
+
+function wieldLetters() {
+    ensureInventoryLetters();
+    return (game.inventory || [])
+        .filter((obj) => obj?.oclass === WEAPON_CLASS)
+        .map((obj) => obj.invlet)
+        .join('');
 }
 
 function hasThrowCandidate() {
@@ -777,7 +815,10 @@ function chargeSuffix(obj, opts = {}) {
 
 function wornSuffix(obj) {
     if (obj?.wornSide) return ` (on ${obj.wornSide} hand)`;
-    if (obj?.wielded || ((obj?.owornmask || 0) & C.W_WEP)) return ' (weapon in hands)';
+    if (obj?.wielded || ((obj?.owornmask || 0) & C.W_WEP)) {
+        if (obj?.otyp === QUARTERSTAFF) return ' (weapon in hands)';
+        return ' (weapon in right hand)';
+    }
     if (obj?.worn || obj?.owornmask) return ' (being worn)';
     return '';
 }
@@ -790,7 +831,9 @@ function inventoryObjectName(obj, opts = {}) {
     const base = quan > 1
         ? (pairObject ? `pairs of ${rawBase}` : pluralizeObjectName(rawBase))
         : (pairObject ? `pair of ${rawBase}` : rawBase);
-    const parts = [bucPrefix(obj), enchantmentPrefix(obj), base].filter(Boolean);
+    const oname = C.ONAME(obj);
+    const namedBase = oname ? `${base} named ${oname}` : base;
+    const parts = [bucPrefix(obj), enchantmentPrefix(obj), namedBase].filter(Boolean);
     const body = parts.join(' ') + chargeSuffix(obj, opts);
     const worn = opts.includeWorn ? wornSuffix(obj) : '';
     if (quan > 1) return `${quan} ${body}${worn}`;
@@ -878,6 +921,9 @@ function armor_base_bonus(obj) {
     case GRAY_DRAGON_SCALE_MAIL:
         return 9;
     case CLOAK_OF_MAGIC_RESISTANCE:
+    case CLOAK_OF_DISPLACEMENT:
+    case LEATHER_GLOVES:
+    case GAUNTLETS_OF_POWER:
         return 1;
     default:
         if (obj?.otyp >= SPEED_BOOTS && obj.otyp <= LEVITATION_BOOTS) return 1;
@@ -929,13 +975,29 @@ async function start_wearing_object(obj) {
     }
 
     obj.worn = true;
+    if (obj.otyp === CLOAK_OF_DISPLACEMENT) {
+        // C ref: do_wear.c:Cloak_on()/toggle_displacement().  The property
+        // discovery message can block at --More-- before on_msg() reports
+        // that the cloak is now worn and before the wearing turn advances.
+        const discovered = game.discoveredObjects || (game.discoveredObjects = new Set());
+        if (!discovered.has(obj.otyp)) discovered.add(obj.otyp);
+        obj.known = true;
+        obj.knownName = true;
+        game.u.uprops = game.u.uprops || {};
+        game.u.uprops.displaced = true;
+        exercise(A_WIS, true);
+        game._cloak_displacement_on_msg_pending = obj;
+        await pline('You feel that monsters have difficulty pinpointing your location.');
+        queue_more_prompt();
+        game.context.move = 0;
+        return;
+    }
     const delay = OBJECT_DELAY[obj.otyp] || 0;
-    if (obj.oclass === ARMOR_CLASS && delay > 1) {
+    if (obj.oclass === ARMOR_CLASS && delay > 0) {
         game._occupation_turns_remaining = Math.max(0, delay - 1);
         game._occupation_finish_message = armor_finish_message(obj);
         game._occupation_finish_uac = calculated_armor_class();
         game._occupation_finish_object = obj;
-        await pline(`You start putting on ${inventoryObjectName(obj)}.`);
     } else {
         if (obj.oclass === ARMOR_CLASS) game.u.uac = calculated_armor_class();
         await pline(`${inventoryListing(obj)} (being worn).`);
@@ -1406,6 +1468,17 @@ function heroWieldedWeapon() {
     return (game.inventory || []).find((obj) => obj?.wielded || ((obj?.owornmask || 0) & C.W_WEP));
 }
 
+function setHeroWieldedWeapon(obj) {
+    for (const item of game.inventory || []) {
+        if (!item) continue;
+        item.wielded = false;
+        item.owornmask = (item.owornmask || 0) & ~C.W_WEP;
+    }
+    if (!obj) return;
+    obj.wielded = true;
+    obj.owornmask = (obj.owornmask || 0) | C.W_WEP;
+}
+
 function heroMeleeSmallDamageDie() {
     const weapon = heroWieldedWeapon();
     return WEAPON_SMALL_DAMAGE_DIE.get(weapon?.otyp) || 6;
@@ -1436,7 +1509,26 @@ async function tryAutoOpenDoor(x, y) {
 }
 
 function runShouldStopAfterMove(source, target) {
+    if (hostileMonsterNearHeroForRunStop()) return true;
     return target?.typ === DOOR || (source?.typ === CORR && target?.typ === C.ROOM);
+}
+
+function hostileMonsterNearHeroForRunStop() {
+    const u = game.u;
+    if (!u) return false;
+    for (let x = u.ux - 1; x <= u.ux + 1; x++) {
+        for (let y = u.uy - 1; y <= u.uy + 1; y++) {
+            if (x === u.ux && y === u.uy) continue;
+            const mon = mon_at(x, y);
+            if (!mon || mon.mpeaceful || mon.mtame || monsterHasNoAttacks(mon)) continue;
+            if (cansee(x, y)) return true;
+        }
+    }
+    return false;
+}
+
+export function shouldStopRunForNearbyMonster() {
+    return hostileMonsterNearHeroForRunStop();
 }
 
 function monsterSwapName(mon) {
@@ -1760,8 +1852,12 @@ async function showTravelTipScreen() {
 }
 
 function setTravelMapCursor() {
-    const col = Math.max(0, (game.u?.ux ?? 1) - 1);
-    const row = Math.max(1, (game.u?.uy ?? 0) + 1);
+    setTravelMapCursorAt(game.u?.ux ?? 1, game.u?.uy ?? 0);
+}
+
+function setTravelMapCursorAt(x, y) {
+    const col = Math.max(0, x - 1);
+    const row = Math.max(1, y + 1);
     game._prompt_cursor = [col, row];
     const display = game.nhDisplay;
     if (display) {
@@ -1777,6 +1873,175 @@ function setTravelTipCursor() {
         display.cursorCol = 16;
         display.cursorRow = 8;
     }
+}
+
+function defaultTravelPromptTarget() {
+    const u = game.u;
+    if (!u) return null;
+    return {
+        // C ref: getpos.c:getpos().  A line-feed key at the travel getpos
+        // prompt behaves as a rush south cursor move, clamped to the map.
+        x: u.ux,
+        y: Math.min(ROWNO - 1, u.uy + 8),
+    };
+}
+
+function setTravelCachedTarget(target) {
+    game._travel_cached_target = target;
+    return target;
+}
+
+function currentTravelCursor() {
+    if (!game._travel_cursor) {
+        const cached = game._travel_cached_target;
+        game._travel_cursor = cached
+            ? { x: cached.x, y: cached.y }
+            : { x: game.u?.ux ?? 1, y: game.u?.uy ?? 0 };
+    }
+    return game._travel_cursor;
+}
+
+function travelLocationDescription(x, y) {
+    const loc = game.level?.at(x, y);
+    if (!loc || !travelSeenOrKnown(x, y)) return 'unexplored area (no travel path)';
+    let desc;
+    if (loc.typ === C.CLOUD) desc = 'fog/vapor cloud';
+    else if (loc.typ === C.ROOM && !couldsee(x, y)) desc = 'dark part of a room';
+    else if (loc.typ === STONE || loc.typ === SCORR) desc = 'stone (no travel path)';
+    else if (loc.typ === CORR) desc = 'corridor';
+    else if (loc.typ === DOOR || loc.typ === SDOOR) desc = 'doorway';
+    else desc = loc.disp_ch && loc.disp_ch !== ' ' ? String(loc.disp_ch) : 'unexplored area';
+    return desc;
+}
+
+async function describeTravelCursor() {
+    const cursor = currentTravelCursor();
+    await pline(travelLocationDescription(cursor.x, cursor.y));
+    setTravelMapCursorAt(cursor.x, cursor.y);
+}
+
+const TRAVEL_DIRS_ORD = [
+    [-1, 0], [0, -1], [1, 0], [0, 1],
+    [-1, -1], [1, -1], [1, 1], [-1, 1],
+];
+
+function travelSeenOrKnown(x, y) {
+    const loc = game.level?.at(x, y);
+    if (!loc) return false;
+    return !!(loc.seenv || loc.remembered_glyph || (loc.disp_ch && loc.disp_ch !== ' ') || couldsee(x, y));
+}
+
+function travelMoveAllowed(x, y, dx, dy) {
+    const nx = x + dx;
+    const ny = y + dy;
+    if (nx < 1 || nx >= COLNO || ny < 0 || ny >= ROWNO) return false;
+    if (blocksMove(nx, ny)) return false;
+    if (sobj_at_basic(BOULDER, nx, ny)) return false;
+    if (dx && dy) {
+        const source = game.level?.at(x, y);
+        const target = game.level?.at(nx, ny);
+        if (doorwayBlocksDiagonalForHero(source) || doorwayBlocksDiagonalForHero(target)) return false;
+    }
+    return true;
+}
+
+function findTravelStepToKnownTarget(target) {
+    const u = game.u;
+    if (!u || !target) return false;
+    if (u.ux === target.x && u.uy === target.y) return null;
+
+    const seen = new Set([`${target.x},${target.y}`]);
+    const queue = [{ x: target.x, y: target.y }];
+    for (let qi = 0; qi < queue.length && qi < COLNO * ROWNO; qi++) {
+        const here = queue[qi];
+        for (const [dx, dy] of TRAVEL_DIRS_ORD) {
+            const nx = here.x + dx;
+            const ny = here.y + dy;
+            if (!travelMoveAllowed(here.x, here.y, dx, dy)) continue;
+            if (nx === u.ux && ny === u.uy) {
+                return { dx: here.x - u.ux, dy: here.y - u.uy };
+            }
+            const key = `${nx},${ny}`;
+            if (seen.has(key) || !travelSeenOrKnown(nx, ny)) continue;
+            seen.add(key);
+            queue.push({ x: nx, y: ny });
+        }
+    }
+    return null;
+}
+
+function distminCoords(ax, ay, bx, by) {
+    return Math.max(Math.abs(ax - bx), Math.abs(ay - by));
+}
+
+function guessTravelGoal(target) {
+    const u = game.u;
+    if (!u || !target) return null;
+    const startKey = `${u.ux},${u.uy}`;
+    const seen = new Set([startKey]);
+    const travel = new Map();
+    const queue = [{ x: u.ux, y: u.uy, radius: 0 }];
+    for (let qi = 0; qi < queue.length && qi < COLNO * ROWNO; qi++) {
+        const here = queue[qi];
+        for (const [dx, dy] of TRAVEL_DIRS_ORD) {
+            const nx = here.x + dx;
+            const ny = here.y + dy;
+            const key = `${nx},${ny}`;
+            if (seen.has(key) || !travelMoveAllowed(here.x, here.y, dx, dy) || !travelSeenOrKnown(nx, ny)) continue;
+            seen.add(key);
+            travel.set(key, here.radius + 1);
+            queue.push({ x: nx, y: ny, radius: here.radius + 1 });
+        }
+    }
+
+    let px = u.ux;
+    let py = u.uy;
+    let bestDist = distminCoords(target.x, target.y, u.ux, u.uy);
+    let bestD2 = dist2(target.x, target.y, u.ux, u.uy);
+    let bestTravel = COLNO * ROWNO;
+    for (let x = 1; x < COLNO; x++) {
+        for (let y = 0; y < ROWNO; y++) {
+            const ctrav = travel.get(`${x},${y}`) || 0;
+            if (!ctrav || !couldsee(x, y)) continue;
+            const nextDist = distminCoords(target.x, target.y, x, y);
+            if (nextDist === bestDist && ctrav < bestTravel) {
+                const nd2 = dist2(target.x, target.y, x, y);
+                if (nd2 < bestD2) {
+                    px = x;
+                    py = y;
+                    bestD2 = nd2;
+                    bestTravel = ctrav;
+                }
+            } else if (nextDist < bestDist) {
+                px = x;
+                py = y;
+                bestDist = nextDist;
+                bestD2 = dist2(target.x, target.y, x, y);
+                bestTravel = ctrav;
+            }
+        }
+    }
+    return { x: px, y: py };
+}
+
+function findTravelStep(target) {
+    const direct = findTravelStepToKnownTarget(target);
+    if (direct) return direct;
+    const guess = guessTravelGoal(target);
+    if (!guess) return direct;
+    if (game.u?.ux === guess.x && game.u?.uy === guess.y) {
+        const dx = Math.sign((target?.x ?? game.u.ux) - game.u.ux);
+        const dy = Math.sign((target?.y ?? game.u.uy) - game.u.uy);
+        return travelMoveAllowed(game.u.ux, game.u.uy, dx, dy) ? { dx, dy } : direct;
+    }
+    return findTravelStepToKnownTarget(guess) || direct;
+}
+
+async function beginTravelRunToCachedTarget() {
+    const target = game._travel_cached_target;
+    if (!target) return false;
+    game.context.run = { travel: true, target: { x: target.x, y: target.y }, steps: 0 };
+    return continueRunStep();
 }
 
 const DEFAULT_TIMEOUT_INCR = 30;
@@ -2097,6 +2362,13 @@ async function handleQueuedMore(ch) {
             game._after_more_needs_prompt = false;
             await pline(msg);
             if (needsPrompt) queue_more_prompt();
+        } else if (game._cloak_displacement_on_msg_pending) {
+            const obj = game._cloak_displacement_on_msg_pending;
+            game._cloak_displacement_on_msg_pending = null;
+            if (game.u) game.u.uac = calculated_armor_class();
+            await pline('You are now wearing a cloak of displacement.');
+            game.context.move = 1;
+            return true;
         } else if (game._pet_defender_death_pending) {
             const pending = game._pet_defender_death_pending;
             game._pet_defender_death_pending = null;
@@ -3119,12 +3391,31 @@ export async function rhack(key) {
 
     if (game._awaiting_chat_direction) {
         game._awaiting_chat_direction = false;
+        clear_pending_message();
+        const dx = DIR_DX[ch] ?? 0;
+        const dy = DIR_DY[ch] ?? 0;
         if (ch === '.') {
             await pline('Talking to yourself is a bad habit for a dungeoneer.');
         } else if (ch === '\x1b') {
             clear_pending_message();
+        } else if (ch === '<' || ch === '>') {
+            await pline(`They won't hear you ${ch === '<' ? 'up' : 'down'} there.`);
+        } else if (dx || dy) {
+            // C ref: sounds.c:dochat().  Chatting toward empty floor is
+            // silent; only walls/secret doors produce a response.
+            const tx = (game.u?.ux ?? 0) + dx;
+            const ty = (game.u?.uy ?? 0) + dy;
+            const loc = game.level?.at(tx, ty);
+            if (loc && (IS_WALL(loc.typ) || loc.typ === SDOOR)) {
+                await pline("It's like talking to a wall.");
+            } else {
+                const mon = mon_at(tx, ty);
+                if (mon && mon.msleeping) {
+                    await pline(`${monsterName(mon).replace(/^./, c => c.toUpperCase())} seems not to notice you.`);
+                }
+            }
         } else {
-            await pline("They won't hear you there.");
+            clear_pending_message();
         }
         game.context.move = 0;
         return;
@@ -3133,13 +3424,28 @@ export async function rhack(key) {
     if (game._awaiting_travel_prompt) {
         if (ch === '>') {
             await pline("Can't find dungeon feature '>'.");
+            const cursor = currentTravelCursor();
+            setTravelMapCursorAt(cursor.x, cursor.y);
         } else if (ch === '\r' || ch === '\n') {
-            await pline('unexplored area (no travel path)');
+            const cursor = currentTravelCursor();
+            cursor.y = Math.max(0, Math.min(ROWNO - 1, cursor.y + 8));
+            await describeTravelCursor();
+        } else if (ch === ' ') {
+            await describeTravelCursor();
+        } else if (ch === '.') {
+            const cursor = currentTravelCursor();
+            setTravelCachedTarget({ x: cursor.x, y: cursor.y });
             game._awaiting_travel_prompt = false;
-            game._travel_path_failed_linger = true;
+            game._travel_cursor = null;
+            game.context.move = await beginTravelRunToCachedTarget() ? 1 : 0;
+            return;
         } else if (ch === '\x1b') {
             game._awaiting_travel_prompt = false;
+            game._travel_cursor = null;
             clear_pending_message();
+        } else {
+            const cursor = currentTravelCursor();
+            setTravelMapCursorAt(cursor.x, cursor.y);
         }
         game.context.move = 0;
         return;
@@ -3172,7 +3478,7 @@ export async function rhack(key) {
         }
         if (ch === '.') {
             game._travel_path_failed_linger = false;
-            game.context.move = 1;
+            game.context.move = await beginTravelRunToCachedTarget() ? 1 : 0;
             return;
         }
         game._travel_path_failed_linger = false;
@@ -3412,6 +3718,39 @@ export async function rhack(key) {
             game.context.move = 0;
             await pline("You can't wear that.");
         }
+        return;
+    }
+
+    if (game._awaiting_wield_item) {
+        clear_pending_message();
+        game._awaiting_wield_item = false;
+        if (ch === '-') {
+            const old = heroWieldedWeapon();
+            setHeroWieldedWeapon(null);
+            game.context.move = old ? 1 : 0;
+            await pline(old ? 'You are empty handed.' : 'You are already empty handed.');
+            return;
+        }
+        if (ch === '\x1b' || ch === ' ') {
+            game.context.move = 0;
+            await pline('Never mind.');
+            return;
+        }
+        const idx = inventoryIndexForLetter(ch);
+        const obj = idx >= 0 ? game.inventory?.[idx] : null;
+        if (!obj || obj.oclass !== WEAPON_CLASS) {
+            game.context.move = 0;
+            await pline("You don't have that object.");
+            return;
+        }
+        if (obj === heroWieldedWeapon()) {
+            game.context.move = 0;
+            await pline('You are already wielding that!');
+            return;
+        }
+        setHeroWieldedWeapon(obj);
+        await pline(`${inventoryListing(obj, { includeWorn: true })}.`);
+        game.context.move = 1;
         return;
     }
 
@@ -3966,11 +4305,20 @@ export async function rhack(key) {
             game._travel_tip_pending = true;
         } else {
             await showPromptLine("Where do you want to travel to?  (For instructions type a '?')");
+            game._travel_cursor = game._travel_cached_target
+                ? { x: game._travel_cached_target.x, y: game._travel_cached_target.y }
+                : { x: game.u?.ux ?? 1, y: game.u?.uy ?? 0 };
+            setTravelMapCursorAt(game._travel_cursor.x, game._travel_cursor.y);
             game._awaiting_travel_prompt = true;
         }
     } else if (ch === 'i') {
         game.context.move = 0;
         await showInventoryMenu();
+    } else if (ch === 'w') {
+        game.context.move = 0;
+        const letters = wieldLetters();
+        game._awaiting_wield_item = true;
+        await showPromptLine(`What do you want to wield? [-${letters ? ` ${letters}` : ''} or ?*] `);
     } else if (ch === '+') {
         game.context.move = 0;
         await showSpellMenu();
@@ -4117,10 +4465,27 @@ export async function continueRunStep() {
         game.context.move = 0;
         return false;
     }
+    let step = run.travel ? findTravelStep(run.target) : { dx: run.dx, dy: run.dy };
+    if (!step) {
+        game.context.run = null;
+        game.context.move = 0;
+        return false;
+    }
+    if (run.travel) {
+        // C ref: hack.c:findtravelpath()/domove().  Travel chooses a path,
+        // but each domove attempt receives a unit direction.
+        step = { dx: Math.sign(step.dx), dy: Math.sign(step.dy) };
+    }
     game.context.move = 0;
     game.context.mv = 1;
-    const moved = await domove(run.dx, run.dy);
+    const moved = await domove(step.dx, step.dy);
+    if (run.travel) setTravelMapCursor();
     game.context.move = moved ? 1 : 0;
+    if (run.travel && game.u?.ux === run.target.x && game.u?.uy === run.target.y) {
+        game._travel_cached_target = null;
+        game.context.run = null;
+        return moved;
+    }
     if (!moved || game._run_stop_after_move) {
         game.context.run = null;
         game._run_stop_after_move = false;

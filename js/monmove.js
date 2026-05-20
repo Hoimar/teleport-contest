@@ -6,8 +6,10 @@ import { OBJECT_CLASS, OBJECT_DIR } from './object_data.js';
 import {
     BURN, DUST, ENGR_BLOOD, HEADSTONE,
     D_BROKEN, D_CLOSED, D_ISOPEN, D_LOCKED, D_NODOOR, D_TRAPPED,
-    DOOR, IRONBARS, LADDER, ROOM, SQKY_BOARD, SLP_GAS_TRAP, STAIRS, WEB,
-    IS_DOOR, IS_LAVA, IS_OBSTRUCTED, IS_POOL, IS_STWALL, IS_TREE, IS_WALL, IS_WATERWALL,
+    ARROW_TRAP, DART_TRAP, ROCKTRAP, BEAR_TRAP, LANDMINE, ROLLING_BOULDER_TRAP,
+    RUST_TRAP, FIRE_TRAP, PIT, SPIKED_PIT, HOLE, TRAPDOOR,
+    DOOR, IRONBARS, LADDER, LAVAWALL, MAGIC_PORTAL, ROOM, SQKY_BOARD, SLP_GAS_TRAP, STAIRS, WEB,
+    ACCESSIBLE, IS_DOOR, IS_LAVA, IS_OBSTRUCTED, IS_POOL, IS_STWALL, IS_TREE, IS_WALL, IS_WATERWALL,
     I_SPECIAL, M_AP_FURNITURE, M_AP_OBJECT,
     MON_POLE_DIST, NEED_AXE, NEED_HTH_WEAPON, NEED_PICK_AXE, NEED_PICK_OR_AXE,
     NEED_RANGED_WEAPON, NEED_WEAPON, W_ARMS, W_NONDIGGABLE, W_WEP,
@@ -46,6 +48,7 @@ const M1_NOEYES = 0x00001000;
 const M1_NOHANDS = 0x00002000;
 const M1_MINDLESS = 0x00010000;
 const M1_ANIMAL = 0x00040000;
+const M1_SEE_INVIS = 0x01000000;
 const M2_STRONG = 0x04000000;
 const M2_COLLECT = 0x40000000;
 const M2_MAGIC = 0x80000000;
@@ -273,18 +276,78 @@ function mnexto_basic(mtmp) {
     return true;
 }
 
+function apparxy_accessible_basic(mtmp, x, y) {
+    const loc = game.level?.at(x, y);
+    if (!loc) return false;
+    if (IS_DOOR(loc.typ)) return !(loc.doormask & (D_CLOSED | D_LOCKED));
+    if (IS_OBSTRUCTED(loc.typ) || IS_WATERWALL(loc.typ) || loc.typ === LAVAWALL)
+        return mon_passes_walls(mtmp);
+    if (IS_POOL(loc.typ)) return mon_swims(mtmp) || mon_in_air(mtmp);
+    if (IS_LAVA(loc.typ)) return mon_likes_lava(mtmp) || mon_in_air(mtmp);
+    return ACCESSIBLE(loc.typ);
+}
+
 function set_apparxy_basic(mtmp) {
-    // C ref: monmove.c:set_apparxy().  In the current visibility model the
-    // hero is neither invisible nor displaced, so monsters target the real
-    // hero square.  This is especially important for u.ustuck while swallowed.
-    mtmp.mux = game.u?.ux ?? mtmp.mx;
-    mtmp.muy = game.u?.uy ?? mtmp.my;
+    // C ref: monmove.c:set_apparxy().  Monsters remember an apparent hero
+    // square; displacement can move that image and consumes RNG before
+    // distfleeck()/m_move() use mtmp->mux,muy.
+    const ux = game.u?.ux ?? mtmp.mx;
+    const uy = game.u?.uy ?? mtmp.my;
+    let mx = mtmp.mux ?? ux;
+    let my = mtmp.muy ?? uy;
+    if (mtmp.mtame || game.u?.ustuck === mtmp || (mx === ux && my === uy)) {
+        mtmp.mux = ux;
+        mtmp.muy = uy;
+        return;
+    }
+
+    const notseen = mtmp.mcansee === 0
+        || (game.u?.uinvis && !monster_perceives_invisible(mtmp));
+    const notthere = !!game.u?.uprops?.displaced && mtmp.data?.name !== 'DISPLACER_BEAST';
+    let displ = 0;
+    if (game.u?.uprops?.underwater || game.u?.underwater || game.Underwater) displ = 1;
+    else if (notseen) displ = 1;
+    else if (notthere) displ = couldsee(mx, my) ? 2 : 1;
+    if (!displ) {
+        mtmp.mux = ux;
+        mtmp.muy = uy;
+        return;
+    }
+
+    const gotu = notseen ? !rn2(3) : notthere ? !rn2(4) : false;
+    if (gotu) {
+        mtmp.mux = ux;
+        mtmp.muy = uy;
+        return;
+    }
+
+    for (let tryCnt = 1; tryCnt <= 200; tryCnt++) {
+        mx = ux - displ + rn2(2 * displ + 1);
+        my = uy - displ + rn2(2 * displ + 1);
+        const blockedSelf = displ !== 2 && mx === mtmp.mx && my === mtmp.my;
+        const accessible = (mx === ux && my === uy) || mon_passes_walls(mtmp)
+            || apparxy_accessible_basic(mtmp, mx, my);
+        const seen = couldsee(mx, my);
+        if (!isok(mx, my)) continue;
+        if (blockedSelf) continue;
+        if (!accessible) continue;
+        if (!seen) continue;
+        mtmp.mux = mx;
+        mtmp.muy = my;
+        return;
+    }
+    mtmp.mux = ux;
+    mtmp.muy = uy;
 }
 
 function can_track_basic(ptr) {
     // C ref: mondata.c:can_track() normally delegates to haseyes().
     // Excalibur awareness is future hero-equipment work.
     return !((ptr?.mflags1 ?? 0) & M1_NOEYES);
+}
+
+function monster_perceives_invisible(mtmp) {
+    return !!((mtmp.data?.mflags1 ?? 0) & M1_SEE_INVIS);
 }
 
 function m_canseeu_basic(mtmp) {
@@ -569,13 +632,48 @@ function distmin(x0, y0, x1, y1) {
     return Math.max(Math.abs(x0 - x1), Math.abs(y0 - y1));
 }
 
+function sgn(n) {
+    return n < 0 ? -1 : n > 0 ? 1 : 0;
+}
+
+function linedup_blocking_terrain(x, y) {
+    if (!isok(x, y)) return true;
+    const loc = game.level?.at(x, y);
+    if (!loc) return true;
+    if (IS_OBSTRUCTED(loc.typ) || IS_WATERWALL(loc.typ) || loc.typ === LAVAWALL) return true;
+    if (IS_DOOR(loc.typ) && (loc.doormask & (D_CLOSED | D_LOCKED))) return true;
+    return false;
+}
+
 function lined_up_basic(mtmp) {
     const tx = mtmp.mux ?? game.u?.ux ?? mtmp.mx;
     const ty = mtmp.muy ?? game.u?.uy ?? mtmp.my;
-    const dx = Math.abs(tx - mtmp.mx);
-    const dy = Math.abs(ty - mtmp.my);
-    if ((dx && dy && dx !== dy) || Math.max(dx, dy) >= BOLT_LIM) return false;
-    return clear_path(tx, ty, mtmp.mx, mtmp.my);
+    const tbx = tx - mtmp.mx;
+    const tby = ty - mtmp.my;
+    if (!tbx && !tby) return false;
+    if ((tbx && tby && Math.abs(tbx) !== Math.abs(tby))
+        || distmin(tbx, tby, 0, 0) >= BOLT_LIM) return false;
+
+    const targetIsHero = tx === game.u?.ux && ty === game.u?.uy;
+    if (targetIsHero ? couldsee(mtmp.mx, mtmp.my) : clear_path(tx, ty, mtmp.mx, mtmp.my))
+        return true;
+    if (!targetIsHero) return false;
+
+    // C ref: mthrowu.c:linedup().  Hero-targeted line checks can be blocked
+    // only by boulders; with conditional boulder handling this still rolls
+    // rn2(2 + boulderspots), even when boulderspots is zero.
+    const dx = sgn(tbx);
+    const dy = sgn(tby);
+    let x = mtmp.mx;
+    let y = mtmp.my;
+    let boulderspots = 0;
+    do {
+        x += dx;
+        y += dy;
+        if (linedup_blocking_terrain(x, y)) return false;
+        if (boulder_at(x, y)) boulderspots++;
+    } while (x !== tx || y !== ty);
+    return rn2(2 + boulderspots) < 2;
 }
 
 function hero_throw_range_basic() {
@@ -881,6 +979,22 @@ function remove_dead_monster(mtmp) {
     newsym(mtmp.mx, mtmp.my);
 }
 
+function migrate_monster_off_level_basic(mtmp, trap) {
+    // C ref: teleport.c:mlevel_tele_trap(); mon.c:migrate_to_level().
+    const oldx = mtmp.mx;
+    const oldy = mtmp.my;
+    const monsters = game.level?.monsters || [];
+    const idx = monsters.indexOf(mtmp);
+    if (idx >= 0) monsters.splice(idx, 1);
+    mtmp.mx = 0;
+    mtmp.my = 0;
+    mtmp.migrating = {
+        type: trap?.ttyp === MAGIC_PORTAL ? 'portal' : 'random',
+        tolev: trap?.dst ? { ...trap.dst } : null,
+    };
+    newsym(oldx, oldy);
+}
+
 function monster_name(mtmp) {
     if (hallucinating()) return randomHallucinatedMonsterName();
     return String(mtmp?.data?.name || 'monster').toLowerCase().replace(/_/g, ' ');
@@ -1157,16 +1271,43 @@ function mons_see_trap_basic(trap) {
     }
 }
 
+function floor_trigger_trap_basic(ttyp) {
+    // C ref: trap.c:floor_trigger().
+    switch (ttyp) {
+    case ARROW_TRAP:
+    case DART_TRAP:
+    case ROCKTRAP:
+    case SQKY_BOARD:
+    case BEAR_TRAP:
+    case LANDMINE:
+    case ROLLING_BOULDER_TRAP:
+    case SLP_GAS_TRAP:
+    case RUST_TRAP:
+    case FIRE_TRAP:
+    case PIT:
+    case SPIKED_PIT:
+    case HOLE:
+    case TRAPDOOR:
+        return true;
+    default:
+        return false;
+    }
+}
+
 async function mintrap_basic(mtmp) {
     const trap = trap_at_basic(mtmp.mx, mtmp.my);
     if (!trap) return MMOVE_MOVED;
     // C ref: trap.c:mintrap().  Floor traps first check whether the monster
     // is in the air, then known trap types usually get avoided without the
     // effect firing.
-    if (mon_in_air(mtmp)) return MMOVE_MOVED;
+    if (floor_trigger_trap_basic(trap.ttyp) && mon_in_air(mtmp)) return MMOVE_MOVED;
     if (mon_knows_traps_basic(mtmp, trap.ttyp) && rn2(4)) return MMOVE_MOVED;
     mon_learns_traps_basic(mtmp, trap.ttyp);
     mons_see_trap_basic(trap);
+    if (trap.ttyp === MAGIC_PORTAL) {
+        migrate_monster_off_level_basic(mtmp, trap);
+        return MMOVE_DIED;
+    }
     if (trap.ttyp === SQKY_BOARD) return mintrap_squeaky_board_basic(mtmp, trap);
     if (trap.ttyp === SLP_GAS_TRAP) return mintrap_sleep_gas_basic(mtmp);
     return MMOVE_MOVED;
@@ -1640,7 +1781,7 @@ function monster_weapon_damage(obj) {
 async function mattacku_basic(mtmp, state) {
     if (game.u?.uswallow && game.u?.ustuck !== mtmp) return false;
     const rangeWeapon = state?.inrange && !state.nearby && mon_has_attack_type(mtmp, 'AT_WEAP');
-    if ((!state?.nearby && !rangeWeapon) || state.scared || mtmp.mpeaceful || mtmp.mtame) return false;
+    if (state.scared || mtmp.mpeaceful || mtmp.mtame) return false;
     if ((game._occupation_turns_remaining || 0) > 1 || game._occupation_finish_uac != null) return false;
     if ((game.u?.uhp ?? 1) <= 0) return false;
 
@@ -1655,7 +1796,18 @@ async function mattacku_basic(mtmp, state) {
     }
     const engulf = basic_engulf_attack(mtmp);
     const physical = engulf ? null : basic_physical_attacks(mtmp, !rangeWeapon);
-    if (!engulf && !physical && !rangeWeapon) return false;
+    if (!engulf && !physical && !rangeWeapon) {
+        if (state?.inrange && (mtmp.data?.mattk || []).some(Boolean))
+            mattacku_to_hit(mtmp);
+        return false;
+    }
+    if (!state?.nearby && !rangeWeapon) {
+        // C ref: monmove.c:dochug() calls mhitu.c:mattacku() for in-range
+        // displaced images; mattacku() computes AC_VALUE() before range2
+        // suppresses ordinary physical attacks.
+        if (state?.inrange) mattacku_to_hit(mtmp);
+        return false;
+    }
     const toHit = mattacku_to_hit(mtmp);
     if (game._hero_melee_message_pending && game._pending_message) queue_more_prompt();
     // C ref: mhitu.c:mattacku() computes AC_VALUE() before AT_WEAP range
@@ -1700,6 +1852,9 @@ async function m_move_basic(mtmp) {
         rn2(3);
         return MMOVE_NOTHING;
     }
+    set_apparxy_basic(mtmp);
+    ggx = mtmp.mux ?? ggx;
+    ggy = mtmp.muy ?? ggy;
     if (mtmp.data?.name === 'TENGU' && !rn2(5) && !mtmp.mcan
         && !tele_restrict_basic(mtmp)) {
         // C ref: monmove.c:m_move(); teleporting by nature happens before

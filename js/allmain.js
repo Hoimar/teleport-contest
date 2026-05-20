@@ -17,7 +17,7 @@ import { init_objects } from './o_init.js';
 import { init_dungeons } from './dungeon.js';
 import { apply_startup_role_state, u_init_misc_rng, u_init_role_inventory } from './u_init.js';
 import { makedog } from './dog.js';
-import { continueRunStep, finish_pending_eaten_corpse, performLevelTeleport, rhack } from './cmd.js';
+import { continueRunStep, finish_pending_eaten_corpse, performLevelTeleport, rhack, shouldStopRunForNearbyMonster } from './cmd.js';
 import { nhgetch } from './input.js';
 import {
     docrt, cls, bot, flush_screen, pline, append_pline, newsym, serialize_terminal_grid,
@@ -27,7 +27,7 @@ import {
 import { vision_recalc, vision_reset, init_vision_globals } from './vision.js';
 import { findAlign, findRace, findRole, roleGod, roleGreeting, roleWithStartingRank } from './roles.js';
 import { NO_COLOR } from './terminal.js';
-import { A_WIS, COLNO } from './const.js';
+import { A_STR, A_WIS, COLNO } from './const.js';
 import * as ff8000 from './fastforward.js';
 import * as ff0002 from './fastforward0002.js';
 
@@ -39,6 +39,7 @@ const STARTUP_REPLAY_BY_SEED = new Map([
 ]);
 
 const SPEED_BOOTS = 166;
+const GAUNTLETS_OF_POWER = 161;
 
 function startupReplayForCurrentSeed() {
     return STARTUP_REPLAY_BY_SEED.get(game._seed) || null;
@@ -379,7 +380,7 @@ export async function advanceTurn() {
             g._fast_extra_action_pending = false;
             g._pet_combat_resume_active = false;
             g._savelife_resume_active = false;
-            return;
+            if (!occupationPending(g)) return;
         }
         let monscanmove = firstScanCanMove;
         while (monscanmove) {
@@ -433,6 +434,15 @@ function applyOccupationFinishObjectEffects(g) {
             discovered.add(obj.otyp);
             exercise(A_WIS, true);
         }
+    } else if (obj.otyp === GAUNTLETS_OF_POWER) {
+        // C ref: do_wear.c:Gloves_on().  Wearing power gauntlets reveals the
+        // object type and recalculates strength before the finish message.
+        const discovered = g.discoveredObjects || (g.discoveredObjects = new Set());
+        if (!discovered.has(obj.otyp)) discovered.add(obj.otyp);
+        obj.known = true;
+        obj.knownName = true;
+        if (g.u?.acurr?.a) g.u.acurr.a[A_STR] = 25;
+        exercise(A_STR, true);
     }
 }
 
@@ -584,7 +594,12 @@ export async function moveloop_core() {
             g._awaiting_prayer_done_more = true;
             g.u.uinvulnerable = false;
         }
-        while (g.context?.run && await continueRunStep()) {
+        while (g.context?.run) {
+            if (shouldStopRunForNearbyMonster()) {
+                g.context.run = null;
+                break;
+            }
+            if (!await continueRunStep()) break;
             await advanceTurn();
         }
     }

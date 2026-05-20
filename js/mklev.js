@@ -8101,11 +8101,19 @@ function wizStartApplyLit(x1, y1, x2, y2, lit) {
 }
 
 function wizStartSetDoor(x, y, mask) {
+    // C ref: sp_lev.c:sel_set_door().  Applying des.door() to an existing
+    // map secret door updates its mask but leaves it as SDOOR.
     const loc = game.level?.at(wizStartX(x), wizStartY(y));
     if (!loc) return;
-    loc.typ = DOOR;
+    let doorMask = mask;
+    if (!IS_DOOR(loc.typ) && loc.typ !== SDOOR)
+        loc.typ = (doorMask & D_SECRET) ? SDOOR : DOOR;
+    if (doorMask & D_SECRET) {
+        doorMask &= ~D_SECRET;
+        if (doorMask < D_CLOSED) doorMask = D_CLOSED;
+    }
     loc.horizontal = false;
-    set_door_mask(loc, mask);
+    set_door_mask(loc, doorMask);
 }
 
 function wizStartDryLocation() {
@@ -11001,17 +11009,29 @@ function place_branch(branchp, x = 0, y = 0) {
         const on_end1 = (branchp.end1?.dnum === g.u?.uz?.dnum
             && branchp.end1?.dlevel === g.u?.uz?.dlevel);
         const dest = on_end1 ? branchp.end2 : branchp.end1;
-        const goes_up = on_end1 ? !!branchp.end1_up : !branchp.end1_up;
-        const loc = g.level?.at(mp.x, mp.y);
-        if (loc) {
-            loc.typ = STAIRS;
-            loc.ladder = goes_up ? 1 : 2;
+        if (branchp.type === 'portal') {
+            mkportal(mp.x, mp.y, dest);
+        } else {
+            const goes_up = on_end1 ? !!branchp.end1_up : !branchp.end1_up;
+            const loc = g.level?.at(mp.x, mp.y);
+            if (loc) {
+                loc.typ = STAIRS;
+                loc.ladder = goes_up ? 1 : 2;
+            }
+            stairway_add(mp.x, mp.y, goes_up, false, dest || { dnum: 0, dlevel: 0 }, true);
+            if (goes_up) g.level.upstair = { x: mp.x, y: mp.y };
+            else g.level.dnstair = { x: mp.x, y: mp.y };
         }
-        stairway_add(mp.x, mp.y, goes_up, false, dest || { dnum: 0, dlevel: 0 }, true);
-        if (goes_up) g.level.upstair = { x: mp.x, y: mp.y };
-        else g.level.dnstair = { x: mp.x, y: mp.y };
     }
     g.made_branch = true;
+}
+
+function mkportal(x, y, dest) {
+    // C ref: mkmaze.c:mkportal(); portal branches are floor traps, not stairs.
+    const trap = maketrap(x, y, MAGIC_PORTAL);
+    if (!trap) return null;
+    trap.dst = { dnum: dest?.dnum ?? 0, dlevel: dest?.dlevel ?? 0 };
+    return trap;
 }
 
 // ============================================================
