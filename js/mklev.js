@@ -2881,6 +2881,10 @@ export function makemon(mdat, x, y, mmflags = 0) {
     };
     const mon = {
         mx: x, my: y,
+        // C ref: makemon.c:makemon().  `zeromonst` clears mux/muy to 0;
+        // set_apparxy() must not treat a new monster as already knowing
+        // the current hero square.
+        mux: 0, muy: 0,
         ch: display.ch,
         color: display.color,
         data: { ...ptr, mmove: ptr.mmove ?? display.mmove },

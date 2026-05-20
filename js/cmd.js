@@ -2382,6 +2382,7 @@ async function handleQueuedMore(ch) {
     const preTurnResume = pausedMonsterTurn && !!game._pre_turn_more_waiting;
     const monsterAttackResume = pausedMonsterTurn && !!game._monster_attack_more_waiting;
     const pausedFloorListTurn = !!game._resume_floor_list_turn;
+    const pausedRunTail = !!game._run_paused_for_more;
     const preserveMonsterMoreBase = pausedMonsterTurn
         && game._preserve_more_base_for_next_monster_message
         && game._latched_more_screen;
@@ -2581,6 +2582,15 @@ async function handleQueuedMore(ch) {
         }
         game._resume_monster_turn = true;
         game.context.move = 1;
+    } else if (pausedRunTail && !game._more) {
+        game._run_paused_for_more = false;
+        if (game.context?.run) {
+            game._resume_run_after_more = true;
+            game.context.move = 1;
+        } else {
+            game._resume_run_after_more = false;
+            game.context.move = 0;
+        }
     } else {
         game.context.move = 0;
     }

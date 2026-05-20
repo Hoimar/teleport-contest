@@ -313,8 +313,8 @@ function set_apparxy_basic(mtmp) {
     // distfleeck()/m_move() use mtmp->mux,muy.
     const ux = game.u?.ux ?? mtmp.mx;
     const uy = game.u?.uy ?? mtmp.my;
-    let mx = mtmp.mux ?? ux;
-    let my = mtmp.muy ?? uy;
+    let mx = Number.isFinite(mtmp.mux) ? mtmp.mux : 0;
+    let my = Number.isFinite(mtmp.muy) ? mtmp.muy : 0;
     if (mtmp.mtame || game.u?.ustuck === mtmp || (mx === ux && my === uy)) {
         mtmp.mux = ux;
         mtmp.muy = uy;
@@ -1129,12 +1129,14 @@ async function wildmiss_displaced_image_basic(mtmp) {
     if (!cansee(mtmp.mx, mtmp.my)) return false;
     const invis = game.u?.uinvis || game.u?.uprops?.invisible || game.u?.Invis;
     const line = `The ${monster_name(mtmp)} strikes at your ${invis ? 'invisible ' : ''}displaced image and misses you!`;
-    if (game._more && game._pending_message) {
+    if (game._pending_message) {
         game._after_more_message = game._after_more_message
             ? `${game._after_more_message}  ${line}`
             : line;
         game._after_more_needs_prompt = true;
         game._monster_attack_more_latched = true;
+        game._monster_attack_pause_after_more = true;
+        if (!game._more) queue_more_prompt();
         mtmp.mlstmv = game.moves || 0;
         return true;
     }
@@ -1142,6 +1144,8 @@ async function wildmiss_displaced_image_basic(mtmp) {
     await pline(line);
     queue_more_prompt();
     latch_monster_message_on_base_screen(line);
+    game._monster_attack_more_latched = true;
+    game._monster_attack_pause_after_more = true;
     mtmp.mlstmv = game.moves || 0;
     return true;
 }
@@ -2625,7 +2629,8 @@ export async function movemon() {
                     // pass can happen; the next pline or input-boundary flush
                     // services the More.
                     g._monster_attack_more_latched = false;
-                    if (g._after_more_message) {
+                    if (g._after_more_message || g._monster_attack_pause_after_more) {
+                        g._monster_attack_pause_after_more = false;
                         g._resume_movemon_after_mon = mtmp;
                         g._resume_somebody_can_move = mtmp.movement >= NORMAL_SPEED;
                         g._monster_turn_paused_for_more = true;

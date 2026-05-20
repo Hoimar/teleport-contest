@@ -175,6 +175,9 @@ export function pet_arrive_with_you() {
     const ch = pet === PM_KITTEN ? 'f' : pet === PM_PONY ? 'u' : 'd';
     const mon = {
         mx: x, my: y,
+        // C ref: dog.c:mon_arrive().  Arriving pets refresh their apparent
+        // hero target so relocation helpers do not use stale migration data.
+        mux: game.u?.ux ?? 0, muy: game.u?.uy ?? 0,
         ch: migrating?.ch || ch,
         color: migrating?.color ?? 15,
         data: { ...pet },

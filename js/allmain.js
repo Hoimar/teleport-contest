@@ -536,6 +536,26 @@ async function refreshHallucinationDisplayAtInputBoundary(g) {
     }
 }
 
+async function continueRunTail(g) {
+    // C ref: allmain.c:moveloop_core().  A blocking tty `more()` inside a
+    // run/travel repeat returns to the interrupted repeat loop after dismissal,
+    // without charging a fresh player turn first.
+    g._run_paused_for_more = false;
+    while (g.context?.run) {
+        if (shouldStopRunForNearbyMonster()) {
+            g.context.run = null;
+            break;
+        }
+        if (!await continueRunStep()) break;
+        await advanceTurn();
+        if (g._more) {
+            if (g.context?.run) g._run_paused_for_more = true;
+            return false;
+        }
+    }
+    return true;
+}
+
 // C ref: allmain.c moveloop_core()
 export async function moveloop_core() {
     const g = game;
@@ -572,6 +592,11 @@ export async function moveloop_core() {
     // Advance turn; run/rush movement may consume multiple turns before
     // returning to the input boundary.
     if (g.context?.move) {
+        if (g._resume_run_after_more) {
+            g._resume_run_after_more = false;
+            if (!g._more) await continueRunTail(g);
+            return;
+        }
         if (g._monster_turn_paused_for_more && g._more) return;
         if (g._floor_list_pauses_turn && g._more) {
             g._floor_list_pauses_turn = false;
@@ -607,16 +632,11 @@ export async function moveloop_core() {
         // C ref: topl.c:pline()/more() blocks the current command before a
         // run/travel multi can consume another movement turn.  Prayer's
         // occupation above still reaches gn.nomovemsg in this same command.
-        if (g._more) return;
-        while (g.context?.run) {
-            if (shouldStopRunForNearbyMonster()) {
-                g.context.run = null;
-                break;
-            }
-            if (!await continueRunStep()) break;
-            await advanceTurn();
-            if (g._more) return;
+        if (g._more) {
+            if (g.context?.run) g._run_paused_for_more = true;
+            return;
         }
+        await continueRunTail(g);
     }
 }
 
