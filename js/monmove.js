@@ -21,6 +21,7 @@ import {
 import {
     newsym, queue_more_prompt, pline, flush_screen, clear_pending_message,
     docrt, refresh_swallowed_overlay, serialize_terminal_grid, append_pline, see_monsters,
+    show_glyph_cell,
 } from './display.js';
 import { nhgetch } from './input.js';
 import { clear_path, cansee, couldsee } from './vision.js';
@@ -28,6 +29,7 @@ import { m_dowear_basic } from './mon_wear.js';
 import { gettrack } from './track.js';
 import { randomHallucinatedMonsterName } from './random_text.js';
 import { getObjectDescription } from './o_init.js';
+import { NO_COLOR } from './terminal.js';
 
 const NORMAL_SPEED = 12;
 const BOLT_LIM = 8;
@@ -925,6 +927,11 @@ function pick_or_axe_weapon_candidate(mtmp) {
         || (mtmp.inventory || []).find((obj) => obj?.otyp === AXE);
 }
 
+function ranged_weapon_candidate(mtmp) {
+    if (mtmp.mw?.otyp === ORCISH_DAGGER || mtmp.mw?.otyp === DART) return mtmp.mw;
+    return (mtmp.inventory || []).find((obj) => obj?.otyp === ORCISH_DAGGER || obj?.otyp === DART) || null;
+}
+
 async function mon_wield_item_basic(mtmp) {
     let obj = null;
     let exclaim = true;
@@ -932,8 +939,9 @@ async function mon_wield_item_basic(mtmp) {
         obj = hth_weapon_candidate(mtmp);
     } else if (mtmp.weapon_check === NEED_RANGED_WEAPON) {
         // C ref: weapon.c:mon_wield_item() with NEED_RANGED_WEAPON uses
-        // select_rwep()'s launcher result. Ranged selection is not modeled
-        // yet, so failed selection only resets weapon_check below.
+        // select_rwep()'s launcher result. Full ranged selection is still
+        // incomplete; keep failed selection as a side effect for current
+        // weapon_check evidence.
         obj = null;
     } else if (mtmp.weapon_check === NEED_PICK_AXE) {
         obj = pick_weapon_candidate(mtmp);
@@ -963,6 +971,115 @@ async function mon_wield_item_basic(mtmp) {
         await append_monster_topline(`${monster_subject(mtmp)} wields ${wield_object_name(obj)}${exclaim ? '!' : '.'}`);
     }
     return true;
+}
+
+function remove_monster_inventory_object(mtmp, obj) {
+    if (!obj) return;
+    if ((obj.quan ?? 1) > 1) {
+        obj.quan--;
+        return;
+    }
+    const inv = mtmp.inventory || [];
+    const idx = inv.indexOf(obj);
+    if (idx >= 0) inv.splice(idx, 1);
+    if (mtmp.mw === obj) mtmp.mw = null;
+    obj.owornmask = 0;
+}
+
+function first_monster_on_throw_path(mtmp, dx, dy, range) {
+    let x = mtmp.mx;
+    let y = mtmp.my;
+    for (let i = 0; i < range; i++) {
+        x += dx;
+        y += dy;
+        const mon = mon_at(x, y, mtmp);
+        if (mon) return { mon, x, y, steps: i + 1 };
+        if (x === game.u?.ux && y === game.u?.uy) return { hero: true, x, y, steps: i + 1 };
+    }
+    return null;
+}
+
+async function throw_weapon_at_hero_basic(mtmp, obj) {
+    const tx = mtmp.mux ?? game.u?.ux ?? mtmp.mx;
+    const ty = mtmp.muy ?? game.u?.uy ?? mtmp.my;
+    const dx = sgn(tx - mtmp.mx);
+    const dy = sgn(ty - mtmp.my);
+    const range = distmin(mtmp.mx, mtmp.my, tx, ty);
+    const seenThrower = cansee(mtmp.mx, mtmp.my);
+    remove_monster_inventory_object(mtmp, obj);
+
+    if (seenThrower) {
+        await pline(`${monster_subject(mtmp)} throws a ${monster_weapon_name(obj)}!`);
+        queue_more_prompt();
+        game._monster_attack_more_latched = true;
+        game._monster_attack_pause_after_more = true;
+    }
+
+    const hit = first_monster_on_throw_path(mtmp, dx, dy, range);
+    const emptyFlightSteps = hit ? Math.max(0, hit.steps - 1) : range;
+    for (let i = 0; i < emptyFlightSteps; i++) rn2(5);
+    if (hit?.mon) {
+        const glyphX = hit.x - dx;
+        const glyphY = hit.y - dy;
+        if (seenThrower && isok(glyphX, glyphY)) show_glyph_cell(glyphX, glyphY, ')', NO_COLOR, false);
+        rnd(20);
+        const damage = monster_weapon_damage(obj);
+        if (typeof hit.mon.mhp === 'number') {
+            const hp = hit.mon.mhp - damage;
+            hit.mon.mhp = hit.mon.mtame ? Math.max(1, hp) : Math.max(0, hp);
+        }
+        const hitMessage = seenThrower
+            ? `The ${monster_weapon_name(obj)} hits the ${monster_name(hit.mon)}.`
+            : 'It is hit.';
+        const afterDx = dx || sgn((mtmp.mux ?? game.u?.ux ?? glyphX) - mtmp.mx);
+        const afterDy = dy || sgn((mtmp.muy ?? game.u?.uy ?? glyphY) - mtmp.my);
+        const landingX = glyphX + afterDx;
+        const landingY = glyphY + afterDy;
+        obj.ox = landingX;
+        obj.oy = landingY;
+        obj.owornmask = 0;
+        obj.quan = 1;
+        obj.ch = ')';
+        obj.color = NO_COLOR;
+        obj._defer_pet_pickup = true;
+        obj._pet_keep_projectile = true;
+        game.level.objects = game.level.objects || [];
+        if (!game.level.objects.includes(obj)) game.level.objects.unshift(obj);
+        if (seenThrower) {
+            game._after_more_message = hitMessage;
+            game._after_more_needs_prompt = false;
+            game._after_more_projectile_glyph = { x: landingX, y: landingY, ch: ')' };
+        } else {
+            await pline(hitMessage);
+            if (isok(landingX, landingY)) newsym(landingX, landingY);
+        }
+    }
+    if (game.context?.run) game.context.run = null;
+    return true;
+}
+
+async function thrwmu_basic(mtmp) {
+    // C ref: mthrowu.c:thrwmu().  This is the ordinary thrown-weapon front
+    // door; polearms, launchers, potions, and returning weapons remain future
+    // work outside current evidence.
+    if (mtmp.weapon_check === NEED_WEAPON || !mtmp.mw) {
+        mtmp.weapon_check = NEED_RANGED_WEAPON;
+        await mon_wield_item_basic(mtmp);
+    }
+    const obj = ranged_weapon_candidate(mtmp);
+    if (!obj) return false;
+    if (!lined_up_basic(mtmp)) return false;
+
+    const dist = distmin(game.u?.ux ?? mtmp.mux ?? mtmp.mx, game.u?.uy ?? mtmp.muy ?? mtmp.my, mtmp.mx, mtmp.my);
+    const oldDist = distmin(game.u?.ux0 ?? game.u?.ux ?? mtmp.mx, game.u?.uy0 ?? game.u?.uy ?? mtmp.my, mtmp.mx, mtmp.my);
+    const targetX = mtmp.mux ?? game.u?.ux ?? mtmp.mx;
+    const targetY = mtmp.muy ?? game.u?.uy ?? mtmp.my;
+    const targetDist = distmin(mtmp.mx, mtmp.my, targetX, targetY);
+    if (dist > oldDist) {
+        const limit = BOLT_LIM - targetDist;
+        if (limit > 0 && rn2(limit)) return false;
+    }
+    return throw_weapon_at_hero_basic(mtmp, obj);
 }
 
 function can_attack_after_move_basic(mtmp, state) {
@@ -1738,8 +1855,13 @@ async function postmove_door_basic(mtmp) {
     }
     if (loc.doormask === D_CLOSED && mon_can_open_doors(mtmp)) {
         set_door_mask_basic(loc, D_ISOPEN);
+        // C ref: monmove.c:postmov().  The monster has already moved to the
+        // door square, but an unseen opener is reported as the door changing.
+        mtmp._opened_unseen_door = true;
         newsym(mtmp.mx, mtmp.my);
         game.vision_full_recalc = 1;
+        if (canseeit) await append_pline('You see a door open.');
+        else await append_pline('You hear a door open.');
     } else if ((loc.doormask & D_CLOSED) && trapped) {
         set_door_mask_basic(loc, D_NODOOR);
         newsym(mtmp.mx, mtmp.my);
@@ -2238,10 +2360,8 @@ async function mattacku_basic(mtmp, state) {
         return true;
     }
     if (game._hero_melee_message_pending && game._pending_message) queue_more_prompt();
-    // C ref: mhitu.c:mattacku() computes AC_VALUE() before AT_WEAP range
-    // dispatch. The actual thrwmu()/select_rwep path is still future work.
     if (rangeWeapon && !physical) {
-        return false;
+        return thrwmu_basic(mtmp);
     }
     if (engulf) return engulf_attack(mtmp, engulf, toHit);
     await flush_pending_more_before_monster_message();
@@ -2413,6 +2533,7 @@ async function m_move_basic(mtmp, resumeAfterTenguTeleRestrict = false) {
     }
     if (digTunnel && await m_digweapon_check_basic(mtmp, nix, niy)) return MMOVE_DONE;
     const engulfingHero = game.u?.uswallow && game.u?.ustuck === mtmp;
+    delete mtmp._opened_unseen_door;
     mtmp.mx = nix;
     mtmp.my = niy;
     if (canTunnel && may_dig_basic(nix, niy)) {
@@ -2445,6 +2566,9 @@ async function m_move_basic(mtmp, resumeAfterTenguTeleRestrict = false) {
         if (doorStatus !== MMOVE_DIED) {
             if (game._swallowed_expulsion_paused_for_more) {
                 game._swallowed_expulsion_paused_for_more = false;
+            } else if (mtmp._opened_unseen_door) {
+                // The door newsym() above owns this frame; keep the opener
+                // suppressed until it takes another movement step.
             } else if (!deferWarningRedraw) {
                 // C ref: display.c:see_monsters() warning refreshes moved
                 // off-screen monsters at input boundaries; this movement
@@ -2668,6 +2792,10 @@ export function mcalcdistress() {
             mtmp.mfrozen = 0;
             mtmp.mcanmove = 1;
         }
+        if (mtmp.mfleetim && --mtmp.mfleetim <= 0) {
+            mtmp.mfleetim = 0;
+            mtmp.mflee = false;
+        }
     }
 }
 
@@ -2763,6 +2891,11 @@ export async function movemon() {
         // before targeting, fleeing, or ordinary movement.
         if (mtmp.mconf && !rn2(50)) mtmp.mconf = 0;
         if (mtmp.mstun && !rn2(10)) mtmp.mstun = 0;
+
+        // C ref: monmove.c:dochug().  Fleeing monsters check the random
+        // teleport gate before can_teleport(); non-teleporting pets still
+        // consume the rn2(40) while fleeing.
+        if (mtmp.mflee) rn2(40);
 
         // dochugw -> dochug
         set_apparxy_basic(mtmp);

@@ -27,7 +27,7 @@ import {
 import { vision_recalc, vision_reset, init_vision_globals } from './vision.js';
 import { findAlign, findRace, findRole, roleGod, roleGreeting, roleWithStartingRank } from './roles.js';
 import { NO_COLOR } from './terminal.js';
-import { A_DEX, A_STR, A_WIS, COLNO } from './const.js';
+import { A_DEX, A_STR, A_WIS, COLNO, NORMAL_SPEED } from './const.js';
 import * as ff8000 from './fastforward.js';
 import * as ff0002 from './fastforward0002.js';
 
@@ -47,9 +47,14 @@ async function nhTimeoutBasic() {
     if (u?.uprops?.confusion) {
         // C ref: timeout.c:nh_timeout() decrements timed intrinsics and
         // handles CONFUSION through make_confused() when the timer expires.
+        const oldConfusion = u.uprops.confusion;
         u.uprops.confusion = Math.max(0, u.uprops.confusion - 1);
         u.uconfusion = u.uprops.confusion;
-        if (!u.uprops.confusion) u.uconfusion = 0;
+        if (!u.uprops.confusion) {
+            u.uconfusion = 0;
+            const state = (u.uprops?.hallucination || u.uhallucination) ? 'trippy' : 'confused';
+            if (oldConfusion) await append_pline(`You feel less ${state} now.`);
+        }
     }
 
     // C ref: timeout.c:nh_timeout() WOUNDED_LEGS case -> do.c:heal_legs().
@@ -458,6 +463,64 @@ function occupationPending(g) {
     return (g._occupation_turns_remaining || 0) > 0 || !!g._occupation_finish_message;
 }
 
+function encumberedMoveAmount(encumbrance) {
+    let moveamt = NORMAL_SPEED;
+    switch (encumbrance || 0) {
+    case 1:
+        moveamt -= Math.trunc(moveamt / 4);
+        break;
+    case 2:
+        moveamt -= Math.trunc(moveamt / 2);
+        break;
+    case 3:
+        moveamt -= Math.trunc((moveamt * 3) / 4);
+        break;
+    case 4:
+        moveamt -= Math.trunc((moveamt * 7) / 8);
+        break;
+    default:
+        break;
+    }
+    return moveamt;
+}
+
+function seedEncumberedDebtAfterExtraTurn(g) {
+    const enc = g.u?.uencumber || 0;
+    if (!enc) {
+        g._encumbered_move_debt = null;
+        return;
+    }
+    const moveamt = encumberedMoveAmount(enc);
+    g._encumbered_move_debt = (NORMAL_SPEED - moveamt) - moveamt;
+}
+
+function encumberedDebtNeedsExtraTurn(g) {
+    const enc = g.u?.uencumber || 0;
+    if (!enc || g._encumbered_move_debt == null) return false;
+    const moveamt = encumberedMoveAmount(enc);
+    g._encumbered_move_debt += NORMAL_SPEED - moveamt;
+    return g._encumbered_move_debt > 0;
+}
+
+function accrueEncumberedMoveDebt(g, options = {}) {
+    const enc = g.u?.uencumber || 0;
+    if (!enc || g._encumbered_move_debt == null) return;
+    const moveamt = encumberedMoveAmount(enc);
+    g._encumbered_move_debt += NORMAL_SPEED - moveamt;
+    if (options.capPendingExtra) {
+        const pendingExtra = 0;
+        if (g._encumbered_move_debt > pendingExtra) {
+            g._encumbered_move_debt = pendingExtra;
+        }
+    }
+}
+
+function creditEncumberedExtraTurn(g) {
+    const enc = g.u?.uencumber || 0;
+    if (!enc || g._encumbered_move_debt == null) return;
+    g._encumbered_move_debt -= encumberedMoveAmount(enc);
+}
+
 function applyOccupationFinishObjectEffects(g) {
     const obj = g._occupation_finish_object;
     if (!obj) return;
@@ -565,6 +628,31 @@ async function continueOccupationTurns(g) {
     return true;
 }
 
+async function continueSimpleTimedRepeats(g, options = {}) {
+    // C ref: cmd.c:set_occupation()/timed_occupation() and allmain.c's
+    // occupation front door.  Counted wait/search repeats spend turns without
+    // reading fresh input until the count runs out or tty output interrupts.
+    const leaveTailForInputBoundary = !!options.leaveTailForInputBoundary;
+    const interrupted = () => g._more || g._monster_turn_paused_for_more;
+    if (interrupted()) {
+        g._simple_timed_repeats_remaining = 0;
+        return false;
+    }
+    while ((g._simple_timed_repeats_remaining || 0) > (leaveTailForInputBoundary ? 1 : 0)) {
+        g._simple_timed_repeats_remaining--;
+        await advanceTurn();
+        if (interrupted()) {
+            g._simple_timed_repeats_remaining = 0;
+            return false;
+        }
+        // C ref: allmain.c:u_calc_moveamt().  Batched timed occupations
+        // still spend burdened movement points, but the catch-up monster
+        // allocation is not charged inside this JS batching loop.
+        if (leaveTailForInputBoundary) accrueEncumberedMoveDebt(g, { capPendingExtra: true });
+    }
+    return true;
+}
+
 async function refreshHallucinationDisplayAtInputBoundary(g) {
     if (g.context?.mv) return;
     // C topl.c captures a blocking --More-- before moveloop_core resumes its
@@ -611,6 +699,18 @@ async function continueRunTail(g) {
             if (g.context?.run) g._run_paused_for_more = true;
             return false;
         }
+        if (encumberedDebtNeedsExtraTurn(g) && !g._monster_turn_paused_for_more) {
+            // C ref: allmain.c:moveloop_core()/u_calc_moveamt().  Automatic
+            // run repeats still obey the hero movement-point accumulator; a
+            // burdened runner can have monster movement catch up before the
+            // next repeated domove().
+            await advanceTurn();
+            if (g._more || g._monster_turn_paused_for_more) {
+                if (g.context?.run) g._run_paused_for_more = true;
+                return false;
+            }
+            creditEncumberedExtraTurn(g);
+        }
     }
     return true;
 }
@@ -636,6 +736,11 @@ export async function moveloop_core() {
     g.context = g.context || {};
     g.context.move = 0; // Reset before rhack
     g.context.mv = 0;
+
+    if ((g._simple_timed_repeats_remaining || 0) > 0 && !g._more) {
+        await continueSimpleTimedRepeats(g);
+        return;
+    }
 
     const key = await nhgetch();
     // Read and execute one command
@@ -679,6 +784,15 @@ export async function moveloop_core() {
             }
             if (!await continueOccupationTurns(g)) return;
         }
+        if (encumberedDebtNeedsExtraTurn(g) && !g._more && !g._monster_turn_paused_for_more) {
+            // C ref: allmain.c:moveloop_core()/u_calc_moveamt().  A
+            // burdened hero does not always recover enough movement for the
+            // next input after a time-taking command, so monsters may get a
+            // catch-up allocation first.
+            await advanceTurn();
+            if (g._more || g._monster_turn_paused_for_more) return;
+            creditEncumberedExtraTurn(g);
+        }
         if (g._extra_encumbered_turn_pending && !g._more && !g._monster_turn_paused_for_more) {
             // C ref: allmain.c:moveloop_core()/u_calc_moveamt().  Becoming
             // slightly encumbered can leave u.umovement below NORMAL_SPEED,
@@ -686,6 +800,7 @@ export async function moveloop_core() {
             g._extra_encumbered_turn_pending = false;
             await advanceTurn();
             if (g._more || g._monster_turn_paused_for_more) return;
+            seedEncumberedDebtAfterExtraTurn(g);
         }
         while ((g._prayer_turns_remaining || 0) > 0) {
             g._prayer_turns_remaining--;
@@ -704,6 +819,7 @@ export async function moveloop_core() {
             if (g.context?.run) g._run_paused_for_more = true;
             return;
         }
+        if (!await continueSimpleTimedRepeats(g, { leaveTailForInputBoundary: true })) return;
         await continueRunTail(g);
     }
 }

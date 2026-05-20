@@ -15,7 +15,7 @@ import {
     object_glyph_for_menu,
 } from './display.js';
 import { cansee, couldsee, vision_recalc, vision_reset } from './vision.js';
-import { makemon, mklev, mkobj, mksobj, monster_by_user_name, next_ident, place_lregion, place_object } from './mklev.js';
+import { makemon, mklev, mkobj, mkcorpstat, mksobj, monster_by_user_name, monsterPtr, next_ident, place_lregion, place_object } from './mklev.js';
 import { OBJECT_CHARGED, OBJECT_CLASS, OBJECT_DELAY, OBJECT_MATERIAL } from './object_data.js';
 import { finish_pet_kill, obj_resists, pet_arrive_with_you } from './dog.js';
 import { merge_inventory_object, newuexp, pluslvl } from './u_init.js';
@@ -139,6 +139,15 @@ const BULKY_KILL_DROP_OBJECTS = new Set([
     153, 154, 155, 156, 157, 158,
     164, 170,
     CHEST, EXPENSIVE_CAMERA, STETHOSCOPE, BOULDER,
+]);
+
+const CORPSE_WEIGHT_BY_MONSTER = new Map([
+    // C ref: include/monsters.h SIZ(cwt, cnutrit, ...).
+    ['GNOME', 650],
+]);
+
+const LEGACY_CORPSE_NUM_TO_MONSTER = new Map([
+    [21, 'GNOME'],
 ]);
 
 const OBJECT_BASE_NAMES = new Map([
@@ -976,8 +985,7 @@ function knownObjectType(otyp) {
 
 function baseObjectName(obj) {
     if (obj?.otyp === CORPSE) {
-        if (obj.corpsenm === 21) return 'gnome corpse';
-        return 'corpse';
+        return `${corpseMonsterDisplayName(obj)} corpse`;
     }
     if ((obj?.knownName || knownObjectType(obj?.otyp)) && OBJECT_BASE_NAMES.has(obj.otyp)) return OBJECT_BASE_NAMES.get(obj.otyp);
     const appearanceName = unknownAppearanceName(obj);
@@ -986,6 +994,18 @@ function baseObjectName(obj) {
     if (obj?.oclass === RING_CLASS) return 'ring';
     if (obj?.oclass === WAND_CLASS) return 'wand';
     return 'object';
+}
+
+function corpseMonsterPtr(obj) {
+    if (Number.isInteger(obj?.corpsenm) && LEGACY_CORPSE_NUM_TO_MONSTER.has(obj.corpsenm)) {
+        return monsterPtr(LEGACY_CORPSE_NUM_TO_MONSTER.get(obj.corpsenm));
+    }
+    return monsterPtr(obj?.corpsenm) || null;
+}
+
+function corpseMonsterDisplayName(obj) {
+    const ptr = corpseMonsterPtr(obj);
+    return String(ptr?.name || 'monster').toLowerCase().replace(/_/g, ' ');
 }
 
 function shouldShowBuc(obj) {
@@ -1540,7 +1560,7 @@ function corpseEatingReqtime(obj) {
     // C ref: eat.c:eatcorpse(); corpse delay is weight-dependent:
     // victual.reqtime = 3 + (mons[mnum].cwt >> 6), then start_eating()
     // records the first bite without consuming an input boundary.
-    const cwt = obj?.corpse_cwt || (obj?.corpsenm === 21 ? 650 : 0);
+    const cwt = obj?.corpse_cwt || CORPSE_WEIGHT_BY_MONSTER.get(corpseMonsterPtr(obj)?.name) || 0;
     return 3 + (cwt >> 6);
 }
 
@@ -1644,6 +1664,7 @@ async function drinkSink() {
 
 async function handleFloorCorpseEatKey(ch) {
     const obj = game._floor_corpse_eat_obj;
+    const corpseName = baseObjectName(obj);
     game._awaiting_floor_corpse_eat = false;
     game._floor_corpse_eat_obj = null;
     game._prompt_cursor = null;
@@ -1653,15 +1674,22 @@ async function handleFloorCorpseEatKey(ch) {
         return true;
     }
     rn2(20);
-    rn2(5);
-    const damage = rnd(8);
-    if (typeof game.u?.uhp === 'number') game.u.uhp = Math.max(0, game.u.uhp - damage);
+    if (obj?._live_kill_corpse) {
+        rn2(7);
+        rn2(4);
+        rn2(4);
+        rn2(3);
+    } else {
+        rn2(5);
+        const damage = rnd(8);
+        if (typeof game.u?.uhp === 'number') game.u.uhp = Math.max(0, game.u.uhp - damage);
+    }
     if (obj) game._pending_eaten_corpse_remove = obj;
     game._occupation_turns_remaining = corpseEatingReqtime(obj);
-    game._occupation_finish_message = 'You finish eating the gnome corpse.';
+    game._occupation_finish_message = `You finish eating the ${corpseName}.`;
     game._occupation_pack_finish_message = true;
     game._occupation_finish_removes_eaten_corpse = true;
-    await pline('You feel sick.');
+    await pline(obj?._live_kill_corpse ? 'Blecch!  Rotten food!' : 'You feel sick.');
     game.context.move = 1;
     return true;
 }
@@ -1999,6 +2027,12 @@ function heroMeleeSmallDamageDie() {
     return WEAPON_SMALL_DAMAGE_DIE.get(weapon?.otyp) || 6;
 }
 
+function heroMeleeDamageBonus() {
+    const weapon = heroWieldedWeapon();
+    if (!weapon || typeof weapon.spe !== 'number') return 0;
+    return weapon.spe;
+}
+
 function doorwayBlocksDiagonalForHero(loc) {
     return loc && loc.typ === DOOR && (loc.doormask & ~C.D_BROKEN);
 }
@@ -2115,7 +2149,7 @@ async function bumpClosedDoor(dx, dy) {
 }
 
 function runShouldStopAfterMove(source, target) {
-    if (hostileMonsterNearHeroForRunStop()) return true;
+    if (hostileMonsterNearHeroForRunStop(game.context?.run)) return true;
     return target?.typ === DOOR || (source?.typ === CORR && target?.typ === C.ROOM);
 }
 
@@ -2194,14 +2228,24 @@ function maybeTurnCorridorRun(run) {
     }
 }
 
-function hostileMonsterNearHeroForRunStop() {
+function hostileMonsterNearHeroForRunStop(run = game.context?.run) {
     const u = game.u;
     if (!u) return false;
     for (let x = u.ux - 1; x <= u.ux + 1; x++) {
         for (let y = u.uy - 1; y <= u.uy + 1; y++) {
             if (x === u.ux && y === u.uy) continue;
             const mon = mon_at(x, y);
-            if (!mon || mon.mpeaceful || mon.mtame || monsterHasNoAttacks(mon)) continue;
+            if (!mon) continue;
+            if (run?.mode === 1 && !run.travel) {
+                // C ref: hack.c:lookaround().  Shift-direction running only
+                // stops for visible monsters in the square being run toward;
+                // side monsters are ignored until they block or attack.
+                const infront = x === u.ux + run.dx && y === u.uy + run.dy;
+                if (!infront) continue;
+                if (cansee(x, y)) return true;
+                continue;
+            }
+            if (mon.mpeaceful || mon.mtame || monsterHasNoAttacks(mon)) continue;
             if (cansee(x, y)) return true;
         }
     }
@@ -2289,7 +2333,11 @@ async function attackMonster(mon) {
 async function swapWithSafeMonster(mon, x, y) {
     const u = game.u;
     if (!rn2(7)) {
-        if (mon.mtame) rnd(6);
+        if (mon.mtame) {
+            const fleetime = rnd(6);
+            mon.mflee = true;
+            mon.mfleetim = Math.max(mon.mfleetim || 0, fleetime === 1 ? 2 : fleetime);
+        }
         await pline(`You stop.  ${monsterSwapName(mon).replace(/^your /, 'Your ')} is in the way!`);
         game.context.run = null;
         return;
@@ -2319,7 +2367,7 @@ async function heroMeleeAttack(mon) {
         return;
     }
     exercise(A_DEX, true);
-    const damage = rnd(heroMeleeSmallDamageDie());
+    const damage = Math.max(1, rnd(heroMeleeSmallDamageDie()) + heroMeleeDamageBonus());
     if (typeof mon.mhp === 'number') {
         mon.mhp -= damage;
         if (mon.mhp <= 0) {
@@ -2374,6 +2422,41 @@ function corpseChance(mon) {
     const verysmall = VERY_SMALL_MONSTERS.has(monsterName(mon)) ? 1 : 0;
     const denom = 2 + (genoFreq < 2 ? 1 : 0) + verysmall;
     return !rn2(denom);
+}
+
+function corpseStatFlagsForMonster(mon, baseFlags = C.CORPSTAT_NONE) {
+    let flags = baseFlags;
+    if (mon?.female) flags |= C.CORPSTAT_FEMALE;
+    else if (!mon?.data?.neuter) flags |= C.CORPSTAT_MALE;
+    return flags;
+}
+
+function ttyMapColor(color) {
+    return color === 0 || color === 7 ? NO_COLOR : color;
+}
+
+function corpseDisplayColorForMonster(mon) {
+    return ttyMapColor(mon?.data?.color ?? NO_COLOR);
+}
+
+function makeMonsterCorpse(mon, baseFlags = C.CORPSTAT_NONE) {
+    // C ref: src/mon.c:make_corpse().  The ordinary xkilled() path enters
+    // mkcorpstat(CORPSE, ..., CORPSTAT_INIT), so mksobj() first initializes a
+    // random corpse before the caller-supplied monster type overrides it.
+    if ((mon?.data?.geno || 0) & G_NOCORPSE) return null;
+    const flags = corpseStatFlagsForMonster(mon, baseFlags) | C.CORPSTAT_INIT;
+    const oldLiveCorpseTimeout = game._live_corpse_timeout;
+    game._live_corpse_timeout = true;
+    try {
+        const corpse = mkcorpstat(CORPSE, mon, mon?.data, mon.mx, mon.my, flags);
+        if (corpse) {
+            corpse.color = corpseDisplayColorForMonster(mon);
+            corpse._live_kill_corpse = true;
+        }
+        return corpse;
+    } finally {
+        game._live_corpse_timeout = oldLiveCorpseTimeout;
+    }
 }
 
 function accessibleKillDropSquare(x, y) {
@@ -2452,7 +2535,9 @@ function heroKilledMonster(mon) {
         game._pending_tame_kill_reaction = true;
     }
     maybeDropKillTreasure(mon);
-    corpseChance(mon);
+    if (corpseChance(mon) && accessibleKillDropSquare(mon.mx, mon.my)) {
+        makeMonsterCorpse(mon);
+    }
     if (mon.mpeaceful && !rn2(2)) {
         // Luck adjustment is outside the current scoring surface.
     }
@@ -3459,6 +3544,13 @@ async function handleQueuedMore(ch) {
             game._after_more_message = '';
             game._after_more_needs_prompt = false;
             await pline(msg);
+            if (game._after_more_projectile_glyph) {
+                const glyph = game._after_more_projectile_glyph;
+                game._after_more_projectile_glyph = null;
+                const oldX = glyph.ch === ')' ? glyph.x - 1 : glyph.x;
+                if (C.isok(oldX, glyph.y)) newsym(oldX, glyph.y);
+                if (C.isok(glyph.x, glyph.y)) show_glyph_cell(glyph.x, glyph.y, glyph.ch, NO_COLOR, false);
+            }
             if (needsPrompt) {
                 queue_more_prompt();
                 if (pausedMonsterTurn && game._monster_attack_resume_behind_after_more) {
@@ -4679,6 +4771,50 @@ async function applyPendingLevelChange() {
 }
 
 // C ref: cmd.c rhack — main command dispatcher
+function isCommandCountDigit(ch) {
+    return ch >= '0' && ch <= '9';
+}
+
+function startOrContinueCommandCount(ch) {
+    game._command_count_digits = `${game._command_count_digits || ''}${ch}`;
+    game.context.move = 0;
+}
+
+function consumeCommandCountForCommand() {
+    const digits = game._command_count_digits || '';
+    game._command_count_digits = '';
+    if (!digits) {
+        game.context.commandCount = 0;
+        game.context.multi = 0;
+        return 0;
+    }
+    const count = Math.min(Number.parseInt(digits, 10) || 0, 2147483647);
+    game.context.commandCount = count;
+    game.context.multi = count > 0 ? count - 1 : 0;
+    return count;
+}
+
+function queueSimpleTimedRepeatsForCount() {
+    // C ref: cmd.c:parse()/set_occupation()/timed_occupation().  The
+    // command's own time charge is handled by moveloop_core() after rhack()
+    // returns; the simple repeat queue only models the subsequent timed
+    // occupation turns.
+    const remaining = Math.max(0, (game.context?.multi || 0) - 2);
+    if (remaining > 0) game._simple_timed_repeats_remaining = remaining;
+}
+
+function refreshHeroPreviousPositionForStationaryCommand() {
+    if (!game.u) return;
+    game.u.ux0 = game.u.ux;
+    game.u.uy0 = game.u.uy;
+}
+
+function clearDeferredPetPickupObjects() {
+    for (const obj of game.level?.objects || []) {
+        if (obj?._defer_pet_pickup) delete obj._defer_pet_pickup;
+    }
+}
+
 export async function rhack(key) {
     if (key === 0) {
         // Read key from input
@@ -5951,9 +6087,24 @@ export async function rhack(key) {
         return;
     }
 
+    // C ref: cmd.c:parse()/get_count().  With number_pad off, digits are a
+    // count prefix and do not dispatch until a following non-digit command.
+    if (isCommandCountDigit(ch)) {
+        startOrContinueCommandCount(ch);
+        return;
+    }
+    if (game._command_count_digits && ch === '\x1b') {
+        game._command_count_digits = '';
+        clear_pending_message();
+        game.context.move = 0;
+        return;
+    }
+    consumeCommandCountForCommand();
+
     // Message lines persist while waiting for input, then clear when the
     // next command begins unless the command prints a replacement.
     clear_pending_message();
+    clearDeferredPetPickupObjects();
     const forceCommandPrefix = !!game._force_command_prefix;
     game._force_command_prefix = false;
 
@@ -5989,14 +6140,18 @@ export async function rhack(key) {
             'Are you waiting to get hit?', '_did_nothing_flag')) {
             game.context.move = 0;
         } else {
+            refreshHeroPreviousPositionForStationaryCommand();
             game.context.move = 1;
+            queueSimpleTimedRepeatsForCount();
         }
     } else if (ch === 's') {
         if (!forceCommandPrefix && await cmdSafetyPrevention('Searching', 'another search',
             'You already found a monster.', '_already_found_flag')) {
             game.context.move = 0;
         } else {
+            refreshHeroPreviousPositionForStationaryCommand();
             game.context.move = 1;
+            queueSimpleTimedRepeatsForCount();
         }
     } else if (ch === 'm') {
         game._force_command_prefix = true;
@@ -6174,10 +6329,11 @@ export async function rhack(key) {
     } else if (ch === 'e') {
         const corpse = floorCorpseAtHero();
         if (corpse) {
+            const corpseName = baseObjectName(corpse);
             game.context.move = 0;
             game._awaiting_floor_corpse_eat = true;
             game._floor_corpse_eat_obj = corpse;
-            await showPromptLine('There is a gnome corpse here; eat it? [ynq] (n)');
+            await showPromptLine(`There is a ${corpseName} here; eat it? [ynq] (n)`);
         } else {
             game.context.move = 0;
             const letters = eatLetters();
@@ -6297,6 +6453,13 @@ export async function domove(dx, dy) {
     if (impaired) {
         dx = impaired.dx;
         dy = impaired.dy;
+        if (game.context?.run && !game.context.run.travel) {
+            // C ref: cmd.c:confdir()/hack.c:domove_core().  Confused
+            // movement mutates u.dx/u.dy, so an active run continues (or
+            // stops) using the confused vector rather than the original key.
+            game.context.run.dx = dx;
+            game.context.run.dy = dy;
+        }
     }
 
     const newx = u.ux + dx;
@@ -6356,6 +6519,13 @@ export async function domove(dx, dy) {
         if (isSafeMonster(mon)) {
             await swapWithSafeMonster(mon, newx, newy);
             return true;
+        }
+        if (game.context?.run && cansee(newx, newy)) {
+            // C ref: hack.c:domove_core().  Running into a visible non-safe
+            // monster stops the run instead of performing a melee attack.
+            game.context.move = 0;
+            game.context.run = null;
+            return false;
         }
         await attackMonster(mon);
         return true;

@@ -567,6 +567,7 @@ function monster_visible(mon) {
     // physical sight when it is not an undetected hider and not unseen
     // invisible.
     if (!mon || mon.mundetected) return false;
+    if (mon._opened_unseen_door) return false;
     if (mon.minvis && !(game.u?.usee_invisible || game.u?.uprops?.see_invisible)) return false;
     return true;
 }

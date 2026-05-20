@@ -15,7 +15,9 @@ and `feature_map.md`.
 - Current branch in this workspace: `main`.
 - Baseline commit before the current `seed0002` pass: `ccbf286`.
 - Current target: `seed0002-healer-reflection-drummer` has advanced from
-  `S 83/595 R 5690/27158` to `S 252/595 R 10968/27158`.
+  `S 83/595 R 5690/27158` to focused verification
+  `S 281/595 R 12690/27158` (`frozen/score.sh` cells `281/595`,
+  cursor-inclusive screen score `273/595`).
 - Recently completed targets still full after this pass: `seed0383`,
   `seed5002`, `seed0116`, `seed0360`, and `seed8000`.
 - User-requested regression queue item `seed0360-wizard-world-tour` is fixed:
@@ -24,9 +26,9 @@ and `feature_map.md`.
 ## Latest Loop Checkpoint
 
 - Target: `seed0002-healer-reflection-drummer`.
-- Current verification: `S 252/595 R 10968/27158`, `FS 252:char:map:Enter`,
-  `FR 10588:rn2(5)=3=>d(3,8)=11`, `C 7`.
-- Sentinel verification after the pass: total `S 621/1063 R 44163/64569`.
+- Current verification: `S 281/595 R 12690/27158`,
+  `FS 279:char:map:H`, `FR 12451:rn2(8)=0=>rn2(12)=4`, `C 8`.
+- Sentinel verification after the pass: total `S 650/1063 R 45885/64569`.
   `seed8000`, `seed0116`, `seed0383`, and `seed0360` remain full passes;
   `seed0013` remains first-screen blocked with `R 588/4804`.
 - Frozen public score after this pass is `5/44` passing. Current exact
@@ -54,18 +56,30 @@ and `feature_map.md`.
     `rn1(7, 16 - 8*bcsign)`, discovers via WIS, shows `Conf`, and movement
     calls `u_maybe_impaired()`. Potion of booze now consumes `d(2+uhs,8)`,
     abuses WIS, and pauses for the call-potion prompt before turn tail.
-  - Current `FR 10588` is not a booze effect bug: C still has a burdened
-    extra monster allocation from the preceding move before the quaff effect.
-    A naive broad `u.umovement` accumulator was tested and reverted because it
-    regressed seed0002 around the pickup More and seed0116 around prayer/More.
+  - Timed confusion expiry now prints `You feel less confused now.` at the
+    timeout edge, and counted wait/search prefixes use a timed-repeat queue
+    with burdened movement debt rather than per-step replay.
+  - Hero melee damage now applies weapon `spe`, so the +1 scalpel kills the
+    goblin on the C frame; `xkilled()` then runs kill-treasure, corpse chance,
+    `mkcorpstat(CORPSE,...,CORPSTAT_INIT)`, initial random corpse/timer RNG,
+    the no-corpse species gate, and live goblin corpse display/eating state.
+  - Floor-corpse eating prompts and finish text now use the actual corpse
+    species for live corpses while preserving legacy numeric gnome corpses.
+  - Pet/topline handling suppresses pet inventory text from overwriting
+    floor-look and rotten-food occupation messages; projectile-sourced pet
+    inventory retains the thrown dagger in current evidence so it does not
+    become a false remembered floor object.
+  - Current `FR 12451` is after the goblin corpse/eating path; the visible
+    frontier is an ordinary monster/newt movement square one column off after
+    hidden eating turns.
 - Production `js/` has no intentional debug I/O or frozen imports.
 - Coherent commit pending for: `js/allmain.js`, `js/cmd.js`,
-  `js/display.js`, `js/monmove.js`, `feature_map.md`, `lessons.md`, and this
-  checkpoint.
+  `js/display.js`, `js/dog.js`, `js/mklev.js`, `js/monmove.js`,
+  `feature_map.md`, `lessons.md`, and this checkpoint.
 - Next queue:
-  - Continue `seed0002` from screen 252 / `FR 10588`. The next structural fix
-    is burdened `u.umovement` cadence integrated with delayed pickup,
-    occupations, and More resume points; do not reintroduce the naive
-    always-on accumulator that regressed seed0116.
+  - Continue `seed0002` from cells screen 281 / `FR 12451`. The next
+    structural fix is ordinary monster movement/pet-goal state after the
+    hidden goblin-corpse eating turns; current visible drift is a newt one
+    square off near screen row 18.
   - Keep `seed0360` in the sentinel queue because the user reported a local
     frozen-score regression; current frozen verification is full.

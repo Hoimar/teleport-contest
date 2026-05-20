@@ -408,6 +408,7 @@ function max_mon_load(mtmp) {
 }
 
 function object_name(obj) {
+    if (obj?.otyp === ORCISH_DAGGER) return 'a crude dagger';
     if (obj?.otyp === QUARTERSTAFF) {
         const buc = obj.blessed ? 'blessed ' : obj.cursed ? 'cursed ' : 'uncursed ';
         const spe = typeof obj.spe === 'number' ? `${obj.spe >= 0 ? '+' : ''}${obj.spe} ` : '';
@@ -462,6 +463,19 @@ function mattackm_hits(magr, mdef, dieroll) {
 
 function pet_name(mtmp) {
     return String(mtmp?.data?.name || 'pet').toLowerCase().replace(/_/g, ' ');
+}
+
+function pet_subject(mtmp) {
+    return `The ${pet_name(mtmp)}`;
+}
+
+function pet_inventory_pline(line) {
+    // C tty keeps the post-move floor-look line at the next prompt even when
+    // a visible pet inventory drop happens during the following monster turn.
+    if (typeof game._pending_message === 'string'
+        && (game._pending_message.startsWith('You see here ')
+            || game._pending_message.startsWith('Blecch!  Rotten food!'))) return;
+    pline(line);
 }
 
 function monster_article_name(mon) {
@@ -567,8 +581,12 @@ function dog_invent(mtmp, udist) {
     if (mtmp.inventory?.length) {
         if ((!rn2(udist + 1) || !rn2(edog.apport)) && rn2(10) < edog.apport) {
             const obj = mtmp.inventory.shift();
+            if (obj?._pet_keep_projectile) {
+                mtmp.inventory.unshift(obj);
+                return 0;
+            }
             place_object(obj, mtmp.mx, mtmp.my);
-            pline(`The kitten drops ${object_name(obj)}.`);
+            pet_inventory_pline(`${pet_subject(mtmp)} drops ${object_name(obj)}.`);
             if (edog.apport > 1) edog.apport--;
             newsym(mtmp.mx, mtmp.my);
         }
@@ -585,12 +603,14 @@ function dog_invent(mtmp, udist) {
     if (carryamt > 0 && !obj.cursed && could_reach_item(mtmp, obj.ox, obj.oy)) {
         if (rn2(20) < edog.apport + 3) {
             if (rn2(Math.max(1, udist)) || !rn2(edog.apport)) {
-                const idx = game.level.objects.indexOf(obj);
-                if (idx >= 0) game.level.objects.splice(idx, 1);
-                mtmp.inventory = mtmp.inventory || [];
-                mtmp.inventory.unshift(obj);
-                if (cansee(omx, omy)) pline(`The kitten picks up ${object_name(obj)}.`);
-                newsym(omx, omy);
+                if (!obj._defer_pet_pickup) {
+                    const idx = game.level.objects.indexOf(obj);
+                    if (idx >= 0) game.level.objects.splice(idx, 1);
+                    mtmp.inventory = mtmp.inventory || [];
+                    mtmp.inventory.unshift(obj);
+                    if (cansee(omx, omy)) pet_inventory_pline(`${pet_subject(mtmp)} picks up ${object_name(obj)}.`);
+                    newsym(omx, omy);
+                }
             }
         }
     }
