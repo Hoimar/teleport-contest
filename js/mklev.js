@@ -449,6 +449,8 @@ const TRAPPED_CHEST = 25;
 
 function is_hole(t) { return t === HOLE || t === TRAPDOOR; }
 function is_pit(t) { return t === PIT || t === SPIKED_PIT; }
+function unhideable_trap(t) { return t === HOLE; }
+function undestroyable_trap(t) { return t === MAGIC_PORTAL || t === VIBRATING_SQUARE; }
 
 const MONSTERS = MONSTER_DATA.map(([name, mlet, mlevel, mmove, maligntyp, geno, difficulty, color, neuter, male, female, msound = 0, mresists = 0, mconveys = 0, mflags1 = 0, mflags2 = 0, mflags3 = 0, mattk = []]) => ({
     name, mlet, mlevel, mmove, maligntyp, geno, difficulty, color, msound, mresists, mconveys, mflags1, mflags2, mflags3, mattk,
@@ -2980,7 +2982,19 @@ function holeDestination() {
 function maketrap(x, y, typ) {
     // C ref: trap.c:maketrap() - these are door/chest states, not map traps.
     if (typ === TRAPPED_DOOR || typ === TRAPPED_CHEST) return null;
-    const trap = { ttyp: typ, tx: x, ty: y, tseen: false, once: false, launch: { x: 0, y: 0 } };
+    if (!game.level) return null;
+    if (!game.level.traps) game.level.traps = [];
+    let trap = game.level.traps.find((ttmp) => ttmp.tx === x && ttmp.ty === y) || null;
+    const oldplace = !!trap;
+    if (oldplace && undestroyable_trap(trap.ttyp)) return null;
+    if (!trap) trap = { tx: x, ty: y };
+    trap.ttyp = typ;
+    trap.tseen = unhideable_trap(typ);
+    trap.once = false;
+    trap.launch = { x: 0, y: 0 };
+    delete trap.tnote;
+    delete trap.dst;
+    delete trap.launch2;
     if (typ === SQKY_BOARD) {
         const used = new Set((game.level?.traps || [])
             .filter((t) => t.ttyp === SQKY_BOARD && typeof t.tnote === 'number')
@@ -3011,9 +3025,7 @@ function maketrap(x, y, typ) {
         trap.launch = { x, y };
         trap.launch2 = { x, y };
     }
-    if (!game.level) return trap;
-    if (!game.level.traps) game.level.traps = [];
-    game.level.traps.push(trap);
+    if (!oldplace) game.level.traps.push(trap);
     return trap;
 }
 

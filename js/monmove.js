@@ -6,7 +6,7 @@ import { OBJECT_CLASS, OBJECT_DIR } from './object_data.js';
 import {
     BURN, DUST, ENGR_BLOOD, HEADSTONE,
     D_BROKEN, D_CLOSED, D_ISOPEN, D_LOCKED, D_NODOOR, D_TRAPPED,
-    DOOR, IRONBARS, LADDER, ROOM, SQKY_BOARD, STAIRS, WEB,
+    DOOR, IRONBARS, LADDER, ROOM, SQKY_BOARD, SLP_GAS_TRAP, STAIRS, WEB,
     IS_DOOR, IS_LAVA, IS_OBSTRUCTED, IS_POOL, IS_STWALL, IS_TREE, IS_WALL, IS_WATERWALL,
     I_SPECIAL, M_AP_FURNITURE, M_AP_OBJECT,
     MON_POLE_DIST, NEED_AXE, NEED_HTH_WEAPON, NEED_PICK_AXE, NEED_PICK_OR_AXE,
@@ -40,6 +40,7 @@ const M1_TUNNEL = 0x00000020;
 const M1_NEEDPICK = 0x00000040;
 const M1_HIDE = 0x00000100;
 const M1_CONCEAL = 0x00000080;
+const M1_BREATHLESS = 0x00000400;
 const M1_NOEYES = 0x00001000;
 const M1_NOHANDS = 0x00002000;
 const M1_MINDLESS = 0x00010000;
@@ -47,6 +48,7 @@ const M1_ANIMAL = 0x00040000;
 const M2_STRONG = 0x04000000;
 const M2_COLLECT = 0x40000000;
 const M2_MAGIC = 0x80000000;
+const MR_SLEEP = 0x04;
 const MTSZ = 4;
 const MS_RIDER = 35;
 const MS_LEADER = 36;
@@ -999,6 +1001,32 @@ async function wake_nearto_basic(x, y, distance) {
     }
 }
 
+function helpless_basic(mtmp) {
+    return !!mtmp?.msleeping || mtmp?.mcanmove === 0;
+}
+
+function breathless_basic(ptr) {
+    return !!((ptr?.mflags1 ?? 0) & M1_BREATHLESS);
+}
+
+function resists_sleep_basic(mtmp) {
+    return !!((mtmp?.data?.mresists ?? 0) & MR_SLEEP);
+}
+
+function sleep_monst_basic(mtmp, amount) {
+    // C ref: mhitm.c:sleep_monst(). Negative "how" callers skip the
+    // separate resist() roll; sleep-gas traps pass a positive duration.
+    if (!mtmp || resists_sleep_basic(mtmp) || mtmp.mcanmove === 0) return false;
+    const frozen = Math.min((amount || 0) + (mtmp.mfrozen || 0), 127);
+    if (frozen > 0) {
+        mtmp.mcanmove = 0;
+        mtmp.mfrozen = frozen;
+    } else {
+        mtmp.msleeping = 1;
+    }
+    return true;
+}
+
 async function mintrap_squeaky_board_basic(mtmp, trap) {
     // C ref: trap.c:trapeffect_sqky_board().
     if (mon_in_air(mtmp)) return MMOVE_MOVED;
@@ -1014,6 +1042,16 @@ async function mintrap_squeaky_board_basic(mtmp, trap) {
         await append_monster_topline(`You hear ${note} squeak ${where}.`);
     }
     await wake_nearto_basic(mtmp.mx, mtmp.my, 40);
+    return MMOVE_MOVED;
+}
+
+function mintrap_sleep_gas_basic(mtmp) {
+    // C ref: trap.c:trapeffect_slp_gas_trap().
+    if (!resists_sleep_basic(mtmp)
+        && !breathless_basic(mtmp.data)
+        && !helpless_basic(mtmp)) {
+        sleep_monst_basic(mtmp, rnd(25));
+    }
     return MMOVE_MOVED;
 }
 
@@ -1049,6 +1087,7 @@ async function mintrap_basic(mtmp) {
     mon_learns_traps_basic(mtmp, trap.ttyp);
     mons_see_trap_basic(trap);
     if (trap.ttyp === SQKY_BOARD) return mintrap_squeaky_board_basic(mtmp, trap);
+    if (trap.ttyp === SLP_GAS_TRAP) return mintrap_sleep_gas_basic(mtmp);
     return MMOVE_MOVED;
 }
 
