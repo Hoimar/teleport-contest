@@ -13,39 +13,41 @@ and `feature_map.md`.
 ## Current State
 
 - Current branch in this workspace: `main`.
-- Baseline commit before this cursor-fix pass: `a1c49b3`.
+- Baseline commit before the current `seed0383` pass: `5e4371b`.
 - Just-completed target: `seed0360-wizard-world-tour` frozen-scorer cursor
-  regression.
-- Active hypothesis for the next pass: retarget `seed0383-wizard-hallucinate`;
-  RNG is exact and the remaining blocker is hallucinated new-level map/redraw
-  drift after screen 195/196.
+  regression remains stable at full pass.
+- Active hypothesis for the next pass: continue `seed0383-wizard-hallucinate`;
+  RNG is exact and the remaining blocker is a `Monnam()` display-name side
+  effect during fleeing/scary monster movement before screen 199.
 
 ## Latest Loop Checkpoint
 
-- Target: `seed0360-wizard-world-tour`.
-- Current verification: full pass, `S 833/833 R 120639/120639`, `FS -`,
-  `FR -`, `C 0`; `node frozen/ps_test_runner.mjs
-  sessions/seed0360-wizard-world-tour.session.json` also passes
-  `Screen 833/833`, `cursors 833/833`.
-- Sentinel verification after the pass: total `S 430/1063 R 38877/64569`.
-  `seed8000` and `seed0116` remain full passes; `seed0383` is
-  `S 197/219 R 16915/16915`; `seed0002` is
+- Target: `seed0383-wizard-hallucinate`.
+- Current verification: `S 200/219 R 16915/16915`, `FS 199:char:map:l`,
+  `FR -`, `C 0`.
+- User-requested sentinel check: `seed0360-wizard-world-tour` remains a full
+  pass, `S 833/833 R 120639/120639`, `FS -`, `FR -`, `C 0`.
+- Sentinel verification after the pass: total `S 433/1063 R 38877/64569`.
+  `seed8000` and `seed0116` remain full passes; `seed0002` remains
   `S 83/595 R 5690/27158`; `seed0013` remains
   `S 0/99 R 580/4804`.
-- Clean-end full verification: `S 1699/11405 R 233570/792838`; hack audit
-  `hard=0 suspicious=38`; memory lint is clean.
+- Harness checks: hack audit `hard=0 suspicious=39`; memory lint is clean.
 - Implemented subsystem truth in this iteration:
-  - Forced getpos cursor movement now uses `getpos.c:truncate_to_map()` edge
-    shortening, so diagonal moves at the map edge do not drift on one axis.
-  - Controlled teleport and farlook exits clear stale getpos prompt cursors so
-    post-command message frames return the terminal cursor to the hero/map
-    position (`C ref: teleport.c:teleds()`, `pager.c:do_look()`).
-  - The initial `#levelchange` `getlin()` prompt places the cursor one column
-    past the visible prompt for tty's invisible trailing input space
-    (`C ref: win/tty/getline.c:hooked_tty_getlin()`).
+  - Active override/menu screens suppress the ordinary input-boundary
+    Hallucination refresh while C is still inside `select_menu()`.
+  - Full-screen tty menu dismissal before level-teleport selection performs the
+    `erase_menu_or_text()` full redraw shape (`docrt()+flush_screen()`).
+  - Level teleport consumes old-level `vision_recalc(2)` Hallucination warning
+    redraws before save, then performs the arrival-side monster overlay needed
+    to match C's display RNG through the materialize frame.
+  - Visible monster pickup messages now use a `Monnam()`-style hallucinated
+    subject and real food floor names, and pickup refreshes the monster layer
+    before the following object-layer hallucination redraw.
 - Production `js/` has no intentional debug I/O or frozen imports.
-- Coherent commit pending for: `js/cmd.js`, `feature_map.md`, `lessons.md`, and
-  this checkpoint.
+- Coherent commit pending for: `js/allmain.js`, `js/cmd.js`, `js/monmove.js`,
+  `js/vision.js`, `feature_map.md`, `lessons.md`, and this checkpoint.
 - Next queue:
-  - Retarget `seed0383-wizard-hallucinate`: RNG is complete, first visible
-    blocker is hallucinated new-level map/redraw drift after screen 195/196.
+  - Continue `seed0383-wizard-hallucinate`: C step 199 has a display-RNG
+    `Monnam()` side effect around `distfleeck()`/scary movement before the
+    final monster/object redraw. Do not patch with display skips; port the
+    relevant monster-message side effect.

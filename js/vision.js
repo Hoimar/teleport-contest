@@ -132,8 +132,9 @@ export function vision_reset() {
             viz_clear[y][i] = block ? 0 : 1;
         }
     }
-    game._viz_rmin = null;
-    game._viz_rmax = null;
+    // C ref: vision.c:vision_reset() rebuilds the blockage cache but leaves
+    // gv.viz_rmin/gv.viz_rmax intact; the next vision_recalc(2) uses the
+    // previous visible ranges to redraw old in-sight coordinates.
 }
 
 // Bresenham quadrant path functions (C ref: vision.c q1-q4_path)
@@ -513,7 +514,7 @@ export function vision_recalc(control = 0) {
 
     const old_rmin = game._viz_rmin;
     const old_rmax = game._viz_rmax;
-    if (old_array && control !== 2 && game.level) {
+    if (old_array && game.level) {
         for (let row = 0; row < ROWNO; row++) {
             const old_row = old_array[row];
             const next_row = next[row];

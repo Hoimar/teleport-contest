@@ -539,6 +539,10 @@ async function refreshHallucinationDisplayAtInputBoundary(g) {
     // C getlin()/yn_function() prompt reads happen inside the interrupted
     // command, before control returns to allmain's next input-boundary redraw.
     if (g._prompt_cursor && g._pending_message) return;
+    // C tty menus read their selection inside select_menu(); while the menu
+    // window is active, moveloop_core() has not resumed for the Hallucination
+    // input-boundary redraw.
+    if (g._override_screen) return;
     if (!(g.u?.uhallucination || g.u?.uprops?.hallucination)) return;
     if (g.u?.uswallow && g.u?.ustuck && g._swallowed_map_active) {
         // C ref: allmain.c:moveloop_core() once-per-player-input Hallucination

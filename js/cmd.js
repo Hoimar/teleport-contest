@@ -2070,6 +2070,21 @@ function clearOverrideScreen() {
     game._override_prev = null;
 }
 
+async function redrawAfterFullScreenMenuDismiss() {
+    // C ref: win/tty/wintty.c:erase_menu_or_text().  Full-screen menus
+    // dismissed with offx == 0 restore the playfield via docrt()+flush.
+    const prevWarning = game._hallucination_warning_rng_active;
+    game._hallucination_warning_rng_active = true;
+    try {
+        vision_recalc(2);
+        vision_recalc(0);
+        await docrt();
+        await flush_screen(1);
+    } finally {
+        game._hallucination_warning_rng_active = prevWarning;
+    }
+}
+
 async function showTravelTipScreen() {
     // C ref: cmd.c:dotravel() enters the farlook selection UI and shows the
     // farlook/travel tip before the first cursor prompt.
@@ -3887,6 +3902,16 @@ export async function performLevelTeleport(target) {
         const migratingSet = new Set(followers);
         game.level.monsters = game.level.monsters.filter((mon) => !migratingSet.has(mon));
     }
+    // C ref: do.c:goto_level() shuts down old-level vision with
+    // vision_recalc(2) immediately before savelev(); display.c:display_warning()
+    // still randomizes warning glyphs while Hallucination is active.
+    const prevWarningRng = game._hallucination_warning_rng_active;
+    game._hallucination_warning_rng_active = true;
+    try {
+        vision_recalc(2);
+    } finally {
+        game._hallucination_warning_rng_active = prevWarningRng;
+    }
     saveCurrentLevelState();
     game.u.uz = newUz;
     if (!restoreCachedLevelState(newUz)) await mklev();
@@ -3902,7 +3927,15 @@ export async function performLevelTeleport(target) {
     pet_arrive_with_you();
     initrack();
     vision_reset();
+    // C ref: display.c:docrt() starts with vision_recalc(2), forcing old
+    // visible cells through newsym() before the level-change full redraw.
+    vision_recalc(2);
     vision_recalc(0);
+    // C ref: display.c:docrt_flags() overlays monsters after its full
+    // vision_recalc(0).  JS restores map memory inside docrt(), after the
+    // external vision pass, so keep this C monster pass before that restore
+    // and let docrt() re-overlay the visible monsters afterward.
+    see_monsters();
     await docrt();
     if (game.u?.uhallucination || game.u?.uprops?.hallucination) see_objects();
     await pline('You materialize on a different level!');
@@ -5066,13 +5099,19 @@ export async function rhack(key) {
                 return;
             }
             const target = game._level_teleport_menu_choices?.[ch];
-            if (target) game._pending_level_teleport_target = target;
+            if (target) {
+                await redrawAfterFullScreenMenuDismiss();
+                game._pending_level_teleport_target = target;
+            }
             game.context.move = 0;
             return;
         }
         if (prev === game._level_teleport_menu_page2_screen) {
             const target = game._level_teleport_menu_page2_choices?.[ch];
-            if (target) game._pending_level_teleport_target = target;
+            if (target) {
+                await redrawAfterFullScreenMenuDismiss();
+                game._pending_level_teleport_target = target;
+            }
             game.context.move = 0;
             return;
         }

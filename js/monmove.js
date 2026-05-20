@@ -20,7 +20,7 @@ import {
 } from './const.js';
 import {
     newsym, queue_more_prompt, pline, flush_screen, clear_pending_message,
-    docrt, refresh_swallowed_overlay, serialize_terminal_grid, append_pline,
+    docrt, refresh_swallowed_overlay, serialize_terminal_grid, append_pline, see_monsters,
 } from './display.js';
 import { nhgetch } from './input.js';
 import { clear_path, cansee, couldsee } from './vision.js';
@@ -82,6 +82,7 @@ const SCROLL_CLASS = 9;
 const SPBOOK_CLASS = 10;
 const WAND_CLASS = 11;
 const GEM_CLASS = 13;
+const SPRIG_OF_WOLFSBANE = 283;
 const ROCK = 474;
 const BOULDER = 475;
 const AXE = 44;
@@ -1087,7 +1088,7 @@ async function mpickstuff_basic(mtmp) {
     for (const obj of pile) {
         if (!mon_would_take_item(mtmp, obj) || can_carry(mtmp, obj) <= 0) continue;
         if (cansee(mtmp.mx, mtmp.my)) {
-            await append_monster_topline(`The ${monster_name(mtmp)} picks up ${floor_object_name(obj)}.`);
+            await append_monster_topline(`${monster_subject(mtmp)} picks up ${floor_object_name(obj)}.`);
         }
         const idx = game.level.objects.indexOf(obj);
         if (idx >= 0) game.level.objects.splice(idx, 1);
@@ -1095,6 +1096,7 @@ async function mpickstuff_basic(mtmp) {
         mtmp.inventory.unshift(obj);
         mtmp.misc_worn_check = (mtmp.misc_worn_check || 0) | I_SPECIAL;
         newsym(mtmp.mx, mtmp.my);
+        if (hallucinating()) see_monsters();
         return true;
     }
     return false;
@@ -1133,7 +1135,21 @@ function monster_name(mtmp) {
     return String(mtmp?.data?.name || 'monster').toLowerCase().replace(/_/g, ' ');
 }
 
+function monster_subject(mtmp) {
+    if (hallucinating()) return sentence_case(randomHallucinatedMonsterName('the'));
+    return `The ${monster_name(mtmp)}`;
+}
+
+function sentence_case(text) {
+    const str = String(text || '');
+    return str ? `${str[0].toUpperCase()}${str.slice(1)}` : str;
+}
+
 function floor_object_name(obj) {
+    if (obj?.oclass === FOOD_CLASS) {
+        const base = obj.otyp === SPRIG_OF_WOLFSBANE ? 'sprig of wolfsbane' : 'food';
+        return `${/^[aeiou]/i.test(base) ? 'an' : 'a'} ${base}`;
+    }
     if (obj?.oclass === POTION_CLASS) return 'a potion';
     if (obj?.oclass === GEM_CLASS) {
         if (obj.otyp === ROCK) return 'a rock';
