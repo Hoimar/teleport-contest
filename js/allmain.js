@@ -442,8 +442,11 @@ export async function advanceTurn() {
     await nhTimeoutBasic();
     regen_hp();
 
-    await dosounds();
+    if (await dosounds()) return;
+    finishPostDosoundsTurnTail(g);
+}
 
+function finishPostDosoundsTurnTail(g) {
     gethungry();
     exerchk();
     maybe_wipe_engraving();
@@ -777,6 +780,11 @@ export async function moveloop_core() {
     const key = await nhgetch();
     // Read and execute one command
     await rhack(key);
+    if (g._resume_post_dosounds_turn_tail && !g._more) {
+        g._resume_post_dosounds_turn_tail = false;
+        finishPostDosoundsTurnTail(g);
+        return;
+    }
     // C ref: teleport.c:level_tele() schedules the destination; allmain.c
     // performs deferred_goto() after rhack() returns.
     if (g._pending_level_teleport_target) {
@@ -849,8 +857,14 @@ export async function moveloop_core() {
         // C ref: topl.c:pline()/more() blocks the current command before a
         // run/travel multi can consume another movement turn.  Prayer's
         // occupation above still reaches gn.nomovemsg in this same command.
-        if (g._more) {
+        const runSoundMoreLatched = !!g._run_sound_more_latched;
+        if (g._more && !runSoundMoreLatched) {
             if (g.context?.run) g._run_paused_for_more = true;
+            return;
+        }
+        if (runSoundMoreLatched) {
+            g._run_sound_more_latched = false;
+            await continueRunTail(g);
             return;
         }
         if (!await continueSimpleTimedRepeats(g, { leaveTailForInputBoundary: true })) return;

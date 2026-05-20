@@ -9166,6 +9166,7 @@ export async function mklev() {
     await makelevel();
     const slev = currentSpecialLevel();
     const loadedSpecial = !!(slev?.proto && slev.proto !== 'rogue');
+    if (!loadedSpecial) wallification(1, 0, COLNO - 1, ROWNO - 1);
     if (loadedSpecial) link_doors_rooms();
     if (loadedSpecial && (game._last_special_protofile === 'castle'
         || game._last_special_protofile === 'valley'
@@ -11183,6 +11184,28 @@ function shkinit(shopIndex, sroom) {
         shk.isshk = 1;
         shk.mpeaceful = 1;
         shk.msleeping = 0;
+        const roomIndex = game.level.rooms.indexOf(sroom);
+        const door = sroom?.doorct ? game.level?.doors?.[sroom.fdoor] : null;
+        // C ref: shknam.c:shkinit().  Movement needs the shopkeeper's
+        // usual inside-door square (`shk`) and shop door (`shd`) even before
+        // full billing/customer state exists.
+        shk.mextra = shk.mextra || {};
+        shk.mextra.eshk = {
+            shoproom: roomIndex >= 0 ? roomIndex + ROOMOFFSET : 0,
+            shoptype: sroom.rtype,
+            shoplevel: { ...(game.u?.uz || { dnum: 0, dlevel: 1 }) },
+            shd: door ? { x: door.x, y: door.y } : { x: pos.x, y: pos.y },
+            shk: { x: pos.x, y: pos.y },
+            robbed: 0,
+            credit: 0,
+            debit: 0,
+            loan: 0,
+            following: false,
+            surcharge: false,
+            billct: 0,
+            visitct: 0,
+            customer: '',
+        };
     }
     rnd(100); // C ref: shknam.c:mkmonmoney() initial capital amount.
     next_ident();

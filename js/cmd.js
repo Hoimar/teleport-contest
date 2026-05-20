@@ -91,6 +91,7 @@ const DART = 23;
 const ORCISH_DAGGER = 36;
 const CORPSE = 265;
 const G_NOCORPSE = 0x0010;
+const STATUE = 476;
 const RANDOM_CLASS = 0;
 const POT_CONFUSION = 299;
 const POT_PARALYSIS = 301;
@@ -991,6 +992,9 @@ function baseObjectName(obj) {
     if (obj?.otyp === CORPSE) {
         return `${corpseMonsterDisplayName(obj)} corpse`;
     }
+    if (obj?.otyp === STATUE) {
+        return statueObjectName(obj);
+    }
     if ((obj?.knownName || knownObjectType(obj?.otyp)) && OBJECT_BASE_NAMES.has(obj.otyp)) return OBJECT_BASE_NAMES.get(obj.otyp);
     const appearanceName = unknownAppearanceName(obj);
     if (appearanceName) return appearanceName;
@@ -1007,9 +1011,31 @@ function corpseMonsterPtr(obj) {
     return monsterPtr(obj?.corpsenm) || null;
 }
 
-function corpseMonsterDisplayName(obj) {
+function objectMonsterDisplayName(obj) {
     const ptr = corpseMonsterPtr(obj);
     return String(ptr?.name || 'monster').toLowerCase().replace(/_/g, ' ');
+}
+
+function corpseMonsterDisplayName(obj) {
+    return objectMonsterDisplayName(obj);
+}
+
+function statueObjectName(obj) {
+    // C ref: src/objnam.c:xname().  Statues include the monster type stored
+    // in obj->corpsenm; generic statues retain the base object name.
+    const ptr = corpseMonsterPtr(obj);
+    if (!ptr) return 'statue';
+    const name = objectMonsterDisplayName(obj);
+    return `statue of ${indefiniteArticle(name)} ${name}`;
+}
+
+function toplineWouldOverflowWithPrevious(line) {
+    const prev = game._last_topline_message || '';
+    if (!prev || !line || !game._last_topline_can_force_more) return false;
+    const cols = game.nhDisplay?.cols || COLNO;
+    // C ref: win/tty/topl.c:update_topl().  A new topline can be packed
+    // after the previous one only if there remains room for a later --More--.
+    return line.length + prev.length + 3 >= cols - 8;
 }
 
 function shouldShowBuc(obj) {
@@ -1357,7 +1383,13 @@ async function lookHereAfterMove() {
         .filter(o => o.ox === u.ux && o.oy === u.uy);
     if (!objects.length) return;
     if (objects.length === 1) {
-        await pline(`You see here ${inventoryObjectName(objects[0])}.`);
+        const line = `You see here ${inventoryObjectName(objects[0])}.`;
+        const overflow = toplineWouldOverflowWithPrevious(line);
+        await pline(line);
+        if (overflow) {
+            game._floor_list_pauses_turn = true;
+            queue_more_prompt();
+        }
         return;
     }
     game._pending_message = `${' '.repeat(41)}Things that are here:`;
