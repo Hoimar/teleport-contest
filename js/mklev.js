@@ -8484,14 +8484,17 @@ export async function mklev() {
     g.in_mklev = true;
     clearSpecialLregions();
     await makelevel();
-    if (game._last_special_protofile === 'castle'
+    const slev = currentSpecialLevel();
+    const loadedSpecial = !!(slev?.proto && slev.proto !== 'rogue');
+    if (loadedSpecial) link_doors_rooms();
+    if (loadedSpecial && (game._last_special_protofile === 'castle'
         || game._last_special_protofile === 'valley'
         || game._last_special_protofile === 'sanctum'
         || game._last_special_protofile === 'orcus'
         || game._last_special_protofile === 'minetn-5'
         || game._last_special_protofile === 'wizard1'
         || game._last_special_protofile === 'wizard2'
-        || game._last_special_protofile === 'wizard3') {
+        || game._last_special_protofile === 'wizard3')) {
         for (let i = 0; i < (g.level?.nroom ?? 0); i++) {
             fill_special_room(g.level.rooms[i]);
         }
@@ -10006,6 +10009,50 @@ function add_door(x, y, aroom) {
     }
     g.level.doors[aroom.fdoor] = { x, y };
     g.level.doorindex++;
+}
+
+function shared_with_room(x, y, droom) {
+    if (!isok(x, y) || !droom) return false;
+    const rmno = (droom.roomnoidx ?? game.level.rooms.indexOf(droom)) + ROOMOFFSET;
+    const loc = game.level.at(x, y);
+    if ((loc?.roomno ?? 0) === rmno && !loc.edge) return false;
+    if (isok(x - 1, y) && (game.level.at(x - 1, y)?.roomno ?? 0) === rmno && x - 1 <= droom.hx)
+        return true;
+    if (isok(x + 1, y) && (game.level.at(x + 1, y)?.roomno ?? 0) === rmno && x + 1 >= droom.lx)
+        return true;
+    if (isok(x, y - 1) && (game.level.at(x, y - 1)?.roomno ?? 0) === rmno && y - 1 <= droom.hy)
+        return true;
+    if (isok(x, y + 1) && (game.level.at(x, y + 1)?.roomno ?? 0) === rmno && y + 1 >= droom.ly)
+        return true;
+    return false;
+}
+
+function maybe_add_door_to_room(x, y, droom) {
+    if (!droom || droom.hx < 0) return;
+    const rmno = (droom.roomnoidx ?? game.level.rooms.indexOf(droom)) + ROOMOFFSET;
+    const loc = game.level.at(x, y);
+    if (!loc) return;
+    if ((!droom.irregular && inside_room(droom, x, y))
+        || (loc.roomno ?? 0) === rmno
+        || shared_with_room(x, y, droom)) {
+        add_door(x, y, droom);
+    }
+}
+
+// C ref: sp_lev.c:link_doors_rooms()
+function link_doors_rooms() {
+    const nroom = game.level?.nroom ?? 0;
+    for (let y = 0; y < ROWNO; y++)
+        for (let x = 0; x < COLNO; x++) {
+            const loc = game.level?.at(x, y);
+            if (!loc || !(IS_DOOR(loc.typ) || loc.typ === SDOOR)) continue;
+            for (let i = 0; i < nroom; i++) {
+                const room = game.level.rooms?.[i];
+                maybe_add_door_to_room(x, y, room);
+                for (const subroom of room?.sbrooms || [])
+                    maybe_add_door_to_room(x, y, subroom);
+            }
+        }
 }
 
 function bydoor(x, y) {
