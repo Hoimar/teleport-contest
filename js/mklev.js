@@ -29,7 +29,7 @@ import {
     SDOOR, SCORR, IRONBARS, TREE, FOUNTAIN, SINK, ALTAR, GRAVE,
     DIR_N, DIR_S, DIR_E, DIR_W, DIR_180,
     IS_WALL, IS_STWALL, IS_DOOR, IS_OBSTRUCTED, IS_FURNITURE, IS_POOL, IS_LAVA, IS_ROOM,
-    SPACE_POS, isok, W_NONDIGGABLE, FILL_NORMAL, FILL_NONE, FILL_LVFLAGS,
+    SPACE_POS, ZAP_POS, isok, W_NONDIGGABLE, FILL_NORMAL, FILL_NONE, FILL_LVFLAGS,
     DRY, WET, HOT, SOLID,
     ICE, MOAT, POOL, WATER, LAVAPOOL, LAVAWALL, DBWALL, DRAWBRIDGE_UP, THRONE,
     A_LAWFUL, A_NONE, Align2amask,
@@ -451,6 +451,7 @@ function is_hole(t) { return t === HOLE || t === TRAPDOOR; }
 function is_pit(t) { return t === PIT || t === SPIKED_PIT; }
 function unhideable_trap(t) { return t === HOLE; }
 function undestroyable_trap(t) { return t === MAGIC_PORTAL || t === VIBRATING_SQUARE; }
+function is_xport_trap(t) { return t >= TELEP_TRAP && t <= MAGIC_PORTAL; }
 
 const MONSTERS = MONSTER_DATA.map(([name, mlet, mlevel, mmove, maligntyp, geno, difficulty, color, neuter, male, female, msound = 0, mresists = 0, mconveys = 0, mflags1 = 0, mflags2 = 0, mflags3 = 0, mattk = []]) => ({
     name, mlet, mlevel, mmove, maligntyp, geno, difficulty, color, msound, mresists, mconveys, mflags1, mflags2, mflags3, mattk,
@@ -2978,6 +2979,72 @@ function holeDestination() {
     return dst;
 }
 
+function closed_door_at(x, y) {
+    const loc = game.level?.at(x, y);
+    return loc?.typ === DOOR && !!(loc.doormask & (D_CLOSED | D_LOCKED));
+}
+
+function isclearpath_basic(cc, distance, dx, dy) {
+    // C ref: trap.c:isclearpath().
+    let x = cc.x;
+    let y = cc.y;
+    while (distance-- > 0) {
+        x += dx;
+        y += dy;
+        if (!isok(x, y)) return false;
+        const typ = game.level?.at(x, y)?.typ;
+        if (typ == null || !ZAP_POS(typ) || closed_door_at(x, y)) return false;
+        const trap = (game.level?.traps || []).find((ttmp) => ttmp.tx === x && ttmp.ty === y);
+        if (trap && (is_pit(trap.ttyp) || is_hole(trap.ttyp) || is_xport_trap(trap.ttyp))) return false;
+    }
+    cc.x = x;
+    cc.y = y;
+    return true;
+}
+
+function find_random_launch_coord_basic(trap) {
+    // C ref: trap.c:find_random_launch_coord().  Explicit Lua launchplace
+    // offsets are not currently modeled; random special traps use this path.
+    if (!trap || isSokobanLevel()) return null;
+    const x = trap.tx;
+    const y = trap.ty;
+    const mindist = trap.ttyp === ROLLING_BOULDER_TRAP ? 2 : 4;
+    let distance = rn1(5, 4);
+    let dir = rn2(8);
+    let trycount = 0;
+    while (distance >= mindist) {
+        const dx = xdir[dir];
+        const dy = ydir[dir];
+        const cc = { x, y };
+        let success = !(trap.ttyp === ROLLING_BOULDER_TRAP
+                && is_pool_or_lava_at(x + distance * dx, y + distance * dy))
+            && isclearpath_basic(cc, distance, dx, dy);
+        if (trap.ttyp === ROLLING_BOULDER_TRAP) {
+            const bcc = { x, y };
+            if (!isclearpath_basic(bcc, distance, -dx, -dy)) success = false;
+        }
+        if (success) return cc;
+        if (++dir > 7) dir = 0;
+        if ((++trycount % 8) === 0) distance--;
+    }
+    return null;
+}
+
+function mkroll_launch_basic(trap, x, y, otyp, ocount) {
+    // C ref: trap.c:mkroll_launch().
+    const cc = find_random_launch_coord_basic(trap) || { x, y };
+    if (cc.x !== x || cc.y !== y) {
+        const obj = mksobj_at(otyp, cc.x, cc.y, true, false);
+        if (obj) obj.quan = ocount;
+    }
+    trap.launch = { x: cc.x, y: cc.y };
+    if (trap.ttyp === ROLLING_BOULDER_TRAP) {
+        trap.launch2 = { x: x - (cc.x - x), y: y - (cc.y - y) };
+    } else {
+        trap.launch_otyp = otyp;
+    }
+}
+
 // maketrap stub
 function maketrap(x, y, typ) {
     // C ref: trap.c:maketrap() - these are door/chest states, not map traps.
@@ -3021,10 +3088,7 @@ function maketrap(x, y, typ) {
     if (is_hole(typ)) {
         trap.dst = holeDestination();
     }
-    if (typ === ROLLING_BOULDER_TRAP && isSokobanLevel()) {
-        trap.launch = { x, y };
-        trap.launch2 = { x, y };
-    }
+    if (typ === ROLLING_BOULDER_TRAP) mkroll_launch_basic(trap, x, y, BOULDER, 1);
     if (!oldplace) game.level.traps.push(trap);
     return trap;
 }
