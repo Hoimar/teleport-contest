@@ -53,6 +53,22 @@ const M2 = {
     M2_MAGIC: 0x80000000,
 };
 
+const M3 = {
+    M3_WANTSAMUL: 0x0001,
+    M3_WANTSBELL: 0x0002,
+    M3_WANTSBOOK: 0x0004,
+    M3_WANTSCAND: 0x0008,
+    M3_WANTSARTI: 0x0010,
+    M3_WANTSALL: 0x001f,
+    M3_WAITFORU: 0x0040,
+    M3_CLOSE: 0x0080,
+    M3_COVETOUS: 0x001f,
+    M3_WAITMASK: 0x00c0,
+    M3_INFRAVISION: 0x0100,
+    M3_INFRAVISIBLE: 0x0200,
+    M3_DISPLACES: 0x0400,
+};
+
 const M1 = {
     M1_FLY: 0x00000001,
     M1_SWIM: 0x00000002,
@@ -180,7 +196,7 @@ const CLR = {
     DRAGON_SILVER: 14,
 };
 
-const CONSTS = { ...GEN, ...M1, ...M2, ...MR, ...MS, ...CLR };
+const CONSTS = { ...GEN, ...M1, ...M2, ...M3, ...MR, ...MS, ...CLR };
 CONSTS.A_NONE = 0;
 
 const ATTACK_MACROS = {
@@ -288,6 +304,7 @@ function collectMonsters(text) {
         const mconveys = evalMask(args[7]);
         const mflags1 = evalMask(args[8]);
         const mflags2 = evalMask(args[9]);
+        const mflags3 = evalMask(args[10]);
         const difficulty = Number(args[11]);
         const color = evalMask(args[12]);
         const neuter = (mflags2 & M2.M2_NEUTER) !== 0 ? 1 : 0;
@@ -295,7 +312,7 @@ function collectMonsters(text) {
         const female = (mflags2 & M2.M2_FEMALE) !== 0 ? 1 : 0;
         rows.push([
             name, mlet, mlevel, mmove, maligntyp, geno, difficulty, color,
-            neuter, male, female, msound, mresists, mconveys, mflags1, mflags2, mattk,
+            neuter, male, female, msound, mresists, mconveys, mflags1, mflags2, mflags3, mattk,
         ]);
     }
     return rows;
@@ -308,7 +325,7 @@ const rows = collectMonsters(source);
 const lines = [
     '// Generated from nethack-c/upstream/include/monsters.h (NetHack 5.0).',
     '// C refs: include/monsters.h MON() rows, include/monflag.h G_* flags, makemon.c:rndmonst_adj().',
-    '// Fields: name, mlet, mlevel, mmove, maligntyp, geno, difficulty, color, neuter, male, female, msound, mresists, mconveys, mflags1, mflags2, mattk.',
+    '// Fields: name, mlet, mlevel, mmove, maligntyp, geno, difficulty, color, neuter, male, female, msound, mresists, mconveys, mflags1, mflags2, mflags3, mattk.',
     'export const MONSTER_DATA = [',
     ...rows.map((row) => `    ${JSON.stringify(row)},`),
     '];',

@@ -12,6 +12,7 @@ import {
     MON_POLE_DIST, NEED_AXE, NEED_HTH_WEAPON, NEED_PICK_AXE, NEED_PICK_OR_AXE,
     NEED_RANGED_WEAPON, NEED_WEAPON, W_ARMS, W_NONDIGGABLE, W_WEP,
     GP_CHECKSCARY, SDOOR, W_NONPASSWALL,
+    STRAT_WAITFORU, STRAT_WAITMASK,
     isok, SPACE_POS, is_pit,
 } from './const.js';
 import {
@@ -1977,7 +1978,11 @@ export async function movemon() {
         // waiting, or still-sleeping monsters. Disturb/wake-up RNG is not
         // modeled yet, so sleeping monsters spend movement without movement
         // AI until that front door is ported.
-        if (mtmp.mcanmove === 0 || mtmp.msleeping) continue;
+        if ((mtmp.mstrategy & STRAT_WAITFORU)
+            && (m_canseeu_basic(mtmp) || mtmp.mhp < mtmp.mhpmax)) {
+            mtmp.mstrategy &= ~STRAT_WAITFORU;
+        }
+        if (mtmp.mcanmove === 0 || (mtmp.mstrategy & STRAT_WAITMASK) || mtmp.msleeping) continue;
         if (is_hider(mtmp)
             && (mtmp.m_ap_type === M_AP_FURNITURE
                 || mtmp.m_ap_type === M_AP_OBJECT

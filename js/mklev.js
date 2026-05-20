@@ -33,9 +33,11 @@ import {
     DRY, WET, HOT, SOLID,
     ICE, MOAT, POOL, WATER, LAVAPOOL, LAVAWALL, DBWALL, DRAWBRIDGE_UP, THRONE,
     A_LAWFUL, A_NONE, Align2amask,
-    LR_DOWNSTAIR, LR_UPSTAIR, LR_BRANCH, LR_TELE, LR_UPTELE, LR_DOWNTELE, NO_MINVENT, MM_IGNOREWATER, MM_IGNORELAVA, MM_ADJACENTOK, MM_ANGRY, MM_EPRI, MM_ASLEEP, MM_NOGRP, MM_NOTAIL, MM_NONAME, GP_CHECKSCARY, GP_AVOID_MONPOS,
+    LR_DOWNSTAIR, LR_UPSTAIR, LR_BRANCH, LR_TELE, LR_UPTELE, LR_DOWNTELE, NO_MINVENT, MM_IGNOREWATER, MM_IGNORELAVA, MM_ADJACENTOK, MM_ANGRY, MM_EPRI, MM_ASLEEP, MM_NOGRP, MM_NOTAIL, MM_NONAME, MM_NOWAIT, GP_CHECKSCARY, GP_AVOID_MONPOS,
     MARK as ENGR_MARK, N_ENGRAVE,
     M_AP_OBJECT, M_AP_FURNITURE,
+    STRAT_APPEARMSG, STRAT_WAITFORU, STRAT_CLOSE,
+    M3_WAITFORU, M3_CLOSE, M3_WAITMASK, M3_COVETOUS,
     In_mines, Is_rogue_level,
 } from './const.js';
 
@@ -448,8 +450,8 @@ const TRAPPED_CHEST = 25;
 function is_hole(t) { return t === HOLE || t === TRAPDOOR; }
 function is_pit(t) { return t === PIT || t === SPIKED_PIT; }
 
-const MONSTERS = MONSTER_DATA.map(([name, mlet, mlevel, mmove, maligntyp, geno, difficulty, color, neuter, male, female, msound = 0, mresists = 0, mconveys = 0, mflags1 = 0, mflags2 = 0, mattk = []]) => ({
-    name, mlet, mlevel, mmove, maligntyp, geno, difficulty, color, msound, mresists, mconveys, mflags1, mflags2, mattk,
+const MONSTERS = MONSTER_DATA.map(([name, mlet, mlevel, mmove, maligntyp, geno, difficulty, color, neuter, male, female, msound = 0, mresists = 0, mconveys = 0, mflags1 = 0, mflags2 = 0, mflags3 = 0, mattk = []]) => ({
+    name, mlet, mlevel, mmove, maligntyp, geno, difficulty, color, msound, mresists, mconveys, mflags1, mflags2, mflags3, mattk,
     neuter: !!neuter, male: !!male, female: !!female,
 }));
 
@@ -2808,6 +2810,16 @@ function mon_set_minvis(mon, cursedPotion = false) {
     if (!mon.invis_blkd) mon.minvis = mon.perminvis;
 }
 
+function init_mstrategy_for(mon, ptr, mmflags) {
+    // C ref: makemon.c:makemon() initializes mstrategy from mflags3 unless
+    // MM_NOWAIT suppresses the initial waiting/covetous strategy.
+    const flags = ptr?.mflags3 ?? 0;
+    if (!mon || !flags || (mmflags & MM_NOWAIT)) return;
+    if (flags & M3_WAITFORU) mon.mstrategy |= STRAT_WAITFORU;
+    if (flags & M3_CLOSE) mon.mstrategy |= STRAT_CLOSE;
+    if (flags & (M3_WAITMASK | M3_COVETOUS)) mon.mstrategy |= STRAT_APPEARMSG;
+}
+
 // makemon stub
 export function makemon(mdat, x, y, mmflags = 0) {
     let ptr = (mdat === null) ? null : mdat;
@@ -2867,6 +2879,7 @@ export function makemon(mdat, x, y, mmflags = 0) {
         minvis: 0,
         perminvis: 0,
         invis_blkd: 0,
+        mstrategy: 0,
     };
     // C makemon() inserts at the head of fmon. Movement allocation and
     // action order depend on this list order because each monster consumes
@@ -2942,6 +2955,7 @@ export function makemon(mdat, x, y, mmflags = 0) {
             game._monster_init_has_gold = false;
         }
     }
+    init_mstrategy_for(mon, mon.data || ptr, mmflags);
     return mon;
 }
 
