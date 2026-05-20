@@ -631,6 +631,33 @@ function terrain_covers_objects(loc) {
     return ((IS_POOL(loc.typ) && !underwater) || loc.typ === LAVAPOOL || loc.typ === LAVAWALL);
 }
 
+function mapped_location_memory(loc, x, y, visible) {
+    // C ref: display.c:_map_location().  Even when the hero or a monster is
+    // drawn on top, the object/trap/background layer updates remembered glyphs.
+    const covered = terrain_covers_objects(loc);
+    const obj = game.level?.objects?.find(o => o.ox === x && o.oy === y);
+    const trap = game.level?.traps?.find(t => t.tx === x && t.ty === y);
+
+    if (obj && !covered) {
+        if (obj.otyp === STATUE
+            && (game.u?.uprops?.hallucination || game.u?.uhallucination)) {
+            object_glyph_for_display(obj, x, y, visible);
+            const mem = random_object_glyph_for_display();
+            return { ch: mem.ch, color: mem.color, decgfx: false };
+        }
+        const og = object_glyph_for_display(obj, x, y, visible);
+        return { ch: og.ch, color: og.color, decgfx: false };
+    }
+
+    if (trap?.tseen && !covered) {
+        const tr = trap_glyph(trap);
+        return { ch: tr.ch, color: tr.color, decgfx: tr.dec };
+    }
+
+    const tg = terrain_glyph(loc, x, y);
+    return { ch: tg.ch, color: tg.color, decgfx: tg.dec };
+}
+
 export function map_level_for_wizard() {
     // C refs: wizcmds.c:wiz_map(), detect.c:do_mapping().
     if (!game.level) return;
@@ -757,17 +784,18 @@ export function newsym(x, y) {
         return;
     }
 
+    const visible = cansee(x, y);
+    if (visible) loc.waslit = !!loc.lit;
+
     if (game.u?.ux === x && game.u?.uy === y) {
         // Hero
         show_glyph_cell(x, y, '@', CLR_WHITE, false);
-        const tg = terrain_glyph(loc, x, y);
-        loc.remembered_glyph = { ch: tg.ch, color: tg.color, decgfx: tg.dec };
+        if (game.level?.flags?.hero_memory)
+            loc.remembered_glyph = mapped_location_memory(loc, x, y, visible);
         return;
     }
 
     const mon = game.level?.monsters?.find(m => m.mx === x && m.my === y);
-    const visible = cansee(x, y);
-    if (visible) loc.waslit = !!loc.lit;
 
     if (!visible) {
         const wg = mon ? warning_glyph(mon) : null;
