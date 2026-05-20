@@ -10,7 +10,7 @@ import {
     maybe_generate_rnd_mon, regen_hp, gethungry, exerchk,
     maybe_wipe_engraving, maybe_update_seer_turn, dosounds, exercise,
 } from './allmain_turns.js';
-import { mcalcdistress, mcalcmove, movemon } from './monmove.js';
+import { flush_deferred_warning_redraws, mcalcdistress, mcalcmove, movemon } from './monmove.js';
 import { initrack, settrack } from './track.js';
 import { mklev, l_nhcore_init, u_on_upstairs } from './mklev.js';
 import { init_objects } from './o_init.js';
@@ -376,6 +376,13 @@ export async function advanceTurn() {
     if (!resumeTurnTailOnly) {
         const firstScanCanMove = await movemon();
         if (g._monster_turn_paused_for_more) return;
+        if (g._more && firstScanCanMove && g._scan_more_from_tele_restrict) {
+            g._scan_more_from_tele_restrict = false;
+            g._resume_somebody_can_move = true;
+            g._monster_turn_paused_for_more = true;
+            g._preserve_more_base_for_next_monster_message = true;
+            return;
+        }
         if (g._fast_extra_action_pending) {
             g._fast_extra_action_pending = false;
             g._pet_combat_resume_active = false;
@@ -540,7 +547,10 @@ export async function moveloop_core() {
     }
     const hallucinating = !!(g.u?.uhallucination || g.u?.uprops?.hallucination);
     await refreshHallucinationDisplayAtInputBoundary(g);
-    if (!hallucinating && g.u?.uprops?.warning) refresh_warning_monsters();
+    if (!g._more) {
+        flush_deferred_warning_redraws();
+        if (!hallucinating && g.u?.uprops?.warning) refresh_warning_monsters();
+    }
     await bot();
     await flush_screen(1);
 

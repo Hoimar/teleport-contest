@@ -235,10 +235,13 @@ async function tele_restrict_basic(mtmp) {
         const hadPending = !!game._pending_message;
         await pline(`A mysterious force prevents the ${monster_name(mtmp)} from teleporting!`);
         if (hadPending) {
-            queue_more_prompt();
+            if (!game._more) queue_more_prompt();
+            else game._more_dismissals_remaining = 1;
+            game._scan_more_from_tele_restrict = true;
             if (!game._latched_more_screen) {
                 await flush_screen(1);
                 game._latched_more_screen = serialize_terminal_grid(game.nhDisplay);
+                game._latched_more_keep_until_dismiss = true;
                 game._latched_more_cursor = [
                     game.nhDisplay?.cursorCol ?? Math.min(`${game._pending_message || ''}--More--`.length, 79),
                     game.nhDisplay?.cursorRow ?? 0,
@@ -547,6 +550,38 @@ function resists_magic_missile_basic(mtmp) {
     return (mtmp?.data?.mattk || []).some((attack) =>
         attack?.[1] === 'AD_MAGM' || attack?.[1] === 'AD_RBRE')
         || mtmp?.data?.name === 'BABY_GRAY_DRAGON';
+}
+
+function warning_active_for_mon_basic(mtmp, x = mtmp?.mx, y = mtmp?.my) {
+    if (!mtmp || !game.u?.uprops?.warning || mtmp.mpeaceful) return false;
+    if (dist2(game.u?.ux ?? 0, game.u?.uy ?? 0, x, y) >= 100) return false;
+    const realLevel = Math.trunc((mtmp.m_lev ?? mtmp.data?.mlevel ?? 0) / 4);
+    return realLevel >= (game.context?.warnlevel ?? 1);
+}
+
+function defer_warning_move_redraw_basic(mtmp, omx, omy, appr) {
+    // C refs: display.c:display_warning(), display.c:show_glyph(),
+    // allmain.c:moveloop_core(). Warning glyphs are floating display state;
+    // off-screen monster moves are refreshed at the next input boundary.
+    return appr === 1
+        && !cansee(omx, omy)
+        && !cansee(mtmp.mx, mtmp.my)
+        && (warning_active_for_mon_basic(mtmp, omx, omy)
+            || warning_active_for_mon_basic(mtmp, mtmp.mx, mtmp.my));
+}
+
+function defer_warning_redraw_square(x, y) {
+    if (!isok(x, y)) return;
+    game._deferred_warning_redraws = game._deferred_warning_redraws || [];
+    if (!game._deferred_warning_redraws.some((pt) => pt.x === x && pt.y === y))
+        game._deferred_warning_redraws.push({ x, y });
+}
+
+export function flush_deferred_warning_redraws() {
+    const pending = game._deferred_warning_redraws || [];
+    if (!pending.length) return;
+    game._deferred_warning_redraws = [];
+    for (const pt of pending) newsym(pt.x, pt.y);
 }
 
 function minliquid_basic(mtmp) {
@@ -1088,6 +1123,155 @@ function monster_possessive(mtmp) {
     return 'its';
 }
 
+async function wildmiss_displaced_image_basic(mtmp) {
+    // C ref: mhitu.c:wildmiss().  The displaced-image miss is a pline(),
+    // not a combat roll, so it must not consume hit or damage RNG.
+    if (!cansee(mtmp.mx, mtmp.my)) return false;
+    const invis = game.u?.uinvis || game.u?.uprops?.invisible || game.u?.Invis;
+    const line = `The ${monster_name(mtmp)} strikes at your ${invis ? 'invisible ' : ''}displaced image and misses you!`;
+    if (game._more && game._pending_message) {
+        game._after_more_message = game._after_more_message
+            ? `${game._after_more_message}  ${line}`
+            : line;
+        game._after_more_needs_prompt = true;
+        game._monster_attack_more_latched = true;
+        mtmp.mlstmv = game.moves || 0;
+        return true;
+    }
+    await flush_pending_more_before_monster_message();
+    await pline(line);
+    queue_more_prompt();
+    latch_monster_message_on_base_screen(line);
+    mtmp.mlstmv = game.moves || 0;
+    return true;
+}
+
+function latch_monster_message_on_base_screen(line) {
+    if (!game._monster_more_base_screen) return false;
+    const rows = String(game._monster_more_base_screen).split('\n');
+    rows[0] = `${line}--More--`;
+    game._latched_more_screen = rows.join('\n');
+    game._latched_more_cursor = [Math.min(rows[0].length, 79), 0];
+    game._latched_more_keep_until_dismiss = true;
+    if (game._monster_more_restore_message) {
+        game._restore_message_after_more = game._monster_more_restore_message;
+        game._monster_more_restore_message = '';
+    }
+    game._monster_more_base_screen = '';
+    return true;
+}
+
+function patch_serialized_screen_points(baseScreen, points) {
+    const rows = String(baseScreen || '').split('\n');
+    for (const pt of points || []) {
+        const row = pt.y + 1;
+        const col = pt.x - 1;
+        if (row < 0 || row >= rows.length || col < 0) continue;
+        const cell = game.nhDisplay?.grid?.[row]?.[col];
+        if (!cell) continue;
+        const parsed = parse_serialized_row_cells(rows[row] || '');
+        while (parsed.length <= col) parsed.push({ ch: ' ', color: 8, attr: 0 });
+        parsed[col] = {
+            ch: cell.ch || ' ',
+            color: Number.isInteger(cell.color) ? cell.color : 8,
+            attr: cell.attr || 0,
+        };
+        rows[row] = serialize_row_cells(parsed);
+    }
+    return rows.join('\n');
+}
+
+function sgr_fg_to_color(code) {
+    if (code === 39 || code === 0) return 8;
+    if (code >= 30 && code <= 37) return code - 30;
+    if (code >= 90 && code <= 97) return 8 + (code - 90);
+    return null;
+}
+
+function color_to_sgr_fg(color) {
+    if (color === 8 || color == null || color < 0 || color > 15) return 39;
+    return color < 8 ? 30 + color : 90 + (color - 8);
+}
+
+function parse_serialized_row_cells(row) {
+    const cells = [];
+    let color = 8;
+    let attr = 0;
+    for (let i = 0; i < row.length; i++) {
+        if (row[i] === '\x1b' && row[i + 1] === '[') {
+            let j = i + 2;
+            while (j < row.length && !/[A-Za-z]/.test(row[j])) j++;
+            const command = row[j];
+            const body = row.slice(i + 2, j);
+            if (command === 'm') {
+                const codes = body ? body.split(';').map((part) => Number(part || 0)) : [0];
+                if (codes.includes(0)) {
+                    color = 8;
+                    attr = 0;
+                }
+                for (const code of codes) {
+                    const fg = sgr_fg_to_color(code);
+                    if (fg != null) color = fg;
+                    if (code === 1) attr |= 2;
+                    else if (code === 4) attr |= 4;
+                    else if (code === 7) attr |= 1;
+                }
+            } else if (command === 'C') {
+                const n = Number(body || 1);
+                for (let k = 0; k < n; k++) cells.push({ ch: ' ', color, attr });
+            }
+            i = j;
+            continue;
+        }
+        cells.push({ ch: row[i], color, attr });
+    }
+    return cells;
+}
+
+function serialize_row_cells(cells) {
+    let last = cells.length - 1;
+    while (last >= 0 && cells[last].ch === ' ') last--;
+    let out = '';
+    let curColor = 8;
+    let curAttr = 0;
+    for (let i = 0; i <= last; i++) {
+        const cell = cells[i] || { ch: ' ', color: 8, attr: 0 };
+        const color = Number.isInteger(cell.color) ? cell.color : 8;
+        const attr = cell.attr || 0;
+        if (color !== curColor || attr !== curAttr) {
+            const codes = [];
+            if (attr !== curAttr) {
+                codes.push(0);
+                if (attr & 2) codes.push(1);
+                if (attr & 4) codes.push(4);
+                if (attr & 1) codes.push(7);
+                if (color !== 8) codes.push(color_to_sgr_fg(color));
+            } else {
+                codes.push(color_to_sgr_fg(color));
+            }
+            out += `\x1b[${codes.join(';')}m`;
+            curColor = color;
+            curAttr = attr;
+        }
+        out += cell.ch || ' ';
+    }
+    if (curColor !== 8 || curAttr !== 0) out += '\x1b[39m';
+    return out;
+}
+
+async function prepare_monster_more_base_screen() {
+    const points = game._monster_more_base_deferred || [];
+    if (!game._monster_more_base_screen || !points.length) return;
+    game._deferred_warning_redraws = points.slice();
+    flush_deferred_warning_redraws();
+    await flush_screen(1);
+    game._monster_more_base_screen = patch_serialized_screen_points(
+        game._monster_more_base_screen,
+        points,
+    );
+    game._monster_more_base_deferred = [];
+}
+
 function occupation_message_boundary_active() {
     return (game._occupation_turns_remaining || 0) > 0 || !!game._occupation_finish_message;
 }
@@ -1530,6 +1714,12 @@ function basic_physical_attacks(mtmp, includeWeapon = true) {
     return attacks;
 }
 
+function wildmiss_melee_attack_available_basic(mtmp) {
+    // C ref: mhitu.c:mattacku().  `wildmiss()` is shared by ordinary
+    // hand-to-hand and adjacent weapon attacks, independent of adtyp.
+    return (mtmp.data?.mattk || []).some((attack) => attack && BASIC_MELEE_ATTACKS.has(attack[0]));
+}
+
 function basic_engulf_attack(mtmp) {
     const attacks = mtmp.data?.mattk || [];
     const realAttacks = attacks.filter(Boolean);
@@ -1860,9 +2050,20 @@ async function mattacku_basic(mtmp, state) {
     }
     const engulf = basic_engulf_attack(mtmp);
     const physical = engulf ? null : basic_physical_attacks(mtmp, !rangeWeapon);
+    const wildmissMelee = !engulf && wildmiss_melee_attack_available_basic(mtmp);
+    const heroDisplaced = !!game.u?.uprops?.displaced
+        && !hallucinating()
+        && mtmp.data?.name !== 'DISPLACER_BEAST';
+    const targetsDisplacedImage = heroDisplaced && state?.nearby
+        && (mtmp.mux !== game.u?.ux || mtmp.muy !== game.u?.uy);
     if (!engulf && !physical && !rangeWeapon) {
-        if (state?.inrange && (mtmp.data?.mattk || []).some(Boolean))
+        if (state?.inrange && (mtmp.data?.mattk || []).some(Boolean)) {
             mattacku_to_hit(mtmp);
+            if (targetsDisplacedImage && wildmissMelee) {
+                await wildmiss_displaced_image_basic(mtmp);
+                return true;
+            }
+        }
         return false;
     }
     if (!state?.nearby && !rangeWeapon) {
@@ -1873,6 +2074,10 @@ async function mattacku_basic(mtmp, state) {
         return false;
     }
     const toHit = mattacku_to_hit(mtmp);
+    if (targetsDisplacedImage && (physical || wildmissMelee)) {
+        await wildmiss_displaced_image_basic(mtmp);
+        return true;
+    }
     if (game._hero_melee_message_pending && game._pending_message) queue_more_prompt();
     // C ref: mhitu.c:mattacku() computes AC_VALUE() before AT_WEAP range
     // dispatch. The actual thrwmu()/select_rwep path is still future work.
@@ -2062,20 +2267,25 @@ async function m_move_basic(mtmp) {
         game.u.uy = niy;
         game.vision_full_recalc = 1;
     }
+    const deferWarningRedraw = defer_warning_move_redraw_basic(mtmp, omx, omy, appr);
+    if (deferWarningRedraw) {
+        defer_warning_redraw_square(omx, omy);
+        defer_warning_redraw_square(mtmp.mx, mtmp.my);
+    }
     maybe_unhide_at_basic(mtmp);
     mon_track_add(mtmp, omx, omy);
     const previousWarningRng = game._monster_move_warning_rng_active;
     game._monster_move_warning_rng_active = true;
     let doorStatus;
     try {
-        newsym(omx, omy);
+        if (!deferWarningRedraw) newsym(omx, omy);
         const trapStatus = await mintrap_basic(mtmp);
         if (trapStatus === MMOVE_DIED) return MMOVE_DIED;
         doorStatus = postmove_door_basic(mtmp);
         if (doorStatus !== MMOVE_DIED) {
             if (game._swallowed_expulsion_paused_for_more) {
                 game._swallowed_expulsion_paused_for_more = false;
-            } else {
+            } else if (!deferWarningRedraw) {
                 // C ref: display.c:see_monsters() warning refreshes moved
                 // off-screen monsters at input boundaries; this movement
                 // skeleton keeps the current JS monster layer in step until
@@ -2289,6 +2499,7 @@ export function mcalcdistress() {
 
 export async function movemon() {
     const g = game;
+    await prepare_monster_more_base_screen();
     let somebody_can_move = !!g._resume_somebody_can_move;
     g._resume_somebody_can_move = false;
 
@@ -2454,6 +2665,7 @@ export async function movemon() {
         g._more_dismissals_remaining = 0;
     }
     g._packed_monster_more_candidate = false;
+    if (!g._more) flush_deferred_warning_redraws();
 
     return somebody_can_move;
 }

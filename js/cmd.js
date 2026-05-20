@@ -2382,6 +2382,9 @@ async function handleQueuedMore(ch) {
     const preTurnResume = pausedMonsterTurn && !!game._pre_turn_more_waiting;
     const monsterAttackResume = pausedMonsterTurn && !!game._monster_attack_more_waiting;
     const pausedFloorListTurn = !!game._resume_floor_list_turn;
+    const preserveMonsterMoreBase = pausedMonsterTurn
+        && game._preserve_more_base_for_next_monster_message
+        && game._latched_more_screen;
     if (!moreDismissKey) {
         if (game._direction_help_screen) {
             showSerializedOverride(game._direction_help_screen, [8, 23]);
@@ -2393,6 +2396,15 @@ async function handleQueuedMore(ch) {
 
     game._more_dismissals_remaining--;
     game._monster_more_accepts_any_key = false;
+    if (preserveMonsterMoreBase) {
+        game._monster_more_base_screen = preserveMonsterMoreBase;
+        game._monster_more_base_deferred = (game._deferred_warning_redraws || []).slice();
+        game._monster_more_restore_message = game._pending_message || '';
+    }
+    game._preserve_more_base_for_next_monster_message = false;
+    game._latched_more_screen = null;
+    game._latched_more_cursor = null;
+    game._latched_more_keep_until_dismiss = false;
     if (game._fire_wand_side_effect_pending) {
         game._more_dismissals_remaining = 0;
         await showFireWandSideEffects();
@@ -2455,6 +2467,11 @@ async function handleQueuedMore(ch) {
             return true;
         }
         clear_pending_message();
+        if (game._restore_message_after_more) {
+            const msg = game._restore_message_after_more;
+            game._restore_message_after_more = '';
+            await pline(msg);
+        }
         game._hallucination_warning_rng_active = false;
         if (game._arrival_floor_look_after_more) {
             game._arrival_floor_look_after_more = false;
