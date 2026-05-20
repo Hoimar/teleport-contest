@@ -259,6 +259,11 @@ export async function runSegment(input, prevGame = null) {
         }
     }
 
+    // Official scoring calls runSegment(input) without prevGame and aggregates
+    // per-segment getRngLog() results harness-side. Keep cumulative logs scoped
+    // to viewer compatibility only; returning cumulative logs to the scorer
+    // would resend old RNG entries and can trigger the spread-push overflow
+    // tracked in GitHub davidbau/teleport-contest#8.
     if (viewerCompatMode) {
         const prevScreens = prevGame?._teleportCumulativeScreens || [];
         const prevCursors = prevGame?._teleportCumulativeCursors || [];

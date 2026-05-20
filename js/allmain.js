@@ -27,7 +27,7 @@ import {
 import { vision_recalc, vision_reset, init_vision_globals } from './vision.js';
 import { findAlign, findRace, findRole, roleGod, roleGreeting, roleWithStartingRank } from './roles.js';
 import { NO_COLOR } from './terminal.js';
-import { A_STR, A_WIS, COLNO } from './const.js';
+import { A_DEX, A_STR, A_WIS, COLNO } from './const.js';
 import * as ff8000 from './fastforward.js';
 import * as ff0002 from './fastforward0002.js';
 
@@ -40,6 +40,23 @@ const STARTUP_REPLAY_BY_SEED = new Map([
 
 const SPEED_BOOTS = 166;
 const GAUNTLETS_OF_POWER = 161;
+
+async function nhTimeoutBasic() {
+    // C ref: timeout.c:nh_timeout() WOUNDED_LEGS case -> do.c:heal_legs().
+    const u = game.u;
+    const timeout = u?.uprops?.wounded_legs || 0;
+    if (!timeout) return;
+    u.uprops.wounded_legs = Math.max(0, timeout - 1);
+    if (u.uprops.wounded_legs) return;
+
+    if (u.wounded_legs_dex_penalty && Array.isArray(u.acurr?.a)) {
+        u.acurr.a[A_DEX] = (u.acurr.a[A_DEX] ?? 0) + 1;
+    }
+    u.wounded_legs_dex_penalty = false;
+    const legs = u.wounded_legs_side === 'both' ? 'legs' : 'leg';
+    u.wounded_legs_side = null;
+    await pline(`Your ${legs} ${legs === 'legs' ? 'feel' : 'feels'} better.`);
+}
 
 function startupReplayForCurrentSeed() {
     return STARTUP_REPLAY_BY_SEED.get(game._seed) || null;
@@ -406,6 +423,7 @@ export async function advanceTurn() {
     if (g.u?.uprops?.fast) g._fast_extra_action_pending = rn2(3) !== 0;
     settrack();
 
+    await nhTimeoutBasic();
     regen_hp();
 
     await dosounds();
@@ -441,6 +459,9 @@ function applyOccupationFinishObjectEffects(g) {
             discovered.add(obj.otyp);
             exercise(A_WIS, true);
         }
+        // C ref: do_wear.c:Boots_on() learns worn boots' enchantment after
+        // the delayed donning action because the status-line AC change reveals it.
+        obj.known = true;
     } else if (obj.otyp === GAUNTLETS_OF_POWER) {
         // C ref: do_wear.c:Gloves_on().  Wearing power gauntlets reveals the
         // object type and recalculates strength before the finish message.

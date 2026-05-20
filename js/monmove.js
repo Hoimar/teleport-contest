@@ -1,7 +1,7 @@
 import { game } from './gstate.js';
 import { d, rn2, rnd } from './rng.js';
 import { dog_move } from './dog.js';
-import { enexto_core, monsterPtr, MONSTER_SYMBOLS, newmonhp_state_for } from './mklev.js';
+import { enexto_core, monsterPtr, MONSTER_SYMBOLS, newmonhp_state_for, pick_newcham_shape_for } from './mklev.js';
 import { OBJECT_CLASS, OBJECT_DIR } from './object_data.js';
 import {
     BURN, DUST, ENGR_BLOOD, HEADSTONE,
@@ -232,8 +232,26 @@ async function tele_restrict_basic(mtmp) {
     // C ref: teleport.c:tele_restrict().
     if (!game.level?.flags?.noteleport) return false;
     if (mtmp && cansee(mtmp.mx, mtmp.my)) {
+        const line = `A mysterious force prevents the ${monster_name(mtmp)} from teleporting!`;
+        if (game._more && game._pending_message) {
+            game._after_more_message = line;
+            game._after_more_needs_prompt = false;
+            game._monster_turn_paused_for_more = true;
+            game._resume_tengu_after_tele_restrict = mtmp;
+            if (!game._latched_more_screen) {
+                flush_deferred_warning_redraws();
+                await flush_screen(1);
+                game._latched_more_screen = serialize_terminal_grid(game.nhDisplay);
+                game._latched_more_keep_until_dismiss = true;
+                game._latched_more_cursor = [
+                    game.nhDisplay?.cursorCol ?? Math.min(`${game._pending_message || ''}--More--`.length, 79),
+                    game.nhDisplay?.cursorRow ?? 0,
+                ];
+            }
+            return true;
+        }
         const hadPending = !!game._pending_message;
-        await pline(`A mysterious force prevents the ${monster_name(mtmp)} from teleporting!`);
+        await pline(line);
         if (hadPending) {
             if (!game._more) queue_more_prompt();
             else game._more_dismissals_remaining = 1;
@@ -299,12 +317,10 @@ function mnexto_basic(mtmp) {
 function apparxy_accessible_basic(mtmp, x, y) {
     const loc = game.level?.at(x, y);
     if (!loc) return false;
-    if (IS_DOOR(loc.typ)) return !(loc.doormask & (D_CLOSED | D_LOCKED));
-    if (IS_OBSTRUCTED(loc.typ) || IS_WATERWALL(loc.typ) || loc.typ === LAVAWALL)
-        return mon_passes_walls(mtmp);
-    if (IS_POOL(loc.typ)) return mon_swims(mtmp) || mon_in_air(mtmp);
-    if (IS_LAVA(loc.typ)) return mon_likes_lava(mtmp) || mon_in_air(mtmp);
-    return ACCESSIBLE(loc.typ);
+    // C ref: monmove.c:set_apparxy() uses rm.h:ACCESSIBLE(typ), not
+    // monster movement passability.  Door masks, pools, and lava do not
+    // matter for choosing an apparent hero square.
+    return ACCESSIBLE(loc.typ) || mon_passes_walls(mtmp);
 }
 
 function set_apparxy_basic(mtmp) {
@@ -387,6 +403,24 @@ function monster_should_see_target(mtmp, omx, omy, ggx, ggy) {
 
 function is_hider(mtmp) {
     return !!(mtmp.data?.mflags1 & M1_HIDE);
+}
+
+function restrap_basic(mtmp) {
+    // C ref: mon.c:restrap().  The RNG gate is before the trapped/ceiling
+    // and adjacency exclusions.
+    if (mtmp.mcan || mtmp.m_ap_type || cansee(mtmp.mx, mtmp.my)) return false;
+    if (rn2(3)) return false;
+    if (game.u?.ustuck === mtmp) return false;
+    const trap = trap_at_basic(mtmp.mx, mtmp.my);
+    if (mtmp.mtrapped && trap && !is_pit(trap.ttyp)) return false;
+    if (dist2(mtmp.mx, mtmp.my, game.u?.ux ?? 0, game.u?.uy ?? 0) < 3) return false;
+    if (mtmp.data?.mlet === 'S_MIMIC') return false;
+    const loc = game.level?.at(mtmp.mx, mtmp.my);
+    if (loc?.typ === ROOM && (loc.roomno ?? 0) > 0) {
+        mtmp.mundetected = 1;
+        return true;
+    }
+    return false;
 }
 
 function hides_under_basic(mtmp) {
@@ -1113,7 +1147,11 @@ function floor_object_name(obj) {
 }
 
 function monster_weapon_name(obj) {
-    if (obj?.otyp === ORCISH_DAGGER) return 'crude dagger';
+    if (obj?.otyp === ORCISH_DAGGER) {
+        const encountered = game.encounteredObjects || (game.encounteredObjects = new Set());
+        if (typeof encountered.add === 'function') encountered.add(obj.otyp);
+        return 'crude dagger';
+    }
     return floor_object_name(obj).replace(/^(?:an?|the) /, '');
 }
 
@@ -1135,7 +1173,7 @@ async function wildmiss_displaced_image_basic(mtmp) {
             : line;
         game._after_more_needs_prompt = true;
         game._monster_attack_more_latched = true;
-        game._monster_attack_pause_after_more = true;
+        game._monster_attack_resume_behind_after_more = true;
         if (!game._more) queue_more_prompt();
         mtmp.mlstmv = game.moves || 0;
         return true;
@@ -1282,6 +1320,14 @@ function occupation_message_boundary_active() {
 
 function hallucinating() {
     return !!(game.u?.uhallucination || game.u?.uprops?.hallucination);
+}
+
+function hero_sees_invisible_basic() {
+    return !!(game.u?.usee_invisible
+        || game.u?.see_invisible
+        || game.u?.See_invisible
+        || game.u?.uinvis_aware
+        || game.u?.uprops?.see_invisible);
 }
 
 function is_more_dismiss_key(ch) {
@@ -1627,6 +1673,8 @@ function spell_would_be_useless_basic(mtmp, spellName) {
     case 'HASTE_SELF':
         return mtmp.permspeed === MFAST;
     case 'DISAPPEAR':
+        // C ref: mcastu.c:spell_would_be_useless().
+        if (mtmp.mpeaceful && !hero_sees_invisible_basic()) return true;
         return !!(mtmp.minvis || mtmp.invis_blkd);
     case 'CURE_SELF':
         return (mtmp.mhp ?? 1) >= (mtmp.mhpmax ?? mtmp.mhp ?? 1);
@@ -2101,7 +2149,7 @@ async function mattacku_basic(mtmp, state) {
     return true;
 }
 
-async function m_move_basic(mtmp) {
+async function m_move_basic(mtmp, resumeAfterTenguTeleRestrict = false) {
     // C ref: monmove.c:m_move().  This is a narrow ordinary-monster
     // movement skeleton: adjacent candidates, mtrack backtracking rolls, and
     // deterministic approach/flee selection.  Tunneling, most traps, full
@@ -2125,16 +2173,21 @@ async function m_move_basic(mtmp) {
         rn2(3);
         return MMOVE_NOTHING;
     }
-    set_apparxy_basic(mtmp);
-    ggx = mtmp.mux ?? ggx;
-    ggy = mtmp.muy ?? ggy;
-    if (mtmp.data?.name === 'TENGU' && !rn2(5) && !mtmp.mcan
-        && !(await tele_restrict_basic(mtmp))) {
-        // C ref: monmove.c:m_move(); teleporting by nature happens before
-        // ordinary path selection.
-        if ((mtmp.mhp ?? 0) < 7 || mtmp.mpeaceful || rn2(2)) rloc_basic(mtmp);
-        else mnexto_basic(mtmp);
-        return MMOVE_MOVED;
+    if (!resumeAfterTenguTeleRestrict) {
+        set_apparxy_basic(mtmp);
+        ggx = mtmp.mux ?? ggx;
+        ggy = mtmp.muy ?? ggy;
+        if (mtmp.data?.name === 'TENGU' && !rn2(5) && !mtmp.mcan) {
+            const restricted = await tele_restrict_basic(mtmp);
+            if (game._monster_turn_paused_for_more) return MMOVE_DONE;
+            if (!restricted) {
+                // C ref: monmove.c:m_move(); teleporting by nature happens
+                // before ordinary path selection.
+                if ((mtmp.mhp ?? 0) < 7 || mtmp.mpeaceful || rn2(2)) rloc_basic(mtmp);
+                else mnexto_basic(mtmp);
+                return MMOVE_MOVED;
+            }
+        }
     }
     if ((mtmp.data?.mflags1 & M1_CONCEAL)
         && can_hide_under_object_basic(mtmp.mx, mtmp.my)) {
@@ -2386,22 +2439,36 @@ function pick_vampire_shape(mon) {
 
 function apply_newcham_basic(mon, ptr) {
     if (!mon || !ptr || mon.data?.name === ptr.name) return false;
-    if (!ptr.male && !ptr.female && !ptr.neuter) rn2(10);
+    if (ptr.male) {
+        mon.female = false;
+    } else if (ptr.female) {
+        mon.female = true;
+    } else if (!ptr.neuter) {
+        if (!rn2(10) && !(ptr.mlet === 'S_VAMPIRE' || vampire_shifter_base(mon.cham))) {
+            mon.female = !mon.female;
+        }
+    }
+    const oldHp = mon.mhp ?? 0;
+    const oldMax = mon.mhpmax ?? oldHp;
     const monState = newmonhp_state_for(ptr);
     mon.data = { ...ptr, mmove: ptr.mmove ?? 12 };
     mon.ch = MONSTER_SYMBOLS[ptr.mlet] ?? mon.ch ?? 'm';
     mon.color = ptr.color ?? mon.color ?? 15;
     mon.m_lev = monState.level;
-    mon.mhp = monState.hp;
     mon.mhpmax = monState.hp;
+    let hp = oldMax > 0 ? Math.trunc(oldHp * mon.mhpmax / oldMax) : mon.mhpmax;
+    if (hp < 0 || hp > mon.mhpmax) hp = mon.mhpmax;
+    mon.mhp = hp || 1;
     return true;
 }
 
 function decide_to_shapeshift_basic(mon) {
     if (!vampire_shifter_base(mon?.cham)) {
         // C ref: mon.c:decide_to_shapeshift() regular shapeshifter gate.
-        // Full runtime newcham() target selection remains future work.
-        if (!mon?.mspec_used && !rn2(6)) mon.mspec_used = 3 + rn2(10);
+        if (!mon?.mspec_used && !rn2(6)) {
+            mon.mspec_used = 3 + rn2(10);
+            apply_newcham_basic(mon, pick_newcham_shape_for(mon));
+        }
         return;
     }
     if (mon.data?.mlet !== 'S_VAMPIRE') {
@@ -2512,7 +2579,8 @@ export async function movemon() {
         g._resume_tame_post_distfleeck = null;
     }
     const resumeAfter = g._resume_movemon_after_mon || null;
-    let skippingResumedPrefix = !!resumeAfter;
+    const resumeTenguAfterTeleRestrict = g._resume_tengu_after_tele_restrict || null;
+    let skippingResumedPrefix = !!(resumeAfter || resumeTenguAfterTeleRestrict);
     g._resume_movemon_after_mon = null;
 
     // C ref: mon.c:iter_mons_safe() snapshots fmon before the movement
@@ -2521,10 +2589,30 @@ export async function movemon() {
     const monsters = [...(g.level.monsters || [])];
     for (const mtmp of monsters) {
         if (skippingResumedPrefix) {
-            if (mtmp === resumeAfter) skippingResumedPrefix = false;
-            continue;
+            if (mtmp === resumeAfter) {
+                skippingResumedPrefix = false;
+                continue;
+            }
+            if (mtmp === resumeTenguAfterTeleRestrict) {
+                skippingResumedPrefix = false;
+            } else {
+                continue;
+            }
         }
         if (!g.level.monsters?.includes(mtmp)) continue;
+        if (mtmp === resumeTenguAfterTeleRestrict) {
+            g._resume_tengu_after_tele_restrict = null;
+            const moveStatus = await m_move_basic(mtmp, true);
+            if (moveStatus === MMOVE_DIED) continue;
+            if (g._monster_turn_paused_for_more) return false;
+            const postMoveState = distfleeck(mtmp);
+            if ((moveStatus !== MMOVE_MOVED && moveStatus !== MMOVE_DONE)
+                || (moveStatus === MMOVE_MOVED && can_attack_after_move_basic(mtmp, postMoveState))) {
+                await mattacku_basic(mtmp, postMoveState);
+                if (g._monster_turn_paused_for_more) return false;
+            }
+            continue;
+        }
         // C ref: mon.c:movemon_singlemon() runs this before the movement
         // budget check, so zero-budget fog clouds still leave vapor.
         m_everyturn_effect(mtmp);
@@ -2554,13 +2642,15 @@ export async function movemon() {
             && (m_canseeu_basic(mtmp) || mtmp.mhp < mtmp.mhpmax)) {
             mtmp.mstrategy &= ~STRAT_WAITFORU;
         }
-        if (mtmp.mcanmove === 0 || (mtmp.mstrategy & STRAT_WAITMASK) || mtmp.msleeping) continue;
-        if (is_hider(mtmp)
-            && (mtmp.m_ap_type === M_AP_FURNITURE
+        if (is_hider(mtmp)) {
+            if (restrap_basic(mtmp)) continue;
+            if (mtmp.m_ap_type === M_AP_FURNITURE
                 || mtmp.m_ap_type === M_AP_OBJECT
-                || mtmp.mundetected)) {
-            continue;
+                || mtmp.mundetected) {
+                continue;
+            }
         }
+        if (mtmp.mcanmove === 0 || (mtmp.mstrategy & STRAT_WAITMASK) || mtmp.msleeping) continue;
 
         // C ref: monmove.c:dochug().  Awake movable monsters scuff any
         // engraving underfoot before status recovery and movement AI.
@@ -2599,6 +2689,7 @@ export async function movemon() {
             if (non_tame_movement_opportunity(mtmp, fleeState)) {
                 moveStatus = maybe_cast_undirected_spell_before_move(mtmp) ? MMOVE_DONE : await m_move_basic(mtmp);
                 if (moveStatus === MMOVE_DIED) continue;
+                if (g._monster_turn_paused_for_more) return false;
                 // C calls distfleeck() again after m_move() returns for ordinary
                 // movement, even when the monster is off-screen.
                 postMoveState = distfleeck(mtmp);

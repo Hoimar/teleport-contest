@@ -16,6 +16,7 @@ import {
     LANDMINE, SLP_GAS_TRAP, HOLE, TRAPDOOR, MAGIC_PORTAL, MAGIC_TRAP, ANTI_MAGIC,
     M_AP_OBJECT, IS_POOL, IS_WALL,
     SV0, SV1, SV2, SV3, SV4, SV5, SV6, SV7, WM_MASK,
+    WM_X_TL, WM_X_TR, WM_X_BL, WM_X_BR, WM_X_TLBR, WM_X_BLTR,
     WARNCOUNT, def_warnsyms, Is_rogue_level,
 } from './const.js';
 import { depth, distmin, dist2 } from './hacklib.js';
@@ -141,7 +142,12 @@ function obj_is_generic(obj) {
 }
 
 function observe_object(obj) {
-    if (obj) obj.dknown = true;
+    if (!obj) return;
+    obj.dknown = true;
+    if (typeof obj.otyp === 'number') {
+        const encountered = game.encounteredObjects || (game.encounteredObjects = new Set());
+        if (typeof encountered.add === 'function') encountered.add(obj.otyp);
+    }
 }
 
 function hallucinated_statue_glyph() {
@@ -172,6 +178,10 @@ function random_object_glyph_for_display() {
 function monster_data_for_corpsenm(corpsenm) {
     if (Number.isInteger(corpsenm)) return MONSTER_DATA[corpsenm] || null;
     if (typeof corpsenm === 'string') return MONSTER_DATA.find(m => m[0] === corpsenm) || null;
+    if (corpsenm && typeof corpsenm === 'object') {
+        return MONSTER_DATA.find(m => m[0] === corpsenm.name)
+            || [corpsenm.name, corpsenm.mlet, 0, 0, 0, 0, 0, corpsenm.color ?? NO_COLOR];
+    }
     return null;
 }
 
@@ -323,10 +333,12 @@ function display_wall_type(loc) {
     // C ref: display.c:wall_angle(). For wallification glyphs, NetHack
     // derives the visible wall character from terrain type plus seenv.
     const seenv = (loc.seenv || 0) & 0xff;
-    if (!seenv || ((loc.wall_info || 0) & WM_MASK)) return loc.typ;
+    if (!seenv || (((loc.wall_info || 0) & WM_MASK) && loc.typ !== CROSSWALL)) return loc.typ;
     let rotated = seenv;
     let row = null;
     switch (loc.typ) {
+    case CROSSWALL:
+        return display_crosswall_type(loc, seenv);
     case TDWALL:
         row = [STONE, TLCORNER, TRCORNER, HWALL, TDWALL];
         break;
@@ -352,6 +364,83 @@ function display_wall_type(loc) {
     else if ((rotated & (SV3 | SV5 | SV7)) || ((rotated & SV4) && (rotated & SV6))) col = 4;
     else if (rotated & (SV0 | SV1 | SV2)) col = (rotated & (SV4 | SV6)) ? 4 : 3;
     return row[col];
+}
+
+function onlySeenv(seenv, bits) {
+    return !!((seenv & bits) && !(seenv & ~bits));
+}
+
+function display_crosswall_type(loc, seenv) {
+    // C ref: display.c:wall_angle(), CROSSWALL case.
+    const mode = (loc.wall_info || 0) & WM_MASK;
+    switch (mode) {
+    case 0:
+        if (seenv === SV0) return BRCORNER;
+        if (seenv === SV2) return BLCORNER;
+        if (seenv === SV4) return TLCORNER;
+        if (seenv === SV6) return TRCORNER;
+        if (!(seenv & ~(SV0 | SV1 | SV2)) && ((seenv & SV1) || seenv === (SV0 | SV2)))
+            return TUWALL;
+        if (!(seenv & ~(SV2 | SV3 | SV4)) && ((seenv & SV3) || seenv === (SV2 | SV4)))
+            return TRWALL;
+        if (!(seenv & ~(SV4 | SV5 | SV6)) && ((seenv & SV5) || seenv === (SV4 | SV6)))
+            return TDWALL;
+        if (!(seenv & ~(SV0 | SV6 | SV7)) && ((seenv & SV7) || seenv === (SV0 | SV6)))
+            return TLWALL;
+        return CROSSWALL;
+    case WM_X_TL:
+    case WM_X_TR:
+    case WM_X_BL:
+    case WM_X_BR: {
+        const crossMatrix = [
+            [BRCORNER, BLCORNER, TLCORNER, TUWALL, TRWALL, CROSSWALL],
+            [BLCORNER, TLCORNER, TRCORNER, TRWALL, TDWALL, CROSSWALL],
+            [TLCORNER, TRCORNER, BRCORNER, TDWALL, TLWALL, CROSSWALL],
+            [TRCORNER, BRCORNER, BLCORNER, TLWALL, TUWALL, CROSSWALL],
+        ];
+        let rowIdx = 0;
+        let rotated = seenv;
+        if (mode === WM_X_TL) {
+            rowIdx = 1;
+            rotated = ((seenv >> 4) | (seenv << 4)) & 0xff;
+        } else if (mode === WM_X_TR) {
+            rowIdx = 2;
+            rotated = ((seenv >> 6) | (seenv << 2)) & 0xff;
+        } else if (mode === WM_X_BL) {
+            rowIdx = 0;
+            rotated = ((seenv >> 2) | (seenv << 6)) & 0xff;
+        } else {
+            rowIdx = 3;
+        }
+        if (rotated === SV4) return STONE;
+        rotated &= ~SV4;
+        let col = 5; // C_crwall
+        if (rotated === SV0) col = 1;
+        else if (rotated & (SV2 | SV3)) {
+            if (rotated & (SV5 | SV6 | SV7)) col = 5;
+            else if (rotated & (SV0 | SV1)) col = 4;
+            else col = 2;
+        } else if (rotated & (SV5 | SV6)) {
+            if (rotated & (SV1 | SV2 | SV3)) col = 5;
+            else if (rotated & (SV0 | SV7)) col = 3;
+            else col = 0;
+        } else if (rotated & SV1) col = (rotated & SV7) ? 5 : 4;
+        else if (rotated & SV7) col = (rotated & SV1) ? 5 : 3;
+        return crossMatrix[rowIdx][col];
+    }
+    case WM_X_TLBR:
+        if (onlySeenv(seenv, SV1 | SV2 | SV3)) return BLCORNER;
+        if (onlySeenv(seenv, SV5 | SV6 | SV7)) return TRCORNER;
+        if (onlySeenv(seenv, SV0 | SV4)) return STONE;
+        return CROSSWALL;
+    case WM_X_BLTR:
+        if (onlySeenv(seenv, SV0 | SV1 | SV7)) return BRCORNER;
+        if (onlySeenv(seenv, SV3 | SV4 | SV5)) return TLCORNER;
+        if (onlySeenv(seenv, SV2 | SV6)) return STONE;
+        return CROSSWALL;
+    default:
+        return STONE;
+    }
 }
 
 function secret_door_horizontal(loc, x, y) {
@@ -996,11 +1085,17 @@ function _buildScreenOutput() {
             }
         }
         if (game._more && game._more_next_message_row) {
-            const more = '--More--';
-            for (let c = 0; c < more.length; c++) display.setCell(c, 1, more[c], NO_COLOR, 0);
+            const more = `${game._message_continuation_row || ''}--More--`;
+            for (let c = 0; c < display.cols; c++)
+                display.setCell(c, 1, ' ', NO_COLOR, 0);
+            for (let c = 0; c < Math.min(more.length, display.cols); c++)
+                display.setCell(c, 1, more[c], NO_COLOR, 0);
         }
         // Cursor at the active blocking prompt before any map/prompt cursor.
-        if (game._more && game._more_next_message_row) display.setCursor('--More--'.length, 1);
+        if (game._more && game._more_next_message_row) {
+            const more = `${game._message_continuation_row || ''}--More--`;
+            display.setCursor(Math.min(more.length, display.cols - 1), 1);
+        }
         else if (msg && game._more && !floorListActive) display.setCursor(Math.min(msg.length, display.cols - 1), 0);
         else if (game._prompt_cursor) display.setCursor(game._prompt_cursor[0], game._prompt_cursor[1]);
         else if (game.u?.ux > 0)
@@ -1050,6 +1145,7 @@ export function clear_pending_message() {
     game._pending_message = '';
     game._more = false;
     game._more_next_message_row = false;
+    game._message_continuation_row = '';
     game._more_dismissals_remaining = 0;
     game._hero_melee_message_pending = false;
     game._pet_combat_more_latched = false;

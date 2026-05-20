@@ -15,9 +15,9 @@ import {
 } from './display.js';
 import { cansee, couldsee, vision_recalc, vision_reset } from './vision.js';
 import { makemon, mklev, mksobj, monster_by_user_name, next_ident, place_lregion, place_object } from './mklev.js';
-import { OBJECT_DELAY } from './object_data.js';
+import { OBJECT_CLASS, OBJECT_DELAY, OBJECT_MATERIAL } from './object_data.js';
 import { finish_pet_kill, pet_arrive_with_you } from './dog.js';
-import { merge_inventory_object, pluslvl } from './u_init.js';
+import { merge_inventory_object, newuexp, pluslvl } from './u_init.js';
 import { adjalign, exercise, gethungry } from './allmain_turns.js';
 import { initrack } from './track.js';
 import { roleGod } from './roles.js';
@@ -58,6 +58,11 @@ const WAN_MAGIC_MISSILE = 429;
 const QUARTERSTAFF = 79;
 const WAR_HAMMER = 76;
 const CLOAK_OF_MAGIC_RESISTANCE = 139;
+const M1_FLY = 0x00000001;
+const M1_CLING = 0x00000010;
+const M1_CONCEAL = 0x00000080;
+const M1_HIDE = 0x00000100;
+const M2_STALK = 0x01000000;
 const CLOAK_OF_DISPLACEMENT = 149;
 const SPEED_BOOTS = 166;
 const LEVITATION_BOOTS = 172;
@@ -72,6 +77,7 @@ const CHEST = 215;
 const GOLD_PIECE = 438;
 const SCALPEL = 39;
 const DART = 23;
+const ORCISH_DAGGER = 36;
 const CORPSE = 265;
 const BOULDER = 475;
 const FORTUNE_COOKIE = 289;
@@ -98,6 +104,7 @@ const LEVELCHANGE_MORE_LEN = '--More--'.length;
 const OBJECT_BASE_NAMES = new Map([
     [DART, 'dart'],
     [SCALPEL, 'scalpel'],
+    [ORCISH_DAGGER, 'crude dagger'],
     [WAR_HAMMER, 'war hammer'],
     [QUARTERSTAFF, 'quarterstaff'],
     [GRAY_DRAGON_SCALE_MAIL, 'gray dragon scale mail'],
@@ -119,6 +126,8 @@ const OBJECT_BASE_NAMES = new Map([
     [MAGIC_MARKER, 'magic marker'],
     [257, 'drum'],
     [258, 'drum'],
+    [311, 'potion of monster detection'],
+    [312, 'potion of object detection'],
     [306, 'potion of see invisible'],
     [307, 'potion of healing'],
     [308, 'potion of extra healing'],
@@ -127,12 +136,22 @@ const OBJECT_BASE_NAMES = new Map([
     [323, 'scroll of enchant armor'],
     [325, 'scroll of confuse monster'],
     [328, 'scroll of enchant weapon'],
+    [330, 'scroll of taming'],
     [332, 'scroll of light'],
     [335, 'scroll of food detection'],
     [336, 'scroll of identify'],
     [374, 'spellbook of healing'],
+    [367, 'spellbook of magic missile'],
+    [370, 'spellbook of sleep'],
+    [372, 'spellbook of light'],
+    [373, 'spellbook of detect monsters'],
+    [375, 'spellbook of knock'],
+    [377, 'spellbook of confuse monster'],
+    [379, 'spellbook of drain life'],
+    [378, 'spellbook of cure blindness'],
     [380, 'spellbook of slow monster'],
     [383, 'spellbook of force bolt'],
+    [384, 'spellbook of cause fear'],
     [391, 'spellbook of extra healing'],
     [397, 'spellbook of identify'],
     [403, 'spellbook of protection'],
@@ -154,8 +173,9 @@ const OBJECT_BASE_NAMES = new Map([
 ]);
 
 const SPELLBOOK_SPELL_INFO = new Map([
-    [380, { name: 'slow monster', level: 2, category: 'enchantment', fail: '0%' }],
-    [383, { name: 'force bolt', level: 1, category: 'attack', fail: '0%' }],
+    [378, { name: 'cure blindness', level: 2, category: 'healing', skillLevel: C.P_UNSKILLED }],
+    [380, { name: 'slow monster', level: 2, category: 'enchantment', skillLevel: C.P_BASIC }],
+    [383, { name: 'force bolt', level: 1, category: 'attack', skillLevel: C.P_BASIC }],
 ]);
 
 const INVENTORY_GROUPS = [
@@ -396,6 +416,7 @@ function make_wish_object(name) {
         otmp.oextra = { ...(otmp.oextra || {}), oname: spec.oname };
         if (spec.namedArtifact) {
             rn2(2); // C ref: objnam.c:readobjnam() artifact wish conduct gate.
+            if (!otmp.oartifact) game._nartifact_exist = (game._nartifact_exist ?? 0) + 1;
             otmp.oartifact = true;
         }
     }
@@ -855,7 +876,7 @@ function inventoryObjectName(obj, opts = {}) {
     if (obj?.menuName) return obj.menuName;
     const quan = obj?.quan || 1;
     const rawBase = baseObjectName(obj);
-    const pairObject = /\b(?:boots|gloves)$/.test(rawBase);
+    const pairObject = /\b(?:boots|gloves)$/.test(rawBase) || rawBase.startsWith('gauntlets of ');
     const base = quan > 1
         ? (pairObject ? `pairs of ${rawBase}` : pluralizeObjectName(rawBase))
         : (pairObject ? `pair of ${rawBase}` : rawBase);
@@ -914,6 +935,66 @@ function knownSpellEntries() {
         entries.push({ letter: String.fromCharCode(97 + entries.length), ...info });
     }
     return entries;
+}
+
+const MAT_IRON = 11;
+const MAT_MITHRIL = 17;
+
+function isMetallicObject(obj) {
+    const mat = OBJECT_MATERIAL[obj?.otyp] ?? 0;
+    return mat >= MAT_IRON && mat <= MAT_MITHRIL;
+}
+
+function percentSpellSuccessBasic(entry) {
+    // C ref: spell.c:percent_success().  This ports the Wizard-relevant
+    // casting chance path used by the current sessions: base role penalty,
+    // metal gloves/boots penalties, Int, level, and basic spell skill.
+    if (!entry || game.urole?.name?.m !== 'Wizard') return 100;
+    let splcaster = 1; // role.c Wizard spelbase
+    const ulevel = game.u?.ulevel ?? 1;
+    const statused = game.u?.acurr?.a?.[C.A_INT] ?? 10;
+
+    for (const obj of game.inventory || []) {
+        if (!obj || obj.oclass !== ARMOR_CLASS || !(obj.worn || obj.owornmask)) continue;
+        if (!isMetallicObject(obj)) continue;
+        if (obj.otyp >= LEATHER_GLOVES && obj.otyp <= GAUNTLETS_OF_POWER + 1) splcaster += 6;
+        else if (obj.otyp >= SPEED_BOOTS && obj.otyp <= LEVITATION_BOOTS) splcaster += 2;
+    }
+
+    const weapon = (game.inventory || []).find((obj) => obj?.wielded || ((obj?.owornmask || 0) & C.W_WEP));
+    if (weapon?.otyp === QUARTERSTAFF) splcaster -= 3;
+    if (splcaster > 20) splcaster = 20;
+
+    let chance = Math.trunc(11 * statused / 2);
+    const skill = Math.max(entry.skillLevel ?? C.P_UNSKILLED, C.P_UNSKILLED) - 1;
+    const difficulty = (entry.level - 1) * 4 - ((skill * 6) + Math.trunc(ulevel / 3) + 1);
+    if (difficulty > 0) {
+        chance -= Math.trunc(Math.sqrt(900 * difficulty + 2000));
+    } else {
+        const learning = Math.trunc(15 * -difficulty / entry.level);
+        chance += learning > 20 ? 20 : learning;
+    }
+    if (chance < 0) chance = 0;
+    if (chance > 120) chance = 120;
+    chance = Math.trunc(chance * (20 - splcaster) / 15) - splcaster;
+    if (chance > 100) return 100;
+    if (chance < 0) return 0;
+    return chance;
+}
+
+function spellRetentionTextBasic(entry, turnsLeft) {
+    // C ref: spell.c:spellretention().
+    const keen = 20000;
+    if (turnsLeft < 1) return '(gone)';
+    if (turnsLeft >= keen) return '100%';
+    let percent = Math.trunc((turnsLeft - 1) / Math.trunc(keen / 100)) + 1;
+    const skill = Math.max(entry.skillLevel ?? C.P_UNSKILLED, C.P_UNSKILLED);
+    const accuracy = skill === C.P_EXPERT ? 2
+        : skill === C.P_SKILLED ? 5
+        : skill === C.P_BASIC ? 10
+        : 25;
+    percent = accuracy * (Math.trunc((percent - 1) / accuracy) + 1);
+    return `${percent - accuracy + 1}%-${percent}%`;
 }
 
 function putonLetters() {
@@ -1345,6 +1426,7 @@ function setWoundedLegs(side, timeout) {
     u.uprops = u.uprops || {};
     if (!u.uprops.wounded_legs && Array.isArray(u.acurr?.a)) {
         u.acurr.a[A_DEX] = Math.max(0, (u.acurr.a[A_DEX] ?? 0) - 1);
+        u.wounded_legs_dex_penalty = true;
     }
     u.uprops.wounded_legs = Math.max(u.uprops.wounded_legs || 0, timeout || 0);
     u.wounded_legs_side = side || u.wounded_legs_side || 'right';
@@ -1418,6 +1500,20 @@ function boulderDestinationBlocked(x, y) {
     return !!sobj_at_basic(BOULDER, x, y);
 }
 
+function shouldShowBoulderPushMessage(boulder) {
+    // C ref: hack.c:dopush() suppresses repeated messages for the same
+    // boulder until enough turns have passed.
+    const now = game.moves || 0;
+    if (game._bldrpush_obj !== boulder) {
+        game._bldrpush_obj = boulder;
+        game._bldrpushtime = now + 1;
+    }
+    const show = now > (game._bldrpushtime || 0) + 2
+        || now < (game._bldrpushtime || 0);
+    game._bldrpushtime = now;
+    return show;
+}
+
 async function tryPushBoulder(boulder, sx, sy, dx, dy) {
     const rx = sx + dx;
     const ry = sy + dy;
@@ -1427,7 +1523,8 @@ async function tryPushBoulder(boulder, sx, sy, dx, dy) {
         return false;
     }
 
-    await pline('With great effort you move the boulder.');
+    if (shouldShowBoulderPushMessage(boulder))
+        await pline('With great effort you move the boulder.');
     exercise(A_STR, true);
     boulder.ox = rx;
     boulder.oy = ry;
@@ -1889,31 +1986,56 @@ function zapDig(dx, dy) {
 }
 
 const TOURIST_DISCOVERIES_SCREEN = "Discoveries, by order of discovery within each class\n\n\u001b[7mScrolls\u001b[0m\n  scroll of magic mapping (ANDOVA BEGARIN)\n\u001b[7mPotions\u001b[0m\n  potion of extra healing (murky)\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n--More--";
-const WIZARD_DISCOVERY_DESCRIPTIONS = new Map([
-    [QUARTERSTAFF, 'quarterstaff (staff)'],
-    [CLOAK_OF_MAGIC_RESISTANCE, 'cloak of magic resistance (piece of cloth)'],
-    [325, 'scroll of confuse monster (VERR YED HORRE)'],
-    [332, 'scroll of light (ELAM EBOW)'],
-    [335, 'scroll of food detection (XIXAXA XOXAXA XUXAXA)'],
-    [383, 'spellbook of force bolt (light blue)'],
-    [380, 'spellbook of slow monster (white)'],
+const DISCOVERY_DESCRIPTION_SLOT = new Map([
+    [QUARTERSTAFF, 'staff'],
+    [CLOAK_OF_MAGIC_RESISTANCE, 148],
+    [383, 376], // SPE_FORCE_BOLT's shuffled description slot in this object table.
 ]);
-const WIZARD_UNKNOWN_SPELL_DISCOVERIES = [
-    '* spellbook of magic missile (indigo)',
-    '* spellbook of sleep (magenta)',
-    '* spellbook of light (light brown)',
-    '* spellbook of detect monsters (cloth)',
-    '* spellbook of healing (leathery)',
-    '* spellbook of knock (thick)',
-    '* spellbook of confuse monster (thin)',
-    '* spellbook of drain life (checkered)',
-    '* spellbook of cause fear (yellow)',
-    '* spellbook of protection (plaid)',
+const WIZARD_SKILL_BASED_SPELLBOOKS = [
+    367, // magic missile
+    370, // sleep
+    372, // light
+    373, // detect monsters
+    374, // healing
+    375, // knock
+    377, // confuse monster
+    379, // drain life
+    380, // slow monster
+    384, // cause fear
+    403, // protection
+];
+const DISCOVERY_SECTIONS = [
+    ['Amulets', AMULET_CLASS],
+    ['Weapons', WEAPON_CLASS],
+    ['Armor', ARMOR_CLASS],
+    ['Scrolls', SCROLL_CLASS],
+    ['Spellbooks', SPBOOK_CLASS],
+    ['Potions', POTION_CLASS],
+    ['Rings', RING_CLASS],
+    ['Wands', WAND_CLASS],
+    ['Tools', TOOL_CLASS],
 ];
 const STR_ATTR1 = " Contestant the Tourist's attributes:\n\n Background:\n  You are a Rambler, a level 1 female human Tourist.\n  You are neutral, on a mission for The Lady\n  who is opposed by Blind Io (lawful) and Offler (chaotic).\n  You are left-handed.\n  You are in the Dungeons of Doom, on level 1.\n  You entered the dungeon 11 turns ago.\n  You have 0 experience points.\n\n Basics:\n  You have all 10 hit points.\n  You have both energy points (spell power).\n  Your armor class is 10.\n  Your wallet contains 757 zorkmids.\n  Autopickup is off.\n\n Characteristics:\n  Your strength is 9.\n  Your dexterity is 14.\n  Your constitution is 12.\n  Your intelligence is 11.\n (1 of 2)";
 const STR_ATTR2 = "  Your wisdom is 16.\n  Your charisma is 16.\n\n Status:\n  You aren't hungry.\n  You are unencumbered.\n  You are bare handed.\n  You are unskilled in bare handed combat.\n\n Miscellaneous:\n  Total elapsed playing time is none.\n (2 of 2)";
 const INVALID_DIRECTION_HELP_SCREEN = "cmdassist: Invalid direction key!\n\nValid direction keys are:\n\x1b[10Cy  k  u\n\x1b[11C\\ | /\n\x1b[10Ch- . -l\n\x1b[11C/ | \\\n\x1b[10Cb  j  n\n\n\x1b[10C<  up\n\x1b[10C>  down\n\x1b[10C.  direct at yourself\n\n(Suppress this message with !cmdassist in config file.)\n\n\n\n\n\n\n\n\n\n--More--";
 const TRAVEL_CURSOR_PROMPT = "(For instructions type a '?')  Move cursor to the desired destination:";
+const GETPOS_HELP_LINES = [
+    "Use 'h', 'j', 'k', 'l' to move the cursor to the desired destination.",
+    "Use 'H', 'J', 'K', 'L' to fast-move the cursor, 8 units at a time.",
+    "(or prefix normal move with 'G' or 'g' to fast-move)",
+    "Or enter a background symbol (ex. '<').",
+    "Use '@' to move the cursor on yourself.",
+    "Use 'm'/'M' to move the cursor to next/previous monster.",
+    "Use 'o'/'O' to move the cursor to next/previous object.",
+    "Use 'd'/'D' to move the cursor to next/previous door or doorway.",
+    "Use 'x'/'X' to move the cursor next to an unexplored location.",
+    "Use 'a'/'A' to move the cursor to anything interesting.",
+    "Use '*' to change fast-move mode to skipping same glyphs.",
+    "Use '!' to toggle menu listing for possible targets.",
+    'Use \'"\' to change the mode of limiting possible targets.',
+    "Use '#' to toggle automatic description.",
+    "Type a '.' when you are at the right place.",
+];
 
 function showOverride(screen, cursor) {
     game._override_serialized_screen = null;
@@ -1971,6 +2093,46 @@ async function showTravelTipScreen() {
     const screen = serialize_terminal_grid(display);
     showSerializedOverride(screen, [16, 8]);
     game._override_serialized_persistent = true;
+}
+
+async function showGetposHelpScreen(kind = 'travel') {
+    // C ref: getpos.c:getpos_help(). Tty menu overlays the current map from
+    // column 10 onward and blocks on a More prompt before returning to getpos.
+    await flush_screen(1);
+    const display = game.nhDisplay;
+    if (!display?.putstr) return;
+    display.clearRow(0);
+    for (let row = 1; row <= 16; row++) {
+        for (let col = 9; col < COLNO; col++)
+            display.setCell(col, row, ' ', NO_COLOR, 0);
+    }
+    for (let row = 0; row < GETPOS_HELP_LINES.length; row++)
+        display.putstr(10, row, GETPOS_HELP_LINES[row], NO_COLOR, 0);
+    display.putstr(10, 16, '--More--', NO_COLOR, 0);
+    display.setCursor(18, 16);
+    const screen = serialize_terminal_grid(display);
+    game._getpos_help_screen = screen;
+    game._getpos_help_after_more = kind;
+    showSerializedOverride(screen, [18, 16]);
+    queue_more_prompt();
+}
+
+async function resumeGetposAfterHelp(kind) {
+    game._getpos_help_screen = '';
+    game._getpos_help_after_more = '';
+    if (kind === 'travel') {
+        const cursor = currentTravelCursor();
+        await showPromptLine('Move cursor to the desired destination:');
+        setTravelMapCursorAt(cursor.x, cursor.y);
+    } else if (kind === 'teleport') {
+        const cursor = currentTeleportCursor();
+        await showPromptLine("Move cursor to the desired position:");
+        setTravelMapCursorAt(cursor.x, cursor.y);
+    } else if (kind === 'farlook') {
+        const cursor = currentFarlookCursor();
+        await showPromptLine('Pick a monster, object or location.');
+        setTravelMapCursorAt(cursor.x, cursor.y);
+    }
 }
 
 function setTravelMapCursor() {
@@ -2055,10 +2217,119 @@ function travelLocationDescription(x, y) {
     return desc;
 }
 
+function teleportLocationDescription(x, y) {
+    const loc = game.level?.at(x, y);
+    if (!loc) return 'stone';
+    if (loc.typ === C.CLOUD) return 'fog/vapor cloud';
+    if (loc.typ === STONE || loc.typ === SCORR) return 'stone';
+    if (IS_WALL(loc.typ)) return 'wall';
+    if (loc.typ === CORR) return 'corridor';
+    if (loc.typ === DOOR || loc.typ === SDOOR) return 'doorway';
+    if (loc.typ === C.ROOM) return 'floor of a room';
+    return loc.disp_ch && loc.disp_ch !== ' ' ? String(loc.disp_ch) : 'floor of a room';
+}
+
+function farlookLocationDescription(x, y) {
+    const loc = game.level?.at(x, y);
+    if (!loc) return 'stone';
+    if (loc.typ === C.ROOM) return 'floor of a room';
+    if (loc.typ === C.CLOUD) return 'fog/vapor cloud';
+    if (loc.typ === STONE || loc.typ === SCORR) return 'stone';
+    if (IS_WALL(loc.typ)) return 'wall';
+    if (loc.typ === CORR) return 'corridor';
+    if (loc.typ === DOOR || loc.typ === SDOOR) return 'doorway';
+    return loc.disp_ch && loc.disp_ch !== ' ' ? String(loc.disp_ch) : 'floor of a room';
+}
+
+function farlookFullDescription(x, y) {
+    const loc = game.level?.at(x, y);
+    if (!loc || loc.typ === STONE || loc.typ === SCORR || IS_WALL(loc.typ))
+        return '\x0ex\x0f\x1b[8Cthe interior of a monster or a wall (wall)';
+    return '\x0e~\x0f\x1b[8Ca doorway or the floor of a room or the dark part of a room or ice';
+}
+
+function farlookContinuation(x, y) {
+    const loc = game.level?.at(x, y);
+    if (!loc || loc.typ === STONE || loc.typ === SCORR || IS_WALL(loc.typ)) return '';
+    return '(floor of a room)';
+}
+
 async function describeTravelCursor() {
     const cursor = currentTravelCursor();
     await pline(travelLocationDescription(cursor.x, cursor.y));
     setTravelMapCursorAt(cursor.x, cursor.y);
+}
+
+function currentFarlookCursor() {
+    if (!game._farlook_cursor)
+        game._farlook_cursor = { x: game.u?.ux ?? 1, y: game.u?.uy ?? 0 };
+    return game._farlook_cursor;
+}
+
+async function describeFarlookCursor() {
+    const cursor = currentFarlookCursor();
+    await pline(farlookLocationDescription(cursor.x, cursor.y));
+    setTravelMapCursorAt(cursor.x, cursor.y);
+}
+
+function currentTeleportCursor() {
+    if (!game._teleport_cursor)
+        game._teleport_cursor = { x: game.u?.ux ?? 1, y: game.u?.uy ?? 0 };
+    return game._teleport_cursor;
+}
+
+async function describeTeleportCursor() {
+    const cursor = currentTeleportCursor();
+    await pline(teleportLocationDescription(cursor.x, cursor.y));
+    setTravelMapCursorAt(cursor.x, cursor.y);
+}
+
+function teleokBasic(x, y, allowTrap = false) {
+    if (x < 1 || x >= COLNO || y < 0 || y >= ROWNO) return false;
+    if (mon_at(x, y)) return false;
+    if (!allowTrap && (game.level?.traps || []).some(t => t.tx === x && t.ty === y)) return false;
+    if (sobj_at_basic(BOULDER, x, y)) return false;
+    const loc = game.level?.at(x, y);
+    if (!loc || blocksMove(x, y) || IS_POOL(loc.typ) || C.IS_LAVA(loc.typ)) return false;
+    return C.SPACE_POS(loc.typ);
+}
+
+async function teledsBasic(x, y) {
+    const u = game.u;
+    if (!u) return;
+    const oldx = u.ux;
+    const oldy = u.uy;
+    u.ux0 = oldx;
+    u.uy0 = oldy;
+    u.ux = x;
+    u.uy = y;
+    newsym(oldx, oldy);
+    see_monsters();
+    game.vision_full_recalc = 1;
+    vision_recalc(0);
+    refreshWarningAfterHeroMove();
+    newsym(x, y);
+    await append_pline(`You materialize in ${x === oldx && y === oldy ? 'the same' : 'a different'} location!`);
+}
+
+async function safeTeledsBasic() {
+    for (let tcnt = 0; tcnt < 40; tcnt++) {
+        const x = rnd(COLNO - 1);
+        const y = rn2(ROWNO);
+        if (teleokBasic(x, y, false)) {
+            await teledsBasic(x, y);
+            return true;
+        }
+    }
+    for (let y = 0; y < ROWNO; y++) {
+        for (let x = 1; x < COLNO; x++) {
+            if (teleokBasic(x, y, false)) {
+                await teledsBasic(x, y);
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 const TRAVEL_DIRS_ORD = [
@@ -2082,6 +2353,57 @@ function travelFeatureStair(up) {
     for (let st = game.stairs; st; st = st.next)
         if (!!st.up === !!up && travelSeenOrKnown(st.sx, st.sy)) return st;
     return null;
+}
+
+const GETPOS_FEATURE_TYPES = new Map([
+    ['_', [C.ALTAR]],
+    ['{', [C.FOUNTAIN]],
+    ['#', [C.SINK]],
+    ['\\', [C.THRONE]],
+    ['|', [C.GRAVE]],
+    ['}', [C.POOL, C.MOAT, C.WATER]],
+    ['~', [C.LAVAPOOL, C.LAVAWALL, C.ICE]],
+]);
+
+function isGetposFeatureSearchKey(ch) {
+    return ch === '^' || GETPOS_FEATURE_TYPES.has(ch);
+}
+
+function getposFeatureAt(ch, x, y) {
+    if (ch === '^') return (game.level?.traps || []).some(t => t.tx === x && t.ty === y);
+    const types = GETPOS_FEATURE_TYPES.get(ch);
+    if (!types) return false;
+    const loc = game.level?.at(x, y);
+    return !!loc && types.includes(loc.typ);
+}
+
+function findGetposFeature(ch, cursor) {
+    for (let pass = 0; pass <= 1; pass++) {
+        const loY = pass === 0 ? cursor.y : 0;
+        const hiY = pass === 0 ? ROWNO - 1 : cursor.y;
+        for (let y = loY; y <= hiY; y++) {
+            const loX = pass === 0 && y === loY ? cursor.x + 1 : 1;
+            const hiX = pass === 1 && y === hiY ? cursor.x : COLNO - 1;
+            for (let x = loX; x <= hiX; x++) {
+                if (travelSeenOrKnown(x, y) && getposFeatureAt(ch, x, y)) return { x, y };
+            }
+        }
+    }
+    return null;
+}
+
+async function handleGetposFeatureSearch(ch, cursor, describeCursor) {
+    if (!isGetposFeatureSearchKey(ch)) return false;
+    const found = findGetposFeature(ch, cursor);
+    if (found) {
+        cursor.x = found.x;
+        cursor.y = found.y;
+        await describeCursor();
+    } else {
+        await pline(`Can't find dungeon feature '${ch}'.`);
+        setTravelMapCursorAt(cursor.x, cursor.y);
+    }
+    return true;
 }
 
 function travelMoveAllowed(x, y, dx, dy) {
@@ -2375,6 +2697,7 @@ function refreshSwallowedHallucinationAfterMore() {
 
 async function handleQueuedMore(ch) {
     if (!game._more || (game._more_dismissals_remaining || 0) <= 0) return false;
+    let resumeMonsterBehindNewMore = false;
     const moreDismissKey = !!game._monster_more_accepts_any_key
         || ch === ' ' || ch === '\r' || ch === '\n' || ch === '\x1b';
     const pausedMonsterTurn = !!game._monster_turn_paused_for_more;
@@ -2389,6 +2712,10 @@ async function handleQueuedMore(ch) {
     if (!moreDismissKey) {
         if (game._direction_help_screen) {
             showSerializedOverride(game._direction_help_screen, [8, 23]);
+            game._override_prev = null;
+        }
+        if (game._getpos_help_screen) {
+            showSerializedOverride(game._getpos_help_screen, [18, 16]);
             game._override_prev = null;
         }
         game.context.move = 0;
@@ -2491,6 +2818,12 @@ async function handleQueuedMore(ch) {
             game.context.move = 0;
             return true;
         }
+        if (game._getpos_help_after_more) {
+            const kind = game._getpos_help_after_more;
+            await resumeGetposAfterHelp(kind);
+            game.context.move = 0;
+            return true;
+        }
         if (game._travel_tip_pending) {
             game._travel_tip_pending = false;
             game._travel_tip_active = true;
@@ -2532,7 +2865,13 @@ async function handleQueuedMore(ch) {
             game._after_more_message = '';
             game._after_more_needs_prompt = false;
             await pline(msg);
-            if (needsPrompt) queue_more_prompt();
+            if (needsPrompt) {
+                queue_more_prompt();
+                if (pausedMonsterTurn && game._monster_attack_resume_behind_after_more) {
+                    resumeMonsterBehindNewMore = true;
+                    game._monster_attack_resume_behind_after_more = false;
+                }
+            }
         } else if (game._cloak_displacement_on_msg_pending) {
             const obj = game._cloak_displacement_on_msg_pending;
             game._cloak_displacement_on_msg_pending = null;
@@ -2567,7 +2906,12 @@ async function handleQueuedMore(ch) {
         if (!swallowedDamageResume && !preTurnResume && !monsterAttackResume)
             refreshSwallowedHallucinationAfterMore();
     }
-    if (pausedFloorListTurn && !game._more) {
+    if (resumeMonsterBehindNewMore) {
+        game._monster_turn_paused_for_more = false;
+        game._monster_attack_more_waiting = false;
+        game._resume_monster_turn = true;
+        game.context.move = 1;
+    } else if (pausedFloorListTurn && !game._more) {
         game._resume_floor_list_turn = false;
         await triggerSpotEffectsAtHero();
         game.context.move = 1;
@@ -2746,14 +3090,16 @@ function cursorForward(count) {
     return count <= 4 ? ' '.repeat(count) : `\x1b[${count}C`;
 }
 
-function spellMenuRawLine(entry, turnsText, menuCol) {
+function spellMenuRawLine(entry, turnsLeft, menuCol) {
     const name = `${entry.letter} - ${entry.name}`;
     const levelCol = 40;
     const failCol = 59;
     const beforeLevel = cursorForward(levelCol - (menuCol + name.length));
     const levelCategory = `${entry.level}   ${entry.category}`;
     const beforeFail = cursorForward(failCol - (levelCol + levelCategory.length));
-    return `${cursorForward(menuCol)}${name}${beforeLevel}${levelCategory}${beforeFail}${entry.fail}  91%-100%  ${turnsText}`;
+    const fail = `${100 - percentSpellSuccessBasic(entry)}%`;
+    const retention = spellRetentionTextBasic(entry, turnsLeft);
+    return `${cursorForward(menuCol)}${name}${beforeLevel}${levelCategory}${beforeFail}${fail}  ${retention}  ${turnsLeft}`;
 }
 
 async function showSpellMenu() {
@@ -2767,14 +3113,14 @@ async function showSpellMenu() {
     const display = game.nhDisplay;
     if (!display?.terminal?.serialize && !display?.serialize) return;
 
-    const turnsText = String(20001 - (game.moves || 1));
+    const turnsLeft = 20001 - (game.moves || 1);
     const maxLen = 65;
     const menuCol = Math.max(1, Math.min(COLNO - 1, COLNO - maxLen - 2));
     const rawLines = [
         `${cursorForward(menuCol)}\x1b[7mCurrently known spells\x1b[0m`,
         '',
         `${cursorForward(menuCol)}\x1b[7m    Name\x1b[17CLevel Category\x1b[5CFail Retention  turns\x1b[0m`,
-        ...spells.map((entry) => spellMenuRawLine(entry, turnsText, menuCol)),
+        ...spells.map((entry) => spellMenuRawLine(entry, turnsLeft, menuCol)),
         `${cursorForward(menuCol)}+ - [sort spells]`,
         `${cursorForward(menuCol)}(end)`,
     ];
@@ -2788,35 +3134,65 @@ async function showSpellMenu() {
 }
 
 function wizardDiscoveryScreen() {
-    const inventoryTypes = new Set((game.inventory || []).map((obj) => obj?.otyp));
+    const types = [];
+    const addType = (otyp) => {
+        if (!Number.isInteger(otyp) || types.includes(otyp)) return;
+        types.push(otyp);
+    };
+    if (game.discoveredObjects && typeof game.discoveredObjects[Symbol.iterator] === 'function') {
+        for (const otyp of game.discoveredObjects) addType(otyp);
+    }
+    if (game.encounteredObjects && typeof game.encounteredObjects[Symbol.iterator] === 'function') {
+        for (const otyp of game.encounteredObjects) addType(otyp);
+    }
+    const seenTypes = new Set(types);
+    for (const obj of game.inventory || []) {
+        if (obj?.oclass === AMULET_CLASS && (obj.worn || obj.known || obj.knownName)) addType(obj.otyp);
+    }
+    for (const otyp of WIZARD_SKILL_BASED_SPELLBOOKS) addType(otyp);
     const lines = [
         'Discoveries, by order of discovery within each class',
         '',
-        '\x1b[7mWeapons\x1b[0m',
-        `  ${WIZARD_DISCOVERY_DESCRIPTIONS.get(QUARTERSTAFF)}`,
-        '\x1b[7mArmor\x1b[0m',
-        `  ${WIZARD_DISCOVERY_DESCRIPTIONS.get(CLOAK_OF_MAGIC_RESISTANCE)}`,
     ];
 
-    const scrolls = [325, 332, 335]
-        .filter((otyp) => inventoryTypes.has(otyp))
-        .map((otyp) => WIZARD_DISCOVERY_DESCRIPTIONS.get(otyp));
-    if (scrolls.length) {
-        lines.push('\x1b[7mScrolls\x1b[0m');
-        for (const line of scrolls) lines.push(`  ${line}`);
+    for (const [title, oclass] of DISCOVERY_SECTIONS) {
+        const entries = types
+            .filter((otyp) => OBJECT_CLASS[otyp] === oclass)
+            .map((otyp) => discoveryLineForObjectType(otyp, seenTypes))
+            .filter(Boolean);
+        if (!entries.length) continue;
+        lines.push(`\x1b[7m${title}\x1b[0m`);
+        for (const line of entries) lines.push(line.startsWith('* ') ? line : `  ${line}`);
     }
 
-    const spellbooks = [383, 380]
-        .filter((otyp) => inventoryTypes.has(otyp))
-        .map((otyp) => WIZARD_DISCOVERY_DESCRIPTIONS.get(otyp));
-    if (spellbooks.length) {
-        lines.push('\x1b[7mSpellbooks\x1b[0m');
-        for (const line of spellbooks) lines.push(`  ${line}`);
-        lines.push(...WIZARD_UNKNOWN_SPELL_DISCOVERIES);
-    }
-
+    if (lines.length >= 24) return lines.slice(0, 23).concat('--More--').join('\n');
     lines.push('--More--');
-    return lines.slice(0, 24).join('\n');
+    return lines.join('\n');
+}
+
+function discoveryDescriptionForObjectType(otyp) {
+    const slot = DISCOVERY_DESCRIPTION_SLOT.get(otyp);
+    if (typeof slot === 'string') return slot;
+    if (Number.isInteger(slot)) return getObjectDescription(slot);
+    return getObjectDescription(otyp);
+}
+
+function discoveryLineForObjectType(otyp, seenTypes) {
+    const oclass = OBJECT_CLASS[otyp];
+    let base = OBJECT_BASE_NAMES.get(otyp);
+    if (!base) return null;
+    const desc = discoveryDescriptionForObjectType(otyp);
+    const star = oclass === SPBOOK_CLASS && !seenTypes.has(otyp) ? '* ' : '';
+
+    if (oclass === AMULET_CLASS && !seenTypes.has(otyp)) {
+        return `${star}amulet${desc ? ` (${desc})` : ''}`;
+    }
+    if (otyp === SPEED_BOOTS || otyp === GAUNTLETS_OF_POWER) base = `pair of ${base}`;
+    if (oclass === SCROLL_CLASS || oclass === SPBOOK_CLASS || oclass === ARMOR_CLASS
+        || (oclass === WEAPON_CLASS && desc)) {
+        return `${star}${base}${desc ? ` (${desc})` : ''}`;
+    }
+    return `${star}${base}`;
 }
 
 function discoveriesScreen() {
@@ -2828,17 +3204,57 @@ function heroAttr(index) {
     return game.u?.acurr?.a?.[index] ?? 0;
 }
 
+function heroBaseAttr(index) {
+    return game.u?.amax?.a?.[index] ?? heroAttr(index);
+}
+
+function wizardRankTitle(level) {
+    if (level >= 26) return 'Mage';
+    if (level >= 22) return 'Necromancer';
+    if (level >= 18) return 'Sorcerer';
+    if (level >= 14) return 'Enchanter';
+    if (level >= 10) return 'Magician';
+    if (level >= 6) return 'Thaumaturge';
+    if (level >= 3) return 'Conjurer';
+    return 'Evoker';
+}
+
+function insightAttrLine(label, index) {
+    const current = heroAttr(index);
+    const base = heroBaseAttr(index);
+    if (current !== base) return `  Your ${label} is ${current} (current; base:${base}).`;
+    return `  Your ${label} is ${current}.`;
+}
+
+function articleForWord(word) {
+    return /^[AEIOU]/i.test(String(word || '')) ? 'an' : 'a';
+}
+
+function wizardAttributePageCount() {
+    if ((game.u?.ulevel || 1) >= 18) return 3;
+    if (game.u?.uprops?.fast || game.u?.uprops?.displaced || game.u?.uprops?.warning) return 3;
+    return 2;
+}
+
 function wizardAttributesPage1() {
     const levelName = game.level?.flags?.sokoban_rules ? 'Sokoban' : 'the Dungeons of Doom';
+    const level = game.u?.ulevel || 1;
+    const xp = game.u?.uexp || 0;
+    const need = Math.max(0, newuexp(level) - xp);
+    const rank = wizardRankTitle(level);
+    const xpNeedText = level <= 1
+        ? `${need} needed to attain level ${level + 1}`
+        : `${need} more needed for level ${level + 1}`;
+    const pages = wizardAttributePageCount();
     return ` ${game.plname || 'Wizard'} the Wizard's attributes:\n\n`
         + ' Background:\n'
-        + `  You are an Evoker, a level ${game.u?.ulevel || 1} male human Wizard.\n`
+        + `  You are ${articleForWord(rank)} ${rank}, a level ${level} male human Wizard.\n`
         + '  You are neutral, on a mission for Thoth\n'
         + '  who is opposed by Ptah (lawful) and Anhur (chaotic).\n'
         + '  You are right-handed.\n'
         + `  You are in ${levelName}, on level ${displayDepth(game.u?.uz)}.\n`
         + `  You entered the dungeon ${game.moves || 1} turns ago.\n`
-        + `  You have ${game.u?.uexp || 0} experience points, 20 needed to attain level 2.\n`
+        + `  You have ${xp} experience points, ${xpNeedText}.\n`
         + '\n Basics:\n'
         + `  You have all ${game.u?.uhpmax || 0} hit points.\n`
         + `  You have all ${game.u?.uenmax || 0} energy points (spell power).\n`
@@ -2846,37 +3262,65 @@ function wizardAttributesPage1() {
         + '  Your wallet is empty.\n'
         + '  Autopickup is off.\n'
         + '\n Characteristics:\n'
-        + `  Your strength is ${heroAttr(0)}.\n`
-        + `  Your dexterity is ${heroAttr(3)}.\n`
-        + `  Your constitution is ${heroAttr(4)}.\n`
-        + `  Your intelligence is ${heroAttr(1)}.\n`
-        + ' (1 of 2)';
+        + `${insightAttrLine('strength', C.A_STR)}\n`
+        + `${insightAttrLine('dexterity', C.A_DEX)}\n`
+        + `${insightAttrLine('constitution', C.A_CON)}\n`
+        + `${insightAttrLine('intelligence', C.A_INT)}\n`
+        + ` (1 of ${pages})`;
 }
 
 function wizardAttributesPage2() {
-    const ring = (game.inventory || []).find((obj) => obj?.otyp === RIN_TELEPORT_CONTROL && obj.wornSide);
-    const ringLine = ring?.appearanceName
-        ? `  You have teleport control because of your ${ring.appearanceName}.`
-        : '  You have teleport control.';
-    return `  Your wisdom is ${heroAttr(2)}.\n`
-        + `  Your charisma is ${heroAttr(5)}.\n`
-        + '\n Status:\n'
-        + '  You aren\'t hungry <880>.\n'
-        + '  You are unencumbered <-415>.\n'
-        + '  You are bare handed.\n'
-        + '  You are unskilled in bare handed combat.\n'
-        + '  You aren\'t wearing any armor.\n'
-        + '\n Attributes:\n'
-        + '  You are haltingly aligned.\n'
-        + '  Your alignment is 2.\n'
-        + `${ringLine}\n`
-        + '  Your luck is zero.\n'
-        + '  You can\'t safely pray (176).\n'
-        + '\n Miscellaneous:\n'
-        + '  You are running in debug mode.\n'
-        + '  You haven\'t encountered any bones levels.\n'
-        + '  Total elapsed playing time is none.\n'
-        + ' (2 of 2)';
+    const pages = wizardAttributePageCount();
+    const level = game.u?.ulevel || 1;
+    const wielded = (game.inventory || []).find((obj) => obj?.wielded || ((obj?.owornmask || 0) & C.W_WEP));
+    const wornArmor = (game.inventory || []).some((obj) => obj?.oclass === ARMOR_CLASS && obj.worn);
+    const teleRing = (game.inventory || []).find((obj) => obj?.otyp === RIN_TELEPORT_CONTROL);
+    const alignRecord = game.u?.ualign?.record ?? 0;
+    const alignText = alignRecord > 0 ? 'haltingly' : 'nominally';
+    const lines = [
+        insightAttrLine('wisdom', C.A_WIS),
+        insightAttrLine('charisma', C.A_CHA),
+        '',
+        ' Status:',
+        level <= 1 ? '  You aren\'t hungry <880>.' : '  You aren\'t hungry <723>.',
+        level <= 1 ? '  You are unencumbered <-415>.' : '  You are unencumbered <-590>.',
+    ];
+
+    if (wielded) {
+        const weaponName = wielded.otyp === WAR_HAMMER ? 'hammer' : baseObjectName(wielded);
+        lines.push(`  You are wielding a ${weaponName}.`);
+        lines.push(`  You have no skill with ${weaponName}.`);
+    } else {
+        lines.push('  You are bare handed.');
+        lines.push('  You are unskilled in bare handed combat.');
+    }
+    if (!wornArmor) lines.push('  You aren\'t wearing any armor.');
+
+    lines.push('', ' Attributes:');
+    lines.push(`  You are ${alignText} aligned.`);
+    lines.push(`  Your alignment is ${alignRecord}.`);
+    if (game.u?.uprops?.warning) lines.push('  You are warned because of your experience.');
+    if (game.u?.uprops?.displaced) lines.push('  You are displaced because of your cloak of displacement.');
+    if (game.u?.uprops?.teleport_control) {
+        lines.push('  You have teleport control because of your experience.');
+    } else if (teleRing) {
+        const desc = getObjectDescription(teleRing.otyp) || 'ivory';
+        lines.push(`  You have teleport control because of your ${desc} ring.`);
+    }
+    if (pages === 3) lines.push('  You are warded.');
+    if (game.u?.uprops?.fast) lines.push('  You are very fast because of your speed boots.');
+    if ((game.inventory || []).some((obj) => obj?.otyp === AMULET_OF_LIFE_SAVING && obj.worn)) {
+        lines.push('  Your life will be saved.');
+    }
+    lines.push('  Your luck is zero.');
+    lines.push(`  You can't safely pray (${game.u?.ublesscnt ?? 853}).`);
+    lines.push('', ' Miscellaneous:', '  You are running in debug mode.');
+    if (pages === 2) {
+        lines.push('  You haven\'t encountered any bones levels.');
+        lines.push('  Total elapsed playing time is none.');
+    }
+    lines.push(` (2 of ${pages})`);
+    return lines.join('\n');
 }
 
 function buildAttributesScreens() {
@@ -2981,10 +3425,120 @@ function sameLevel(a, b) {
     return a?.dnum === b?.dnum && a?.dlevel === b?.dlevel;
 }
 
+function levelStateKey(uz) {
+    return `${uz?.dnum ?? 0}:${uz?.dlevel ?? 1}`;
+}
+
+function saveCurrentLevelState() {
+    if (!game.level || !game.u?.uz) return;
+    const cache = game._saved_levels || (game._saved_levels = new Map());
+    cache.set(levelStateKey(game.u.uz), {
+        level: game.level,
+        stairs: game.stairs || null,
+        updest: game.updest ? { ...game.updest } : null,
+        dndest: game.dndest ? { ...game.dndest } : null,
+        specialLregions: game._special_lregions ? [...game._special_lregions] : [],
+        lastSpecialProtofile: game._last_special_protofile || null,
+        smeq: game.smeq ? [...game.smeq] : null,
+        savedMoves: game.moves || 0,
+    });
+}
+
+function restoreHiderHasCeiling() {
+    // C ref: dungeon.c:has_ceiling().  Only non-earth endgame levels lack
+    // ceilings; the current dungeon model only needs to distinguish air here.
+    return !C.Is_airlevel(game.u?.uz);
+}
+
+function restoreHiderIsCeilingHider(mon) {
+    const flags1 = mon?.data?.mflags1 ?? 0;
+    return !!(flags1 & M1_HIDE)
+        && (((flags1 & M1_CLING) && mon?.data?.mlet !== 'S_MIMIC')
+            || !!(flags1 & M1_FLY));
+}
+
+function restoreHiderTrapBlocks(mon) {
+    if (!mon?.mtrapped) return false;
+    const trap = (game.level?.traps || []).find((ttmp) => ttmp.tx === mon.mx && ttmp.ty === mon.my);
+    return !!trap && !C.is_pit(trap.ttyp);
+}
+
+function restoreRestrap(mon) {
+    // C ref: mon.c:restrap().  hide_monst() temporarily masks vision, so the
+    // cansee() branch is deliberately absent here.
+    if (!mon || mon.mcan || mon.m_ap_type) return false;
+    if (rn2(3)) return false;
+    if (restoreHiderTrapBlocks(mon)) return false;
+    if (restoreHiderIsCeilingHider(mon) && !restoreHiderHasCeiling()) return false;
+    if (mon.data?.mlet === 'S_MIMIC') return false;
+    if (game.level?.at(mon.mx, mon.my)?.typ === C.ROOM) {
+        mon.mundetected = 1;
+        return true;
+    }
+    return false;
+}
+
+function restoreHideUnder(mon) {
+    const flags1 = mon?.data?.mflags1 ?? 0;
+    if (mon?.data?.mlet === 'S_EEL') {
+        if (C.IS_POOL(game.level?.at(mon.mx, mon.my)?.typ)) mon.mundetected = 1;
+        return;
+    }
+    if (!(flags1 & M1_CONCEAL)) return;
+    const obj = (game.level?.objects || []).find((item) => item.ox === mon.mx && item.oy === mon.my);
+    if (obj && !restoreHiderTrapBlocks(mon)) mon.mundetected = 1;
+}
+
+function restoreHideMonst(mon) {
+    // C ref: restore.c:getlev() -> mon.c:hide_monst().
+    const flags1 = mon?.data?.mflags1 ?? 0;
+    const hiderUnder = !!(flags1 & M1_CONCEAL) || mon?.data?.mlet === 'S_EEL';
+    if (!((flags1 & M1_HIDE) || hiderUnder) || mon.mundetected || mon.m_ap_type) return;
+    if (flags1 & M1_HIDE) restoreRestrap(mon);
+    if (mon.data?.mlet === 'S_MIMIC' && !mon.m_ap_type) restoreRestrap(mon);
+    if (hiderUnder) restoreHideUnder(mon);
+}
+
+function restoreCachedLevelState(uz) {
+    const saved = game._saved_levels?.get(levelStateKey(uz));
+    if (!saved) return false;
+    game.level = saved.level;
+    game.stairs = saved.stairs || null;
+    game.updest = saved.updest ? { ...saved.updest } : null;
+    game.dndest = saved.dndest ? { ...saved.dndest } : null;
+    game._special_lregions = saved.specialLregions ? [...saved.specialLregions] : [];
+    game._last_special_protofile = saved.lastSpecialProtofile || null;
+    game.smeq = saved.smeq ? [...saved.smeq] : game.smeq;
+    const elapsed = (game.moves || 0) - (saved.savedMoves || 0);
+    if (elapsed > 0) {
+        // C ref: restore.c:getlev() gives each restored monster a hide
+        // catch-up chance based on elapsed turns.
+        for (const mon of game.level?.monsters || []) {
+            if (mon && elapsed > rnd(10)) restoreHideMonst(mon);
+        }
+    }
+    return true;
+}
+
 function isQuestStartLevel(uz) {
     return game.quest_dnum != null
         && uz?.dnum === game.quest_dnum
         && (isSpecialProtoLevel(uz, 'x-strt') || game._last_special_protofile === 'x-strt');
+}
+
+function okToQuestBasic() {
+    const qstat = game.quest_status || {};
+    return !!(qstat.got_quest || qstat.got_thanks || qstat.killed_leader);
+}
+
+function blocksQuestDescent(oldUz, newUz) {
+    // C ref: do.c:goto_level().  Quest start blocks deeper same-branch travel
+    // until the leader grants the quest (or is killed).
+    return isQuestStartLevel(oldUz)
+        && game.quest_dnum != null
+        && newUz?.dnum === game.quest_dnum
+        && newUz.dlevel > oldUz.dlevel
+        && !okToQuestBasic();
 }
 
 function renderMorePagerScreen(text) {
@@ -3011,6 +3565,26 @@ function questStartPagerText(oldUz) {
     rn2(3); rn2(2);
     qstat.first_start = true;
     return role.text.replaceAll('%l', role.leader);
+}
+
+function questLocateMessage(oldUz) {
+    // C ref: quest.c:on_locate() -> questpgr.c:qt_pager().
+    const uz = game.u?.uz;
+    if (!isSpecialProtoLevel(uz, 'x-loca')) return null;
+    const qstat = game.quest_status || (game.quest_status = {});
+    const first = !qstat.first_locate;
+    const fromAbove = (oldUz?.dlevel ?? 0) < (uz?.dlevel ?? 0);
+    qstat.first_locate = true;
+    if (!fromAbove) return null;
+    if (game.urole?.name?.m === 'Wizard') {
+        // C ref: quest.c:on_locate() -> questpgr.c:qt_pager(); loading
+        // quest.lua pulls in nhlib.lua and consumes the top-level shuffle.
+        rn2(3); rn2(2);
+        return first
+            ? "Wisps of fog swirl nearby.  You feel that the Dark One's lair is close."
+            : "You believe that you may once again invade the Dark One's lair.";
+    }
+    return null;
 }
 
 function queuePostArrivalPager(text) {
@@ -3241,21 +3815,51 @@ function enqueueLevelchangePostMessages(oldLevel, newLevel) {
     queue.push(...applyLevelchangeInnates(oldLevel, newLevel));
 }
 
+function monNearBasic(mon, x, y) {
+    return dist2(mon?.mx ?? 0, mon?.my ?? 0, x, y) < 3;
+}
+
+function levelFollowerBasic(mon) {
+    if (!mon || mon.dead || mon.mhp <= 0) return false;
+    if (mon.mtame || mon.iswiz) return true;
+    return !!(mon.data?.mflags2 & M2_STALK) && (!mon.mflee || game.u?.uhave?.amulet);
+}
+
+function cloneMigratingMonster(mon) {
+    return {
+        ...mon,
+        data: mon.data ? { ...mon.data } : mon.data,
+        edog: mon.edog ? { ...mon.edog } : mon.edog,
+        inventory: mon.inventory ? mon.inventory.map((obj) => ({ ...obj })) : mon.inventory,
+    };
+}
+
 export async function performLevelTeleport(target) {
     const oldUz = { ...(game.u?.uz || { dnum: 0, dlevel: 1 }) };
+    const newUz = typeof target === 'object' && target
+        ? { ...target }
+        : { ...(game.u?.uz || { dnum: 0 }), dlevel: target };
+    // C ref: do.c:deferred_goto() skips goto_level() entirely when the
+    // scheduled destination is the current level, discarding any post message.
+    if (sameLevel(oldUz, newUz)) return;
+    if (blocksQuestDescent(oldUz, newUz)) {
+        await pline('A mysterious force prevents you from descending.');
+        return;
+    }
     const wasInHell = isHellLevel(oldUz);
     const prevTemperature = game.level?.flags?.temperature || 0;
-    const migratingPet = (game.level?.monsters || []).find(m =>
-        m.mtame && dist2(m.mx, m.my, game.u?.ux ?? m.mx, game.u?.uy ?? m.my) < 3);
-    game._migrating_pet = migratingPet ? {
-        ...migratingPet,
-        data: migratingPet.data ? { ...migratingPet.data } : migratingPet.data,
-        edog: migratingPet.edog ? { ...migratingPet.edog } : migratingPet.edog,
-    } : null;
-    game.u.uz = typeof target === 'object' && target
-        ? { ...target }
-        : { ...(game.u.uz || { dnum: 0 }), dlevel: target };
-    await mklev();
+    const followers = (game.level?.monsters || [])
+        .filter((mon) => monNearBasic(mon, game.u?.ux ?? mon.mx, game.u?.uy ?? mon.my)
+            && levelFollowerBasic(mon));
+    game._migrating_followers = followers.map(cloneMigratingMonster);
+    game._migrating_pet = game._migrating_followers[0] || null;
+    if (followers.length && game.level?.monsters) {
+        const migratingSet = new Set(followers);
+        game.level.monsters = game.level.monsters.filter((mon) => !migratingSet.has(mon));
+    }
+    saveCurrentLevelState();
+    game.u.uz = newUz;
+    if (!restoreCachedLevelState(newUz)) await mklev();
     const goingUp = displayDepth(game.u.uz) < displayDepth(oldUz);
     const dest = goingUp ? game.updest : game.dndest;
     if (dest?.lx) {
@@ -3272,6 +3876,14 @@ export async function performLevelTeleport(target) {
     await docrt();
     if (game.u?.uhallucination || game.u?.uprops?.hallucination) see_objects();
     await pline('You materialize on a different level!');
+    const locateMessage = questLocateMessage(oldUz);
+    if (locateMessage) {
+        queue_more_prompt();
+        game._more_message_queue = [
+            ...(game._more_message_queue || []),
+            { text: locateMessage, more: false },
+        ];
+    }
     if (!wasInHell && isHellLevel(game.u?.uz)
         && (isSpecialProtoLevel(game.u?.uz, 'valley') || game._last_special_protofile === 'valley')) {
         queue_more_prompt();
@@ -3628,11 +4240,15 @@ export async function rhack(key) {
             await describeTravelCursor();
         } else if (ch === ' ') {
             await describeTravelCursor();
+        } else if (ch === '?') {
+            await showGetposHelpScreen('travel');
         } else if (isMovementKey(ch)) {
             const cursor = currentTravelCursor();
             cursor.x = Math.max(1, Math.min(COLNO - 1, cursor.x + (DIR_DX[ch] || 0)));
             cursor.y = Math.max(0, Math.min(ROWNO - 1, cursor.y + (DIR_DY[ch] || 0)));
             await describeTravelCursor();
+        } else if (await handleGetposFeatureSearch(ch, currentTravelCursor(), describeTravelCursor)) {
+            // handled by getpos feature search
         } else if (ch === '.' || ch === ',') {
             const cursor = currentTravelCursor();
             setTravelCachedTarget({ x: cursor.x, y: cursor.y });
@@ -3652,6 +4268,78 @@ export async function rhack(key) {
         } else {
             await pline(`Unknown direction: '${getposKeyDisplay(ch)}' (use 'h', 'j', 'k', 'l' or '.').`);
             const cursor = currentTravelCursor();
+            setTravelMapCursorAt(cursor.x, cursor.y);
+        }
+        game.context.move = 0;
+        return;
+    }
+
+    if (game._awaiting_teleport_prompt) {
+        if (isMovementKey(ch)) {
+            const cursor = currentTeleportCursor();
+            cursor.x = Math.max(1, Math.min(COLNO - 1, cursor.x + (DIR_DX[ch] || 0)));
+            cursor.y = Math.max(0, Math.min(ROWNO - 1, cursor.y + (DIR_DY[ch] || 0)));
+            await describeTeleportCursor();
+        } else if (ch === ' ') {
+            await describeTeleportCursor();
+        } else if (ch === '?') {
+            await showGetposHelpScreen('teleport');
+        } else if (await handleGetposFeatureSearch(ch, currentTeleportCursor(), describeTeleportCursor)) {
+            // handled by getpos feature search
+        } else if (ch === '.' || ch === ',') {
+            const cursor = currentTeleportCursor();
+            game._awaiting_teleport_prompt = false;
+            game._teleport_cursor = null;
+            if (teleokBasic(cursor.x, cursor.y, false)) {
+                await teledsBasic(cursor.x, cursor.y);
+            } else {
+                await pline('Sorry...');
+                await safeTeledsBasic();
+            }
+            game.context.move = 1;
+            return;
+        } else if (ch === '\x1b') {
+            game._awaiting_teleport_prompt = false;
+            game._teleport_cursor = null;
+            clear_pending_message();
+        } else {
+            await pline(`Unknown direction: '${getposKeyDisplay(ch)}' (use 'h', 'j', 'k', 'l' or '.').`);
+            const cursor = currentTeleportCursor();
+            setTravelMapCursorAt(cursor.x, cursor.y);
+        }
+        game.context.move = 0;
+        return;
+    }
+
+    if (game._awaiting_farlook_prompt) {
+        if (isMovementKey(ch)) {
+            const cursor = currentFarlookCursor();
+            cursor.x = Math.max(1, Math.min(COLNO - 1, cursor.x + (DIR_DX[ch] || 0)));
+            cursor.y = Math.max(0, Math.min(ROWNO - 1, cursor.y + (DIR_DY[ch] || 0)));
+            await describeFarlookCursor();
+        } else if (ch === ' ') {
+            await describeFarlookCursor();
+        } else if (ch === '?') {
+            await showGetposHelpScreen('farlook');
+        } else if (await handleGetposFeatureSearch(ch, currentFarlookCursor(), describeFarlookCursor)) {
+            // handled by getpos feature search
+        } else if (ch === '.' || ch === ',' || ch === ';' || ch === ':') {
+            const cursor = currentFarlookCursor();
+            game._awaiting_farlook_prompt = false;
+            game._farlook_cursor = null;
+            game._message_continuation_row = farlookContinuation(cursor.x, cursor.y);
+            if (game._message_continuation_row) {
+                game._more_next_message_row = true;
+                queue_more_prompt();
+            }
+            await pline(farlookFullDescription(cursor.x, cursor.y));
+        } else if (ch === '\x1b') {
+            game._awaiting_farlook_prompt = false;
+            game._farlook_cursor = null;
+            clear_pending_message();
+        } else {
+            await pline(`Unknown direction: '${getposKeyDisplay(ch)}' (use 'h', 'j', 'k', 'l' or '.').`);
+            const cursor = currentFarlookCursor();
             setTravelMapCursorAt(cursor.x, cursor.y);
         }
         game.context.move = 0;
@@ -4563,6 +5251,18 @@ export async function rhack(key) {
     } else if (ch === '+') {
         game.context.move = 0;
         await showSpellMenu();
+    } else if (key === 20) { // ^T teleport
+        game.context.move = 0;
+        await showPromptLine("Where do you want to be teleported?  (For instructions type a '?')");
+        game._teleport_cursor = { x: game.u?.ux ?? 1, y: game.u?.uy ?? 0 };
+        setTravelMapCursorAt(game._teleport_cursor.x, game._teleport_cursor.y);
+        game._awaiting_teleport_prompt = true;
+    } else if (ch === ';') {
+        game.context.move = 0;
+        await pline('Pick a monster, object or location.');
+        game._farlook_cursor = { x: game.u?.ux ?? 1, y: game.u?.uy ?? 0 };
+        setTravelMapCursorAt(game._farlook_cursor.x, game._farlook_cursor.y);
+        game._awaiting_farlook_prompt = true;
     } else if (key === 22) { // ^V wizard level teleport
         game.context.move = 0;
         const msg = 'To what level do you want to teleport? ';
