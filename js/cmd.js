@@ -2166,6 +2166,35 @@ function getposKeyDisplay(ch) {
     return ch;
 }
 
+function truncateGetposCursorToMap(cursor, dx, dy) {
+    // C ref: getpos.c:truncate_to_map().  Diagonal moves at the edge
+    // shorten both axes together instead of clamping x and y separately.
+    if (cursor.x + dx < 1) {
+        dy -= Math.sign(dy) * (1 - (cursor.x + dx));
+        dx = 1 - cursor.x;
+    } else if (cursor.x + dx > COLNO - 1) {
+        dy += Math.sign(dy) * ((COLNO - 1) - (cursor.x + dx));
+        dx = (COLNO - 1) - cursor.x;
+    }
+    if (cursor.y + dy < 0) {
+        dx -= Math.sign(dx) * (0 - (cursor.y + dy));
+        dy = 0 - cursor.y;
+    } else if (cursor.y + dy > ROWNO - 1) {
+        dx += Math.sign(dx) * ((ROWNO - 1) - (cursor.y + dy));
+        dy = (ROWNO - 1) - cursor.y;
+    }
+    cursor.x += dx;
+    cursor.y += dy;
+}
+
+function moveGetposCursor(cursor, ch, multiplier = 1) {
+    truncateGetposCursorToMap(
+        cursor,
+        (DIR_DX[ch] || 0) * multiplier,
+        (DIR_DY[ch] || 0) * multiplier,
+    );
+}
+
 function defaultTravelPromptTarget() {
     const u = game.u;
     if (!u) return null;
@@ -2309,6 +2338,7 @@ async function teledsBasic(x, y) {
     vision_recalc(0);
     refreshWarningAfterHeroMove();
     newsym(x, y);
+    game._prompt_cursor = null;
     await append_pline(`You materialize in ${x === oldx && y === oldy ? 'the same' : 'a different'} location!`);
 }
 
@@ -4139,6 +4169,7 @@ export async function rhack(key) {
             if (cmd === 'levelchange') {
                 const prompt = 'To what experience level do you want to be set?';
                 await showPromptLine(prompt);
+                game._prompt_cursor = [prompt.length + 1, 0];
                 game._awaiting_levelchange_value = true;
                 game._levelchange_input = '';
             } else if (cmd === 'pray') {
@@ -4236,7 +4267,7 @@ export async function rhack(key) {
             }
         } else if (ch === '\r' || ch === '\n') {
             const cursor = currentTravelCursor();
-            cursor.y = Math.max(0, Math.min(ROWNO - 1, cursor.y + 8));
+            truncateGetposCursorToMap(cursor, 0, 8);
             await describeTravelCursor();
         } else if (ch === ' ') {
             await describeTravelCursor();
@@ -4244,8 +4275,7 @@ export async function rhack(key) {
             await showGetposHelpScreen('travel');
         } else if (isMovementKey(ch)) {
             const cursor = currentTravelCursor();
-            cursor.x = Math.max(1, Math.min(COLNO - 1, cursor.x + (DIR_DX[ch] || 0)));
-            cursor.y = Math.max(0, Math.min(ROWNO - 1, cursor.y + (DIR_DY[ch] || 0)));
+            moveGetposCursor(cursor, ch);
             await describeTravelCursor();
         } else if (await handleGetposFeatureSearch(ch, currentTravelCursor(), describeTravelCursor)) {
             // handled by getpos feature search
@@ -4277,8 +4307,7 @@ export async function rhack(key) {
     if (game._awaiting_teleport_prompt) {
         if (isMovementKey(ch)) {
             const cursor = currentTeleportCursor();
-            cursor.x = Math.max(1, Math.min(COLNO - 1, cursor.x + (DIR_DX[ch] || 0)));
-            cursor.y = Math.max(0, Math.min(ROWNO - 1, cursor.y + (DIR_DY[ch] || 0)));
+            moveGetposCursor(cursor, ch);
             await describeTeleportCursor();
         } else if (ch === ' ') {
             await describeTeleportCursor();
@@ -4314,8 +4343,7 @@ export async function rhack(key) {
     if (game._awaiting_farlook_prompt) {
         if (isMovementKey(ch)) {
             const cursor = currentFarlookCursor();
-            cursor.x = Math.max(1, Math.min(COLNO - 1, cursor.x + (DIR_DX[ch] || 0)));
-            cursor.y = Math.max(0, Math.min(ROWNO - 1, cursor.y + (DIR_DY[ch] || 0)));
+            moveGetposCursor(cursor, ch);
             await describeFarlookCursor();
         } else if (ch === ' ') {
             await describeFarlookCursor();
@@ -4327,6 +4355,7 @@ export async function rhack(key) {
             const cursor = currentFarlookCursor();
             game._awaiting_farlook_prompt = false;
             game._farlook_cursor = null;
+            game._prompt_cursor = null;
             game._message_continuation_row = farlookContinuation(cursor.x, cursor.y);
             if (game._message_continuation_row) {
                 game._more_next_message_row = true;
