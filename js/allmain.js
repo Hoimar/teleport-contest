@@ -40,6 +40,7 @@ const STARTUP_REPLAY_BY_SEED = new Map([
 
 const SPEED_BOOTS = 166;
 const GAUNTLETS_OF_POWER = 161;
+const ARMOR_CLASS = 3;
 
 async function nhTimeoutBasic() {
     // C ref: timeout.c:nh_timeout() WOUNDED_LEGS case -> do.c:heal_legs().
@@ -453,6 +454,11 @@ function applyOccupationFinishObjectEffects(g) {
     const obj = g._occupation_finish_object;
     if (!obj) return;
     g._occupation_finish_object = null;
+    if (obj.oclass === ARMOR_CLASS) {
+        // C ref: do_wear.c:Armor_on()/Helmet_on()/Gloves_on(). Once armor
+        // is actually worn, the status-line AC change reveals its +/- value.
+        obj.known = true;
+    }
     if (obj.otyp === SPEED_BOOTS) {
         const discovered = g.discoveredObjects || (g.discoveredObjects = new Set());
         if (!discovered.has(obj.otyp)) {

@@ -12,10 +12,11 @@ import {
     serialize_terminal_grid, queue_more_prompt,
     apply_hallucination_display_transition, refresh_swallowed_overlay,
     see_monsters, see_objects, see_traps, refresh_warning_monsters, map_level_for_wizard,
+    object_glyph_for_menu,
 } from './display.js';
 import { cansee, couldsee, vision_recalc, vision_reset } from './vision.js';
 import { makemon, mklev, mksobj, monster_by_user_name, next_ident, place_lregion, place_object } from './mklev.js';
-import { OBJECT_CLASS, OBJECT_DELAY, OBJECT_MATERIAL } from './object_data.js';
+import { OBJECT_CHARGED, OBJECT_CLASS, OBJECT_DELAY, OBJECT_MATERIAL } from './object_data.js';
 import { finish_pet_kill, pet_arrive_with_you } from './dog.js';
 import { merge_inventory_object, newuexp, pluslvl } from './u_init.js';
 import { adjalign, exercise, gethungry } from './allmain_turns.js';
@@ -47,6 +48,7 @@ const DIR_DY = { h: 0, l: 0, j: 1, k: -1, y: -1, u: -1, b: 1, n: 1 };
 const RUN_KEY = { H: 'h', L: 'l', J: 'j', K: 'k', Y: 'y', U: 'u', B: 'b', N: 'n' };
 
 const AMULET_OF_LIFE_SAVING = 202;
+const AMULET_OF_GUARDING = 210;
 const GRAY_DRAGON_SCALE_MAIL = 101;
 const WAN_FIRE = 430;
 const WAN_COLD = 431;
@@ -58,6 +60,7 @@ const WAN_MAGIC_MISSILE = 429;
 const QUARTERSTAFF = 79;
 const WAR_HAMMER = 76;
 const CLOAK_OF_MAGIC_RESISTANCE = 139;
+const CLOAK_OF_PROTECTION = 146;
 const M1_FLY = 0x00000001;
 const M1_CLING = 0x00000010;
 const M1_CONCEAL = 0x00000080;
@@ -69,6 +72,7 @@ const LEVITATION_BOOTS = 172;
 const RIN_TELEPORT_CONTROL = 195;
 const RIN_INCREASE_ACCURACY = 176;
 const RIN_STEALTH = 181;
+const RIN_PROTECTION = 178;
 const EXPENSIVE_CAMERA = 229;
 const MIRROR = 230;
 const STETHOSCOPE = 237;
@@ -114,7 +118,7 @@ const OBJECT_BASE_NAMES = new Map([
     [LEATHER_GLOVES, 'leather gloves'],
     [GAUNTLETS_OF_POWER, 'gauntlets of power'],
     [AMULET_OF_LIFE_SAVING, 'amulet of life saving'],
-    [178, 'ring of protection'],
+    [RIN_PROTECTION, 'ring of protection'],
     [RIN_INCREASE_ACCURACY, 'ring of increase accuracy'],
     [199, 'ring of see invisible'],
     [RIN_STEALTH, 'ring of stealth'],
@@ -172,10 +176,24 @@ const OBJECT_BASE_NAMES = new Map([
     [461, 'white gem'],
 ]);
 
+const ARMOR_MAGIC_CANCELLATION = new Map([
+    [93, 1], // cornuthaum
+    [121, 2], [122, 2],
+    [123, 1], [124, 1], [125, 1],
+    [126, 2], [127, 2],
+    [128, 1], [129, 1], [130, 1], [131, 1], [132, 1], [133, 1], [134, 1],
+    [138, 1], [139, 1], [140, 1], [141, 1],
+    [142, 2], [143, 2],
+    [144, 1], [145, 1],
+    [146, 3],
+    [147, 1], [148, 1], [149, 1],
+]);
+
 const SPELLBOOK_SPELL_INFO = new Map([
     [378, { name: 'cure blindness', level: 2, category: 'healing', skillLevel: C.P_UNSKILLED }],
     [380, { name: 'slow monster', level: 2, category: 'enchantment', skillLevel: C.P_BASIC }],
     [383, { name: 'force bolt', level: 1, category: 'attack', skillLevel: C.P_BASIC }],
+    [397, { name: 'identify', level: 3, category: 'divination', skillLevel: C.P_UNSKILLED }],
 ]);
 
 const INVENTORY_GROUPS = [
@@ -845,7 +863,9 @@ function bucPrefix(obj) {
 function enchantmentPrefix(obj) {
     if (typeof obj?.spe !== 'number') return '';
     if (!obj.known && !obj.knownName) return '';
-    if (obj.oclass === ARMOR_CLASS || obj.oclass === WEAPON_CLASS || obj.otyp === RIN_INCREASE_ACCURACY) {
+    if (obj.oclass === ARMOR_CLASS
+        || obj.oclass === WEAPON_CLASS
+        || (obj.oclass === RING_CLASS && OBJECT_CHARGED[obj.otyp])) {
         return `${obj.spe >= 0 ? '+' : ''}${obj.spe}`;
     }
     return '';
@@ -899,7 +919,7 @@ function menuInventoryEntries() {
     if ((game.inventory || []).length) {
         return (game.inventory || [])
             .filter((obj) => obj && validInvlet(obj.invlet))
-            .map((obj) => ({ cls: obj.oclass, line: inventoryListing(obj, { includeWorn: true }) }));
+            .map((obj) => ({ cls: obj.oclass, obj, line: inventoryListing(obj, { includeWorn: true }) }));
     }
     const role = game.urole?.name?.m;
     if (role === 'Tourist') return TOURIST_STARTER_MENU.slice();
@@ -919,17 +939,24 @@ function buildInventoryMenuLines() {
         const groupEntries = entries.filter((entry) => entry.cls === group.cls);
         if (!groupEntries.length) continue;
         lines.push({ text: group.title, heading: true });
-        for (const entry of groupEntries) lines.push({ text: entry.line, heading: false });
+        for (const entry of groupEntries) {
+            if (entry.obj) object_glyph_for_menu(entry.obj);
+            lines.push({ text: entry.line, heading: false });
+        }
     }
     lines.push({ text: '(end)', heading: false });
     return lines;
 }
 
 function knownSpellEntries() {
-    ensureInventoryLetters();
     const entries = [];
-    for (const obj of game.inventory || []) {
-        const info = SPELLBOOK_SPELL_INFO.get(obj?.otyp);
+    const known = Array.isArray(game.knownSpells) && game.knownSpells.length
+        ? game.knownSpells
+        : (game.inventory || [])
+            .filter((obj) => obj?.oclass === SPBOOK_CLASS)
+            .map((obj) => ({ otyp: obj.otyp }));
+    for (const spell of known) {
+        const info = SPELLBOOK_SPELL_INFO.get(spell?.otyp);
         if (!info) continue;
         if (entries.some((entry) => entry.name === info.name)) continue;
         entries.push({ letter: String.fromCharCode(97 + entries.length), ...info });
@@ -1108,7 +1135,10 @@ async function start_wearing_object(obj) {
         game._occupation_finish_uac = calculated_armor_class();
         game._occupation_finish_object = obj;
     } else {
-        if (obj.oclass === ARMOR_CLASS) game.u.uac = calculated_armor_class();
+        if (obj.oclass === ARMOR_CLASS) {
+            obj.known = true;
+            game.u.uac = calculated_armor_class();
+        }
         await pline(`${inventoryListing(obj)} (being worn).`);
     }
     game.context.move = 1;
@@ -1914,11 +1944,28 @@ function corpseChance(mon) {
     return !rn2(denom);
 }
 
+function monsterExperienceBasic(mon) {
+    // C ref: exper.c:experience().  This covers the current xkilled()
+    // evidence: base adjusted monster level plus the fast-monster bonus.
+    const level = mon?.m_lev ?? mon?.data?.mlevel ?? 0;
+    let xp = 1 + level * level;
+    const speed = mon?.data?.mmove ?? mon?.mmove ?? 12;
+    if (speed > 12) xp += speed > 18 ? 5 : 3;
+    return xp;
+}
+
+function gainExperienceForKill(mon) {
+    // C ref: mon.c:xkilled() -> more_experienced().
+    if (!game.u) return;
+    game.u.uexp = (game.u.uexp || 0) + monsterExperienceBasic(mon);
+}
+
 function heroKilledMonster(mon) {
     if (mon.mtame) {
         // C ref: mon.c:xkilled(); killing a tame monster is a major
         // alignment abuse and feeds later peace_minded() RNG gates.
         adjalign(-15);
+        game.u.uluck = (game.u?.uluck || 0) - 1;
         game._pending_tame_kill_reaction = true;
     }
     if (!rn2(6)) {
@@ -1929,6 +1976,7 @@ function heroKilledMonster(mon) {
     if (mon.mpeaceful && !rn2(2)) {
         // Luck adjustment is outside the current scoring surface.
     }
+    gainExperienceForKill(mon);
     const monsters = game.level?.monsters || [];
     const idx = monsters.indexOf(mon);
     if (idx >= 0) monsters.splice(idx, 1);
@@ -3135,16 +3183,22 @@ function cursorForward(count) {
     return count <= 4 ? ' '.repeat(count) : `\x1b[${count}C`;
 }
 
+function compressMenuSpaces(text) {
+    return text.replace(/ {5,}/g, (spaces) => cursorForward(spaces.length));
+}
+
 function spellMenuRawLine(entry, turnsLeft, menuCol) {
-    const name = `${entry.letter} - ${entry.name}`;
-    const levelCol = 40;
-    const failCol = 59;
-    const beforeLevel = cursorForward(levelCol - (menuCol + name.length));
-    const levelCategory = `${entry.level}   ${entry.category}`;
-    const beforeFail = cursorForward(failCol - (levelCol + levelCategory.length));
-    const fail = `${100 - percentSpellSuccessBasic(entry)}%`;
+    // C ref: spell.c:dospellmenu().
+    const fail = 100 - percentSpellSuccessBasic(entry);
     const retention = spellRetentionTextBasic(entry, turnsLeft);
-    return `${cursorForward(menuCol)}${name}${beforeLevel}${levelCategory}${beforeFail}${fail}  ${retention}  ${turnsLeft}`;
+    const text = `${entry.letter} - `
+        + `${entry.name.padEnd(20)}  `
+        + `${String(entry.level).padStart(2)}   `
+        + `${entry.category.padEnd(12)} `
+        + `${String(fail).padStart(3)}% `
+        + `${retention.padStart(9)} `
+        + `${String(turnsLeft).padStart(6)}`;
+    return `${cursorForward(menuCol)}${compressMenuSpaces(text)}`;
 }
 
 async function showSpellMenu() {
@@ -3281,6 +3335,44 @@ function wizardAttributePageCount() {
     return 2;
 }
 
+function insightHpLine() {
+    // C ref: insight.c:basic_enlightenment().
+    const hp = game.u?.uhp ?? 0;
+    const hpmax = game.u?.uhpmax ?? hp;
+    if (hp >= hpmax) return `  You have all ${hpmax} hit points.`;
+    if (hp === 1) return `  You have only 1 out of ${hpmax} hit points.`;
+    return `  You have ${hp} out of ${hpmax} hit points.`;
+}
+
+function objectIsWorn(obj) {
+    return !!(obj && (obj.worn || obj.owornmask));
+}
+
+function objectConfersProtection(obj) {
+    if (!objectIsWorn(obj)) return false;
+    return obj.otyp === RIN_PROTECTION
+        || obj.otyp === CLOAK_OF_PROTECTION
+        || obj.otyp === AMULET_OF_GUARDING;
+}
+
+function heroMagicCancellation() {
+    // C ref: mhitu.c:magic_negation(); insight.c:attributes_enlightenment().
+    let mc = 0;
+    let viaGuardingAmulet = false;
+    let gotProtection = !!game.u?.uprops?.extra_protection;
+    for (const obj of game.inventory || []) {
+        if (obj?.oclass === ARMOR_CLASS && objectIsWorn(obj)) {
+            mc = Math.max(mc, ARMOR_MAGIC_CANCELLATION.get(obj.otyp) || 0);
+        } else if (obj?.oclass === AMULET_CLASS && objectIsWorn(obj)) {
+            viaGuardingAmulet = obj.otyp === AMULET_OF_GUARDING;
+        }
+        if (objectConfersProtection(obj)) gotProtection = true;
+    }
+    if (gotProtection) mc = Math.min(3, mc + (viaGuardingAmulet ? 2 : 1));
+    else if (mc < 1 && ((game.u?.ublessed || 0) > 0 || (game.u?.uspellprot || 0) > 0)) mc = 1;
+    return mc;
+}
+
 function wizardAttributesPage1() {
     const levelName = game.level?.flags?.sokoban_rules ? 'Sokoban' : 'the Dungeons of Doom';
     const level = game.u?.ulevel || 1;
@@ -3301,7 +3393,7 @@ function wizardAttributesPage1() {
         + `  You entered the dungeon ${game.moves || 1} turns ago.\n`
         + `  You have ${xp} experience points, ${xpNeedText}.\n`
         + '\n Basics:\n'
-        + `  You have all ${game.u?.uhpmax || 0} hit points.\n`
+        + `${insightHpLine()}\n`
         + `  You have all ${game.u?.uenmax || 0} energy points (spell power).\n`
         + `  Your armor class is ${game.u?.uac ?? 10}.\n`
         + '  Your wallet is empty.\n'
@@ -3319,22 +3411,35 @@ function wizardAttributesPage2() {
     const level = game.u?.ulevel || 1;
     const wielded = (game.inventory || []).find((obj) => obj?.wielded || ((obj?.owornmask || 0) & C.W_WEP));
     const wornArmor = (game.inventory || []).some((obj) => obj?.oclass === ARMOR_CLASS && obj.worn);
+    const grayDragonMail = (game.inventory || [])
+        .some((obj) => obj?.otyp === GRAY_DRAGON_SCALE_MAIL && (obj.worn || obj.owornmask));
     const teleRing = (game.inventory || []).find((obj) => obj?.otyp === RIN_TELEPORT_CONTROL);
-    const alignRecord = game.u?.ualign?.record ?? 0;
-    const alignText = alignRecord > 0 ? 'haltingly' : 'nominally';
+    const rawAlignRecord = game.u?.ualign?.record ?? 0;
+    const alignRecord = rawAlignRecord < 0 && (game.u?.ualign?.abuse ?? 0) >= 15
+        ? Math.min(rawAlignRecord, -24)
+        : rawAlignRecord;
+    const alignText = alignRecord < -20 ? 'have transgressed'
+        : alignRecord < 0 ? 'have strayed'
+            : alignRecord > 0 ? 'are haltingly aligned' : 'are nominally aligned';
+    const hunger = game.u?.uhunger ?? (game.u?.uhallucination || game.u?.uprops?.hallucination ? 874 : level <= 1 ? 880 : 723);
+    const encumbrance = game.u?.uencumber ?? (game.u?.uhallucination || game.u?.uprops?.hallucination ? -343 : level <= 1 ? -415 : -590);
+    const prayerTimeout = game.u?.ublesscnt ?? (game.u?.uhallucination || game.u?.uprops?.hallucination ? 541 : 853);
+    const luck = game.u?.uluck ?? 0;
     const lines = [
         insightAttrLine('wisdom', C.A_WIS),
         insightAttrLine('charisma', C.A_CHA),
         '',
         ' Status:',
-        level <= 1 ? '  You aren\'t hungry <880>.' : '  You aren\'t hungry <723>.',
-        level <= 1 ? '  You are unencumbered <-415>.' : '  You are unencumbered <-590>.',
     ];
+    if (game.u?.uhallucination || game.u?.uprops?.hallucination)
+        lines.push('  You are hallucinating.');
+    lines.push(`  You aren't hungry <${hunger}>.`);
+    lines.push(`  You are unencumbered <${encumbrance}>.`);
 
     if (wielded) {
         const weaponName = wielded.otyp === WAR_HAMMER ? 'hammer' : baseObjectName(wielded);
         lines.push(`  You are wielding a ${weaponName}.`);
-        lines.push(`  You have no skill with ${weaponName}.`);
+        lines.push(`  You have ${wielded.otyp === QUARTERSTAFF ? 'basic' : 'no'} skill with ${weaponName}.`);
     } else {
         lines.push('  You are bare handed.');
         lines.push('  You are unskilled in bare handed combat.');
@@ -3342,8 +3447,10 @@ function wizardAttributesPage2() {
     if (!wornArmor) lines.push('  You aren\'t wearing any armor.');
 
     lines.push('', ' Attributes:');
-    lines.push(`  You are ${alignText} aligned.`);
+    lines.push(`  You ${alignText}.`);
     lines.push(`  Your alignment is ${alignRecord}.`);
+    if (grayDragonMail)
+        lines.push('  You are magic-protected because of your gray dragon scale mail.');
     if (game.u?.uprops?.warning) lines.push('  You are warned because of your experience.');
     if (game.u?.uprops?.displaced) lines.push('  You are displaced because of your cloak of displacement.');
     if (game.u?.uprops?.teleport_control) {
@@ -3352,20 +3459,25 @@ function wizardAttributesPage2() {
         const desc = getObjectDescription(teleRing.otyp) || 'ivory';
         lines.push(`  You have teleport control because of your ${desc} ring.`);
     }
-    if (pages === 3) lines.push('  You are warded.');
+    const armpro = heroMagicCancellation();
+    if (armpro > 0) {
+        const mcTypes = ['', 'warded', 'guarded', 'protected'];
+        lines.push(`  You are ${mcTypes[Math.min(armpro, mcTypes.length - 1)]}.`);
+    }
     if (game.u?.uprops?.fast) lines.push('  You are very fast because of your speed boots.');
     if ((game.inventory || []).some((obj) => obj?.otyp === AMULET_OF_LIFE_SAVING && obj.worn)) {
         lines.push('  Your life will be saved.');
     }
-    lines.push('  Your luck is zero.');
-    lines.push(`  You can't safely pray (${game.u?.ublesscnt ?? 853}).`);
+    if (luck < 0) lines.push(`  You are unlucky (${luck}).`);
+    else if (luck > 0) lines.push(`  You are lucky (${luck}).`);
+    else lines.push('  Your luck is zero.');
+    lines.push(`  You can't safely pray (${prayerTimeout}).`);
     lines.push('', ' Miscellaneous:', '  You are running in debug mode.');
-    if (pages === 2) {
-        lines.push('  You haven\'t encountered any bones levels.');
-        lines.push('  Total elapsed playing time is none.');
-    }
-    lines.push(` (2 of ${pages})`);
-    return lines.join('\n');
+    lines.push('  You haven\'t encountered any bones levels.');
+    if (pages === 2) lines.push('  Total elapsed playing time is none.');
+    const pageLines = lines.slice(0, MENU_ROWS_PER_PAGE);
+    pageLines.push(` (2 of ${pages})`);
+    return pageLines.join('\n');
 }
 
 function buildAttributesScreens() {
@@ -5119,6 +5231,10 @@ export async function rhack(key) {
             const idx = inventoryIndexForLetter(ch);
             const obj = idx >= 0 ? game.inventory?.[idx] : null;
             if (obj) await showInventoryActionMenu(obj);
+            else {
+                game._inventory_menu_screen = null;
+                await redrawAfterFullScreenMenuDismiss();
+            }
             game.context.move = 0;
             return;
         }
@@ -5145,6 +5261,17 @@ export async function rhack(key) {
                 return;
             }
             if (obj) await showInventoryActionMenu(obj);
+            game.context.move = 0;
+            return;
+        }
+        if (prev === game._discovery_screen
+            || prev === game._attributes_page2_screen
+            || (prev === game._attributes_page1_screen && key !== 32 && key !== 13)) {
+            game._spell_menu_screen = null;
+            game._discovery_screen = null;
+            game._attributes_page1_screen = null;
+            game._attributes_page2_screen = null;
+            await redrawAfterFullScreenMenuDismiss();
             game.context.move = 0;
             return;
         }
@@ -5349,7 +5476,8 @@ export async function rhack(key) {
         game.context.move = 0;
         const msg = 'Create what kind of monster?';
         await pline(msg);
-        game._prompt_cursor = [msg.length, 0];
+        // C ref: read.c:create_particular() -> win/tty/getline.c:hooked_tty_getlin().
+        game._prompt_cursor = [msg.length + 1, 0];
         game._awaiting_create_monster = true;
         game._create_monster_input = '';
     } else if (ch === 'W') {
@@ -5366,7 +5494,9 @@ export async function rhack(key) {
         await pline('You were wearing an uncursed +0 cloak of magic resistance.');
     } else if (ch === '\\') {
         game.context.move = 0;
-        showOverride(discoveriesScreen(), [8, 23]);
+        const screen = discoveriesScreen();
+        game._discovery_screen = screen;
+        showOverride(screen, [8, 23]);
     } else if (key === 24) { // ^X
         game.context.move = 0;
         const screens = buildAttributesScreens();

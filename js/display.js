@@ -216,6 +216,13 @@ function object_glyph_for_display(obj, x, y, visible) {
     return { ch: obj.ch || '?', color: obj.color ?? NO_COLOR };
 }
 
+export function object_glyph_for_menu(obj) {
+    // C ref: invent.c:display_pickinv().  Menu entries still compute
+    // obj_to_glyph(..., rn2_on_display_rng) even when the tty menu renders
+    // text-only inventory rows.
+    return object_glyph_for_display(obj, 0, 0, false);
+}
+
 function is_known_branch_stair(x, y) {
     const currentDnum = game.u?.uz?.dnum ?? 0;
     for (let st = game.stairs; st; st = st.next)

@@ -120,12 +120,17 @@ const FLINT = 473;
 const WAN_POLYMORPH = 422;
 const WAN_TELEPORTATION = 424;
 const WAN_DIGGING = 428;
+const DART = 24;
 const PARTISAN = 56;
 const RANSEUR = 57;
 const SPETUM = 58;
 const BEC_DE_CORBIN = 67;
 const AKLYS = 80;
 const ORCISH_DAGGER = 36;
+const SHORT_SWORD = 46;
+const ELVEN_SHORT_SWORD = 47;
+const ORCISH_SHORT_SWORD = 48;
+const DWARVISH_SHORT_SWORD = 49;
 const BASIC_MELEE_ATTACKS = new Set(['AT_CLAW', 'AT_KICK', 'AT_BITE', 'AT_STNG', 'AT_TUCH', 'AT_BUTT', 'AT_TENT', 'AT_WEAP']);
 const DISTANCE_ATTACK_TYPES = new Set(['AT_SPIT', 'AT_BREA', 'AT_MAGC', 'AT_GAZE']);
 const MCAST = {
@@ -530,7 +535,7 @@ function is_axe_weapon_basic(obj) {
     return obj?.otyp === AXE || obj?.otyp === BATTLE_AXE;
 }
 
-function m_digweapon_check_basic(mtmp, x, y) {
+async function m_digweapon_check_basic(mtmp, x, y) {
     // C ref: monmove.c:m_digweapon_check().  Pick-using tunnellers spend a
     // move wielding the needed tool before entering rock/tree/door terrain.
     if (!((mtmp.data?.mflags1 ?? 0) & M1_NEEDPICK)) return false;
@@ -547,7 +552,7 @@ function m_digweapon_check_basic(mtmp, x, y) {
     } else if (!mw || !is_pick_weapon_for_mon_basic(mtmp, mw)) {
         mtmp.weapon_check = NEED_PICK_AXE;
     }
-    return mtmp.weapon_check >= NEED_PICK_AXE && mon_wield_item_basic(mtmp);
+    return mtmp.weapon_check >= NEED_PICK_AXE && await mon_wield_item_basic(mtmp);
 }
 
 function mon_at(x, y, self) {
@@ -920,8 +925,9 @@ function pick_or_axe_weapon_candidate(mtmp) {
         || (mtmp.inventory || []).find((obj) => obj?.otyp === AXE);
 }
 
-function mon_wield_item_basic(mtmp) {
+async function mon_wield_item_basic(mtmp) {
     let obj = null;
+    let exclaim = true;
     if (mtmp.weapon_check === NEED_HTH_WEAPON) {
         obj = hth_weapon_candidate(mtmp);
     } else if (mtmp.weapon_check === NEED_RANGED_WEAPON) {
@@ -931,10 +937,13 @@ function mon_wield_item_basic(mtmp) {
         obj = null;
     } else if (mtmp.weapon_check === NEED_PICK_AXE) {
         obj = pick_weapon_candidate(mtmp);
+        exclaim = false;
     } else if (mtmp.weapon_check === NEED_AXE) {
         obj = axe_weapon_candidate(mtmp);
+        exclaim = false;
     } else if (mtmp.weapon_check === NEED_PICK_OR_AXE) {
         obj = pick_or_axe_weapon_candidate(mtmp);
+        exclaim = false;
     }
     if (!obj) {
         mtmp.weapon_check = NEED_WEAPON;
@@ -948,6 +957,11 @@ function mon_wield_item_basic(mtmp) {
     mtmp.mw = obj;
     obj.owornmask = (obj.owornmask || 0) | W_WEP;
     mtmp.weapon_check = NEED_WEAPON;
+    if (cansee(mtmp.mx, mtmp.my)) {
+        // C ref: weapon.c:mon_wield_item() reports visible weapon changes via
+        // Monnam(mon), which also consumes display RNG under Hallucination.
+        await append_monster_topline(`${monster_subject(mtmp)} wields ${wield_object_name(obj)}${exclaim ? '!' : '.'}`);
+    }
     return true;
 }
 
@@ -958,7 +972,7 @@ function can_attack_after_move_basic(mtmp, state) {
     return mon_has_attack_type(mtmp, 'AT_WEAP');
 }
 
-function maybe_wield_hth_before_move(mtmp, state) {
+async function maybe_wield_hth_before_move(mtmp, state) {
     // C ref: monmove.c:dochug() phase two lets close hostile weapon users
     // spend their move switching to a hand-to-hand weapon before m_move().
     if (mtmp.mpeaceful || mtmp.mtame || !state?.inrange || state.scared) return false;
@@ -1146,12 +1160,16 @@ function sentence_case(text) {
 }
 
 function floor_object_name(obj) {
-    if (obj?.oclass === FOOD_CLASS) {
+    if (object_class(obj) === FOOD_CLASS) {
         const base = obj.otyp === SPRIG_OF_WOLFSBANE ? 'sprig of wolfsbane' : 'food';
         return `${/^[aeiou]/i.test(base) ? 'an' : 'a'} ${base}`;
     }
-    if (obj?.oclass === POTION_CLASS) return 'a potion';
-    if (obj?.oclass === GEM_CLASS) {
+    if (object_class(obj) === WEAPON_CLASS) {
+        const base = object_base_name(obj);
+        if (base) return object_display_name(obj, base);
+    }
+    if (object_class(obj) === POTION_CLASS) return 'a potion';
+    if (object_class(obj) === GEM_CLASS) {
         if (obj.otyp === ROCK) return 'a rock';
         const noun = obj.otyp >= DILITHIUM_CRYSTAL && obj.otyp <= FLINT
             ? (obj.otyp >= LUCKSTONE ? 'stone' : 'gem')
@@ -1162,13 +1180,57 @@ function floor_object_name(obj) {
     return 'an object';
 }
 
+function object_base_name(obj) {
+    switch (obj?.otyp) {
+    case DART:
+        return 'dart';
+    case ORCISH_DAGGER:
+        return 'crude dagger';
+    case SHORT_SWORD:
+        return 'short sword';
+    case ELVEN_SHORT_SWORD:
+        return 'runed short sword';
+    case ORCISH_SHORT_SWORD:
+        return 'crude short sword';
+    case DWARVISH_SHORT_SWORD:
+        return 'broad short sword';
+    case AXE:
+        return 'axe';
+    case BATTLE_AXE:
+        return 'battle-axe';
+    case PICK_AXE:
+        return 'pick-axe';
+    case DWARVISH_MATTOCK:
+        return 'broad pick';
+    default:
+        return '';
+    }
+}
+
+function object_display_name(obj, base) {
+    let name = obj?.opoisoned ? `poisoned ${base}` : base;
+    const quan = obj?.quan ?? 1;
+    if (quan > 1) return `${quan} ${plural_object_name(name)}`;
+    return `${/^[aeiou]/i.test(name) ? 'an' : 'a'} ${name}`;
+}
+
+function plural_object_name(name) {
+    if (name.endsWith('s')) return name;
+    return `${name}s`;
+}
+
+function wield_object_name(obj) {
+    const base = object_base_name(obj);
+    return base ? object_display_name({ ...obj, quan: 1 }, base) : floor_object_name(obj);
+}
+
 function monster_weapon_name(obj) {
     if (obj?.otyp === ORCISH_DAGGER) {
         const encountered = game.encounteredObjects || (game.encounteredObjects = new Set());
         if (typeof encountered.add === 'function') encountered.add(obj.otyp);
         return 'crude dagger';
     }
-    return floor_object_name(obj).replace(/^(?:an?|the) /, '');
+    return wield_object_name(obj).replace(/^(?:an?|the) /, '');
 }
 
 function monster_possessive(mtmp) {
@@ -1627,9 +1689,17 @@ async function mintrap_basic(mtmp) {
     return MMOVE_MOVED;
 }
 
-function mb_trapped_basic(mtmp) {
-    // C ref: monmove.c:mb_trapped(). Messages, wakeup, and trap memory have
-    // no RNG in the current evidence; the required ownership is rnd(15).
+async function mb_trapped_basic(mtmp, canseeit = cansee(mtmp.mx, mtmp.my)) {
+    // C ref: monmove.c:mb_trapped(). Trapped doors report the explosion
+    // before applying the rnd(15) damage.
+    if (canseeit) {
+        await append_pline('KABOOM!!  You see a door explode.');
+    } else {
+        const range = dist2(game.u?.ux ?? mtmp.mx, game.u?.uy ?? mtmp.my, mtmp.mx, mtmp.my) > 49
+            ? 'distant'
+            : 'nearby';
+        await append_pline(`You hear a ${range} explosion.`);
+    }
     mtmp.mstun = 1;
     if (typeof mtmp.mhp === 'number') {
         mtmp.mhp -= rnd(15);
@@ -1643,15 +1713,16 @@ function mb_trapped_basic(mtmp) {
     return false;
 }
 
-function postmove_door_basic(mtmp) {
+async function postmove_door_basic(mtmp) {
     const loc = game.level?.at(mtmp.mx, mtmp.my);
     if (!loc || !IS_DOOR(loc.typ) || mon_passes_walls(mtmp)) return MMOVE_MOVED;
     const trapped = !!(loc.doormask & D_TRAPPED);
+    const canseeit = cansee(mtmp.mx, mtmp.my);
     if ((loc.doormask & D_LOCKED) && trapped) {
         set_door_mask_basic(loc, D_NODOOR);
         newsym(mtmp.mx, mtmp.my);
         game.vision_full_recalc = 1;
-        return mb_trapped_basic(mtmp) ? MMOVE_DIED : MMOVE_MOVED;
+        return await mb_trapped_basic(mtmp, canseeit) ? MMOVE_DIED : MMOVE_MOVED;
     }
     if (loc.doormask === D_CLOSED && mon_can_open_doors(mtmp)) {
         set_door_mask_basic(loc, D_ISOPEN);
@@ -1661,7 +1732,7 @@ function postmove_door_basic(mtmp) {
         set_door_mask_basic(loc, D_NODOOR);
         newsym(mtmp.mx, mtmp.my);
         game.vision_full_recalc = 1;
-        return mb_trapped_basic(mtmp) ? MMOVE_DIED : MMOVE_MOVED;
+        return await mb_trapped_basic(mtmp, canseeit) ? MMOVE_DIED : MMOVE_MOVED;
     }
     return MMOVE_MOVED;
 }
@@ -2152,7 +2223,7 @@ async function mattacku_basic(mtmp, state) {
     if (rangeWeapon && !physical) {
         if (mtmp.weapon_check === NEED_WEAPON || !mtmp.mw) {
             mtmp.weapon_check = NEED_RANGED_WEAPON;
-            mon_wield_item_basic(mtmp);
+            await mon_wield_item_basic(mtmp);
         }
         return false;
     }
@@ -2324,7 +2395,7 @@ async function m_move_basic(mtmp, resumeAfterTenguTeleRestrict = false) {
         mtmp.muy = game.u.uy;
         return MMOVE_NOTHING;
     }
-    if (digTunnel && m_digweapon_check_basic(mtmp, nix, niy)) return MMOVE_DONE;
+    if (digTunnel && await m_digweapon_check_basic(mtmp, nix, niy)) return MMOVE_DONE;
     const engulfingHero = game.u?.uswallow && game.u?.ustuck === mtmp;
     mtmp.mx = nix;
     mtmp.my = niy;
@@ -2354,7 +2425,7 @@ async function m_move_basic(mtmp, resumeAfterTenguTeleRestrict = false) {
         if (!deferWarningRedraw) newsym(omx, omy);
         const trapStatus = await mintrap_basic(mtmp);
         if (trapStatus === MMOVE_DIED) return MMOVE_DIED;
-        doorStatus = postmove_door_basic(mtmp);
+        doorStatus = await postmove_door_basic(mtmp);
         if (doorStatus !== MMOVE_DIED) {
             if (game._swallowed_expulsion_paused_for_more) {
                 game._swallowed_expulsion_paused_for_more = false;
@@ -2680,7 +2751,7 @@ export async function movemon() {
         // dochugw -> dochug
         set_apparxy_basic(mtmp);
         const fleeState = distfleeck(mtmp); // consuming rn2(5)
-        if (!mtmp.mtame && maybe_wield_hth_before_move(mtmp, fleeState)) continue;
+        if (!mtmp.mtame && await maybe_wield_hth_before_move(mtmp, fleeState)) continue;
 
         // C ref: monmove.c:dochug() delegates tame monsters to
         // dogmove.c:dog_move() after the shared distfleeck() phase.
