@@ -1016,8 +1016,9 @@ function _statusLine2() {
         : `Xp:${u.ulevel || 1}`;
     const turn = game.flags?.time ? ` T:${game.moves || 1}` : '';
     const conditions = [];
-    if (u.uprops?.hallucination || u.uhallucination) conditions.push('Hallu');
     if ((u.uencumber || 0) > 0) conditions.push('Burdened');
+    if (u.uprops?.confusion || u.uconfusion) conditions.push('Conf');
+    if (u.uprops?.hallucination || u.uhallucination) conditions.push('Hallu');
     const conditionText = conditions.length ? ` ${conditions.join(' ')}` : '';
     const hp = game._latched_status_uhp != null && (game._more || game._death_prompt_active)
         ? game._latched_status_uhp

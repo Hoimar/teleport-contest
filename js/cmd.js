@@ -46,6 +46,10 @@ function refreshWarningAfterHeroMove() {
 const DIR_DX = { h: -1, l: 1, j: 0, k: 0, y: -1, u: 1, b: -1, n: 1 };
 const DIR_DY = { h: 0, l: 0, j: 1, k: -1, y: -1, u: -1, b: 1, n: 1 };
 const RUN_KEY = { H: 'h', L: 'l', J: 'j', K: 'k', Y: 'y', U: 'u', B: 'b', N: 'n' };
+const CONFUSED_DIRS = [
+    { dx: -1, dy: 0 }, { dx: 0, dy: -1 }, { dx: 1, dy: 0 }, { dx: 0, dy: 1 },
+    { dx: -1, dy: -1 }, { dx: 1, dy: -1 }, { dx: 1, dy: 1 }, { dx: -1, dy: 1 },
+];
 
 const AMULET_OF_LIFE_SAVING = 202;
 const AMULET_OF_GUARDING = 210;
@@ -88,7 +92,9 @@ const ORCISH_DAGGER = 36;
 const CORPSE = 265;
 const G_NOCORPSE = 0x0010;
 const RANDOM_CLASS = 0;
+const POT_CONFUSION = 299;
 const POT_PARALYSIS = 301;
+const POT_BOOZE = 317;
 const POT_FRUIT_JUICE = 319;
 const SCR_REMOVE_CURSE = 327;
 const SCR_ENCHANT_WEAPON = 328;
@@ -164,13 +170,14 @@ const OBJECT_BASE_NAMES = new Map([
     [LARGE_BOX, 'large box'],
     [CHEST, 'chest'],
     [ICE_BOX, 'ice box'],
+    [POT_CONFUSION, 'potion of confusion'],
     [311, 'potion of monster detection'],
     [312, 'potion of object detection'],
     [306, 'potion of see invisible'],
     [307, 'potion of healing'],
     [308, 'potion of extra healing'],
     [309, 'potion of gain level'],
-    [317, 'potion of booze'],
+    [POT_BOOZE, 'potion of booze'],
     [323, 'scroll of enchant armor'],
     [325, 'scroll of confuse monster'],
     [328, 'scroll of enchant weapon'],
@@ -1537,6 +1544,24 @@ function corpseEatingReqtime(obj) {
     return 3 + (cwt >> 6);
 }
 
+function discoverObjectType(otyp) {
+    const discovered = game.discoveredObjects || (game.discoveredObjects = new Set());
+    if (discovered.has(otyp)) return false;
+    discovered.add(otyp);
+    exercise(A_WIS, true);
+    return true;
+}
+
+function increaseHeroTimeout(stateKey, amount) {
+    if (!game.u) return 0;
+    game.u.uprops = game.u.uprops || {};
+    const oldTimeout = game.u.uprops[stateKey] || 0;
+    const newTimeout = Math.min(C.TIMEOUT, Math.max(0, oldTimeout + amount));
+    game.u.uprops[stateKey] = newTimeout;
+    if (stateKey === 'confusion') game.u.uconfusion = newTimeout;
+    return newTimeout;
+}
+
 async function drinkPotion(obj, idx) {
     if (!obj || obj.oclass !== POTION_CLASS) {
         game.context.move = 0;
@@ -1552,13 +1577,43 @@ async function drinkPotion(obj, idx) {
         game._nomul_turns_remaining = rn2(10) + 25 - (12 * bcsign);
         game._nomul_finish_message = 'You can move again.';
         exercise(A_DEX, false);
-        const discovered = game.discoveredObjects || (game.discoveredObjects = new Set());
-        if (!discovered.has(obj.otyp)) {
-            discovered.add(obj.otyp);
-            exercise(A_WIS, true);
-        }
+        discoverObjectType(obj.otyp);
         await pline('Your feet are frozen to the floor!');
         game.context.move = 1;
+        return;
+    }
+    if (obj.otyp === POT_CONFUSION) {
+        // C refs: potion.c:peffect_confusion(), potion.c:dopotion().
+        const alreadyConfused = !!(game.u?.uprops?.confusion || game.u?.uconfusion);
+        const bcsign = obj.blessed ? 1 : (obj.cursed ? -1 : 0);
+        if (!alreadyConfused) {
+            if (game.u?.uhallucination || game.u?.uprops?.hallucination)
+                await pline('What a trippy feeling!');
+            else
+                await pline('Huh, What?  Where am I?');
+        }
+        increaseHeroTimeout('confusion', rn1(7, 16 - (8 * bcsign)));
+        if (!alreadyConfused && !(game.u?.uhallucination || game.u?.uprops?.hallucination))
+            discoverObjectType(obj.otyp);
+        game.context.move = 1;
+        return;
+    }
+    if (obj.otyp === POT_BOOZE) {
+        // C refs: potion.c:peffect_booze(), potion.c:dopotion().
+        const bcsign = obj.blessed ? 1 : (obj.cursed ? -1 : 0);
+        const prefix = obj.odiluted ? 'watered down ' : '';
+        const liquid = (game.u?.uhallucination || game.u?.uprops?.hallucination)
+            ? 'dandelion wine'
+            : 'liquid fire';
+        await pline(`Ooph!  This tastes like ${prefix}${liquid}!`);
+        if (!obj.blessed) increaseHeroTimeout('confusion', d(2 + (game.u?.uhs ?? 1), 8));
+        if (!obj.odiluted && game.u && typeof game.u.uhp === 'number')
+            game.u.uhp = Math.min(game.u.uhpmax || game.u.uhp, game.u.uhp + 1);
+        if (game.u) game.u.uhunger = (game.u.uhunger ?? 900) + (10 * (2 + bcsign));
+        exercise(A_WIS, false);
+        game._drink_call_after_more = appearance;
+        queue_more_prompt();
+        game.context.move = 0;
         return;
     }
     if (obj.otyp !== POT_FRUIT_JUICE) {
@@ -6208,11 +6263,40 @@ export async function continueRunStep() {
     return moved;
 }
 
+function uMaybeImpaired() {
+    // C ref: hack.c:u_maybe_impaired().
+    if (game.u?.uprops?.stunned || game.u?.ustunned) return true;
+    if (game.u?.uprops?.confusion || game.u?.uconfusion) return !rn2(5);
+    return false;
+}
+
+function impairedMovementDirection() {
+    // C refs: hack.c:impaired_movement(), cmd.c:confdir().
+    if (!uMaybeImpaired()) return null;
+    for (let tries = 0; tries <= 50; tries++) {
+        const dir = CONFUSED_DIRS[rn2(CONFUSED_DIRS.length)];
+        const x = (game.u?.ux || 0) + dir.dx;
+        const y = (game.u?.uy || 0) + dir.dy;
+        if (C.isok(x, y) && !blocksMove(x, y)) return dir;
+    }
+    return { blocked: true, dx: 0, dy: 0 };
+}
+
 export async function domove(dx, dy) {
     const u = game.u;
     if (u.uswallow && u.ustuck) {
         await swallowedHeroAttack(u.ustuck);
         return true;
+    }
+
+    const impaired = impairedMovementDirection();
+    if (impaired?.blocked) {
+        game.context.move = 0;
+        return false;
+    }
+    if (impaired) {
+        dx = impaired.dx;
+        dy = impaired.dy;
     }
 
     const newx = u.ux + dx;

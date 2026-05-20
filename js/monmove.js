@@ -189,10 +189,10 @@ export function mcalcmove(mtmp, m_moving) {
 export function distfleeck(mtmp) {
     // C ref: monmove.c:538
     // boolean sawscary = FALSE, bravegremlin = (rn2(5) == 0);
-    rn2(5); // bravegremlin check
-
     const targetX = mtmp.mux ?? game.u?.ux ?? mtmp.mx;
     const targetY = mtmp.muy ?? game.u?.uy ?? mtmp.my;
+    rn2(5); // bravegremlin check
+
     const d2 = dist2(mtmp.mx, mtmp.my, targetX, targetY);
     return {
         inrange: d2 <= BOLT_LIM * BOLT_LIM,
@@ -2187,7 +2187,6 @@ async function mattacku_basic(mtmp, state) {
     if (game.u?.uswallow && game.u?.ustuck !== mtmp) return false;
     const rangeWeapon = state?.inrange && !state.nearby && mon_has_attack_type(mtmp, 'AT_WEAP');
     if (state.scared || mtmp.mpeaceful || mtmp.mtame) return false;
-    if ((game._occupation_turns_remaining || 0) > 1 || game._occupation_finish_uac != null) return false;
     if ((game.u?.uhp ?? 1) <= 0) return false;
 
     const cooldownAttack = cooldown_replacement_attack(mtmp);
@@ -2201,6 +2200,15 @@ async function mattacku_basic(mtmp, state) {
     }
     const engulf = basic_engulf_attack(mtmp);
     const physical = engulf ? null : basic_physical_attacks(mtmp, !rangeWeapon);
+    if (rangeWeapon && !physical && (mtmp.weapon_check === NEED_WEAPON || !mtmp.mw)) {
+        // C ref: mhitu.c:mattacku()/mthrowu.c:thrwmu(). Even when the
+        // current port suppresses the actual ranged attack during a delayed
+        // occupation, the failed ranged-weapon selection updates
+        // weapon_check so a close monster can spend its next turn wielding.
+        mtmp.weapon_check = NEED_RANGED_WEAPON;
+        await mon_wield_item_basic(mtmp);
+    }
+    if ((game._occupation_turns_remaining || 0) > 1 || game._occupation_finish_uac != null) return false;
     const wildmissMelee = !engulf && wildmiss_melee_attack_available_basic(mtmp);
     const heroDisplaced = !!game.u?.uprops?.displaced
         && !hallucinating()
@@ -2233,10 +2241,6 @@ async function mattacku_basic(mtmp, state) {
     // C ref: mhitu.c:mattacku() computes AC_VALUE() before AT_WEAP range
     // dispatch. The actual thrwmu()/select_rwep path is still future work.
     if (rangeWeapon && !physical) {
-        if (mtmp.weapon_check === NEED_WEAPON || !mtmp.mw) {
-            mtmp.weapon_check = NEED_RANGED_WEAPON;
-            await mon_wield_item_basic(mtmp);
-        }
         return false;
     }
     if (engulf) return engulf_attack(mtmp, engulf, toHit);

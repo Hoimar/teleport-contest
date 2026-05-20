@@ -43,8 +43,16 @@ const GAUNTLETS_OF_POWER = 161;
 const ARMOR_CLASS = 3;
 
 async function nhTimeoutBasic() {
-    // C ref: timeout.c:nh_timeout() WOUNDED_LEGS case -> do.c:heal_legs().
     const u = game.u;
+    if (u?.uprops?.confusion) {
+        // C ref: timeout.c:nh_timeout() decrements timed intrinsics and
+        // handles CONFUSION through make_confused() when the timer expires.
+        u.uprops.confusion = Math.max(0, u.uprops.confusion - 1);
+        u.uconfusion = u.uprops.confusion;
+        if (!u.uprops.confusion) u.uconfusion = 0;
+    }
+
+    // C ref: timeout.c:nh_timeout() WOUNDED_LEGS case -> do.c:heal_legs().
     const timeout = u?.uprops?.wounded_legs || 0;
     if (!timeout) return;
     u.uprops.wounded_legs = Math.max(0, timeout - 1);
