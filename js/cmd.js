@@ -2042,7 +2042,6 @@ async function start_wearing_object(obj) {
         obj.knownName = true;
         game.u.uprops = game.u.uprops || {};
         game.u.uprops.displaced = true;
-        exercise(A_WIS, true);
         game._cloak_displacement_on_msg_pending = obj;
         await pline('You feel that monsters have difficulty pinpointing your location.');
         queue_more_prompt();
