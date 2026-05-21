@@ -691,13 +691,19 @@ function mapped_location_memory(loc, x, y, visible) {
     return { ch: tg.ch, color: tg.color, decgfx: tg.dec };
 }
 
-export function map_level_for_wizard() {
+export function map_level_for_wizard(revealTraps = false) {
     // C refs: wizcmds.c:wiz_map(), detect.c:do_mapping(), detect.c:show_map_spot().
     if (!game.level) return;
     const savedHallucination = game.u?.uprops?.hallucination;
     const savedUHallucination = game.u?.uhallucination;
     if (game.u?.uprops) game.u.uprops.hallucination = 0;
     if (game.u) game.u.uhallucination = 0;
+
+    if (revealTraps) {
+        // C ref: wizcmds.c:wiz_map() marks every trap seen before do_mapping();
+        // ordinary magic mapping does not pre-mark traps.
+        for (const trap of game.level.traps || []) trap.tseen = true;
+    }
 
     for (let y = 0; y < ROWNO; y++) {
         for (let x = 1; x < COLNO; x++) {

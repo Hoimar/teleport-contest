@@ -5295,6 +5295,11 @@ function farlookContinuation(x, y) {
     return '(floor of a room)';
 }
 
+function farlookNeedsPromptAfterFullDescription(x, y) {
+    const loc = game.level?.at(x, y);
+    return loc?.typ === CORR;
+}
+
 function engravingAt(x, y) {
     return (game.level?.engravings || []).find((ep) => ep.x === x && ep.y === y) || null;
 }
@@ -5983,6 +5988,13 @@ async function handleQueuedMore(ch) {
         if (game._farlook_resume_after_more) {
             const state = game._farlook_resume_after_more;
             game._farlook_resume_after_more = null;
+            if (ch === '\x1b') {
+                game._awaiting_farlook_prompt = false;
+                game._farlook_cursor = null;
+                setTravelMapCursorAt(game.u?.ux ?? state.x, game.u?.uy ?? state.y);
+                game.context.move = 0;
+                return true;
+            }
             game._awaiting_farlook_prompt = true;
             game._farlook_cursor = { x: state.x, y: state.y };
             await pline('Pick a monster, object or location.');
@@ -8235,7 +8247,7 @@ export async function rhack(key) {
             if (moreInfoTopic) {
                 game._farlook_more_info_after_more = { topic: moreInfoTopic, x: cursor.x, y: cursor.y };
                 queue_more_prompt();
-            } else {
+            } else if (continuationRow || farlookNeedsPromptAfterFullDescription(cursor.x, cursor.y)) {
                 // C refs: pager.c:do_look(), getpos.c:getpos().  After a
                 // blocking farlook explanation, do_look() loops back into
                 // getpos() at the same cursor position.
@@ -9657,7 +9669,7 @@ export async function rhack(key) {
         showOverride(screens.page1, [9, 23]);
     } else if (key === 6 && (game.wizard || game.flags?.debug)) {
         // C ref: wizcmds.c:wiz_map() -> detect.c:do_mapping().
-        map_level_for_wizard();
+        map_level_for_wizard(true);
         exercise(A_WIS, true);
         game._travel_reset_cursor_once = true;
         game.context.move = 0;
