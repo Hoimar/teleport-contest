@@ -4,6 +4,7 @@
 import { game } from './gstate.js';
 import { enexto_core, makemon, place_object } from './mklev.js';
 import { OBJECT_CLASS } from './object_data.js';
+import { MONSTER_DATA } from './monster_data.js';
 import {
     newsym, pline, queue_more_prompt, flush_screen, clear_pending_message,
     serialize_terminal_grid,
@@ -25,6 +26,7 @@ const ROCK_CLASS = 14;
 const BALL_CLASS = 15;
 const CHAIN_CLASS = 16;
 const ORCISH_DAGGER = 36;
+const DART = 24;
 const JAVELIN = 32;
 const QUARTERSTAFF = 79;
 const TRIPE_RATION = 264;
@@ -473,15 +475,33 @@ function max_mon_load(mtmp) {
 }
 
 function object_name(obj) {
+    if (obj?.otyp === DART) return 'a dart';
     if (obj?.otyp === JAVELIN) return 'a throwing spear';
     if (obj?.otyp === ORCISH_DAGGER) return 'a crude dagger';
     if (obj?.otyp === FOOD_RATION) return 'a food ration';
+    if (obj?.otyp === CORPSE) {
+        const species = corpse_species_name(obj.corpsenm);
+        return `${indefinite_article(species)} ${species} corpse`;
+    }
     if (obj?.otyp === QUARTERSTAFF) {
         const buc = obj.blessed ? 'blessed ' : obj.cursed ? 'cursed ' : 'uncursed ';
         const spe = typeof obj.spe === 'number' ? `${obj.spe >= 0 ? '+' : ''}${obj.spe} ` : '';
         return `a ${buc}${spe}quarterstaff`;
     }
     return 'an object';
+}
+
+function corpse_species_name(corpsenm) {
+    if (Number.isInteger(corpsenm)) {
+        return String(MONSTER_DATA[corpsenm]?.[0] || 'monster').toLowerCase().replace(/_/g, ' ');
+    }
+    if (typeof corpsenm === 'string') return corpsenm.toLowerCase().replace(/_/g, ' ');
+    if (corpsenm?.name) return String(corpsenm.name).toLowerCase().replace(/_/g, ' ');
+    return 'monster';
+}
+
+function indefinite_article(name) {
+    return /^[aeiou]/i.test(String(name || '')) ? 'an' : 'a';
 }
 
 function mark_object_encountered(obj) {
@@ -544,6 +564,27 @@ function pet_name(mtmp) {
 
 function pet_subject(mtmp) {
     return `The ${pet_name(mtmp)}`;
+}
+
+function pet_noit_subject(mtmp) {
+    return mtmp?.mtame ? `Your ${pet_name(mtmp)}` : `The ${pet_name(mtmp)}`;
+}
+
+async function pet_reluctance_pline(line) {
+    if (game._more && game._pending_message) {
+        game._after_more_message = game._after_more_message
+            ? `${game._after_more_message}  ${line}`
+            : line;
+        game._after_more_needs_prompt = true;
+        return;
+    }
+    if (game._pending_message) {
+        game._pending_message = `${game._pending_message}  ${line}`;
+        queue_more_prompt();
+        return;
+    }
+    await pline(line);
+    queue_more_prompt();
 }
 
 function pet_inventory_pline(line) {
@@ -1120,6 +1161,7 @@ export async function dog_move(mtmp, after = true) {
     let uncursedcnt = 0;
     let mfndposcnt = 0;
     let doEat = false;
+    let moveReluctant = false;
 
     for (let nx = Math.max(1, mtmp.mx - 1); nx <= maxx; nx++) {
         for (let ny = Math.max(0, mtmp.my - 1); ny <= maxy; ny++) {
@@ -1168,6 +1210,7 @@ export async function dog_move(mtmp, after = true) {
                         nix = nx;
                         niy = ny;
                         doEat = true;
+                        moveReluctant = false;
                         cursedOnCandidate = false;
                         break searchCandidates;
                     }
@@ -1200,6 +1243,7 @@ export async function dog_move(mtmp, after = true) {
                 nix = nx;
                 niy = ny;
                 nidist = ndist;
+                moveReluctant = cursedOnCandidate;
                 if (j < 0) chcnt = 0;
             }
         }
@@ -1215,5 +1259,9 @@ export async function dog_move(mtmp, after = true) {
     mon_track_add(mtmp, oldx, oldy);
     newsym(oldx, oldy);
     newsym(nix, niy);
+    if (moveReluctant) {
+        const topObj = objects_at(nix, niy)[0];
+        await pet_reluctance_pline(`${pet_noit_subject(mtmp)} steps reluctantly onto ${topObj ? object_name(topObj) : 'something'}.`);
+    }
     return 1;
 }

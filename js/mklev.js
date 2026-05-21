@@ -83,8 +83,8 @@ const GEM_CLASS = 13;
 const ROCK_CLASS = 14;
 const ARROW = 18;
 const ORCISH_ARROW = 20;
-const CROSSBOW_BOLT = 20;
-const DART = 23;
+const CROSSBOW_BOLT = 23;
+const DART = 24;
 const SHURIKEN = 25;
 const BOULDER = 475;
 const ELVEN_ARROW = 19;
@@ -11780,8 +11780,10 @@ function mktrap_victim(trap) {
         curse(otmp);
         place_object(otmp, x, y);
     } while (!rn2(5));
-    // Victim type
-    const PM_ELF = 18, PM_DWARF = 19, PM_ORC = 20, PM_GNOME = 21, PM_HUMAN = 22;
+    // Victim type.  C uses PM_* enum values here, but this JS table has a
+    // different monster order, so store the resolved monster identity.
+    // C ref: mklev.c:mktrap_victim().
+    const PM_ELF = 'ELF', PM_DWARF = 'DWARF', PM_ORC = 'ORC', PM_GNOME = 'GNOME', PM_HUMAN = 'HUMAN';
     const victimCorpseStats = new Map([
         [PM_ELF, { cwt: 800, cnutrit: 350 }],
         [PM_DWARF, { cwt: 900, cnutrit: 300 }],
@@ -11789,8 +11791,12 @@ function mktrap_victim(trap) {
         [PM_GNOME, { cwt: 650, cnutrit: 100 }],
         [PM_HUMAN, { cwt: 1450, cnutrit: 400 }],
     ]);
-    // C consumes rn2(PM_WIZARD - PM_ARCHEOLOGIST) here. Local monster ids
-    // are still placeholders, so keep the upstream role-monster range shape.
+    const TRAP_VICTIM_ROLE_CORPSES = [
+        'BARBARIAN', 'CAVEMAN', 'HEALER', 'KNIGHT', 'MONK', 'PRIEST',
+        'RANGER', 'ROGUE', 'SAMURAI', 'TOURIST', 'VALKYRIE', 'WIZARD',
+    ];
+    // C consumes rn2(PM_WIZARD - PM_ARCHEOLOGIST) here.  Keep that range
+    // shape, then map the selected enum slot onto the local monster data.
     const PM_ARCHEOLOGIST = 0, ROLE_MONSTER_RANGE_BEFORE_WIZARD = 12;
     let victim_mnum;
     switch (rn2(15)) {
@@ -11810,8 +11816,10 @@ function mktrap_victim(trap) {
         break;
     default: victim_mnum = PM_HUMAN; break;
     }
-    if (victim_mnum === PM_HUMAN && rn2(25))
-        victim_mnum = rn1(ROLE_MONSTER_RANGE_BEFORE_WIZARD, PM_ARCHEOLOGIST);
+    if (victim_mnum === PM_HUMAN && rn2(25)) {
+        const roleOffset = rn1(ROLE_MONSTER_RANGE_BEFORE_WIZARD, PM_ARCHEOLOGIST);
+        victim_mnum = TRAP_VICTIM_ROLE_CORPSES[roleOffset - 1] || PM_HUMAN;
+    }
     const corpse = mkcorpstat(CORPSE, null, victim_mnum, x, y, 8); // CORPSTAT_INIT
     if (corpse) {
         corpse.trap_victim = true;

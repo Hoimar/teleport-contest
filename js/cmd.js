@@ -117,7 +117,7 @@ const ELVEN_ARROW = 19;
 const ORCISH_ARROW = 20;
 const YA = 22;
 const SCALPEL = 39;
-const DART = 23;
+const DART = 24;
 const DAGGER = 34;
 const ELVEN_DAGGER = 35;
 const SHORT_SWORD = 46;
@@ -6684,6 +6684,7 @@ function weaponSkillName(obj) {
 function weaponSkillLevelName(obj) {
     if (obj?.otyp === SCALPEL || obj?.otyp === QUARTERSTAFF) return 'basic';
     if (game.urole?.name?.m === 'Ranger' && (obj?.otyp === DAGGER || obj?.otyp === BOW)) return 'basic';
+    if (game.urole?.name?.m === 'Rogue' && obj?.otyp === SHORT_SWORD) return 'basic';
     return 'no';
 }
 
@@ -9064,7 +9065,8 @@ export async function rhack(key) {
             await pline("Sorry, I don't know how to use that.");
             return;
         }
-        if (obj.otyp === EXPENSIVE_CAMERA || obj.otyp === STETHOSCOPE) {
+        if (obj.otyp === EXPENSIVE_CAMERA || obj.otyp === STETHOSCOPE
+            || obj.otyp === LOCK_PICK || obj.otyp === CREDIT_CARD) {
             game._awaiting_apply_direction = obj;
             game.context.move = 0;
             await showPromptLine('In what direction? ');
@@ -9134,6 +9136,19 @@ export async function rhack(key) {
                     await pline('You hear nothing special.');
                 }
             }
+            return;
+        }
+        if (obj.otyp === LOCK_PICK || obj.otyp === CREDIT_CARD) {
+            // C ref: lock.c:pick_lock().  Learning that an adjacent square is
+            // not a door still consumes the apply-key/lockpick turn.
+            const rx = (game.u?.ux ?? 0) + (DIR_DX[ch] || 0);
+            const ry = (game.u?.uy ?? 0) + (DIR_DY[ch] || 0);
+            const loc = game.level?.at(rx, ry);
+            game.context.move = 1;
+            if (!loc || !C.IS_DOOR(loc.typ)) await pline('You see no door there.');
+            else if (loc.doormask === D_NODOOR) await pline('This doorway has no door.');
+            else if (loc.doormask & C.D_ISOPEN) await pline('You cannot lock an open door.');
+            else await pline('This lock is not implemented yet.');
             return;
         }
         if (typeof obj.spe === 'number' && obj.spe > 0) obj.spe--;

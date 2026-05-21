@@ -212,6 +212,11 @@ function object_glyph_for_display(obj, x, y, visible) {
             };
         }
     }
+    if (obj?.otyp === CORPSE) {
+        // C ref: include/display.h:corpse_to_glyph().
+        const mdat = monster_data_for_corpsenm(obj.corpsenm);
+        return { ch: '%', color: mdat?.[7] ?? getObjectColor(CORPSE) ?? NO_COLOR };
+    }
 
     let generic = obj_is_generic(obj);
     if (generic && visible && !game.u?.uhallucination) {
