@@ -7610,7 +7610,10 @@ export async function rhack(key) {
     if (game._awaiting_terrain_menu) {
         game._awaiting_terrain_menu = false;
         clearOverrideScreen();
-        if (ch === 'a' || ch === ' ' || ch === '\r' || ch === '\n') {
+        if (ch === 'a') {
+            game._terrain_view_active = true;
+            showTerrainView("Showing known terrain only...  (For instructions type a '?')");
+        } else if (ch === ' ' || ch === '\r' || ch === '\n') {
             game._terrain_view_intro_more = true;
             const msg = 'Showing known terrain only...';
             showTerrainView(`${msg}--More--`, [msg.length + '--More--'.length, 0]);
@@ -9171,7 +9174,7 @@ export async function rhack(key) {
             game.context.move = 0;
             return;
         }
-        if (prev === game._attributes_page2_screen && key !== 32 && key !== 13) {
+        if (prev === game._attributes_page2_screen && key !== 32 && key !== 13 && key !== 27) {
             const row = Math.max(0, (game._attributes_page2_screen || '').split('\n').length - 1);
             showOverride(game._attributes_page2_screen, [9, row]);
             game.context.move = 0;
@@ -9302,8 +9305,12 @@ export async function rhack(key) {
         vision_recalc(0);
         await docrt();
         if (game._redraw_resumes_run) {
-            game.context.run = { ...game._redraw_resumes_run };
+            game.context.run = { ...game._redraw_resumes_run, stopBeforeOpenDoor: true };
             game._redraw_resumes_run = null;
+            game._resume_run_after_more = true;
+            game.context.move = 1;
+        } else if (game.context?.run) {
+            game.context.run.stopBeforeOpenDoor = true;
             game._resume_run_after_more = true;
             game.context.move = 1;
         } else {
@@ -9718,14 +9725,16 @@ export async function domove(dx, dy) {
     const currentSource = game.level.at(u.ux, u.uy);
     const is_diag = dx !== 0 && dy !== 0;
 
-    if (game.context?.run && !game.context.run.travel
-        && currentSource?.typ === CORR
-        && target?.typ === DOOR
-        && !(target.doormask & (D_CLOSED | D_LOCKED))) {
-        // C ref: hack.c:lookaround().  A corridor run stops at the doorway
-        // boundary before exposing the next room.
-        game.context.move = 0;
-        return false;
+    if (game.context?.run?.stopBeforeOpenDoor && !game.context.run.travel) {
+        if (currentSource?.typ === CORR && target?.typ === DOOR
+            && !(target.doormask & (D_CLOSED | D_LOCKED))) {
+            // C ref: hack.c:lookaround().  A message/redraw-interrupted
+            // corridor run can stop at the doorway boundary before exposing
+            // the next room.
+            game.context.run.stopBeforeOpenDoor = false;
+            game.context.move = 0;
+            return false;
+        }
     }
 
     if (is_diag && !blocksMove(newx, newy)) {

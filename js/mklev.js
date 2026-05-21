@@ -1665,10 +1665,16 @@ export function mkcorpstat(objtyp, mtmp, pm, x, y, flags) {
     // RNG: next_ident from mksobj
     const otmp = mksobj(objtyp, !!(flags & 8), false);
     if (pm !== null && pm !== undefined) {
+        const oldCorpsenm = otmp.corpsenm;
         set_corpsenm(otmp, pm);
-        // C ref: mkobj.c:set_corpsenm(); changing a corpse species stops old
-        // timers and starts a new corpse timer for the replacement type.
-        if (otmp.otyp === CORPSE) start_corpse_timeout(otmp);
+        // C ref: mkobj.c:mkcorpstat().  Unlike set_corpsenm(), mkcorpstat()
+        // only restarts timers for zombify/special corpse cases.
+        if (otmp.otyp === CORPSE
+            && (game._mkcorpstat_zombify
+                || special_corpse(oldCorpsenm)
+                || special_corpse(otmp.corpsenm))) {
+            start_corpse_timeout(otmp);
+        }
     } else if (otmp.corpsenm == null) {
         // rndmonnum — pick random monster
         otmp.corpsenm = rndmonnum();
@@ -10059,7 +10065,12 @@ function apply_themeroom_fill(croom) {
     for (let i = 0; i < count; i++) {
         lua_shuffle(zombifiable);
         const { x, y } = specialRoomLocation(croom);
-        const corpse = mkcorpstat(CORPSE, null, zombifiable[0], x, y, 8);
+        // C refs: themerms.lua Buried zombies, sp_lev.c:create_object(),
+        // mkobj.c:set_corpsenm().  Scripted corpses use create_object(),
+        // whose set_corpsenm() always restarts the corpse timer; mkcorpstat()
+        // has a narrower restart rule.
+        const corpse = mksobj_at(CORPSE, x, y, true, false);
+        set_corpsenm_restart(corpse, zombifiable[0]);
         if (corpse) {
             bury_an_obj_basic(corpse);
             rn2(21); // C ref: themerms.lua Buried zombies math.random(990,1010).

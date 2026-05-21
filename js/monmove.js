@@ -1683,6 +1683,12 @@ async function append_swallowed_damage_message(line) {
 }
 
 async function append_monster_topline(line) {
+    if (game.context?.run) {
+        // C ref: hack.c:lookaround()/topl.c:pline().  Monster/trap messages
+        // emitted during a repeated run can split the visible topline from
+        // the next repeated movement boundary.
+        game.context.run.stopBeforeOpenDoor = true;
+    }
     if (game._pending_message) {
         game._pending_message = `${game._pending_message}  ${line}`;
         queue_more_prompt();

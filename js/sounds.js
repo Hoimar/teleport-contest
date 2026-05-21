@@ -23,6 +23,7 @@ async function sound_pline(msg) {
     if (game.context?.run) {
         // C ref: allmain.c:runmode_delay_output().  Messages emitted while
         // a run/rush is active block the repeated movement at the topline.
+        game.context.run.stopBeforeOpenDoor = true;
         game._more = true;
         game._more_dismissals_remaining = (game._more_dismissals_remaining || 0) + 1;
         game._run_sound_more_latched = true;
