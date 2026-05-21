@@ -19,7 +19,7 @@ import {
     makemon, mklev, mkobj, mkcorpstat, mksobj, monster_by_user_name, monsterPtr,
     next_ident, place_lregion, place_object, shopTypeName, u_on_dnstairs, u_on_upstairs,
 } from './mklev.js';
-import { OBJECT_CHARGED, OBJECT_CLASS, OBJECT_DELAY, OBJECT_MATERIAL } from './object_data.js';
+import { OBJECT_CHARGED, OBJECT_CLASS, OBJECT_DELAY, OBJECT_MATERIAL, OBJECT_PROB } from './object_data.js';
 import { finish_pet_kill, obj_resists, pet_arrive_with_you } from './dog.js';
 import { merge_inventory_object, newuexp, pluslvl } from './u_init.js';
 import { adjalign, exercise, gethungry } from './allmain_turns.js';
@@ -56,8 +56,11 @@ const CONFUSED_DIRS = [
 ];
 
 const AMULET_OF_LIFE_SAVING = 202;
+const AMULET_OF_UNCHANGING = 207;
 const AMULET_OF_GUARDING = 210;
 const GRAY_DRAGON_SCALE_MAIL = 101;
+const WAN_LIGHT = 410;
+const WAN_WISHING = 414;
 const WAN_FIRE = 430;
 const WAN_COLD = 431;
 const WAN_SLEEP = 432;
@@ -65,6 +68,7 @@ const WAN_DEATH = 433;
 const WAN_LIGHTNING = 434;
 const WAN_MAKE_INVISIBLE = 418;
 const WAN_SECRET_DOOR_DETECTION = 411;
+const WAN_POLYMORPH = 422;
 const WAN_DIGGING = 428;
 const WAN_MAGIC_MISSILE = 429;
 const QUARTERSTAFF = 79;
@@ -147,14 +151,17 @@ const EUCALYPTUS_LEAF = 276;
 const G_NOCORPSE = 0x0010;
 const STATUE = 476;
 const RANDOM_CLASS = 0;
+const POT_GAIN_ABILITY = 297;
 const POT_CONFUSION = 299;
 const POT_PARALYSIS = 301;
 const POT_HEALING = 307;
 const POT_EXTRA_HEALING = 308;
 const POT_FULL_HEALING = 315;
+const POT_POLYMORPH = 316;
 const POT_BOOZE = 317;
 const POT_FRUIT_JUICE = 319;
 const POT_OIL = 321;
+const POT_WATER = 322;
 const SCR_REMOVE_CURSE = 327;
 const SCR_ENCHANT_WEAPON = 328;
 const SCR_LIGHT = 332;
@@ -201,6 +208,8 @@ const BALL_CLASS = 15;
 const CHAIN_CLASS = 16;
 const FIRST_SPELL = 366;
 const LAST_SPELL = 407;
+const SPE_POLYMORPH = 399;
+const SPE_BLANK_PAPER = 407;
 const SPE_NOVEL = 408;
 const SPE_BOOK_OF_THE_DEAD = 409;
 const LEVELCHANGE_MORE_LEN = '--More--'.length;
@@ -402,6 +411,7 @@ const OBJECT_BASE_NAMES = new Map([
     [WAN_DIGGING, 'wand of digging'],
     [WAN_MAGIC_MISSILE, 'wand of magic missile'],
     [WAN_SECRET_DOOR_DETECTION, 'wand of secret door detection'],
+    [WAN_POLYMORPH, 'wand of polymorph'],
     [WAN_FIRE, 'wand of fire'],
     [WAN_COLD, 'wand of cold'],
     [WAN_SLEEP, 'wand of sleep'],
@@ -650,6 +660,11 @@ const RACE_INNATE_ABILITIES = new Map([
 function wishedObjectSpec(name) {
     const wish = String(name || '').toLowerCase();
     const spec = {};
+    const chargeMatch = wish.match(/\((\d+)(?::(\d+))?\)/);
+    if (chargeMatch) {
+        spec.recharged = Number(chargeMatch[1]);
+        spec.spe = Number(chargeMatch[2] ?? chargeMatch[1]);
+    }
     const speMatch = wish.match(/(?:^|\s)([+-]\d+)(?:\s|$)/);
     if (speMatch) spec.spe = Number(speMatch[1]);
     if (wish.includes('blessed')) {
@@ -708,6 +723,10 @@ function wishedObjectSpec(name) {
     if (wish.includes('wand of lightning')) {
         rn2(41);
         return { ...spec, otyp: WAN_LIGHTNING };
+    }
+    if (wish.includes('wand of polymorph')) {
+        rn2(46);
+        return { ...spec, otyp: WAN_POLYMORPH };
     }
     if (wish.includes('wand of magic missile')) {
         // C ref: objnam.c:rnd_otyp_by_namedesc() check_of also matches
@@ -796,6 +815,7 @@ function make_wish_object(name) {
     const otmp = mksobj(spec.otyp, true, false);
     otmp.wishedfor = true;
     if (typeof spec.spe === 'number') otmp.spe = spec.spe;
+    if (typeof spec.recharged === 'number') otmp.recharged = spec.recharged;
     if (typeof spec.blessed === 'boolean') otmp.blessed = spec.blessed;
     if (typeof spec.cursed === 'boolean') otmp.cursed = spec.cursed;
     if (spec.appearanceName) otmp.appearanceName = spec.appearanceName;
@@ -913,6 +933,13 @@ function lastInventoryLetter() {
         if (validInvlet(obj?.invlet)) maxCode = Math.max(maxCode, obj.invlet.charCodeAt(0));
     }
     return String.fromCharCode(maxCode);
+}
+
+function inventoryLetterRange() {
+    ensureInventoryLetters();
+    return compressLetters((game.inventory || [])
+        .map((obj) => obj?.invlet)
+        .filter(validInvlet)) || 'a';
 }
 
 function compressLetters(letters) {
@@ -2266,6 +2293,30 @@ function zapLetters() {
         .join('');
 }
 
+async function zappableWand(obj) {
+    // C ref: src/zap.c:zappable().  Successful zaps consume the charge before
+    // cursed backfire and before a directional prompt can be cancelled.
+    if ((obj?.spe ?? 0) < 0 || ((obj?.spe ?? 0) === 0 && rn2(C.WAND_WREST_CHANCE))) {
+        return false;
+    }
+    if ((obj?.spe ?? 0) === 0) await pline('You wrest one last charge from the worn-out wand.');
+    obj.spe = (obj.spe ?? 0) - 1;
+    return true;
+}
+
+async function maybeBackfireWand(obj) {
+    // C ref: src/zap.c:dozap().
+    if (!obj?.cursed || rn2(C.WAND_BACKFIRE_CHANCE)) return false;
+    const idx = game.inventory?.indexOf(obj) ?? -1;
+    if (idx >= 0) game.inventory.splice(idx, 1);
+    const name = baseObjectName(obj);
+    await pline(`${sentenceStart(`the ${name}`)} suddenly explodes!`);
+    const damage = d(Math.max(1, (obj.spe ?? 0) + 2), 6);
+    if (game.u && typeof game.u.uhp === 'number') game.u.uhp = Math.max(0, game.u.uhp - damage);
+    game.context.move = 1;
+    return true;
+}
+
 function dropObjectName(obj) {
     if (obj?.otyp === QUARTERSTAFF) {
         const buc = obj.blessed ? 'blessed ' : obj.cursed ? 'cursed ' : 'uncursed ';
@@ -2341,6 +2392,174 @@ function floorObjectsAt(x, y) {
 function floorObjectsAtHero() {
     const u = game.u || {};
     return floorObjectsAt(u.ux, u.uy);
+}
+
+function removeFloorObject(obj) {
+    const objects = game.level?.objects;
+    // C ref: src/invent.c:delobj_core(); ordinary destruction probes
+    // obj_resists(0,0) even when the object is not special.
+    if (obj_resists(obj, 0, 0)) return;
+    const idx = objects?.indexOf(obj) ?? -1;
+    if (idx >= 0) objects.splice(idx, 1);
+    if (typeof obj?.ox === 'number' && typeof obj?.oy === 'number') newsym(obj.ox, obj.oy);
+}
+
+function replaceFloorObject(obj, replacement) {
+    const objects = game.level?.objects;
+    if (!obj || !replacement || !objects) return replacement;
+    const x = obj.ox;
+    const y = obj.oy;
+    const idx = objects.indexOf(obj);
+    if (obj_resists(obj, 0, 0)) return obj;
+    if (idx >= 0) objects.splice(idx, 1);
+    place_object(replacement, x, y);
+    const placedIdx = objects.indexOf(replacement);
+    if (placedIdx >= 0) objects.splice(placedIdx, 1);
+    if (idx >= 0) objects.splice(Math.min(idx, objects.length), 0, replacement);
+    else objects.unshift(replacement);
+    newsym(x, y);
+    return replacement;
+}
+
+function rndObjectTypeBetween(first, last) {
+    let total = 0;
+    for (let otyp = first; otyp <= last; otyp++) total += OBJECT_PROB[otyp] ?? 0;
+    if (!total) return rn1(last - first + 1, first);
+    let remaining = rnd(total);
+    for (let otyp = first; otyp <= last; otyp++) {
+        remaining -= OBJECT_PROB[otyp] ?? 0;
+        if (remaining <= 0) return otyp;
+    }
+    return first;
+}
+
+function unpolyableObject(obj) {
+    if (!obj) return true;
+    return obj.otyp === WAN_POLYMORPH
+        || obj.otyp === SPE_POLYMORPH
+        || obj.otyp === POT_POLYMORPH
+        || obj.otyp === AMULET_OF_UNCHANGING
+        || obj_resists(obj, 5, 95);
+}
+
+function objShuddersFromPolymorph(obj) {
+    let odds;
+    if (obj?.oclass === WAND_CLASS) odds = 3;
+    else if (obj?.cursed) odds = 3;
+    else if (obj?.blessed) odds = 12;
+    else odds = 8;
+    if ((obj?.quan || 1) > 4) odds = Math.max(1, Math.trunc(odds / 2));
+    return rn2(odds) === 0;
+}
+
+function doObjectSystemShock(obj) {
+    // C ref: src/zap.c:do_osshock().
+    game._zap_obj_zapped = true;
+    if ((game._poly_zapped ?? -1) < 0) {
+        const chance = Math.max(1, (game.u?.uluck ?? 0) + 45);
+        for (let i = obj?.quan || 1; i > 0; i--) {
+            if (!rn2(chance)) {
+                game._poly_zapped = OBJECT_MATERIAL[obj.otyp] ?? 0;
+                break;
+            }
+        }
+    }
+
+    if ((obj?.quan || 1) > 1) {
+        const zapped = rnd(Math.max(1, (obj.quan || 1) - 1));
+        obj.quan = Math.max(1, (obj.quan || 1) - zapped);
+        newsym(obj.ox, obj.oy);
+        return;
+    }
+    removeFloorObject(obj);
+}
+
+function polymorphFloorObject(obj) {
+    // C ref: src/zap.c:poly_obj().
+    const replacement = mkobj(obj.oclass, false);
+    replacement.quan = obj.quan || 1;
+    replacement.no_charge = obj.no_charge;
+    if (replacement.oclass === WAND_CLASS
+        || replacement.oclass === WEAPON_CLASS
+        || replacement.oclass === ARMOR_CLASS) {
+        replacement.spe = obj.spe;
+    }
+    replacement.recharged = obj.recharged;
+    replacement.cursed = !!obj.cursed;
+    replacement.blessed = !!obj.blessed;
+
+    switch (replacement.oclass) {
+    case WAND_CLASS:
+        while (replacement.otyp === WAN_WISHING || replacement.otyp === WAN_POLYMORPH) {
+            replacement.otyp = rndObjectTypeBetween(WAN_LIGHT, WAN_LIGHTNING);
+        }
+        replacement.oclass = OBJECT_CLASS[replacement.otyp] ?? replacement.oclass;
+        if ((replacement.recharged || 0) < rn2(7)) {
+            replacement.recharged = (replacement.recharged || 0) + 1;
+        }
+        break;
+    case POTION_CLASS:
+        while (replacement.otyp === POT_POLYMORPH) {
+            replacement.otyp = rndObjectTypeBetween(POT_GAIN_ABILITY, POT_WATER);
+        }
+        replacement.oclass = OBJECT_CLASS[replacement.otyp] ?? replacement.oclass;
+        break;
+    case SPBOOK_CLASS:
+        while (replacement.otyp === SPE_POLYMORPH) {
+            replacement.otyp = rndObjectTypeBetween(FIRST_SPELL, SPE_BLANK_PAPER);
+        }
+        replacement.oclass = OBJECT_CLASS[replacement.otyp] ?? replacement.oclass;
+        break;
+    default:
+        break;
+    }
+    return replaceFloorObject(obj, replacement);
+}
+
+function learnWandFromVisibleObjectEffect(wand, obj) {
+    // C refs: src/zap.c:bhito(), src/zap.c:learnwand(), src/o_init.c:discover_object().
+    if (!wand || !obj || !cansee(obj.ox, obj.oy)) return;
+    wand.dknown = true;
+    wand.knownName = true;
+    discoverObjectType(wand.otyp);
+}
+
+function polymorphZapHitsObject(obj, wand) {
+    // C ref: src/zap.c:bhito(), WAN_POLYMORPH case.
+    if (unpolyableObject(obj)) return 0;
+    if (objShuddersFromPolymorph(obj)) {
+        doObjectSystemShock(obj);
+        learnWandFromVisibleObjectEffect(wand, obj);
+        return 1;
+    }
+    polymorphFloorObject(obj);
+    return 1;
+}
+
+async function zapPolymorphObjects(wand, dx, dy) {
+    // C refs: src/zap.c:weffects(), src/zap.c:bhit(), src/zap.c:bhitpile().
+    if (!dx && !dy) return;
+    game._zap_obj_zapped = false;
+    game._poly_zapped = -1;
+    let range = rn1(8, 6);
+    let x = game.u?.ux ?? 0;
+    let y = game.u?.uy ?? 0;
+    while (range-- > 0) {
+        x += dx;
+        y += dy;
+        const loc = game.level?.at(x, y);
+        if (!loc) break;
+        const pile = floorObjectsAt(x, y).slice();
+        for (const obj of pile) {
+            if (obj.ox === x && obj.oy === y && (game.level?.objects || []).includes(obj)) {
+                polymorphZapHitsObject(obj, wand);
+            }
+        }
+        if (!C.ZAP_POS(loc.typ) || closedDoorAt(x, y)) break;
+    }
+    if (game._zap_obj_zapped) await pline('You feel shuddering vibrations.');
+    game._zap_obj_zapped = false;
+    game._poly_zapped = -1;
 }
 
 function lookHereFeature() {
@@ -2740,6 +2959,10 @@ async function finishHeavyPickup(obj) {
 
 async function triggerSpotEffectsAtHero() {
     await checkSpecialRoomAfterMove();
+    return triggerTrapAtHero();
+}
+
+async function triggerTrapAtHero() {
     const u = game.u || {};
     const trap = (game.level?.traps || []).find(t => t.tx === u.ux && t.ty === u.uy);
     if (!trap) return false;
@@ -2753,6 +2976,26 @@ async function triggerSpotEffectsAtHero() {
         trap.tseen = true;
         newsym(trap.tx, trap.ty);
         await pline('A little dart shoots out at you!  You are hit by a little dart.');
+        return true;
+    }
+    if (trap.ttyp === C.RUST_TRAP) {
+        // C ref: trap.c:trapeffect_rust_trap().
+        trap.tseen = true;
+        newsym(trap.tx, trap.ty);
+        switch (rn2(5)) {
+        case 0:
+            await pline('A gush of water hits you on the head!');
+            break;
+        case 1:
+            await pline('A gush of water hits your left arm!');
+            break;
+        case 2:
+            await pline('A gush of water hits your right arm!');
+            break;
+        default:
+            await pline('A gush of water hits you!');
+            break;
+        }
         return true;
     }
     return false;
@@ -3254,6 +3497,22 @@ function runDirectionForKey(ch) {
     return RUN_KEY[ch] || null;
 }
 
+async function startRunDirection(dir, mode) {
+    game.context.run = {
+        dx: DIR_DX[dir],
+        dy: DIR_DY[dir],
+        mode,
+        steps: 0,
+        allowTurns: true,
+    };
+    game.context.mv = 1;
+    game.context.move = await domove(DIR_DX[dir], DIR_DY[dir]) ? 1 : 0;
+    if (!game.context.move || game._run_stop_after_move) {
+        game.context.run = null;
+        game._run_stop_after_move = false;
+    }
+}
+
 function hasWoundedLegs() {
     return !!game.u?.uprops?.wounded_legs;
 }
@@ -3287,6 +3546,7 @@ const EXTENDED_AUTOCOMPLETE = [
     { name: 'name', min: 1 },
     { name: 'pray', min: 2 },
     { name: 'quit', min: 1 },
+    { name: 'wizgenesis', min: 10, wizard: true },
     { name: 'wizintrinsic', min: 4, wizard: true },
 ];
 
@@ -3759,6 +4019,30 @@ function maybeTurnCorridorRun(run) {
         run.dx = nextDx;
         run.dy = nextDy;
     }
+}
+
+async function runShouldStopBeforeRepeatMove(run) {
+    // C refs: allmain.c:moveloop_core(), hack.c:lookaround().  Repeated
+    // rushes stop before a closed door; shifted run mode 1 treats it as a
+    // corridor candidate and can still bump into it via domove_core().
+    if (!run || run.travel || run.mode === 1) return false;
+    if (game.u?.ublind || game.u?.uprops?.blind) return false;
+    const u = game.u;
+    if (!u) return false;
+    for (let nx = u.ux - 1; nx <= u.ux + 1; nx++) {
+        for (let ny = u.uy - 1; ny <= u.uy + 1; ny++) {
+            if (nx === u.ux && ny === u.uy) continue;
+            if (nx === u.ux - run.dx && ny === u.uy - run.dy) continue;
+            const loc = game.level?.at(nx, ny);
+            const closedDoor = loc?.typ === DOOR && !!(loc.doormask & (D_CLOSED | D_LOCKED));
+            if (!closedDoor) continue;
+            if (nx !== u.ux && ny !== u.uy) continue;
+            if (game.flags?.mention_walls) await pline('You stop in front of the door.');
+            game.context.move = 0;
+            return true;
+        }
+    }
+    return false;
 }
 
 function hostileMonsterNearHeroForRunStop(run = game.context?.run) {
@@ -7688,7 +7972,7 @@ export async function rhack(key) {
         key = await nhgetch();
     }
 
-    const ch = String.fromCharCode(key);
+    let ch = String.fromCharCode(key);
 
     if (game._awaiting_pray_force_more && game._more && (ch === ' ' || ch === '\r' || ch === '\n')) {
         clear_pending_message();
@@ -7949,6 +8233,38 @@ export async function rhack(key) {
         return;
     }
 
+    if (game._awaiting_quit_confirm) {
+        clear_pending_message();
+        game._awaiting_quit_confirm = false;
+        if (ch === 'y' || ch === 'Y') {
+            const prompt = 'Dump core? [ynq] (q)';
+            await pline(prompt);
+            game._prompt_cursor = [prompt.length + 1, 0];
+            game._awaiting_dump_core = true;
+        }
+        game.context.move = 0;
+        return;
+    }
+
+    if (game._awaiting_dump_core) {
+        if (ch === 'y' || ch === 'Y' || ch === 'n' || ch === 'N'
+            || ch === 'q' || ch === 'Q' || ch === '\x1b') {
+            clear_pending_message();
+            game._awaiting_dump_core = false;
+            const screen = '\nSince you were in wizard mode, the score list will not be checked.';
+            showOverride(screen, [0, 4]);
+            game.program_state = game.program_state || {};
+            game.program_state.gameover = true;
+            game.context.move = 0;
+            return;
+        }
+        const prompt = 'Dump core? [ynq] (q)';
+        await pline(prompt);
+        game._prompt_cursor = [prompt.length + 1, 0];
+        game.context.move = 0;
+        return;
+    }
+
     if (game._awaiting_pray_confirm) {
         clear_pending_message();
         game._awaiting_pray_confirm = false;
@@ -8031,10 +8347,23 @@ export async function rhack(key) {
                 await showPromptLine('Are you sure you want to pray? [yn] (n) ');
                 game._awaiting_pray_confirm = true;
                 game.context.move = 0;
+            } else if (cmd === 'quit') {
+                // C ref: src/end.c:done2().
+                const prompt = 'Really quit without saving? [yn] (n)';
+                await pline(prompt);
+                game._prompt_cursor = [prompt.length + 1, 0];
+                game._awaiting_quit_confirm = true;
             } else if (cmd === 'wizintrinsic') {
                 beginIntrinsicMenu();
                 game._intrinsic_menu.count = '';
                 game.context.move = 0;
+            } else if (cmd === 'wizgenesis') {
+                // C refs: src/cmd.c extended command table, src/wizcmds.c:wiz_genesis().
+                const prompt = 'Create what kind of monster?';
+                await pline(prompt);
+                game._prompt_cursor = [prompt.length + 1, 0];
+                game._awaiting_create_monster = true;
+                game._create_monster_input = '';
             } else if (cmd === 'chat') {
                 // C ref: sounds.c:dochat().
                 await showPromptLine('Talk to whom? (in what direction) ');
@@ -8714,6 +9043,7 @@ export async function rhack(key) {
     }
 
     if (game._awaiting_drop_item) {
+        const promptLine = game._pending_message || '';
         clear_pending_message();
         game._awaiting_drop_item = false;
         const idx = inventoryIndexForLetter(ch);
@@ -8725,6 +9055,12 @@ export async function rhack(key) {
         }
         game.inventory.splice(idx, 1);
         place_object(obj, game.u.ux, game.u.uy);
+        if (game.flags?.verbose === false) {
+            game._pending_message = promptLine;
+            game._prompt_cursor = null;
+            game.context.move = 1;
+            return;
+        }
         await pline(`You drop ${dropObjectName(obj)}.`);
         game.context.move = 1;
         return;
@@ -8854,9 +9190,14 @@ export async function rhack(key) {
             await pline('Never mind.');
             return;
         }
+        if (!await zappableWand(obj)) {
+            game.context.move = 1;
+            await pline('Nothing happens.');
+            return;
+        }
+        if (await maybeBackfireWand(obj)) return;
         if (obj.otyp === WAN_SECRET_DOOR_DETECTION) {
             // C ref: zap.c:zapnodir() -> detect.c:findit().
-            if (typeof obj.spe === 'number' && obj.spe > 0) obj.spe--;
             exercise(A_WIS, true);
             obj.knownName = true;
             await pline("You don't find anything.");
@@ -9014,11 +9355,12 @@ export async function rhack(key) {
         const obj = game._awaiting_zap_direction;
         game._awaiting_zap_direction = null;
         if (!'hykulnjb<>.'.includes(ch)) {
-            game.context.move = 0;
-            await pline('Never mind.');
+            game.context.move = 1;
+            if (!game.u?.ublind && !game.u?.uprops?.blind) {
+                await pline(`${sentenceStart(`the ${baseObjectName(obj)}`)} glows and fades.`);
+            }
             return;
         }
-        if (typeof obj.spe === 'number' && obj.spe > 0) obj.spe--;
         exercise(A_WIS, true);
         if (obj.otyp === WAN_DIGGING) {
             obj.knownName = true;
@@ -9045,6 +9387,8 @@ export async function rhack(key) {
                 }
                 queue_more_prompt();
             }
+        } else if (obj.otyp === WAN_POLYMORPH) {
+            await zapPolymorphObjects(obj, DIR_DX[ch] || 0, DIR_DY[ch] || 0);
         }
         // C ref: topl.c:more() can block inside zap.c:zhitu() before the
         // command returns to allmain.c for turn-tail monster movement.
@@ -9501,21 +9845,13 @@ export async function rhack(key) {
         game.context.move = 0;
     } else if (isMovementKey(ch)) {
         game.context.move = await domove(DIR_DX[ch], DIR_DY[ch]) ? 1 : 0;
+    } else if (key === 10) {
+        // C refs: cmd.c:reset_commands(), cmd.c:do_rush_south().  Line-feed is
+        // C('j'), bound to rush mode 3 rather than shifted run mode 1.
+        await startRunDirection('j', 3);
     } else if (runDirectionForKey(ch)) {
         const dir = runDirectionForKey(ch);
-        game.context.run = {
-            dx: DIR_DX[dir],
-            dy: DIR_DY[dir],
-            mode: 1,
-            steps: 0,
-            allowTurns: true,
-        };
-        game.context.mv = 1;
-        game.context.move = await domove(DIR_DX[dir], DIR_DY[dir]) ? 1 : 0;
-        if (!game.context.move || game._run_stop_after_move) {
-            game.context.run = null;
-            game._run_stop_after_move = false;
-        }
+        await startRunDirection(dir, 1);
     } else if (ch === 'F') {
         game.context.move = 0;
         game._forcefight_pending = true;
@@ -9808,7 +10144,7 @@ export async function rhack(key) {
         }
     } else if (ch === 'd') {
         game.context.move = 0;
-        await showPromptLine(`What do you want to drop? [a-${lastInventoryLetter()} or ?*] `);
+        await showPromptLine(`What do you want to drop? [${inventoryLetterRange()} or ?*] `);
         game._awaiting_drop_item = true;
     } else if (ch === 'S') {
         game.context.move = 0;
@@ -9834,6 +10170,10 @@ export async function continueRunStep() {
     if (run.steps++ > COLNO * ROWNO) {
         game.context.run = null;
         game.context.move = 0;
+        return false;
+    }
+    if (await runShouldStopBeforeRepeatMove(run)) {
+        game.context.run = null;
         return false;
     }
     maybeTurnCorridorRun(run);
@@ -10033,5 +10373,6 @@ export async function domove(dx, dy) {
     newsym(newx, newy);
     await checkSpecialRoomAfterMove();
     await lookHereAfterMove();
+    if (!game._more) await triggerTrapAtHero();
     return true;
 }

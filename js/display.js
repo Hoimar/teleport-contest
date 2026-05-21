@@ -1303,6 +1303,8 @@ function _buildScreenOutput() {
             if (game._floor_list_show_more !== false) {
                 const more = '--More--';
                 const row = Math.min(21, game._floor_list_lines.length + 1);
+                for (let c = 0; c < display.cols - col; c++)
+                    display.setCell(col + c, row, ' ', NO_COLOR, 0);
                 for (let c = 0; c < more.length; c++)
                     display.setCell(col + c, row, more[c], NO_COLOR, 0);
             }

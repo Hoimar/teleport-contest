@@ -391,7 +391,7 @@ export async function newgame() {
     const greetingName = g._startupGreetingName || g.plname;
     const welcome = `${roleGreeting(g.urole)} ${greetingName}, welcome to NetHack!  You are a ${alignName} ${genderAdj} ${g.urace.adj} ${roleName}.`;
     await pline(welcome);
-    if (!ff && (showedQuestIntro || welcome.length + '--More--'.length > COLNO)) {
+    if (!ff && (showedQuestIntro || (g._startup_preamble_messages || []).length > 0)) {
         g._more = true;
         g._more_next_message_row = welcome.length + '--More--'.length >= COLNO;
     }
