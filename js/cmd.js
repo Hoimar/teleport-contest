@@ -6489,14 +6489,16 @@ export async function rhack(key) {
     }
 
     if (game._apply_invalid_more && game._more) {
-        game._apply_invalid_more = false;
-        clear_pending_message();
         if (ch === ' ' || ch === '\r' || ch === '\n' || ch === '\x1b') {
+            game._apply_invalid_more = false;
+            clear_pending_message();
             game._awaiting_apply_item = true;
             await showPromptLine(`What do you want to use or apply? [${applyLetters()} or ?*] `);
             game.context.move = 0;
             return;
         }
+        game.context.move = 0;
+        return;
     }
 
     if (game._terrain_view_done_more) {
