@@ -93,10 +93,15 @@ const RIN_TELEPORT_CONTROL = 195;
 const RIN_INCREASE_ACCURACY = 176;
 const RIN_STEALTH = 181;
 const RIN_PROTECTION = 178;
+const LOCK_PICK = 222;
+const CREDIT_CARD = 223;
 const EXPENSIVE_CAMERA = 229;
 const MIRROR = 230;
+const BLINDFOLD = 233;
 const TOWEL = 234;
+const LEASH = 236;
 const STETHOSCOPE = 237;
+const TIN_OPENER = 239;
 const FIGURINE = 241;
 const MAGIC_MARKER = 242;
 const LEATHER_DRUM = 257;
@@ -105,6 +110,7 @@ const LARGE_BOX = 214;
 const CHEST = 215;
 const ICE_BOX = 216;
 const SACK = 217;
+const BAG_OF_TRICKS = 220;
 const GOLD_PIECE = 438;
 const ARROW = 18;
 const ELVEN_ARROW = 19;
@@ -335,9 +341,15 @@ const OBJECT_BASE_NAMES = new Map([
     [RIN_STEALTH, 'ring of stealth'],
     [RIN_TELEPORT_CONTROL, 'ring of teleport control'],
     [200, 'ring of protection from shape changers'],
+    [LOCK_PICK, 'lock pick'],
+    [CREDIT_CARD, 'credit card'],
     [EXPENSIVE_CAMERA, 'expensive camera'],
     [MIRROR, 'mirror'],
+    [BLINDFOLD, 'blindfold'],
+    [TOWEL, 'towel'],
+    [LEASH, 'leash'],
     [STETHOSCOPE, 'stethoscope'],
+    [TIN_OPENER, 'tin opener'],
     [MAGIC_MARKER, 'magic marker'],
     [257, 'drum'],
     [258, 'drum'],
@@ -1801,7 +1813,24 @@ function wornSuffix(obj) {
         if (obj?.otyp === QUARTERSTAFF) return ' (weapon in hands)';
         return ' (weapon in right hand)';
     }
+    if (obj?.alternate) {
+        const noun = (obj?.quan || 1) > 1 ? 'weapons' : 'weapon';
+        return ` (alternate ${noun}; not wielded)`;
+    }
     if (obj?.worn || obj?.owornmask) return ' (being worn)';
+    return '';
+}
+
+function isContainerType(otyp) {
+    return otyp >= LARGE_BOX && otyp <= BAG_OF_TRICKS;
+}
+
+function emptyContentsPrefix(obj) {
+    if (!obj?.cknown) return '';
+    // C ref: objnam.c:doname_base(); known empty containers get an
+    // "empty" prefix before beatitude.
+    if (obj.otyp === BAG_OF_TRICKS) return obj.spe === 0 && !obj.known ? 'empty' : '';
+    if ((isContainerType(obj.otyp) || obj.otyp === STATUE) && !C.Has_contents(obj)) return 'empty';
     return '';
 }
 
@@ -1838,7 +1867,7 @@ function inventoryObjectName(obj, opts = {}) {
         : (pairObject ? `pair of ${rawBase}` : rawBase);
     const oname = C.ONAME(obj);
     const namedBase = oname ? `${base} named ${oname}` : base;
-    const parts = [bucPrefix(obj), enchantmentPrefix(obj), boxStatePrefix(obj), namedBase].filter(Boolean);
+    const parts = [emptyContentsPrefix(obj), bucPrefix(obj), enchantmentPrefix(obj), boxStatePrefix(obj), namedBase].filter(Boolean);
     const body = parts.join(' ') + chargeSuffix(obj, opts) + unpaidSuffix(obj) + shopPriceSuffix(obj, opts);
     const worn = opts.includeWorn ? wornSuffix(obj) : '';
     if (quan > 1) return `${quan} ${body}${worn}`;
@@ -2265,6 +2294,17 @@ function floorObjectsAt(x, y) {
 function floorObjectsAtHero() {
     const u = game.u || {};
     return floorObjectsAt(u.ux, u.uy);
+}
+
+function lookHereFeature() {
+    const st = stairAtHero();
+    if (st?.up) return { line: 'There is a staircase up out of the dungeon here.', blocks: true };
+    if (st) return { line: 'There is a staircase down here.', blocks: false };
+    const loc = game.level?.at(game.u?.ux, game.u?.uy);
+    if (loc?.typ === C.DOOR && (loc.doormask || 0) === C.D_NODOOR) return { line: 'There is a doorway here.', blocks: false };
+    if (loc?.typ === C.SINK) return { line: 'There is a sink here.', blocks: false };
+    if (loc?.typ === C.FOUNTAIN) return { line: 'There is a fountain here.', blocks: false };
+    return { line: '', blocks: false };
 }
 
 function isContainerObject(obj) {
@@ -6573,7 +6613,7 @@ function encumbranceInsightLine() {
     return '  You are overloaded; you cannot move.';
 }
 
-function roleAttributesPage1() {
+function roleAttributesPageParts() {
     // C ref: insight.c:attributes_enlightenment().
     const role = game.urole || {};
     const female = !!game.flags?.female;
@@ -6582,37 +6622,56 @@ function roleAttributesPage1() {
     const alignName = alignNameForHero();
     const levelName = game.level?.flags?.sokoban_rules ? 'Sokoban' : 'the Dungeons of Doom';
     const gold = heroGoldAmount();
-    return ` ${game.plname || 'Adventurer'} the ${roleName}'s attributes:\n\n`
-        + ' Background:\n'
-        + `  You are ${articleForWord(rank)} ${rank}, a level ${game.u?.ulevel || 1} ${female ? 'female' : 'male'} ${game.urace?.name || 'human'} ${roleName}.\n`
-        + `  You are ${alignName}, on a mission for ${roleGod(role, alignName)}\n`
-        + `${roleOppositionLine(role, alignName)}\n`
-        + `  You are ${game.u?.uhandedness || 'right'}-handed.\n`
-        + `  You are in ${levelName}, on level ${displayDepth(game.u?.uz)}.\n`
-        + `  You entered the dungeon ${game.moves || 1} turns ago.\n`
-        + (game.flags?.moonphase === 4 ? '  There is a full moon in effect.\n' : '')
-        + `  You have ${game.u?.uexp || 0} experience points.\n`
-        + '\n Basics:\n'
-        + `${insightHpLine()}\n`
-        + `${energyLine()}\n`
-        + `  Your armor class is ${game.u?.uac ?? 10}.\n`
-        + (gold > 0 ? `  Your wallet contains ${gold} zorkmids.\n` : '  Your wallet is empty.\n')
-        + '  Autopickup is off.\n'
-        + '\n Characteristics:\n'
-        + `${insightAttrLine('strength', C.A_STR)}\n`
-        + `${insightAttrLine('dexterity', C.A_DEX)}\n`
-        + `${insightAttrLine('constitution', C.A_CON)}\n`
-        + (game.flags?.moonphase === 4 ? '' : `${insightAttrLine('intelligence', C.A_INT)}\n`)
-        + ' (1 of 2)';
+    const headerLines = [
+        ` ${game.plname || 'Adventurer'} the ${roleName}'s attributes:`,
+        '',
+        ' Background:',
+        `  You are ${articleForWord(rank)} ${rank}, a level ${game.u?.ulevel || 1} ${female ? 'female' : 'male'} ${game.urace?.name || 'human'} ${roleName}.`,
+        `  You are ${alignName}, on a mission for ${roleGod(role, alignName)}`,
+        roleOppositionLine(role, alignName),
+        `  You are ${game.u?.uhandedness || 'right'}-handed.`,
+        `  You are in ${levelName}, on level ${displayDepth(game.u?.uz)}.`,
+        `  You entered the dungeon ${game.moves || 1} turns ago.`,
+        ...(game.flags?.moonphase === 4 ? ['  There is a full moon in effect.'] : []),
+        ...(game.flags?.friday13 ? ['  Bad things can happen on Friday the 13th.'] : []),
+        `  You have ${game.u?.uexp || 0} experience points.`,
+        '',
+        ' Basics:',
+        insightHpLine(),
+        energyLine(),
+        `  Your armor class is ${game.u?.uac ?? 10}.`,
+        gold > 0 ? `  Your wallet contains ${gold} zorkmids.` : '  Your wallet is empty.',
+        '  Autopickup is off.',
+        '',
+        ' Characteristics:',
+    ];
+    const attrLines = [
+        insightAttrLine('strength', C.A_STR),
+        insightAttrLine('dexterity', C.A_DEX),
+        insightAttrLine('constitution', C.A_CON),
+        insightAttrLine('intelligence', C.A_INT),
+        insightAttrLine('wisdom', C.A_WIS),
+        insightAttrLine('charisma', C.A_CHA),
+    ];
+    const splitIndex = Math.max(0, Math.min(attrLines.length, MENU_ROWS_PER_PAGE - headerLines.length));
+    return { headerLines, attrLines, splitIndex };
+}
+
+function roleAttributesPage1() {
+    const { headerLines, attrLines, splitIndex } = roleAttributesPageParts();
+    return [
+        ...headerLines,
+        ...attrLines.slice(0, splitIndex),
+        ' (1 of 2)',
+    ].join('\n');
 }
 
 function roleAttributesPage2() {
     // C ref: insight.c:attributes_enlightenment().
+    const { attrLines, splitIndex } = roleAttributesPageParts();
     const wielded = (game.inventory || []).find((obj) => obj?.wielded || ((obj?.owornmask || 0) & C.W_WEP));
     const lines = [
-        ...(game.flags?.moonphase === 4 ? [insightAttrLine('intelligence', C.A_INT)] : []),
-        insightAttrLine('wisdom', C.A_WIS),
-        insightAttrLine('charisma', C.A_CHA),
+        ...attrLines.slice(splitIndex),
         '',
         ' Status:',
     ];
@@ -9501,7 +9560,6 @@ export async function rhack(key) {
         await doUpCommand();
     } else if (ch === ':') {
         game.context.move = 0;
-        const st = stairAtHero();
         const ep = engravingAt(game.u?.ux, game.u?.uy);
         const etext = engravingVisibleText(ep);
         if (etext) {
@@ -9509,17 +9567,29 @@ export async function rhack(key) {
             // engrave.c:read_engr_at().
             await pline(`Something is written here in the dust.  You read: "${etext}".`);
             queue_more_prompt();
-        } else if (st?.up) {
-            await pline('There is a staircase up out of the dungeon here.');
-            queue_more_prompt();
-        } else if (st) {
-            await pline('There is a staircase down here.');
-        } else if (game.level?.at(game.u?.ux, game.u?.uy)?.typ === C.SINK) {
-            await pline('There is a sink here.');
-        } else if (game.level?.at(game.u?.ux, game.u?.uy)?.typ === C.FOUNTAIN) {
-            await pline('There is a fountain here.');
         } else {
-            await pline("You see no objects here.");
+            // C ref: invent.c:dolook() -> invent.c:look_here().
+            const feature = lookHereFeature();
+            const objects = floorObjectsAtHero();
+            if (feature.line) await pline(feature.line);
+            if (feature.blocks) {
+                queue_more_prompt();
+                return;
+            }
+            if (objects.length === 1) {
+                const line = `You see here ${inventoryObjectName(objects[0], { includePrice: true, observe: true })}.`;
+                if (feature.line) await append_pline(line);
+                else await pline(line);
+            } else if (objects.length > 1) {
+                const count = objects.length === 2 ? 'two'
+                    : objects.length < 5 ? 'a few'
+                        : objects.length < 10 ? 'several' : 'many';
+                const line = `There are ${count} objects here.`;
+                if (feature.line) await append_pline(line);
+                else await pline(line);
+            } else if (!feature.line) {
+                await pline("You see no objects here.");
+            }
         }
     } else if (ch === ',') {
         await pickupHere();

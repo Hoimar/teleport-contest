@@ -99,6 +99,8 @@ const CLOAK_OF_MAGIC_RESISTANCE = 148;
 const CLOAK_OF_DISPLACEMENT = 149;
 const SCALPEL = 39;
 const LEATHER_GLOVES = 159;
+const LARGE_BOX = 214;
+const BAG_OF_TRICKS = 220;
 const BLINDFOLD = 233;
 const CREDIT_CARD = 223;
 const EXPENSIVE_CAMERA = 229;
@@ -124,6 +126,7 @@ const POT_FULL_HEALING = 315;
 const POT_POLYMORPH = 316;
 const POT_SICKNESS = 318;
 const POT_ACID = 320;
+const STATUE = 476;
 const SCR_ENCHANT_WEAPON = 328;
 const SCR_MAGIC_MAPPING = 337;
 const SCR_AMNESIA = 338;
@@ -220,7 +223,7 @@ const RANGER_INVENTORY = [
 
 const ROGUE_INVENTORY = [
     { typ: SHORT_SWORD, spe: 0, cls: WEAPON_CLASS, min: 1, max: 1, bless: UNDEF_BLESS, wielded: true },
-    { typ: DAGGER, spe: 0, cls: WEAPON_CLASS, min: 6, max: 15, bless: 0 },
+    { typ: DAGGER, spe: 0, cls: WEAPON_CLASS, min: 6, max: 15, bless: 0, alternate: true },
     { typ: LEATHER_ARMOR, spe: 1, cls: ARMOR_CLASS, min: 1, max: 1, bless: UNDEF_BLESS, worn: true },
     { typ: POT_SICKNESS, spe: 0, cls: POTION_CLASS, min: 1, max: 1, bless: 0 },
     { typ: LOCK_PICK, spe: 0, cls: TOOL_CLASS, min: 1, max: 1, bless: 0 },
@@ -347,6 +350,10 @@ function discover_role_known_object(otyp) {
     if (typeof game.discoveredObjects.add === 'function') game.discoveredObjects.add(otyp);
 }
 
+function is_container_type(otyp) {
+    return otyp >= LARGE_BOX && otyp <= BAG_OF_TRICKS;
+}
+
 function ini_inv_adjust_obj(trop, obj) {
     let stop = false;
     if (trop.cls === COIN_CLASS) {
@@ -362,6 +369,11 @@ function ini_inv_adjust_obj(trop, obj) {
     obj.dknown = true;
     obj.bknown = true;
     obj.rknown = true;
+    if (is_container_type(obj.otyp) || obj.otyp === STATUE) {
+        obj.cknown = true;
+        obj.lknown = true;
+        obj.otrapped = false;
+    }
     discover_starting_object(obj);
     if (obj.oclass === WEAPON_CLASS || obj.oclass === TOOL_CLASS) {
         obj.quan = trquan(trop);
