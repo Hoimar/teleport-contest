@@ -20,6 +20,12 @@ const ROLE_INIT = new Map([
         attrdist: [20, 10, 10, 30, 20, 10],
         hp: 12, pwBase: 2, pwRnd: 0, ac: 0, gold: 0,
     }],
+    ['Ranger', {
+        attrbase: [13, 13, 13, 9, 13, 7],
+        attrmax: [30, 10, 10, 20, 20, 10],
+        attrdist: [30, 10, 10, 20, 20, 10],
+        hp: 15, pwBase: 2, pwRnd: 0, ac: 0, gold: 0,
+    }],
     ['Tourist', {
         attrbase: [7, 10, 6, 7, 7, 10],
         attrmax: [15, 10, 10, 15, 30, 20],
@@ -69,10 +75,24 @@ const COIN_CLASS = 12;
 const GEM_CLASS = 13;
 
 const GOLD_PIECE = 438;
+const ARROW = 18;
+const ELVEN_ARROW = 19;
+const ORCISH_ARROW = 20;
+const YA = 22;
 const DART = 23;
+const DAGGER = 34;
+const ELVEN_SPEAR = 28;
+const ORCISH_SPEAR = 29;
+const DWARVISH_SPEAR = 30;
+const JAVELIN = 32;
 const QUARTERSTAFF = 79;
+const BOW = 83;
+const ELVEN_BOW = 84;
+const ORCISH_BOW = 85;
+const YUMI = 86;
 const HAWAIIAN_SHIRT = 136;
 const CLOAK_OF_MAGIC_RESISTANCE = 148;
+const CLOAK_OF_DISPLACEMENT = 149;
 const SCALPEL = 39;
 const LEATHER_GLOVES = 159;
 const BLINDFOLD = 233;
@@ -85,6 +105,7 @@ const TIN_OPENER = 239;
 const MAGIC_MARKER = 242;
 const SPE_FORCE_BOLT = 383;
 const APPLE = 277;
+const CRAM_RATION = 292;
 const RIN_LEVITATION = 183;
 const RIN_HUNGER = 184;
 const RIN_AGGRAVATE_MONSTER = 185;
@@ -179,6 +200,21 @@ const TOWEL_INVENTORY = [
 
 const MAGIC_MARKER_INVENTORY = [
     { typ: MAGIC_MARKER, spe: 19, cls: TOOL_CLASS, min: 1, max: 1, bless: 0 },
+];
+
+const RANGER_INVENTORY = [
+    { typ: DAGGER, spe: 1, cls: WEAPON_CLASS, min: 1, max: 1, bless: UNDEF_BLESS, wielded: true },
+    { typ: BOW, spe: 1, cls: WEAPON_CLASS, min: 1, max: 1, bless: UNDEF_BLESS, alternate: true },
+    { typ: ARROW, spe: 2, cls: WEAPON_CLASS, min: 50, max: 59, bless: UNDEF_BLESS, quivered: true },
+    { typ: ARROW, spe: 0, cls: WEAPON_CLASS, min: 30, max: 39, bless: UNDEF_BLESS },
+    { typ: CLOAK_OF_DISPLACEMENT, spe: 2, cls: ARMOR_CLASS, min: 1, max: 1, bless: UNDEF_BLESS, worn: true },
+    { typ: CRAM_RATION, spe: 0, cls: FOOD_CLASS, min: 4, max: 4, bless: 0 },
+];
+
+const RANGER_KNOWN_WEAPONS = [
+    ELVEN_ARROW, ORCISH_ARROW, YA,
+    ELVEN_SPEAR, ORCISH_SPEAR, DWARVISH_SPEAR,
+    JAVELIN, ELVEN_BOW, ORCISH_BOW, YUMI,
 ];
 
 function trquan(trop) {
@@ -281,6 +317,16 @@ function discover_starting_object(obj) {
     if (typeof game.encounteredObjects.add === 'function') game.encounteredObjects.add(obj.otyp);
 }
 
+function discover_role_known_object(otyp) {
+    if (!Number.isInteger(otyp)) return;
+    const order = Array.isArray(game.discoveryOrder)
+        ? game.discoveryOrder
+        : (game.discoveryOrder = []);
+    if (!order.includes(otyp)) order.push(otyp);
+    game.discoveredObjects = game.discoveredObjects || new Set();
+    if (typeof game.discoveredObjects.add === 'function') game.discoveredObjects.add(otyp);
+}
+
 function ini_inv_adjust_obj(trop, obj) {
     let stop = false;
     if (trop.cls === COIN_CLASS) {
@@ -309,6 +355,16 @@ function ini_inv_adjust_obj(trop, obj) {
     }
     if (trop.bless !== UNDEF_BLESS) obj.blessed = !!trop.bless;
     return stop;
+}
+
+function apply_starting_worn_extrinsic(obj) {
+    if (!obj?.worn) return;
+    game.u.uprops = game.u.uprops || {};
+    // C refs: u_init.c:ini_inv_use_obj(), worn.c:setworn().
+    // Initial worn armor grants extrinsics, but initial_don suppresses the
+    // follow-up Cloak_on()/toggle_displacement() message.
+    if (obj.otyp === CLOAK_OF_DISPLACEMENT) game.u.uprops.displaced = true;
+    if (obj.otyp === CLOAK_OF_MAGIC_RESISTANCE) game.u.uprops.magic_resistance = true;
 }
 
 function ini_inv(trobs, noCreate, roleName) {
@@ -343,7 +399,10 @@ function ini_inv(trobs, noCreate, roleName) {
         if (ini_inv_adjust_obj(trop, obj)) quan = 1;
         const invObj = add_inventory_object(obj);
         if (trop.wielded) invObj.wielded = true;
+        if (trop.alternate) invObj.alternate = true;
+        if (trop.quivered) invObj.quivered = true;
         if (trop.worn) invObj.worn = true;
+        apply_starting_worn_extrinsic(invObj);
         learn_initial_spell(invObj);
         if (invObj.oclass === SPBOOK_CLASS && starting_spell_level(invObj.otyp) === 1) {
             gotLevel1Spellbook = true;
@@ -396,6 +455,12 @@ export function u_init_role_inventory() {
         if (!rn2(5)) {
             ini_inv(BLINDFOLD_INVENTORY, noCreate, role.name.m);
         }
+    } else if (role?.name?.m === 'Ranger') {
+        ini_inv(RANGER_INVENTORY, noCreate, role.name.m);
+        // C ref: u_init.c:u_init_role() -> knows_class(WEAPON_CLASS).
+        // Rangers know launchers, ammo, and spears, but those types have not
+        // been encountered yet, so the discoveries menu marks them with '*'.
+        for (const otyp of RANGER_KNOWN_WEAPONS) discover_role_known_object(otyp);
     }
     if (roleStartingGold > 0) {
         ini_inv(MONEY_INVENTORY, noCreate, role?.name?.m);

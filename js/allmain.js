@@ -149,7 +149,8 @@ function drawQuestIntroOverlay(alignName) {
         || g.flags?.legacy === false
         || !findRole(g._nhopts?.role)) return false;
     const god = roleGod(g.urole, alignName);
-    const godTitle = (god === 'The Lady' || god === 'Athena' || god === 'Brigit' || god === 'Ishtar')
+    const godTitle = (god === 'The Lady' || god === 'Athena' || god === 'Brigit'
+        || god === 'Ishtar' || god === 'Venus' || god === 'Amaterasu Omikami')
         ? 'goddess'
         : 'god';
     const rank = g.flags?.female
@@ -378,6 +379,8 @@ export async function newgame() {
         g._deferred_startup_uac = 9;
     } else if (!ff && g.flags?.legacy !== false && g.urole?.name?.m === 'Tourist') {
         g._deferred_startup_uac = 10;
+    } else if (!ff && g.flags?.legacy !== false && g.urole?.name?.m === 'Ranger') {
+        g._deferred_startup_uac = 7;
     }
 
     // Welcome message
@@ -388,7 +391,7 @@ export async function newgame() {
     await pline(welcome);
     if (!ff && (showedQuestIntro || welcome.length + '--More--'.length > COLNO)) {
         g._more = true;
-        g._more_next_message_row = !showedQuestIntro || g.urole?.name?.m === 'Tourist';
+        g._more_next_message_row = welcome.length + '--More--'.length >= COLNO;
     }
 }
 

@@ -104,9 +104,21 @@ const LARGE_BOX = 214;
 const CHEST = 215;
 const ICE_BOX = 216;
 const GOLD_PIECE = 438;
+const ARROW = 18;
+const ELVEN_ARROW = 19;
+const ORCISH_ARROW = 20;
+const YA = 22;
 const SCALPEL = 39;
 const DART = 23;
+const DAGGER = 34;
+const ELVEN_SPEAR = 28;
+const ORCISH_SPEAR = 29;
+const DWARVISH_SPEAR = 30;
 const JAVELIN = 32;
+const BOW = 83;
+const ELVEN_BOW = 84;
+const ORCISH_BOW = 85;
+const YUMI = 86;
 const ORCISH_DAGGER = 36;
 const TRIPE_RATION = 264;
 const CORPSE = 265;
@@ -283,12 +295,24 @@ const LEGACY_CORPSE_NUM_TO_MONSTER = new Map([
 ]);
 
 const OBJECT_BASE_NAMES = new Map([
+    [ARROW, 'arrow'],
+    [ELVEN_ARROW, 'elven arrow'],
+    [ORCISH_ARROW, 'orcish arrow'],
+    [YA, 'ya'],
     [DART, 'dart'],
-    [JAVELIN, 'throwing spear'],
+    [DAGGER, 'dagger'],
+    [ELVEN_SPEAR, 'elven spear'],
+    [ORCISH_SPEAR, 'orcish spear'],
+    [DWARVISH_SPEAR, 'dwarvish spear'],
+    [JAVELIN, 'javelin'],
     [SCALPEL, 'scalpel'],
     [ORCISH_DAGGER, 'crude dagger'],
     [WAR_HAMMER, 'war hammer'],
     [QUARTERSTAFF, 'quarterstaff'],
+    [BOW, 'bow'],
+    [ELVEN_BOW, 'elven bow'],
+    [ORCISH_BOW, 'orcish bow'],
+    [YUMI, 'yumi'],
     [GRAY_DRAGON_SCALE_MAIL, 'gray dragon scale mail'],
     [CLOAK_OF_MAGIC_RESISTANCE, 'cloak of magic resistance'],
     [CLOAK_OF_DISPLACEMENT, 'cloak of displacement'],
@@ -823,11 +847,22 @@ function thrownLanding(dx, dy) {
     return { ...last, hitHard };
 }
 
+function matchingLauncherForAmmo(ammo, launcher) {
+    return ammo?.otyp === ARROW && launcher?.otyp === BOW;
+}
+
+function isAmmoObject(obj) {
+    return obj?.otyp === ARROW;
+}
+
 function throwInventoryObject(obj, dirKey) {
     if (!obj || obj.oclass !== WEAPON_CLASS) return;
-    if ((obj.quan || 1) > 1) {
-        // C ref: dothrow.c:throw_obj(); even a one-shot volley uses rnd(1)
-        // for stackable thrown weapons.
+    const wielded = heroWieldedWeapon();
+    const thrownByHand = isAmmoObject(obj) && !matchingLauncherForAmmo(obj, wielded);
+    if ((obj.quan || 1) > 1 && (!isAmmoObject(obj) || matchingLauncherForAmmo(obj, wielded))) {
+        // C ref: dothrow.c:throw_obj(); stackable non-ammo weapons and ammo
+        // with a wielded matching launcher roll multishot even for a one-shot
+        // volley.  Ammo thrown by hand skips that launcher-dependent block.
         rnd(1);
     }
     const thrown = thrownObjectFromInventory(obj);
@@ -842,6 +877,12 @@ function throwInventoryObject(obj, dirKey) {
     if (landing.x === (game.u?.ux ?? 0) && landing.y === (game.u?.uy ?? 0) && !landing.hitHard) return;
     place_object(thrown, landing.x, landing.y);
     see_objects();
+    if (thrownByHand) {
+        const launcher = obj.otyp === ARROW ? 'a bow' : 'the appropriate launcher';
+        const msg = `You aren't wielding ${launcher}, so you throw your ${baseObjectName(obj)} by hand.`;
+        game._pending_message = msg;
+        game._last_topline_message = msg;
+    }
 }
 
 function lastInventoryLetter() {
@@ -1023,6 +1064,21 @@ function throwLetters() {
         if (obj?.oclass === WEAPON_CLASS) letters.push(obj.invlet);
     }
     return letters.join('');
+}
+
+function readyLetters() {
+    ensureInventoryLetters();
+    return (game.inventory || [])
+        .filter((obj) => obj?.oclass === WEAPON_CLASS && !obj.wielded
+            && !((obj?.owornmask || 0) & C.W_WEP) && !obj.alternate)
+        .map((obj) => obj.invlet)
+        .join('');
+}
+
+function setQuiveredObject(obj) {
+    for (const item of game.inventory || []) item.quivered = false;
+    game.uquiver = obj || null;
+    if (obj) obj.quivered = true;
 }
 
 function canWriteWithObject(obj) {
@@ -1731,6 +1787,7 @@ function unpaidSuffix(obj) {
 
 function wornSuffix(obj) {
     if (obj?.wornSide) return ` (on ${obj.wornSide} hand)`;
+    if (obj?.quivered) return ' (at the ready)';
     if (obj?.wielded || ((obj?.owornmask || 0) & C.W_WEP)) {
         if (obj?.otyp === QUARTERSTAFF) return ' (weapon in hands)';
         return ' (weapon in right hand)';
@@ -3956,7 +4013,16 @@ function zapDig(dx, dy) {
 
 const TOURIST_DISCOVERIES_SCREEN = "Discoveries, by order of discovery within each class\n\n\u001b[7mScrolls\u001b[0m\n  scroll of magic mapping (ANDOVA BEGARIN)\n\u001b[7mPotions\u001b[0m\n  potion of extra healing (murky)\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n--More--";
 const DISCOVERY_DESCRIPTION_SLOT = new Map([
+    [ELVEN_ARROW, 'runed arrow'],
+    [ORCISH_ARROW, 'crude arrow'],
+    [YA, 'bamboo arrow'],
+    [ELVEN_SPEAR, 'runed spear'],
+    [ORCISH_SPEAR, 'crude spear'],
+    [DWARVISH_SPEAR, 'stout spear'],
     [JAVELIN, 'throwing spear'],
+    [ELVEN_BOW, 'runed bow'],
+    [ORCISH_BOW, 'crude bow'],
+    [YUMI, 'long bow'],
     [ORCISH_DAGGER, 'crude dagger'],
     [QUARTERSTAFF, 'staff'],
     [CLOAK_OF_MAGIC_RESISTANCE, 148],
@@ -6254,6 +6320,7 @@ function objectDiscoveryScreen() {
     }
 
     if (lines.length >= 24) return lines.slice(0, 23).concat('--More--').join('\n');
+    while (lines.length < 23) lines.push('');
     lines.push('--More--');
     return lines.join('\n');
 }
@@ -6423,6 +6490,7 @@ function weaponSkillName(obj) {
 
 function weaponSkillLevelName(obj) {
     if (obj?.otyp === SCALPEL || obj?.otyp === QUARTERSTAFF) return 'basic';
+    if (game.urole?.name?.m === 'Ranger' && obj?.otyp === DAGGER) return 'basic';
     return 'no';
 }
 
@@ -6625,7 +6693,10 @@ async function showTutorialPrompt(invalidChoice = false) {
     const display = game.nhDisplay;
     if (!display?.terminal?.serialize) return;
 
-    for (let row = 0; row <= (invalidChoice ? 7 : 6); row++) display.clearRow(row);
+    display.clearRow(0);
+    for (let row = 1; row <= (invalidChoice ? 7 : 6); row++) {
+        for (let col = 20; col < display.cols; col++) display.setCell(col, row, ' ', NO_COLOR, 0);
+    }
     display.putstr(21, 0, 'Do you want a tutorial?', NO_COLOR, ATR_INVERSE);
     display.putstr(21, 2, 'y - Yes, do a tutorial', NO_COLOR, 0);
     display.putstr(21, 3, 'n - No, just start play', NO_COLOR, 0);
@@ -7459,7 +7530,7 @@ export async function rhack(key) {
     if (await handleQueuedMore(ch)) return;
 
     if (game._travel_tip_active) {
-        if (ch === ' ' || ch === '\r' || ch === '\n') {
+        if (ch === ' ' || ch === '\r' || ch === '\n' || ch === '\x1b') {
             const kind = game._travel_tip_active;
             game._travel_tip_active = false;
             clearOverrideScreen();
@@ -8330,6 +8401,60 @@ export async function rhack(key) {
         return;
     }
 
+    if (game._awaiting_quiver_confirm) {
+        clear_pending_message();
+        const obj = game._awaiting_quiver_confirm;
+        game._awaiting_quiver_confirm = null;
+        if (ch !== 'y') {
+            game.context.move = 0;
+            await pline('Never mind.');
+            return;
+        }
+        obj.alternate = false;
+        setQuiveredObject(obj);
+        game.context.move = 0;
+        await pline(`${inventoryListing(obj, { includeWorn: true })}.`);
+        return;
+    }
+
+    if (game._awaiting_quiver_item) {
+        clear_pending_message();
+        game._awaiting_quiver_item = false;
+        if (ch === ' ' || ch === '\x1b') {
+            game.context.move = 0;
+            await pline('Never mind.');
+            return;
+        }
+        if (ch === '-') {
+            setQuiveredObject(null);
+            game.context.move = 0;
+            await pline('You now have no ammunition readied.');
+            return;
+        }
+        const idx = inventoryIndexForLetter(ch);
+        const obj = idx >= 0 ? game.inventory?.[idx] : null;
+        if (!obj || obj.oclass !== WEAPON_CLASS) {
+            game.context.move = 0;
+            await pline("You don't have that object.");
+            return;
+        }
+        if (obj.quivered) {
+            game.context.move = 0;
+            await pline('That ammunition is already readied!');
+            return;
+        }
+        if (obj.alternate) {
+            game._awaiting_quiver_confirm = obj;
+            game.context.move = 0;
+            await showPromptLine('That is your alternate weapon.  Ready it instead? [ynq] (q)', { trailingInputSpace: true });
+            return;
+        }
+        setQuiveredObject(obj);
+        game.context.move = 0;
+        await pline(`${inventoryListing(obj, { includeWorn: true })}.`);
+        return;
+    }
+
     if (game._awaiting_drop_item) {
         clear_pending_message();
         game._awaiting_drop_item = false;
@@ -9160,6 +9285,11 @@ export async function rhack(key) {
         const letters = wieldLetters();
         game._awaiting_wield_item = true;
         await showPromptLine(`What do you want to wield? [-${letters ? ` ${letters}` : ''} or ?*] `);
+    } else if (ch === 'Q') {
+        game.context.move = 0;
+        const letters = readyLetters();
+        game._awaiting_quiver_item = true;
+        await showPromptLine(`What do you want to ready? [-${letters ? ` ${letters}` : ''} or ?*] `);
     } else if (ch === '+') {
         game.context.move = 0;
         await showSpellMenu();

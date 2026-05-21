@@ -72,6 +72,28 @@ const G_FREQ = 0x0007;
 const OBJECT_WEIGHT_OVERRIDES = new Map([
     [LARGE_BOX, 350],
     [CHEST, 600],
+    // C refs: objects.h WEAPON(...), mon.c:can_carry().  mksobj() still
+    // initializes most JS object weights as 1, so pets must consult table
+    // weights for heavy weapons before accepting apport goals.
+    [44, 60], // axe
+    [45, 120], // battle-axe
+    [52, 70], // broadsword
+    [53, 70], // elven broadsword
+    [55, 150], // two-handed sword
+    [57, 60], // tsurugi
+    [59, 80], // partisan
+    [62, 75], // glaive
+    [63, 150], // halberd
+    [64, 120], // bardiche
+    [65, 125], // voulge
+    [66, 60], // fauchard
+    [67, 80], // guisarme
+    [68, 120], // bill-guisarme
+    [69, 150], // lucern hammer
+    [70, 100], // bec de corbin
+    [71, 120], // dwarvish mattock
+    [72, 180], // lance
+    [75, 120], // morning star
     // C refs: objects.h ARMOR(...), mon.c:can_carry().
     // Generated armor objects can lack owt in the JS state; pets must still
     // use their table weights before dog_invent() rolls for pickup.
