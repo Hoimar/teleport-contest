@@ -1850,7 +1850,12 @@ function knownSpellEntries() {
         const info = SPELLBOOK_SPELL_INFO.get(spell?.otyp);
         if (!info) continue;
         if (entries.some((entry) => entry.name === info.name)) continue;
-        entries.push({ letter: String.fromCharCode(97 + entries.length), ...info });
+        entries.push({
+            letter: String.fromCharCode(97 + entries.length),
+            otyp: spell?.otyp,
+            turnsLeft: spell?.turnsLeft ?? spell?.sp_know,
+            ...info,
+        });
     }
     return entries;
 }
@@ -5196,28 +5201,36 @@ function compressMenuSpaces(text) {
     return text.replace(/ {5,}/g, (spaces) => cursorForward(spaces.length));
 }
 
-function spellMenuRawLine(entry, turnsLeft, menuCol) {
+function spellKnowledgeTurns(entry, fallback) {
+    const turns = Number.isInteger(entry?.turnsLeft) ? entry.turnsLeft : fallback;
+    return String(turns).padStart(6);
+}
+
+function spellMenuRawLine(entry, turnsLeft, menuCol, showTurns = false) {
     // C ref: spell.c:dospellmenu().
     const fail = 100 - percentSpellSuccessBasic(entry);
     const retention = spellRetentionTextBasic(entry, turnsLeft);
-    const text = `${entry.letter} - `
+    let text = `${entry.letter} - `
         + `${entry.name.padEnd(20)}  `
         + `${String(entry.level).padStart(2)}   `
         + `${entry.category.padEnd(12)} `
         + `${String(fail).padStart(3)}% `
         + `${retention.padStart(9)}`;
+    if (showTurns) text += ` ${spellKnowledgeTurns(entry, turnsLeft)}`;
     return `${cursorForward(menuCol)}${compressMenuSpaces(text)}`;
 }
 
-function spellMenuPlainLine(entry, turnsLeft) {
+function spellMenuPlainLine(entry, turnsLeft, showTurns = false) {
     const fail = 100 - percentSpellSuccessBasic(entry);
     const retention = spellRetentionTextBasic(entry, turnsLeft);
-    return `${entry.letter} - `
+    let text = `${entry.letter} - `
         + `${entry.name.padEnd(20)}  `
         + `${String(entry.level).padStart(2)}   `
         + `${entry.category.padEnd(12)} `
         + `${String(fail).padStart(3)}% `
         + `${retention.padStart(9)}`;
+    if (showTurns) text += ` ${spellKnowledgeTurns(entry, turnsLeft)}`;
+    return text;
 }
 
 async function showSpellMenu() {
@@ -5232,16 +5245,18 @@ async function showSpellMenu() {
     if (!display?.terminal?.serialize && !display?.serialize) return;
 
     const turnsLeft = 20001 - (game.moves || 1);
-    const maxLen = 58;
-    const menuCol = Math.max(1, Math.min(COLNO - 1, COLNO - maxLen - 2));
+    const showTurns = !!(game.wizard || game.flags?.debug);
+    const headerLine = `    ${'Name'.padEnd(20)} Level ${'Category'.padEnd(12)} Fail Retention${showTurns ? '  turns' : ''}`;
     const lines = [
         { text: 'Currently known spells', attr: ATR_INVERSE },
         { text: '' },
         { text: '', headerSegments: true },
-        ...spells.map((entry) => ({ text: spellMenuPlainLine(entry, turnsLeft) })),
+        ...spells.map((entry) => ({ text: spellMenuPlainLine(entry, turnsLeft, showTurns) })),
         { text: '+ - [sort spells]' },
         { text: '(end)' },
     ];
+    const maxLen = Math.max(headerLine.length, ...lines.map((line) => (line.text || '').length));
+    const menuCol = Math.max(1, Math.min(COLNO - 1, COLNO - maxLen - 2));
     for (let row = 0; row < Math.min(5, lines.length); row++)
         display.putstr(menuCol, row, ' '.repeat(COLNO - menuCol), NO_COLOR, 0);
     if (lines.length > 5)
@@ -5260,13 +5275,13 @@ async function showSpellMenu() {
     }
     display.putstr(menuCol, 2, '    Name', NO_COLOR, ATR_INVERSE);
     display.putstr(menuCol + 25, 2, 'Level Category', NO_COLOR, ATR_INVERSE);
-    display.putstr(menuCol + 44, 2, 'Fail Retention', NO_COLOR, ATR_INVERSE);
+    display.putstr(menuCol + 44, 2, `Fail Retention${showTurns ? '  turns' : ''}`, NO_COLOR, ATR_INVERSE);
     let screen = serialize_terminal_grid(display);
     const screenRows = screen.split('\n');
     if (screenRows.length > 2) {
         // C ref: spell.c:dospellmenu(); curses writes the leading header
         // spaces under inverse video, which grid serialization otherwise drops.
-        screenRows[2] = `${cursorForward(menuCol)}\x1b[7m    Name\x1b[17CLevel Category\x1b[5CFail Retention\x1b[0m`;
+        screenRows[2] = `${cursorForward(menuCol)}\x1b[7m    Name\x1b[17CLevel Category\x1b[5CFail Retention${showTurns ? '  turns' : ''}\x1b[0m`;
         screen = screenRows.join('\n');
     }
     const lastRow = lines.length - 1;
