@@ -8,7 +8,7 @@ import { MONSTER_DATA } from './monster_data.js';
 import { OBJECT_CLASS } from './object_data.js';
 import { getObjectColor } from './o_init.js';
 import {
-    COLNO, ROWNO, STONE, ROOM, CORR, DOOR, SDOOR, STAIRS,
+    COLNO, ROWNO, STONE, ROOM, CORR, DOOR, SDOOR, SCORR, STAIRS,
     HWALL, VWALL, TLCORNER, TRCORNER, BLCORNER, BRCORNER,
     CROSSWALL, TUWALL, TDWALL, TLWALL, TRWALL,
     TREE, FOUNTAIN, SINK, ALTAR, GRAVE, THRONE, POOL, MOAT, WATER, LAVAPOOL, LAVAWALL, CLOUD,
@@ -687,27 +687,39 @@ function mapped_location_memory(loc, x, y, visible) {
 }
 
 export function map_level_for_wizard() {
-    // C refs: wizcmds.c:wiz_map(), detect.c:do_mapping().
+    // C refs: wizcmds.c:wiz_map(), detect.c:do_mapping(), detect.c:show_map_spot().
     if (!game.level) return;
     const savedHallucination = game.u?.uprops?.hallucination;
     const savedUHallucination = game.u?.uhallucination;
     if (game.u?.uprops) game.u.uprops.hallucination = 0;
     if (game.u) game.u.uhallucination = 0;
 
-    for (const trap of game.level.traps || []) trap.tseen = true;
-
     for (let y = 0; y < ROWNO; y++) {
         for (let x = 1; x < COLNO; x++) {
             const loc = game.level.at(x, y);
             if (!loc) continue;
+            const old = {
+                ch: loc.disp_ch,
+                color: loc.disp_color,
+                decgfx: loc.disp_decgfx,
+            };
+            const visible = cansee(x, y);
+            if (loc.typ === SCORR) loc.typ = CORR;
             if (IS_WALL(loc.typ) || loc.typ === SDOOR) loc.seenv = 0xff;
-            loc.waslit = true;
             const trap = (game.level.traps || []).find(t => t.tx === x && t.ty === y);
             const covered = terrain_covers_objects(loc);
             let glyph = terrain_glyph(loc, x, y);
             if (trap?.tseen && !covered) glyph = trap_glyph(trap);
-            loc.remembered_glyph = { ch: glyph.ch, color: glyph.color, decgfx: !!glyph.dec };
-            show_glyph_cell(x, y, glyph.ch, glyph.color, !!glyph.dec);
+            else if (!covered) {
+                const obj = (game.level.objects || []).find(o => o.ox === x && o.oy === y);
+                if (obj && old.ch) {
+                    const og = object_glyph_for_display(obj, x, y, visible);
+                    if (old.ch === og.ch && old.color === tty_color(og.color)) glyph = og;
+                }
+            }
+            const decgfx = !!(glyph.dec ?? glyph.decgfx);
+            loc.remembered_glyph = { ch: glyph.ch, color: glyph.color, decgfx };
+            show_glyph_cell(x, y, glyph.ch, glyph.color, decgfx);
         }
     }
     see_monsters();
@@ -1293,7 +1305,8 @@ function _buildScreenOutput() {
             const more = `${game._message_continuation_row || ''}--More--`;
             display.setCursor(Math.min(more.length, display.cols - 1), 1);
         }
-        else if (msg && game._more && !floorListActive) display.setCursor(Math.min(msg.length, display.cols - 1), 0);
+        else if (msg && game._more && !floorListActive)
+            display.setCursor(Math.min(terminalCellWidth(msg), display.cols - 1), 0);
         else if (game._prompt_cursor) display.setCursor(game._prompt_cursor[0], game._prompt_cursor[1]);
         else if (game.u?.ux > 0)
             display.setCursor(game.u.ux - 1, game.u.uy + 1);
@@ -1340,6 +1353,26 @@ export async function append_pline(msg) {
 export function queue_more_prompt(count = 1) {
     game._more_dismissals_remaining = (game._more_dismissals_remaining || 0) + Math.max(1, count);
     game._more = true;
+}
+
+function terminalCellWidth(text) {
+    let width = 0;
+    const s = String(text || '');
+    for (let i = 0; i < s.length; i++) {
+        const ch = s[i];
+        if (ch === '\x0e' || ch === '\x0f') continue;
+        if (ch === '\x1b' && s[i + 1] === '[') {
+            let j = i + 2;
+            while (j < s.length && !/[A-Za-z]/.test(s[j])) j++;
+            const final = s[j] || '';
+            const body = s.slice(i + 2, j);
+            if (final === 'C') width += Number(body || 1) || 1;
+            i = j;
+            continue;
+        }
+        width++;
+    }
+    return width;
 }
 
 export function clear_pending_message() {

@@ -175,16 +175,16 @@ function drawQuestIntroOverlay(alignName) {
         [left, 16, `of us all:  Go bravely with ${god}!`],
         [left, 17, '--More--'],
     ];
-    // C ref: allmain.c:newgame() -> com_pager("legacy").  Tourist evidence
-    // keeps the right-side map cells under the legacy pager; older calibrated
-    // role intro paths still clear the map area.
+    // C ref: allmain.c:newgame() -> com_pager("legacy").  The tty pager
+    // writes text over the already-drawn map instead of clearing the whole
+    // map area.
     if (isTourist) {
         for (let row = 0; row <= 17; row++)
             for (let col = 0; col < display.cols; col++)
                 display.setCell(col, row, ' ', NO_COLOR, 0);
     } else {
         for (let row = 0; row < 22; row++)
-            for (let col = 0; col < display.cols; col++)
+            for (let col = Math.max(0, left - 1); col < display.cols; col++)
                 display.setCell(col, row, ' ', NO_COLOR, 0);
     }
     for (const [col, row, text] of lines) display.putstr(col, row, text, NO_COLOR, 0);
