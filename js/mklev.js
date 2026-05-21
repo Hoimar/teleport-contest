@@ -1456,7 +1456,13 @@ function sobj_at(otyp, x, y) {
 }
 
 function set_corpsenm(otmp, pm) {
-    if (otmp) otmp.corpsenm = pm;
+    if (!otmp) return;
+    if (typeof pm === 'number') {
+        otmp.corpsenm = pm;
+        return;
+    }
+    const ptr = monster_ptr(pm);
+    otmp.corpsenm = ptr ? ptr.name : pm;
 }
 
 function set_corpsenm_restart(otmp, pm) {
@@ -1467,7 +1473,10 @@ function set_corpsenm_restart(otmp, pm) {
 function monster_ptr(ref) {
     if (typeof ref === 'number') return MONSTERS[ref] || null;
     if (ref === 'CAVEWOMAN') return MONSTERS.find((mon) => mon.name === 'CAVEMAN') || null;
-    if (typeof ref === 'string') return MONSTERS.find((mon) => mon.name === ref) || null;
+    if (typeof ref === 'string') {
+        const key = ref.trim().toUpperCase().replace(/[\s-]+/g, '_');
+        return MONSTERS.find((mon) => mon.name === ref || mon.name === key) || null;
+    }
     return ref?.name ? ref : null;
 }
 
@@ -1625,6 +1634,29 @@ function start_corpse_timeout(body) {
     rnz(game.in_mklev ? 25 : 10);
 }
 
+function obj_resists_basic(obj, ochance, achance) {
+    if (!obj || obj.otyp === AMULET_OF_YENDOR
+        || obj.otyp === SPE_BOOK_OF_THE_DEAD
+        || obj.otyp === CANDELABRUM_OF_INVOCATION
+        || obj.otyp === BELL_OF_OPENING
+        || (obj.otyp === CORPSE && is_rider_ref(obj.corpsenm))) return true;
+    return rn2(100) < (obj.oartifact ? achance : ochance);
+}
+
+function remove_level_object(obj) {
+    const idx = game.level?.objects?.indexOf(obj) ?? -1;
+    if (idx >= 0) game.level.objects.splice(idx, 1);
+}
+
+function bury_an_obj_basic(obj) {
+    // C ref: dig.c:bury_an_obj(); burial probes obj_resists(0,0) even when
+    // the object cannot resist, then moves the object off the floor chain.
+    if (obj_resists_basic(obj, 0, 0)) return false;
+    remove_level_object(obj);
+    obj.buried = true;
+    return true;
+}
+
 // mkcorpstat stub
 export function mkcorpstat(objtyp, mtmp, pm, x, y, flags) {
     // C ref: mkcorpstat calls mksobj(objtyp) then set_corpsenm.
@@ -1632,12 +1664,11 @@ export function mkcorpstat(objtyp, mtmp, pm, x, y, flags) {
     // corpsenm before mkcorpstat's caller-supplied type overrides it.
     // RNG: next_ident from mksobj
     const otmp = mksobj(objtyp, !!(flags & 8), false);
-    const oldCorpsenm = otmp.corpsenm;
     if (pm !== null && pm !== undefined) {
         set_corpsenm(otmp, pm);
-        if (otmp.otyp === CORPSE && (special_corpse(oldCorpsenm) || special_corpse(otmp.corpsenm))) {
-            start_corpse_timeout(otmp);
-        }
+        // C ref: mkobj.c:set_corpsenm(); changing a corpse species stops old
+        // timers and starts a new corpse timer for the replacement type.
+        if (otmp.otyp === CORPSE) start_corpse_timeout(otmp);
     } else if (otmp.corpsenm == null) {
         // rndmonnum — pick random monster
         otmp.corpsenm = rndmonnum();
@@ -10027,9 +10058,12 @@ function apply_themeroom_fill(croom) {
     const count = Math.trunc(((croom.hx - croom.lx + 1) * (croom.hy - croom.ly + 1)) / 2);
     for (let i = 0; i < count; i++) {
         lua_shuffle(zombifiable);
-        const x = somex(croom);
-        const y = somey(croom);
-        mkcorpstat(CORPSE, null, zombifiable[0], x, y, 8);
+        const { x, y } = specialRoomLocation(croom);
+        const corpse = mkcorpstat(CORPSE, null, zombifiable[0], x, y, 8);
+        if (corpse) {
+            bury_an_obj_basic(corpse);
+            rn2(21); // C ref: themerms.lua Buried zombies math.random(990,1010).
+        }
     }
 }
 
@@ -10856,6 +10890,22 @@ function somex(croom) { return rn1(croom.hx - croom.lx + 1, croom.lx); }
 function somey(croom) { return rn1(croom.hy - croom.ly + 1, croom.ly); }
 
 function somexy(croom, c) {
+    if (croom.irregular) {
+        const rmno = game.level.rooms.indexOf(croom) + ROOMOFFSET;
+        let try_cnt = 0;
+        while (try_cnt++ < 100) {
+            c.x = somex(croom);
+            c.y = somey(croom);
+            const loc = game.level.at(c.x, c.y);
+            if (loc && !loc.edge && loc.roomno === rmno) return true;
+        }
+        for (c.x = croom.lx; c.x <= croom.hx; c.x++)
+            for (c.y = croom.ly; c.y <= croom.hy; c.y++) {
+                const loc = game.level.at(c.x, c.y);
+                if (loc && !loc.edge && loc.roomno === rmno) return true;
+            }
+        return false;
+    }
     if (!croom.nsubrooms) {
         c.x = somex(croom);
         c.y = somey(croom);

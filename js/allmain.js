@@ -381,6 +381,8 @@ export async function newgame() {
         g._deferred_startup_uac = 10;
     } else if (!ff && g.flags?.legacy !== false && g.urole?.name?.m === 'Ranger') {
         g._deferred_startup_uac = 7;
+    } else if (!ff && g.flags?.legacy !== false && g.urole?.name?.m === 'Rogue') {
+        g._deferred_startup_uac = 7;
     }
 
     // Welcome message

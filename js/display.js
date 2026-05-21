@@ -1013,6 +1013,9 @@ function render_known_terrain_row(y) {
         const loc = game.level.at(x, y);
         const known = loc?.disp_ch && loc.disp_ch !== ' ';
         if (!known) continue;
+        // C ref: cmd.c:doterrain().  The first terrain-view choice shows the
+        // known map without monsters, objects, and traps, so render the base
+        // terrain instead of the remembered object/monster display layer.
         const glyph = terrain_glyph(loc, x, y);
         if (glyph.ch === '#' || glyph.ch === '>') glyph.color = NO_COLOR;
         glyphs.set(x, glyph);

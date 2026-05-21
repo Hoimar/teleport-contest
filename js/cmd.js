@@ -30,6 +30,7 @@ import { dist2 } from './hacklib.js';
 import { getObjectDescription } from './o_init.js';
 import { getRumor, hallucinatedLiquidName, randomHallucinatedMonsterName } from './random_text.js';
 import { finish_pending_swallowed_expulsion } from './monmove.js';
+import { writeSavedGame } from './save_restore.js';
 import { ATR_INVERSE, NO_COLOR } from './terminal.js';
 import * as C from './const.js';
 import {
@@ -103,6 +104,7 @@ const DRUM_OF_EARTHQUAKE = 258;
 const LARGE_BOX = 214;
 const CHEST = 215;
 const ICE_BOX = 216;
+const SACK = 217;
 const GOLD_PIECE = 438;
 const ARROW = 18;
 const ELVEN_ARROW = 19;
@@ -111,6 +113,8 @@ const YA = 22;
 const SCALPEL = 39;
 const DART = 23;
 const DAGGER = 34;
+const ELVEN_DAGGER = 35;
+const SHORT_SWORD = 46;
 const ELVEN_SPEAR = 28;
 const ORCISH_SPEAR = 29;
 const DWARVISH_SPEAR = 30;
@@ -128,6 +132,7 @@ const MEAT_STICK = 268;
 const ENORMOUS_MEATBALL = 269;
 const MEAT_RING = 270;
 const GLOB_OF_GRAY_OOZE = 271;
+const POT_SICKNESS = 318;
 const GLOB_OF_BROWN_PUDDING = 272;
 const GLOB_OF_GREEN_SLIME = 273;
 const GLOB_OF_BLACK_PUDDING = 274;
@@ -301,6 +306,8 @@ const OBJECT_BASE_NAMES = new Map([
     [YA, 'ya'],
     [DART, 'dart'],
     [DAGGER, 'dagger'],
+    [ELVEN_DAGGER, 'elven dagger'],
+    [SHORT_SWORD, 'short sword'],
     [ELVEN_SPEAR, 'elven spear'],
     [ORCISH_SPEAR, 'orcish spear'],
     [DWARVISH_SPEAR, 'dwarvish spear'],
@@ -337,6 +344,7 @@ const OBJECT_BASE_NAMES = new Map([
     [LARGE_BOX, 'large box'],
     [CHEST, 'chest'],
     [ICE_BOX, 'ice box'],
+    [SACK, 'sack'],
     [POT_CONFUSION, 'potion of confusion'],
     [POT_PARALYSIS, 'potion of paralysis'],
     [311, 'potion of monster detection'],
@@ -349,6 +357,7 @@ const OBJECT_BASE_NAMES = new Map([
     [POT_BOOZE, 'potion of booze'],
     [POT_OIL, 'potion of oil'],
     [316, 'potion of polymorph'],
+    [POT_SICKNESS, 'potion of sickness'],
     [323, 'scroll of enchant armor'],
     [325, 'scroll of confuse monster'],
     [326, 'scroll of scare monster'],
@@ -1935,6 +1944,15 @@ function terrainViewCursor() {
 function showTerrainView(message, cursor = terrainViewCursor()) {
     const screen = serialize_known_terrain_view_screen(message);
     showSerializedOverride(screen, cursor);
+    game._override_serialized_persistent = true;
+}
+
+function showTerrainBrowsePrompt() {
+    // C refs: detect.c:reveal_terrain(), detect.c:browse_map(),
+    // getpos.c:getpos().  Terrain reveal enters getpos over the temporary
+    // terrain-only map after the introductory pager is dismissed.
+    showTerrainView("(For instructions type a '?')  Move cursor to anything of interest:");
+    game._terrain_view_active = true;
 }
 
 function knownSpellEntries() {
@@ -2177,6 +2195,17 @@ function dropObjectName(obj) {
         const buc = obj.blessed ? 'blessed ' : obj.cursed ? 'cursed ' : 'uncursed ';
         const spe = typeof obj.spe === 'number' ? `${obj.spe >= 0 ? '+' : ''}${obj.spe} ` : '';
         return `a ${buc}${spe}quarterstaff`;
+    }
+    if (obj?.oclass === WEAPON_CLASS && OBJECT_BASE_NAMES.has(obj.otyp)) {
+        const quan = obj.quan || 1;
+        const rawBase = baseObjectName(obj);
+        const base = quan > 1 ? pluralizeObjectName(rawBase) : rawBase;
+        const buc = obj.blessed ? 'blessed ' : obj.cursed ? 'cursed ' : '';
+        const spe = typeof obj.spe === 'number' && (obj.known || obj.knownName)
+            ? `${obj.spe >= 0 ? '+' : ''}${obj.spe} `
+            : '';
+        const body = `${buc}${spe}${base}`;
+        return quan > 1 ? `${quan} ${body}` : `${indefiniteArticle(body)} ${body}`;
     }
     return 'an object';
 }
@@ -3526,6 +3555,7 @@ function runShouldStopAfterMove(source, target, run = game.context?.run) {
     // does not stop just because the chosen path crosses a doorway or leaves
     // a corridor; findtravelpath()/lookaround() own travel continuation.
     if (run?.travel) return false;
+    if ([C.FOUNTAIN, C.SINK, C.ALTAR, C.THRONE, C.GRAVE].includes(target?.typ)) return true;
     return target?.typ === DOOR || (source?.typ === CORR && target?.typ === C.ROOM);
 }
 
@@ -4023,7 +4053,9 @@ const DISCOVERY_DESCRIPTION_SLOT = new Map([
     [ELVEN_BOW, 'runed bow'],
     [ORCISH_BOW, 'crude bow'],
     [YUMI, 'long bow'],
+    [ELVEN_DAGGER, 'runed dagger'],
     [ORCISH_DAGGER, 'crude dagger'],
+    [SACK, 'bag'],
     [QUARTERSTAFF, 'staff'],
     [CLOAK_OF_MAGIC_RESISTANCE, 148],
     [383, 376], // SPE_FORCE_BOLT's shuffled description slot in this object table.
@@ -4555,24 +4587,39 @@ async function redrawAfterFullScreenMenuDismiss() {
     }
 }
 
-async function showTravelTipScreen() {
-    // C ref: cmd.c:dotravel() enters the farlook selection UI and shows the
-    // farlook/travel tip before the first cursor prompt.
+const TRAVEL_TIP_ROWS = [
+    [0, 'Tip: Farlooking or selecting a map location'],
+    [2, 'You are now in a "farlook" mode - the movement keys move the cursor,'],
+    [3, 'not your character.  Game time does not advance.  This mode is used'],
+    [4, 'to look around the map, or to select a location on it.'],
+    [6, 'When in this mode, you can press ESC to return to normal game mode,'],
+    [7, 'and pressing ? will show the key help.'],
+    [8, '(end)'],
+];
+
+function showTravelTipOverScreen(baseScreen) {
+    const lines = String(baseScreen || '').split('\n');
+    while (lines.length < C.TERMINAL_ROWS) lines.push('');
+    for (let row = 0; row <= 8; row++) lines[row] = '';
+    for (const [row, text] of TRAVEL_TIP_ROWS) lines[row] = `\x1b[10C${text}`;
+    showSerializedOverride(lines.slice(0, C.TERMINAL_ROWS).join('\n'), [16, 8]);
+    game._override_serialized_persistent = true;
+}
+
+async function showTravelTipScreen(baseScreen = null) {
+    // C refs: cmd.c:dotravel(), detect.c:browse_map().  Farlook, travel,
+    // and terrain browsing all use the same getpos tip before the first
+    // cursor prompt.
+    if (baseScreen) {
+        showTravelTipOverScreen(baseScreen);
+        return;
+    }
     await flush_screen(1);
     const display = game.nhDisplay;
     if (!display?.putstr) return;
-    const rows = [
-        [0, 'Tip: Farlooking or selecting a map location'],
-        [2, 'You are now in a "farlook" mode - the movement keys move the cursor,'],
-        [3, 'not your character.  Game time does not advance.  This mode is used'],
-        [4, 'to look around the map, or to select a location on it.'],
-        [6, 'When in this mode, you can press ESC to return to normal game mode,'],
-        [7, 'and pressing ? will show the key help.'],
-        [8, '(end)'],
-    ];
     for (let row = 0; row <= 8; row++)
         display.putstr(9, row, ' '.repeat(C.COLNO - 9), NO_COLOR, 0);
-    for (const [row, text] of rows) {
+    for (const [row, text] of TRAVEL_TIP_ROWS) {
         display.putstr(10, row, text, NO_COLOR, 0);
     }
     const screen = serialize_terminal_grid(display);
@@ -5585,6 +5632,25 @@ function refreshSwallowedHallucinationAfterMore() {
     }
 }
 
+async function showNextStartupPreambleMessage() {
+    if (!Array.isArray(game._startup_preamble_messages)
+        || game._startup_preamble_messages.length === 0) return false;
+    const msg = game._startup_preamble_messages.shift();
+    await pline(msg);
+    // C ref: allmain.c:moveloop_preamble().  Date messages are normal
+    // topl plines queued behind the startup welcome pager.
+    game._more_next_message_row = false;
+    if (game._startup_preamble_messages.length > 0) queue_more_prompt();
+    else game._more = false;
+    game.context.move = 0;
+    return true;
+}
+
+function isStartupWelcomeMessage(msg) {
+    return typeof msg === 'string'
+        && (msg.includes('welcome to NetHack') || msg.includes('welcome back to NetHack'));
+}
+
 async function handleQueuedMore(ch) {
     if (!game._more || (game._more_dismissals_remaining || 0) <= 0) return false;
     let resumeMonsterBehindNewMore = false;
@@ -5659,6 +5725,7 @@ async function handleQueuedMore(ch) {
     } else if (game._death_prompt_pending) {
         await showDeathPrompt();
     } else if (game._more_dismissals_remaining <= 0) {
+        if (await showNextStartupPreambleMessage()) return true;
         if (game._post_arrival_pager_active) {
             game._post_arrival_pager_active = false;
             clearOverrideScreen();
@@ -6347,6 +6414,7 @@ function discoveryLineForObjectType(otyp, encounteredTypes) {
     if (typeKnown && !base && ARMOR_XNAMES.has(otyp)) {
         base = ARMOR_XNAMES.get(otyp).name;
     }
+    if (typeKnown && otyp === ORCISH_DAGGER) base = 'orcish dagger';
     if (!base && !desc) return null;
     if (!base) base = desc;
     if (typeKnown && !desc && (oclass === WEAPON_CLASS || oclass === TOOL_CLASS
@@ -6368,6 +6436,7 @@ function discoveryLineForObjectType(otyp, encounteredTypes) {
     }
     if (oclass === SCROLL_CLASS || oclass === SPBOOK_CLASS || oclass === ARMOR_CLASS
         || oclass === POTION_CLASS
+        || (oclass === TOOL_CLASS && desc)
         || (oclass === WEAPON_CLASS && desc)) {
         return `${prefix}${base}${desc ? ` (${desc})` : ''}${priceQuote}`;
     }
@@ -6521,6 +6590,7 @@ function roleAttributesPage1() {
         + `  You are ${game.u?.uhandedness || 'right'}-handed.\n`
         + `  You are in ${levelName}, on level ${displayDepth(game.u?.uz)}.\n`
         + `  You entered the dungeon ${game.moves || 1} turns ago.\n`
+        + (game.flags?.moonphase === 4 ? '  There is a full moon in effect.\n' : '')
         + `  You have ${game.u?.uexp || 0} experience points.\n`
         + '\n Basics:\n'
         + `${insightHpLine()}\n`
@@ -6532,7 +6602,7 @@ function roleAttributesPage1() {
         + `${insightAttrLine('strength', C.A_STR)}\n`
         + `${insightAttrLine('dexterity', C.A_DEX)}\n`
         + `${insightAttrLine('constitution', C.A_CON)}\n`
-        + `${insightAttrLine('intelligence', C.A_INT)}\n`
+        + (game.flags?.moonphase === 4 ? '' : `${insightAttrLine('intelligence', C.A_INT)}\n`)
         + ' (1 of 2)';
 }
 
@@ -6540,6 +6610,7 @@ function roleAttributesPage2() {
     // C ref: insight.c:attributes_enlightenment().
     const wielded = (game.inventory || []).find((obj) => obj?.wielded || ((obj?.owornmask || 0) & C.W_WEP));
     const lines = [
+        ...(game.flags?.moonphase === 4 ? [insightAttrLine('intelligence', C.A_INT)] : []),
         insightAttrLine('wisdom', C.A_WIS),
         insightAttrLine('charisma', C.A_CHA),
         '',
@@ -7504,6 +7575,25 @@ export async function rhack(key) {
         return;
     }
 
+    if (game._terrain_view_intro_more) {
+        game._override_prev = null;
+        if (ch === ' ' || ch === '\r' || ch === '\n' || ch === '\x1b') {
+            game._terrain_view_intro_more = false;
+            game._more = false;
+            game._more_dismissals_remaining = 0;
+            clear_pending_message();
+            if (!game._terrain_getpos_tip_seen) {
+                game._terrain_getpos_tip_seen = true;
+                game._travel_tip_active = 'terrain';
+                await showTravelTipScreen(serialize_known_terrain_view_screen(''));
+            } else {
+                showTerrainBrowsePrompt();
+            }
+        }
+        game.context.move = 0;
+        return;
+    }
+
     if (game._terrain_view_active) {
         if (ch === ' ' || ch === '\r' || ch === '\n' || ch === '\x1b') {
             const moreMessage = 'Done.--More--';
@@ -7511,6 +7601,7 @@ export async function rhack(key) {
             game._pending_message = 'Done.';
             game._more = true;
             game._terrain_view_done_more = true;
+            game._terrain_view_active = false;
         }
         game.context.move = 0;
         return;
@@ -7520,8 +7611,11 @@ export async function rhack(key) {
         game._awaiting_terrain_menu = false;
         clearOverrideScreen();
         if (ch === 'a' || ch === ' ' || ch === '\r' || ch === '\n') {
-            game._terrain_view_active = true;
-            showTerrainView("Showing known terrain only...  (For instructions type a '?')");
+            game._terrain_view_intro_more = true;
+            const msg = 'Showing known terrain only...';
+            showTerrainView(`${msg}--More--`, [msg.length + '--More--'.length, 0]);
+            game._pending_message = msg;
+            queue_more_prompt();
         }
         game.context.move = 0;
         return;
@@ -7538,6 +7632,8 @@ export async function rhack(key) {
                 await pline("(For instructions type a '?')");
                 queue_more_prompt();
                 game._farlook_prompt_after_instruction_more = true;
+            } else if (kind === 'terrain') {
+                showTerrainBrowsePrompt();
             } else {
                 await showPromptLine(TRAVEL_CURSOR_PROMPT);
                 setTravelMapCursor();
@@ -9075,8 +9171,13 @@ export async function rhack(key) {
             game.context.move = 0;
             return;
         }
+        if (prev === game._attributes_page2_screen && key !== 32 && key !== 13) {
+            const row = Math.max(0, (game._attributes_page2_screen || '').split('\n').length - 1);
+            showOverride(game._attributes_page2_screen, [9, row]);
+            game.context.move = 0;
+            return;
+        }
         if (prev === game._discovery_screen
-            || prev === game._attributes_page2_screen
             || prev === game._look_data_screen
             || prev === game._look_list_screen
             || (prev === game._attributes_page1_screen && key !== 32 && key !== 13)) {
@@ -9107,21 +9208,16 @@ export async function rhack(key) {
 
     const showStartupTutorial = shouldAskTutorial()
         && game._more
-        && typeof game._pending_message === 'string'
-        && game._pending_message.includes('welcome to NetHack')
+        && isStartupWelcomeMessage(game._pending_message)
         && (ch === ' ' || ch === '\r' || ch === '\n');
 
     if (!showStartupTutorial
         && game._more
-        && typeof game._pending_message === 'string'
-        && game._pending_message.includes('welcome to NetHack')
+        && isStartupWelcomeMessage(game._pending_message)
         && Array.isArray(game._startup_preamble_messages)
         && game._startup_preamble_messages.length
         && (ch === ' ' || ch === '\r' || ch === '\n')) {
-        const msg = game._startup_preamble_messages.shift();
-        await pline(msg);
-        game._more = game._startup_preamble_messages.length > 0;
-        game.context.move = 0;
+        await showNextStartupPreambleMessage();
         return;
     }
 
@@ -9141,6 +9237,20 @@ export async function rhack(key) {
         game._avoid_pool_tip_pending = false;
         game._more = false;
         await pline("(Tip: use 'm' prefix to step in if you really want to.)");
+        game.context.move = 0;
+        return;
+    }
+    if (game._awaiting_save_confirm) {
+        game._awaiting_save_confirm = false;
+        clear_pending_message();
+        if (ch === 'y' || ch === 'Y') {
+            writeSavedGame();
+            const screen = `Be seeing you...${'\n'.repeat(C.TERMINAL_ROWS - 1)}`;
+            showOverride(screen, [0, 1]);
+            game._pending_message = 'Be seeing you...';
+            game.program_state = game.program_state || {};
+            game.program_state.gameover = true;
+        }
         game.context.move = 0;
         return;
     }
@@ -9183,8 +9293,23 @@ export async function rhack(key) {
     clearDeferredPetPickupObjects();
     const forceCommandPrefix = !!game._force_command_prefix;
     game._force_command_prefix = false;
+    const redrawCommand = ch === '\x12' || ch === '\x0c';
+    if (!redrawCommand) game._redraw_resumes_run = null;
 
-    if (game._forcefight_pending && isMovementKey(ch)) {
+    if (redrawCommand) {
+        // C refs: cmd.c:cmdlist[]/bind_key(); display.c:doredraw()/docrt_flags().
+        vision_recalc(2);
+        vision_recalc(0);
+        await docrt();
+        if (game._redraw_resumes_run) {
+            game.context.run = { ...game._redraw_resumes_run };
+            game._redraw_resumes_run = null;
+            game._resume_run_after_more = true;
+            game.context.move = 1;
+        } else {
+            game.context.move = 0;
+        }
+    } else if (game._forcefight_pending && isMovementKey(ch)) {
         game._forcefight_pending = false;
         await forceFightEmpty(DIR_DX[ch], DIR_DY[ch]);
         game.context.move = 1;
@@ -9393,6 +9518,33 @@ export async function rhack(key) {
         await pickupHere();
     } else if (ch === 'p') {
         await doPayCommand();
+    } else if (ch === '$') {
+        game.context.move = 0;
+        const gold = heroGoldAmount();
+        await pline(gold > 0
+            ? `Your wallet contains ${gold} zorkmids.`
+            : 'Your wallet is empty.');
+    } else if (ch === ')') {
+        game.context.move = 0;
+        const weapon = heroWieldedWeapon();
+        if (weapon) await pline(`${inventoryListing(weapon, { includeWorn: true })}.`);
+        else await pline('You are bare handed.');
+    } else if (ch === '[') {
+        game.context.move = 0;
+        const wornArmor = (game.inventory || []).filter((obj) =>
+            obj?.oclass === ARMOR_CLASS && (obj.worn || (obj.owornmask || 0)));
+        if (wornArmor.length) await pline(`${inventoryListing(wornArmor[0], { includeWorn: true })}.`);
+        else await pline('You are not wearing any armor.');
+    } else if (ch === '=') {
+        game.context.move = 0;
+        const rings = (game.inventory || []).filter((obj) => obj?.oclass === RING_CLASS && (obj.worn || obj.wornSide));
+        if (rings.length) await pline(`${inventoryListing(rings[0], { includeWorn: true })}.`);
+        else await pline('You are not wearing any rings.');
+    } else if (ch === '"') {
+        game.context.move = 0;
+        const amulet = (game.inventory || []).find((obj) => obj?.oclass === AMULET_CLASS && (obj.worn || (obj.owornmask || 0)));
+        if (amulet) await pline(`${inventoryListing(amulet, { includeWorn: true })}.`);
+        else await pline('You are not wearing an amulet.');
     } else if (ch === 'P') {
         game.context.move = 0;
         const letters = putonLetters();
@@ -9462,6 +9614,10 @@ export async function rhack(key) {
         game.context.move = 0;
         await showPromptLine(`What do you want to drop? [a-${lastInventoryLetter()} or ?*] `);
         game._awaiting_drop_item = true;
+    } else if (ch === 'S') {
+        game.context.move = 0;
+        await showPromptLine('Really save? [yn] (n)', { trailingInputSpace: true });
+        game._awaiting_save_confirm = true;
     } else if (ch === ' ' && showStartupTutorial) {
         game.context.move = 0;
         await showTutorialPrompt(false);
@@ -9559,7 +9715,18 @@ export async function domove(dx, dy) {
     const newx = u.ux + dx;
     const newy = u.uy + dy;
     const target = game.level.at(newx, newy);
+    const currentSource = game.level.at(u.ux, u.uy);
     const is_diag = dx !== 0 && dy !== 0;
+
+    if (game.context?.run && !game.context.run.travel
+        && currentSource?.typ === CORR
+        && target?.typ === DOOR
+        && !(target.doormask & (D_CLOSED | D_LOCKED))) {
+        // C ref: hack.c:lookaround().  A corridor run stops at the doorway
+        // boundary before exposing the next room.
+        game.context.move = 0;
+        return false;
+    }
 
     if (is_diag && !blocksMove(newx, newy)) {
         const side1x = u.ux + dx, side1y = u.uy;
@@ -9650,6 +9817,11 @@ export async function domove(dx, dy) {
     u.ux = newx;
     u.uy = newy;
     if (game.context?.run && runShouldStopAfterMove(source, target)) {
+        if (target?.typ === DOOR && !(target.doormask & (D_CLOSED | D_LOCKED))) {
+            game._redraw_resumes_run = { ...game.context.run };
+        } else {
+            game._redraw_resumes_run = null;
+        }
         game._run_stop_after_move = true;
     }
 

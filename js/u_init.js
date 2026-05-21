@@ -81,16 +81,20 @@ const ORCISH_ARROW = 20;
 const YA = 22;
 const DART = 23;
 const DAGGER = 34;
+const ELVEN_DAGGER = 35;
+const ORCISH_DAGGER = 36;
 const ELVEN_SPEAR = 28;
 const ORCISH_SPEAR = 29;
 const DWARVISH_SPEAR = 30;
 const JAVELIN = 32;
+const SHORT_SWORD = 46;
 const QUARTERSTAFF = 79;
 const BOW = 83;
 const ELVEN_BOW = 84;
 const ORCISH_BOW = 85;
 const YUMI = 86;
 const HAWAIIAN_SHIRT = 136;
+const LEATHER_ARMOR = 134;
 const CLOAK_OF_MAGIC_RESISTANCE = 148;
 const CLOAK_OF_DISPLACEMENT = 149;
 const SCALPEL = 39;
@@ -98,10 +102,12 @@ const LEATHER_GLOVES = 159;
 const BLINDFOLD = 233;
 const CREDIT_CARD = 223;
 const EXPENSIVE_CAMERA = 229;
+const LOCK_PICK = 222;
 const TOWEL = 234;
 const LEASH = 236;
 const STETHOSCOPE = 237;
 const TIN_OPENER = 239;
+const SACK = 217;
 const MAGIC_MARKER = 242;
 const SPE_FORCE_BOLT = 383;
 const APPLE = 277;
@@ -116,6 +122,7 @@ const POT_HEALING = 307;
 const POT_EXTRA_HEALING = 308;
 const POT_FULL_HEALING = 315;
 const POT_POLYMORPH = 316;
+const POT_SICKNESS = 318;
 const POT_ACID = 320;
 const SCR_ENCHANT_WEAPON = 328;
 const SCR_MAGIC_MAPPING = 337;
@@ -211,10 +218,23 @@ const RANGER_INVENTORY = [
     { typ: CRAM_RATION, spe: 0, cls: FOOD_CLASS, min: 4, max: 4, bless: 0 },
 ];
 
+const ROGUE_INVENTORY = [
+    { typ: SHORT_SWORD, spe: 0, cls: WEAPON_CLASS, min: 1, max: 1, bless: UNDEF_BLESS, wielded: true },
+    { typ: DAGGER, spe: 0, cls: WEAPON_CLASS, min: 6, max: 15, bless: 0 },
+    { typ: LEATHER_ARMOR, spe: 1, cls: ARMOR_CLASS, min: 1, max: 1, bless: UNDEF_BLESS, worn: true },
+    { typ: POT_SICKNESS, spe: 0, cls: POTION_CLASS, min: 1, max: 1, bless: 0 },
+    { typ: LOCK_PICK, spe: 0, cls: TOOL_CLASS, min: 1, max: 1, bless: 0 },
+    { typ: SACK, spe: 0, cls: TOOL_CLASS, min: 1, max: 1, bless: 0 },
+];
+
 const RANGER_KNOWN_WEAPONS = [
     ELVEN_ARROW, ORCISH_ARROW, YA,
     ELVEN_SPEAR, ORCISH_SPEAR, DWARVISH_SPEAR,
     JAVELIN, ELVEN_BOW, ORCISH_BOW, YUMI,
+];
+
+const ROGUE_KNOWN_WEAPONS = [
+    ELVEN_DAGGER, ORCISH_DAGGER,
 ];
 
 function trquan(trop) {
@@ -461,6 +481,15 @@ export function u_init_role_inventory() {
         // Rangers know launchers, ammo, and spears, but those types have not
         // been encountered yet, so the discoveries menu marks them with '*'.
         for (const otyp of RANGER_KNOWN_WEAPONS) discover_role_known_object(otyp);
+    } else if (role?.name?.m === 'Rogue') {
+        ini_inv(ROGUE_INVENTORY, noCreate, role.name.m);
+        // C ref: u_init.c:u_init_role() -> knows_class(WEAPON_CLASS).
+        // Rogues know dagger appearances even before encountering those
+        // object types, so discoveries marks them with '*'.
+        for (const otyp of ROGUE_KNOWN_WEAPONS) discover_role_known_object(otyp);
+        if (!rn2(5)) {
+            ini_inv(BLINDFOLD_INVENTORY, noCreate, role.name.m);
+        }
     }
     if (roleStartingGold > 0) {
         ini_inv(MONEY_INVENTORY, noCreate, role?.name?.m);
