@@ -1144,6 +1144,53 @@ async function showThrowPrompt() {
     }
 }
 
+function fireCandidateObject() {
+    if (game.uquiver) return game.uquiver;
+    const quivered = (game.inventory || []).find((obj) => obj?.quivered);
+    if (quivered) return quivered;
+    return heroWieldedWeapon();
+}
+
+function alternateLauncherForAmmo(ammo) {
+    return (game.inventory || []).find((obj) => obj?.alternate && matchingLauncherForAmmo(ammo, obj));
+}
+
+async function doFireCommand() {
+    // C refs: dothrow.c:dofire(), wield.c:ready_ok().
+    const obj = fireCandidateObject();
+    if (!obj) {
+        await pline('You have no ammunition readied.');
+        game.context.move = 0;
+        return;
+    }
+    const wielded = heroWieldedWeapon();
+    if (isAmmoObject(obj) && !matchingLauncherForAmmo(obj, wielded)) {
+        const launcher = alternateLauncherForAmmo(obj);
+        if (launcher) {
+            if (wielded) wielded.alternate = true;
+            launcher.alternate = false;
+            setHeroWieldedWeapon(launcher);
+            await pline(`${inventoryListing(launcher, { includeWorn: true })}.`);
+            queue_more_prompt();
+            game._fire_direction_after_more = obj;
+            game._fire_direction_after_more_takes_turn = true;
+            game.context.move = 0;
+            return;
+        }
+    }
+    if (obj === heroWieldedWeapon() && !obj.quivered && obj !== game.uquiver) {
+        await pline(`${inventoryListing(obj, { includeWorn: true })}.`);
+        queue_more_prompt();
+        game._fire_direction_after_more = obj;
+        game._fire_direction_after_more_takes_turn = true;
+        game.context.move = 0;
+        return;
+    }
+    game._awaiting_throw_direction = obj;
+    game.context.move = 0;
+    await showPromptLine('In what direction? ');
+}
+
 function stairAtHero() {
     for (let st = game.stairs; st; st = st.next) {
         if (st.sx === game.u?.ux && st.sy === game.u?.uy) return st;
@@ -3237,6 +3284,7 @@ const EXTENDED_AUTOCOMPLETE = [
     { name: 'kick', min: 1 },
     { name: 'levelchange', min: 2, wizard: true },
     { name: 'loot', min: 1 },
+    { name: 'name', min: 1 },
     { name: 'pray', min: 2 },
     { name: 'quit', min: 1 },
     { name: 'wizintrinsic', min: 4, wizard: true },
@@ -3265,6 +3313,32 @@ async function showExtendedCommandInput(typed) {
     const shown = completeExtendedCommand(input);
     await showPromptLine(`# ${shown}`);
     game._prompt_cursor = [Math.min(input.length + 2, 79), 0];
+}
+
+function showNameCommandMenu() {
+    const display = game.nhDisplay;
+    if (!display?.putstr) return;
+    // C refs: cmd.c `name` extended command, do_name.c:docallcmd().
+    // TTY draws this menu over the existing map without clearing full rows.
+    const col = 32;
+    const rows = [
+        [0, 'What do you want to name?', true],
+        [2, 'm - a monster', false],
+        [3, 'i - a particular object in inventory', false],
+        [4, 'o - the type of an object in inventory', false],
+        [5, 'f - the type of an object upon the floor', false],
+        [6, 'd - the type of an object on discoveries list', false],
+        [7, 'a - record an annotation for the current level', false],
+        [8, '(end)', false],
+    ];
+    display.putstr(0, 0, ' '.repeat(col), NO_COLOR, 0);
+    for (const [row, text, inverse] of rows) {
+        display.putstr(col - 1, row, ' ', NO_COLOR, 0);
+        display.putstr(col, row, text, NO_COLOR, inverse ? ATR_INVERSE : 0);
+    }
+    const screen = serialize_terminal_grid(display);
+    game._name_menu_screen = screen;
+    showOverride(screen, [col + '(end)'.length + 1, 8]);
 }
 
 function alignNameForHero() {
@@ -5973,6 +6047,16 @@ async function handleQueuedMore(ch) {
             game.context.move = 0;
             return true;
         }
+        if (game._fire_direction_after_more) {
+            const obj = game._fire_direction_after_more;
+            const takesTurn = !!game._fire_direction_after_more_takes_turn;
+            game._fire_direction_after_more = null;
+            game._fire_direction_after_more_takes_turn = false;
+            game._awaiting_throw_direction = obj;
+            await showPromptLine('In what direction? ');
+            game.context.move = takesTurn ? 1 : 0;
+            return true;
+        }
         if (game._drink_call_after_more) {
             const appearance = game._drink_call_after_more;
             game._drink_call_after_more = '';
@@ -6599,7 +6683,7 @@ function weaponSkillName(obj) {
 
 function weaponSkillLevelName(obj) {
     if (obj?.otyp === SCALPEL || obj?.otyp === QUARTERSTAFF) return 'basic';
-    if (game.urole?.name?.m === 'Ranger' && obj?.otyp === DAGGER) return 'basic';
+    if (game.urole?.name?.m === 'Ranger' && (obj?.otyp === DAGGER || obj?.otyp === BOW)) return 'basic';
     return 'no';
 }
 
@@ -7957,6 +8041,9 @@ export async function rhack(key) {
                 await doLootCommand();
             } else if (cmd === 'force') {
                 await doForceCommand();
+            } else if (cmd === 'name') {
+                showNameCommandMenu();
+                game.context.move = 0;
             } else {
                 // C ref: win/tty/getline.c:tty_get_ext_cmd().
                 if (typedExtCommand) {
@@ -9242,12 +9329,14 @@ export async function rhack(key) {
         if (prev === game._discovery_screen
             || prev === game._look_data_screen
             || prev === game._look_list_screen
+            || prev === game._name_menu_screen
             || (prev === game._attributes_page1_screen && key !== 32 && key !== 13)
             || prev === game._attributes_page2_screen) {
             game._spell_menu_screen = null;
             game._discovery_screen = null;
             game._look_data_screen = null;
             game._look_list_screen = null;
+            game._name_menu_screen = null;
             game._attributes_page1_screen = null;
             game._attributes_page2_screen = null;
             await redrawAfterFullScreenMenuDismiss();
@@ -9482,6 +9571,8 @@ export async function rhack(key) {
         const letters = readyLetters();
         game._awaiting_quiver_item = true;
         await showPromptLine(`What do you want to ready? [-${letters ? ` ${letters}` : ''} or ?*] `);
+    } else if (ch === 'f') {
+        await doFireCommand();
     } else if (ch === '+') {
         game.context.move = 0;
         await showSpellMenu();
@@ -9573,7 +9664,7 @@ export async function rhack(key) {
             const feature = lookHereFeature();
             const objects = floorObjectsAtHero();
             if (feature.line) await pline(feature.line);
-            if (feature.blocks) {
+            if (feature.blocks && objects.length > 0) {
                 queue_more_prompt();
                 return;
             }
