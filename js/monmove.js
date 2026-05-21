@@ -51,6 +51,7 @@ const M1_NOEYES = 0x00001000;
 const M1_NOHANDS = 0x00002000;
 const M1_MINDLESS = 0x00010000;
 const M1_ANIMAL = 0x00040000;
+const M1_REGEN = 0x00800000;
 const M1_SEE_INVIS = 0x01000000;
 const M2_STRONG = 0x04000000;
 const M2_COLLECT = 0x40000000;
@@ -1358,6 +1359,10 @@ function wield_object_name(obj) {
 
 function monster_weapon_name(obj) {
     if (obj?.otyp === ORCISH_DAGGER) {
+        const order = Array.isArray(game.discoveryOrder)
+            ? game.discoveryOrder
+            : (game.discoveryOrder = []);
+        if (!order.includes(obj.otyp)) order.push(obj.otyp);
         const encountered = game.encounteredObjects || (game.encounteredObjects = new Set());
         if (typeof encountered.add === 'function') encountered.add(obj.otyp);
         return 'crude dagger';
@@ -2930,6 +2935,14 @@ function maybe_spin_web_basic(mtmp) {
 
 export function mcalcdistress() {
     for (const mtmp of game.level?.monsters || []) {
+        // C refs: mon.c:m_calcdistress(), monmove.c:mon_regen().
+        // All monsters heal one HP on 20-turn boundaries; regenerating
+        // species heal every turn.
+        if ((game.moves || 0) % 20 === 0 || ((mtmp.data?.mflags1 ?? 0) & M1_REGEN)) {
+            if ((mtmp.mhp ?? 0) < (mtmp.mhpmax ?? 0)) {
+                mtmp.mhp = Math.min(mtmp.mhpmax, (mtmp.mhp ?? 0) + 1);
+            }
+        }
         if (mtmp.mspec_used) mtmp.mspec_used--;
         if (mtmp.cham) decide_to_shapeshift_basic(mtmp);
         were_change(mtmp);
@@ -3041,6 +3054,8 @@ export async function movemon() {
         // teleport gate before can_teleport(); non-teleporting pets still
         // consume the rn2(40) while fleeing.
         if (mtmp.mflee) rn2(40);
+        if (mtmp.mflee && !mtmp.mfleetim && mtmp.mhp === mtmp.mhpmax && !rn2(25))
+            mtmp.mflee = false;
 
         // dochugw -> dochug
         set_apparxy_basic(mtmp);

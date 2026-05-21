@@ -154,6 +154,10 @@ function observe_object(obj) {
     if (!obj) return;
     obj.dknown = true;
     if (typeof obj.otyp === 'number') {
+        const order = Array.isArray(game.discoveryOrder)
+            ? game.discoveryOrder
+            : (game.discoveryOrder = []);
+        if (!order.includes(obj.otyp)) order.push(obj.otyp);
         const encountered = game.encounteredObjects || (game.encounteredObjects = new Set());
         if (typeof encountered.add === 'function') encountered.add(obj.otyp);
     }
@@ -989,6 +993,66 @@ function render_map_row(y) {
     return output;
 }
 
+function render_known_terrain_row(y) {
+    if (!game.level) return '';
+    let firstCol = -1, lastCol = -1;
+    const glyphs = new Map();
+    for (let x = 1; x < COLNO; x++) {
+        const loc = game.level.at(x, y);
+        const known = loc?.disp_ch && loc.disp_ch !== ' ';
+        if (!known) continue;
+        const glyph = terrain_glyph(loc, x, y);
+        if (glyph.ch === '#' || glyph.ch === '>') glyph.color = NO_COLOR;
+        glyphs.set(x, glyph);
+        if (glyph.ch !== ' ') {
+            if (firstCol < 0) firstCol = x;
+            lastCol = x;
+        }
+    }
+    if (firstCol < 0) return '';
+
+    let output = '';
+    let activeColor = ANSI_DEFAULT;
+    let activeDec = false;
+    const gap = firstCol - 1;
+    if (gap > 4) output += `\x1b[${gap}C`;
+    else if (gap > 0) output += ' '.repeat(gap);
+
+    for (let x = firstCol; x <= lastCol; x++) {
+        const glyph = glyphs.get(x) || { ch: ' ', color: NO_COLOR, dec: false };
+        if (glyph.ch === ' ') {
+            let run = 1;
+            while (x + run <= lastCol && (glyphs.get(x + run)?.ch ?? ' ') === ' ') run++;
+            if (activeDec) { output += '\x0f'; activeDec = false; }
+            if (run > 4) output += `\x1b[${run}C`;
+            else output += ' '.repeat(run);
+            x += run - 1;
+            continue;
+        }
+
+        const wantAnsi = ANSI_COLOR[glyph.color] ?? ANSI_DEFAULT;
+        if (wantAnsi !== activeColor) {
+            output += `\x1b[${wantAnsi}m`;
+            activeColor = wantAnsi;
+        }
+        if (glyph.dec && !activeDec) { output += '\x0e'; activeDec = true; }
+        else if (!glyph.dec && activeDec) { output += '\x0f'; activeDec = false; }
+        output += glyph.ch;
+    }
+
+    if (activeColor !== ANSI_DEFAULT) output += `\x1b[${ANSI_DEFAULT}m`;
+    if (activeDec) output += '\x0f';
+    return output;
+}
+
+export function serialize_known_terrain_view_screen(message = '') {
+    let output = `${message}\n`;
+    for (let y = 0; y < ROWNO; y++) output += `${render_known_terrain_row(y)}\n`;
+    output += `${_statusLine1()}\n`;
+    output += _statusLine2();
+    return output;
+}
+
 // ── Status lines ──
 function _statusLine1() {
     const u = game.u;
@@ -1020,6 +1084,7 @@ function _statusLine2() {
     if ((u.uencumber || 0) > 0) conditions.push('Burdened');
     if (u.uprops?.confusion || u.uconfusion) conditions.push('Conf');
     if (u.uprops?.hallucination || u.uhallucination) conditions.push('Hallu');
+    if (u.uprops?.deaf) conditions.push('Deaf');
     const conditionText = conditions.length ? ` ${conditions.join(' ')}` : '';
     const hp = game._latched_status_uhp != null && (game._more || game._death_prompt_active)
         ? game._latched_status_uhp

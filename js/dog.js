@@ -10,7 +10,7 @@ import {
 } from './display.js';
 import { nhgetch } from './input.js';
 import {
-    ACCFOOD, APPORT, CADAVER, COLNO, DOGFOOD, MANFOOD, TABU, UNDEF,
+    ACCFOOD, APPORT, CADAVER, COLNO, DOGFOOD, MANFOOD, ROWNO, TABU, UNDEF,
     D_BROKEN, D_CLOSED, D_LOCKED, GP_AVOID_MONPOS, GP_CHECKSCARY, IS_DOOR, IS_OBSTRUCTED,
     IS_LAVA, IS_POOL, IS_ROOM, LADDER, MM_EDOG, MTSZ, NO_MINVENT, SPACE_POS, STAIRS,
     W_WEP, isok,
@@ -67,6 +67,7 @@ const BELL_OF_OPENING = 263;
 const CANDELABRUM_OF_INVOCATION = 262;
 const DOG_HUNGRY = 300;
 const M2_STRONG = 0x04000000;
+const G_FREQ = 0x0007;
 
 const OBJECT_WEIGHT_OVERRIDES = new Map([
     [LARGE_BOX, 350],
@@ -461,6 +462,16 @@ function object_name(obj) {
     return 'an object';
 }
 
+function mark_object_encountered(obj) {
+    if (!Number.isInteger(obj?.otyp)) return;
+    const order = Array.isArray(game.discoveryOrder)
+        ? game.discoveryOrder
+        : (game.discoveryOrder = []);
+    if (!order.includes(obj.otyp)) order.push(obj.otyp);
+    const encountered = game.encounteredObjects || (game.encounteredObjects = new Set());
+    if (typeof encountered.add === 'function') encountered.add(obj.otyp);
+}
+
 function monster_name(mon) {
     return String(mon?.data?.name || 'monster').toLowerCase().replace(/_/g, ' ');
 }
@@ -636,12 +647,23 @@ export async function finish_pet_kill(mtmp, target) {
     // C ref: mon.c:monkilled(). Monster-vs-monster death announces the
     // visible defender before corpse/death side effects run.
     await append_topline_message(`The ${monster_name(target)} is killed!`);
-    rn2(3); // corpse_chance
+    corpse_chance(target);
     grow_up_from_kill(mtmp, target);
     const monsters = game.level?.monsters || [];
     const idx = monsters.indexOf(target);
     if (idx >= 0) monsters.splice(idx, 1);
     newsym(target.mx, target.my);
+}
+
+function corpse_chance(mon) {
+    // C ref: mon.c:corpse_chance(). This pet-kill path only needs the
+    // ordinary corpse RNG gate; corpse object creation is still modeled by
+    // the hero-kill path.
+    const mdat = mon?.data || {};
+    const freq = (mdat.geno ?? 0) & G_FREQ;
+    const verySmall = typeof mdat.msize === 'number' && mdat.msize < 1;
+    const chance = 2 + (freq < 2 ? 1 : 0) + (verySmall ? 1 : 0);
+    return !rn2(chance);
 }
 
 async function dog_invent(mtmp, udist) {
@@ -655,6 +677,7 @@ async function dog_invent(mtmp, udist) {
             // C ref: steal.c:mdrop_obj().  Pet inventory drops are only
             // announced when the drop square is visible.
             if (cansee(mtmp.mx, mtmp.my)) {
+                mark_object_encountered(obj);
                 pet_inventory_pline(`${pet_subject(mtmp)} drops ${object_name(obj)}.`);
             }
             if (edog.apport > 1) edog.apport--;
@@ -680,7 +703,10 @@ async function dog_invent(mtmp, udist) {
                     if (idx >= 0) game.level.objects.splice(idx, 1);
                     mtmp.inventory = mtmp.inventory || [];
                     mtmp.inventory.unshift(obj);
-                    if (cansee(omx, omy)) pet_inventory_pline(`${pet_subject(mtmp)} picks up ${object_name(obj)}.`);
+                    if (cansee(omx, omy)) {
+                        mark_object_encountered(obj);
+                        pet_inventory_pline(`${pet_subject(mtmp)} picks up ${object_name(obj)}.`);
+                    }
                     newsym(omx, omy);
                 }
             }
@@ -691,6 +717,39 @@ async function dog_invent(mtmp, udist) {
 
 function pet_can_see_object(mtmp, x, y) {
     return clear_path(mtmp.mx, mtmp.my, x, y);
+}
+
+function nearest_visible_pet_goal(mtmp) {
+    const ux = game.u?.ux ?? mtmp.mx;
+    const uy = game.u?.uy ?? mtmp.my;
+    const range = 9;
+    let best = null;
+
+    const consider = (x, y) => {
+        if (!isok(x, y)) return;
+        if (dist2(mtmp.mx, mtmp.my, x, y) > range * range) return;
+        if (!clear_path(mtmp.mx, mtmp.my, x, y)) return;
+        const heroDist = dist2(x, y, ux, uy);
+        if (!best || heroDist < best.heroDist) best = { x, y, heroDist };
+    };
+
+    // C refs: dogmove.c:dog_goal(), dogmove.c:wantdoor(),
+    // vision.c:do_clear_area().  When the pet cannot see the hero and has
+    // no useful track, it walks toward the visible square nearest the hero.
+    for (let x = Math.max(1, mtmp.mx - range); x <= Math.min(COLNO - 1, mtmp.mx + range); x++)
+        consider(x, mtmp.my);
+    const minY = Math.max(0, mtmp.my - range);
+    const maxY = Math.min(ROWNO - 1, mtmp.my + range);
+    for (let dy = 1; dy <= range; dy++) {
+        if (mtmp.my + dy > maxY && mtmp.my - dy < minY) break;
+        for (let x = Math.max(1, mtmp.mx - range); x <= Math.min(COLNO - 1, mtmp.mx + range); x++)
+            if (mtmp.my + dy <= maxY) consider(x, mtmp.my + dy);
+        for (let x = Math.max(1, mtmp.mx - range); x <= Math.min(COLNO - 1, mtmp.mx + range); x++)
+            if (mtmp.my - dy >= minY) consider(x, mtmp.my - dy);
+    }
+
+    if (!best || (best.x === mtmp.mx && best.y === mtmp.my)) return null;
+    return best;
 }
 
 function pet_master_x(mtmp) {
@@ -1001,6 +1060,16 @@ function pet_goal(mtmp, after, udist, whappr) {
             followX = edog.ogoal.x;
             followY = edog.ogoal.y;
             edog.ogoal.x = 0;
+        } else {
+            const visibleGoal = dist2(mtmp.mx, mtmp.my, gx, gy) <= 81
+                ? nearest_visible_pet_goal(mtmp)
+                : null;
+            if (visibleGoal) {
+                followX = visibleGoal.x;
+                followY = visibleGoal.y;
+                edog.ogoal.x = followX;
+                edog.ogoal.y = followY;
+            }
         }
     } else {
         edog.ogoal.x = 0;

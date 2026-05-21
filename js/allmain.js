@@ -313,7 +313,7 @@ export async function newgame() {
     g.u.uen = g._seed === 2 ? 5 : 2; 
     g.u.uenmax = g._seed === 2 ? 5 : 2;
     g.u.uac = g._seed === 2 ? 8 : 10; 
-    g.u.uexp = g._seed === 2 ? 1 : 0;
+    g.u.uexp = 0;
     const align = startupAlign();
     const alignName = align.name;
     const initialAlignRecord = g._nhopts?.role && g._nhopts.role !== -1 ? 0 : 10;
@@ -568,6 +568,8 @@ function applyOccupationFinishObjectEffects(g) {
         obj.known = true;
     }
     if (obj.otyp === SPEED_BOOTS) {
+        const order = Array.isArray(g.discoveryOrder) ? g.discoveryOrder : (g.discoveryOrder = []);
+        if (!order.includes(obj.otyp)) order.push(obj.otyp);
         const discovered = g.discoveredObjects || (g.discoveredObjects = new Set());
         if (!discovered.has(obj.otyp)) {
             discovered.add(obj.otyp);
@@ -579,6 +581,8 @@ function applyOccupationFinishObjectEffects(g) {
     } else if (obj.otyp === GAUNTLETS_OF_POWER) {
         // C ref: do_wear.c:Gloves_on().  Wearing power gauntlets reveals the
         // object type and recalculates strength before the finish message.
+        const order = Array.isArray(g.discoveryOrder) ? g.discoveryOrder : (g.discoveryOrder = []);
+        if (!order.includes(obj.otyp)) order.push(obj.otyp);
         const discovered = g.discoveredObjects || (g.discoveredObjects = new Set());
         if (!discovered.has(obj.otyp)) discovered.add(obj.otyp);
         obj.known = true;
@@ -857,7 +861,10 @@ export async function moveloop_core() {
             }
             if (!await continueOccupationTurns(g)) return;
         }
-        if (encumberedDebtNeedsExtraTurn(g) && !g._more && !g._monster_turn_paused_for_more) {
+        const skipEncumberedDebt = !!g._skip_encumbered_debt_after_pet_death_more;
+        g._skip_encumbered_debt_after_pet_death_more = false;
+        if (!skipEncumberedDebt
+            && encumberedDebtNeedsExtraTurn(g) && !g._more && !g._monster_turn_paused_for_more) {
             // C ref: allmain.c:moveloop_core()/u_calc_moveamt().  A
             // burdened hero does not always recover enough movement for the
             // next input after a time-taking command, so monsters may get a
@@ -866,7 +873,8 @@ export async function moveloop_core() {
             if (g._more || g._monster_turn_paused_for_more) return;
             creditEncumberedExtraTurn(g);
         }
-        if (g._extra_encumbered_turn_pending && !g._more && !g._monster_turn_paused_for_more) {
+        if (!skipEncumberedDebt
+            && g._extra_encumbered_turn_pending && !g._more && !g._monster_turn_paused_for_more) {
             // C ref: allmain.c:moveloop_core()/u_calc_moveamt().  Becoming
             // slightly encumbered can leave u.umovement below NORMAL_SPEED,
             // so monsters get one more movement allocation before input.

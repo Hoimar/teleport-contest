@@ -93,6 +93,7 @@ const RIN_POLYMORPH_CONTROL = 197;
 const POT_HALLUCINATION = 304;
 const POT_HEALING = 307;
 const POT_EXTRA_HEALING = 308;
+const POT_FULL_HEALING = 315;
 const POT_POLYMORPH = 316;
 const POT_ACID = 320;
 const SCR_ENCHANT_WEAPON = 328;
@@ -270,8 +271,14 @@ export function add_inventory_object(obj) {
 
 function discover_starting_object(obj) {
     if (!obj?.knownName || typeof obj.otyp !== 'number') return;
+    const order = Array.isArray(game.discoveryOrder)
+        ? game.discoveryOrder
+        : (game.discoveryOrder = []);
+    if (!order.includes(obj.otyp)) order.push(obj.otyp);
     game.discoveredObjects = game.discoveredObjects || new Set();
     if (typeof game.discoveredObjects.add === 'function') game.discoveredObjects.add(obj.otyp);
+    game.encounteredObjects = game.encounteredObjects || new Set();
+    if (typeof game.encounteredObjects.add === 'function') game.encounteredObjects.add(obj.otyp);
 }
 
 function ini_inv_adjust_obj(trop, obj) {
@@ -360,6 +367,12 @@ export function u_init_role_inventory() {
         game._goldCount = rn1(1000, 1001);
         game._startupRoleGoldInitialized = true;
         roleStartingGold = game._goldCount;
+        // C ref: u_init.c:u_init_role(); Healers pre-know full healing
+        // before initial inventory side effects mark carried potions seen.
+        game.discoveryOrder = Array.isArray(game.discoveryOrder) ? game.discoveryOrder : [];
+        if (!game.discoveryOrder.includes(POT_FULL_HEALING)) game.discoveryOrder.push(POT_FULL_HEALING);
+        game.discoveredObjects = game.discoveredObjects || new Set();
+        game.discoveredObjects.add(POT_FULL_HEALING);
         ini_inv(HEALER_INVENTORY, noCreate, role.name.m);
         if (!rn2(25)) {
             // C may add an oil lamp here; object creation is still unported.
@@ -394,7 +407,7 @@ export function u_init_misc_rng() {
     const init = ROLE_INIT.get(role?.name?.m);
     let initialPower = init?.pwBase ?? 2;
     if ((init?.pwRnd ?? 0) > 0) initialPower += rnd(init.pwRnd);
-    rn2(10); // u.uhandedness, roughly 90% right-handed.
+    if (game.u) game.u.uhandedness = rn2(10) ? 'right' : 'left';
     game._initialPower = initialPower;
 }
 

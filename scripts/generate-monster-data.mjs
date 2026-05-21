@@ -196,7 +196,17 @@ const CLR = {
     DRAGON_SILVER: 14,
 };
 
-const CONSTS = { ...GEN, ...M1, ...M2, ...M3, ...MR, ...MS, ...CLR };
+const MZ = {
+    MZ_TINY: 0,
+    MZ_SMALL: 1,
+    MZ_MEDIUM: 2,
+    MZ_HUMAN: 2,
+    MZ_LARGE: 3,
+    MZ_HUGE: 4,
+    MZ_GIGANTIC: 7,
+};
+
+const CONSTS = { ...GEN, ...M1, ...M2, ...M3, ...MR, ...MS, ...CLR, ...MZ };
 CONSTS.A_NONE = 0;
 
 const ATTACK_MACROS = {
@@ -300,6 +310,7 @@ function collectMonsters(text) {
         const maligntyp = CONSTS[lvl[4]?.trim()] ?? Number(lvl[4]);
         const geno = evalMask(args[3]);
         const msound = evalMask(siz[2]);
+        const msize = evalMask(siz[3]);
         const mresists = evalMask(args[6]);
         const mconveys = evalMask(args[7]);
         const mflags1 = evalMask(args[8]);
@@ -312,7 +323,7 @@ function collectMonsters(text) {
         const female = (mflags2 & M2.M2_FEMALE) !== 0 ? 1 : 0;
         rows.push([
             name, mlet, mlevel, mmove, maligntyp, geno, difficulty, color,
-            neuter, male, female, msound, mresists, mconveys, mflags1, mflags2, mflags3, mattk,
+            neuter, male, female, msound, mresists, mconveys, mflags1, mflags2, mflags3, mattk, msize,
         ]);
     }
     return rows;
@@ -325,7 +336,7 @@ const rows = collectMonsters(source);
 const lines = [
     '// Generated from nethack-c/upstream/include/monsters.h (NetHack 5.0).',
     '// C refs: include/monsters.h MON() rows, include/monflag.h G_* flags, makemon.c:rndmonst_adj().',
-    '// Fields: name, mlet, mlevel, mmove, maligntyp, geno, difficulty, color, neuter, male, female, msound, mresists, mconveys, mflags1, mflags2, mflags3, mattk.',
+    '// Fields: name, mlet, mlevel, mmove, maligntyp, geno, difficulty, color, neuter, male, female, msound, mresists, mconveys, mflags1, mflags2, mflags3, mattk, msize.',
     'export const MONSTER_DATA = [',
     ...rows.map((row) => `    ${JSON.stringify(row)},`),
     '];',

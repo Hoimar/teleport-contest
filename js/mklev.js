@@ -456,8 +456,8 @@ function unhideable_trap(t) { return t === HOLE; }
 function undestroyable_trap(t) { return t === MAGIC_PORTAL || t === VIBRATING_SQUARE; }
 function is_xport_trap(t) { return t >= TELEP_TRAP && t <= MAGIC_PORTAL; }
 
-const MONSTERS = MONSTER_DATA.map(([name, mlet, mlevel, mmove, maligntyp, geno, difficulty, color, neuter, male, female, msound = 0, mresists = 0, mconveys = 0, mflags1 = 0, mflags2 = 0, mflags3 = 0, mattk = []]) => ({
-    name, mlet, mlevel, mmove, maligntyp, geno, difficulty, color, msound, mresists, mconveys, mflags1, mflags2, mflags3, mattk,
+const MONSTERS = MONSTER_DATA.map(([name, mlet, mlevel, mmove, maligntyp, geno, difficulty, color, neuter, male, female, msound = 0, mresists = 0, mconveys = 0, mflags1 = 0, mflags2 = 0, mflags3 = 0, mattk = [], msize = 2]) => ({
+    name, mlet, mlevel, mmove, maligntyp, geno, difficulty, color, msound, mresists, mconveys, mflags1, mflags2, mflags3, mattk, msize,
     neuter: !!neuter, male: !!male, female: !!female,
 }));
 
