@@ -1834,9 +1834,9 @@ function terrainViewCursor() {
     return [Math.max(0, (game.u?.ux ?? 1) - 1), Math.max(0, (game.u?.uy ?? 0) + 1)];
 }
 
-function showTerrainView(message) {
+function showTerrainView(message, cursor = terrainViewCursor()) {
     const screen = serialize_known_terrain_view_screen(message);
-    showSerializedOverride(screen, terrainViewCursor());
+    showSerializedOverride(screen, cursor);
 }
 
 function knownSpellEntries() {
@@ -4887,7 +4887,7 @@ async function handleQueuedMore(ch) {
             const appearance = game._drink_call_after_more;
             game._drink_call_after_more = '';
             game._awaiting_potion_call_name = { appearance, text: '' };
-            await showPromptLine(`Call a ${appearance} potion:`);
+            await showPromptLine(`Call a ${appearance} potion:`, { trailingInputSpace: true });
             game.context.move = 0;
             return true;
         }
@@ -4896,8 +4896,7 @@ async function handleQueuedMore(ch) {
             game._call_scroll_after_more = null;
             game._awaiting_scroll_call_name = state;
             const prompt = `Call a ${state.appearance}:`;
-            await showPromptLine(prompt);
-            game._prompt_cursor = [Math.min(prompt.length + 1, 79), 0];
+            await showPromptLine(prompt, { trailingInputSpace: true });
             game.context.move = 0;
             return true;
         }
@@ -5709,9 +5708,10 @@ async function showTutorialPrompt(invalidChoice = false) {
     showOverride(screen, invalidChoice ? [27, 7] : [27, 6]);
 }
 
-async function showPromptLine(text) {
+async function showPromptLine(text, options = {}) {
     await pline(text);
-    game._prompt_cursor = [Math.min(text.length, 79), 0];
+    const cursorPad = options.trailingInputSpace ? 1 : 0;
+    game._prompt_cursor = [Math.min(text.length + cursorPad, 79), 0];
 }
 
 async function showDrinkInventoryPrompt() {
@@ -6498,7 +6498,8 @@ export async function rhack(key) {
 
     if (game._terrain_view_active) {
         if (ch === ' ' || ch === '\r' || ch === '\n' || ch === '\x1b') {
-            showTerrainView('Done.--More--');
+            const moreMessage = 'Done.--More--';
+            showTerrainView(moreMessage, [Math.min(moreMessage.length, 79), 0]);
             game._pending_message = 'Done.';
             game._more = true;
             game._terrain_view_done_more = true;
@@ -7112,7 +7113,7 @@ export async function rhack(key) {
         } else if (ch !== '\x1b') {
             state.text = `${state.text}${ch}`;
         }
-        await showPromptLine(`${prompt}${state.text ? ` ${state.text}` : ''}`);
+        await showPromptLine(`${prompt}${state.text ? ` ${state.text}` : ''}`, { trailingInputSpace: !state.text });
         game.context.move = 0;
         return;
     }
@@ -7140,7 +7141,7 @@ export async function rhack(key) {
         } else {
             state.text = `${state.text || ''}${ch}`;
         }
-        await showPromptLine(`${prompt}${state.text ? ` ${state.text}` : ''}`);
+        await showPromptLine(`${prompt}${state.text ? ` ${state.text}` : ''}`, { trailingInputSpace: !state.text });
         game.context.move = 0;
         return;
     }
@@ -8078,7 +8079,7 @@ export async function rhack(key) {
             game.context.move = 0;
             game._awaiting_floor_corpse_eat = true;
             game._floor_corpse_eat_obj = corpse;
-            await showPromptLine(`There is a ${corpseName} here; eat it? [ynq] (n)`);
+            await showPromptLine(`There is a ${corpseName} here; eat it? [ynq] (n)`, { trailingInputSpace: true });
         } else {
             game.context.move = 0;
             const letters = eatLetters();
