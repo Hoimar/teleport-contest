@@ -9242,7 +9242,8 @@ export async function rhack(key) {
         if (prev === game._discovery_screen
             || prev === game._look_data_screen
             || prev === game._look_list_screen
-            || (prev === game._attributes_page1_screen && key !== 32 && key !== 13)) {
+            || (prev === game._attributes_page1_screen && key !== 32 && key !== 13)
+            || prev === game._attributes_page2_screen) {
             game._spell_menu_screen = null;
             game._discovery_screen = null;
             game._look_data_screen = null;
