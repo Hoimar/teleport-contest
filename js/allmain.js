@@ -488,6 +488,9 @@ export async function advanceTurn() {
 }
 
 function finishPostDosoundsTurnTail(g) {
+    // C ref: allmain.c:moveloop_core().  Prayer timeout drains once during
+    // each real turn, including occupation/extra monster-turn catch-ups.
+    if ((g.u?.ublesscnt || 0) > 0) g.u.ublesscnt--;
     gethungry();
     exerchk();
     maybe_wipe_engraving();
@@ -524,7 +527,87 @@ function applyOccupationFinalTurnState(g) {
 }
 
 function occupationPending(g) {
-    return (g._occupation_turns_remaining || 0) > 0 || !!g._occupation_finish_message;
+    return (g._occupation_turns_remaining || 0) > 0
+        || !!g._occupation_finish_message
+        || !!g._force_lock
+        || (g._force_lock_post_success_turns || 0) > 0;
+}
+
+async function packedOccupationPline(msg) {
+    if (game._pending_message) await append_pline(msg);
+    else await pline(msg);
+}
+
+function clearForceLock(g) {
+    g._force_lock = null;
+    g._force_lock_resume_turn_first = false;
+}
+
+async function forceLockAttempt(g) {
+    const state = g._force_lock;
+    if (!state) return true;
+    const box = state.box;
+    if (!box || box.ox !== g.u?.ux || box.oy !== g.u?.uy) {
+        clearForceLock(g);
+        return true;
+    }
+    if ((state.usedtime || 0) >= 50 || !state.weapon) {
+        await packedOccupationPline('You give up your attempt to force the lock.');
+        if ((state.usedtime || 0) >= 50) exercise(state.picktyp ? A_DEX : A_STR, true);
+        clearForceLock(g);
+        return true;
+    }
+
+    state.usedtime = (state.usedtime || 0) + 1;
+    // C ref: lock.c:forcelock().  The chance check runs once per occupation
+    // turn after that turn's monster/allmain tail has completed.
+    if (rn2(100) >= (state.chance || 0)) return false;
+
+    await packedOccupationPline('You succeed in forcing the lock.');
+    exercise(state.picktyp ? A_DEX : A_STR, true);
+    const destroyit = !state.picktyp && rn2(3) === 0;
+    box.olocked = false;
+    box.obroken = true;
+    box.lknown = true;
+    if (destroyit) {
+        const idx = g.level?.objects?.indexOf(box) ?? -1;
+        if (idx >= 0) g.level.objects.splice(idx, 1);
+        await packedOccupationPline("In fact, you've totally destroyed the chest.");
+    }
+    newsym(box.ox, box.oy);
+    // C's movement loop drains one final monster/allmain allocation after
+    // forcelock() clears the occupation, before the next input prompt.
+    g._force_lock_post_success_turns = 1;
+    clearForceLock(g);
+    return true;
+}
+
+async function continueForceLockTurns(g) {
+    let resumeTurnFirst = !!g._force_lock_resume_turn_first;
+    g._force_lock_resume_turn_first = false;
+    while (g._force_lock || (g._force_lock_post_success_turns || 0) > 0) {
+        if (!g._force_lock) {
+            g._force_lock_post_success_turns--;
+            await advanceTurn();
+            if ((g._more || g._monster_turn_paused_for_more) && occupationPending(g)) {
+                g._occupation_paused_for_more = true;
+                return false;
+            }
+            continue;
+        }
+        if (resumeTurnFirst) {
+            resumeTurnFirst = false;
+        } else if (await forceLockAttempt(g)) {
+            continue;
+        }
+        await advanceTurn();
+        if ((g._more || g._monster_turn_paused_for_more) && occupationPending(g)) {
+            g._force_lock_resume_turn_first = true;
+            g._occupation_paused_for_more = true;
+            return false;
+        }
+    }
+    return true;
 }
 
 function encumberedMoveAmount(encumbrance) {
@@ -704,6 +787,8 @@ async function continueNomulTurns(g) {
 }
 
 async function continueOccupationTurns(g) {
+    if (g._force_lock || (g._force_lock_post_success_turns || 0) > 0)
+        return continueForceLockTurns(g);
     // C ref: allmain.c:moveloop_core()/occupation.  Delayed occupations keep
     // consuming turns, but tty --More-- pauses can split them across inputs.
     while ((g._occupation_turns_remaining || 0) > 0) {
@@ -915,8 +1000,28 @@ export async function moveloop_core() {
             if (g._more || g._monster_turn_paused_for_more) return;
         }
         if (g._resume_monster_turn) {
+            const resumeOccupationAfterMonsterTurn = (!!g._force_lock
+                || (g._force_lock_post_success_turns || 0) > 0)
+                && !!g._occupation_paused_for_more;
             g._resume_monster_turn = false;
             await advanceTurn();
+            if (resumeOccupationAfterMonsterTurn
+                && (g._more || g._monster_turn_paused_for_more)) return;
+            if (g._nomovemsg && !g._more && !g._monster_turn_paused_for_more) {
+                // C refs: end.c:savelife(), allmain.c:moveloop_core().
+                // If the resumed monster turn does not block on another
+                // topline More, the saved-life nomovemsg appears at this same
+                // input boundary behind the "OK, so you don't die." line.
+                const msg = g._nomovemsg;
+                g._nomovemsg = '';
+                if (g._pending_message) await append_pline(msg);
+                else await pline(msg);
+            }
+            if (resumeOccupationAfterMonsterTurn && occupationPending(g)) {
+                g._occupation_paused_for_more = false;
+                if (g._force_lock) g._force_lock_resume_turn_first = false;
+                if (!await continueOccupationTurns(g)) return;
+            }
         } else if (g._occupation_resume) {
             g._occupation_resume = false;
             if (!await continueOccupationTurns(g)) return;
@@ -926,14 +1031,15 @@ export async function moveloop_core() {
             if (!await continueNomulTurns(g)) return;
             if (!occupationPending(g)) finish_pending_eaten_corpse();
             if (g._more && occupationPending(g)) {
+                if (g._force_lock) g._force_lock_resume_turn_first = true;
                 g._occupation_paused_for_more = true;
                 return;
             }
             if (!await continueOccupationTurns(g)) return;
         }
-        const skipEncumberedDebt = !!g._skip_encumbered_debt_after_pet_death_more;
+        const skipPetDeathCatchupDebt = !!g._skip_encumbered_debt_after_pet_death_more;
         g._skip_encumbered_debt_after_pet_death_more = false;
-        if (!skipEncumberedDebt
+        if (!skipPetDeathCatchupDebt
             && encumberedDebtNeedsExtraTurn(g) && !g._more && !g._monster_turn_paused_for_more) {
             // C ref: allmain.c:moveloop_core()/u_calc_moveamt().  A
             // burdened hero does not always recover enough movement for the
@@ -943,7 +1049,7 @@ export async function moveloop_core() {
             if (g._more || g._monster_turn_paused_for_more) return;
             creditEncumberedExtraTurn(g);
         }
-        if (!skipEncumberedDebt
+        if (!skipPetDeathCatchupDebt
             && g._extra_encumbered_turn_pending && !g._more && !g._monster_turn_paused_for_more) {
             // C ref: allmain.c:moveloop_core()/u_calc_moveamt().  Becoming
             // slightly encumbered can leave u.umovement below NORMAL_SPEED,
@@ -957,7 +1063,8 @@ export async function moveloop_core() {
             g._slow_poly_extra_turn_pending_credit = false;
             creditSlowPolyExtraTurn(g);
         }
-        if (slowPolyDebtNeedsExtraTurn(g) && !g._monster_turn_paused_for_more) {
+        if (!skipPetDeathCatchupDebt
+            && slowPolyDebtNeedsExtraTurn(g) && !g._monster_turn_paused_for_more) {
             // C ref: allmain.c:moveloop_core()/u_calc_moveamt().  Slow
             // polymorphed forms can leave u.umovement below NORMAL_SPEED,
             // so monsters receive another pass before the next hero action.

@@ -302,7 +302,7 @@ function terrain_glyph(loc, x, y) {
     }
     const wallColor = (game.level?.flags?.red_walls || hell_level_display())
         ? CLR_RED
-        : game.level?.flags?.sokoban_rules ? CLR_BLUE
+        : game.level?.flags?.sokoban_rules ? (primary_decgraphics() ? CLR_BLUE : NO_COLOR)
             : game.level?.flags?.mines_walls ? CLR_BROWN : NO_COLOR;
     if (!primary_decgraphics()) {
         switch (typ) {

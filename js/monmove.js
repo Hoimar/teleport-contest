@@ -1571,7 +1571,10 @@ async function prepare_monster_more_base_screen() {
 }
 
 function occupation_message_boundary_active() {
-    return (game._occupation_turns_remaining || 0) > 0 || !!game._occupation_finish_message;
+    return (game._occupation_turns_remaining || 0) > 0
+        || !!game._occupation_finish_message
+        || !!game._force_lock
+        || (game._force_lock_post_success_turns || 0) > 0;
 }
 
 function hallucinating() {
@@ -2545,10 +2548,11 @@ async function physical_melee_attacks(mtmp, attacks, toHit) {
                 if (!game._pet_combat_resume_active)
                     game._latched_status_uhp = preDamageHp <= 1 ? Math.max(0, preDamageHp) : 0;
                 game._monster_death_pending = true;
-                if (!game._pet_combat_resume_active) {
-                    game._fatal_monster_attack_paused = true;
-                    game._monster_turn_paused_for_more = true;
-                }
+                // C refs: mhitu.c:mattacku(), end.c:done().  Wizard/explore
+                // death handling interrupts the current monster turn even when
+                // the hit occurred while resuming a deferred pet-combat More.
+                game._fatal_monster_attack_paused = true;
+                game._monster_turn_paused_for_more = true;
                 break;
             }
         } else {
@@ -3121,8 +3125,18 @@ export async function movemon() {
                 g._resume_movemon_after_mon = resumeDogAfterInventory;
             }
         }
-        if (g._more && g._pet_combat_more_latched && g._pet_combat_passive_paused
+        const resumedPetCombatNeedsPause = !!g._after_more_message
+            || !!g._pet_defender_death_pending
+            || !!g._pet_combat_passive_paused
+            || (g._occupation_turns_remaining || 0) > 0
+            || !!g._occupation_finish_message
+            || !!g._force_lock
+            || (g._force_lock_post_success_turns || 0) > 0;
+        if (g._more && g._pet_combat_more_latched && resumedPetCombatNeedsPause
             && !g._savelife_resume_active && !hallucinating()) {
+            if ((!g._after_more_message || !g._after_more_message.includes('  '))
+                && !/ engulfs you!$/.test(g._after_more_message || ''))
+                g._after_more_needs_prompt = false;
             g._resume_tame_post_distfleeck = resumeDogAfterInventory;
             g._resume_movemon_after_mon = resumeDogAfterInventory;
             g._resume_somebody_can_move = resumeDogAfterInventory.movement >= NORMAL_SPEED;
@@ -3254,7 +3268,9 @@ export async function movemon() {
                 || !!g._pet_defender_death_pending
                 || !!g._pet_combat_passive_paused
                 || (g._occupation_turns_remaining || 0) > 0
-                || !!g._occupation_finish_message;
+                || !!g._occupation_finish_message
+                || !!g._force_lock
+                || (g._force_lock_post_success_turns || 0) > 0;
             if (g._more && g._pet_combat_more_latched && petCombatNeedsPause
                 && !g._savelife_resume_active && !hallucinating()) {
                 if ((!g._after_more_message || !g._after_more_message.includes('  '))
@@ -3323,6 +3339,15 @@ export async function movemon() {
                     return false;
                 }
                 if (g._pet_combat_resume_active && g._more && !hallucinating()) {
+                    if (g._packed_monster_more_candidate && !g._after_more_message
+                        && !g._monster_attack_pause_after_more) {
+                        // C refs: win/tty/topl.c:more(), mhitu.c:hitmsg().
+                        // A non-side-effect packed monster hit can remain on
+                        // the topline while later monster movement queues the
+                        // next visible message behind that More.
+                        g._pet_combat_resume_active = false;
+                        continue;
+                    }
                     g._pet_combat_resume_active = false;
                     g._resume_movemon_after_mon = mtmp;
                     g._resume_somebody_can_move = mtmp.movement >= NORMAL_SPEED;

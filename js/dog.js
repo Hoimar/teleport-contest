@@ -605,8 +605,15 @@ function pet_inventory_pline(line) {
     }
     if (game._pending_message) {
         const packed = `${game._pending_message}  ${line}`;
-        game._pending_message = packed;
         if (packed.length >= (game.nhDisplay?.cols || COLNO)) queue_more_prompt();
+        if (game._more) {
+            game._after_more_message = game._after_more_message
+                ? `${game._after_more_message}  ${line}`
+                : line;
+            game._after_more_needs_prompt = false;
+            return;
+        }
+        game._pending_message = packed;
     } else {
         pline(line);
     }
@@ -633,7 +640,10 @@ function hallucinating() {
 }
 
 function occupation_message_boundary_active() {
-    return (game._occupation_turns_remaining || 0) > 0 || !!game._occupation_finish_message;
+    return (game._occupation_turns_remaining || 0) > 0
+        || !!game._occupation_finish_message
+        || !!game._force_lock
+        || (game._force_lock_post_success_turns || 0) > 0;
 }
 
 function pending_pet_combat_boundary() {

@@ -582,6 +582,9 @@ export function apply_startup_role_state() {
     game.u.uen = game._initialPower ?? init.pwBase;
     game.u.uenmax = game.u.uen;
     game.u.uac = init.ac;
+    game.u.uhunger = 900;
+    game.u.ublesscnt = 300;
+    game.u.uencumber = 0;
     game.u.acurr = { a: attrs };
     game.u.amax = { a: maxes };
 }

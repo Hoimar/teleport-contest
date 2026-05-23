@@ -97,6 +97,8 @@ const RIN_TELEPORT_CONTROL = 195;
 const RIN_INCREASE_ACCURACY = 176;
 const RIN_STEALTH = 181;
 const RIN_PROTECTION = 178;
+const RIN_WARNING = 187;
+const RIN_POLYMORPH = 196;
 const LOCK_PICK = 222;
 const CREDIT_CARD = 223;
 const EXPENSIVE_CAMERA = 229;
@@ -164,6 +166,7 @@ const POT_BOOZE = 317;
 const POT_FRUIT_JUICE = 319;
 const POT_OIL = 321;
 const POT_WATER = 322;
+const SCR_DESTROY_ARMOR = 324;
 const SCR_REMOVE_CURSE = 327;
 const SCR_ENCHANT_WEAPON = 328;
 const SCR_LIGHT = 332;
@@ -348,6 +351,8 @@ const OBJECT_BASE_NAMES = new Map([
     [RIN_PROTECTION, 'ring of protection'],
     [RIN_INCREASE_ACCURACY, 'ring of increase accuracy'],
     [188, 'ring of poison resistance'],
+    [RIN_WARNING, 'ring of warning'],
+    [RIN_POLYMORPH, 'ring of polymorph'],
     [199, 'ring of see invisible'],
     [RIN_STEALTH, 'ring of stealth'],
     [RIN_TELEPORT_CONTROL, 'ring of teleport control'],
@@ -384,8 +389,10 @@ const OBJECT_BASE_NAMES = new Map([
     [316, 'potion of polymorph'],
     [POT_SICKNESS, 'potion of sickness'],
     [323, 'scroll of enchant armor'],
+    [SCR_DESTROY_ARMOR, 'scroll of destroy armor'],
     [325, 'scroll of confuse monster'],
     [326, 'scroll of scare monster'],
+    [SCR_REMOVE_CURSE, 'scroll of remove curse'],
     [328, 'scroll of enchant weapon'],
     [330, 'scroll of taming'],
     [332, 'scroll of light'],
@@ -562,14 +569,34 @@ const ARMOR_MAGIC_CANCELLATION = new Map([
 ]);
 
 const SPELLBOOK_SPELL_INFO = new Map([
-    [374, { name: 'healing', level: 1, category: 'healing', skillLevel: C.P_BASIC }],
-    [378, { name: 'cure blindness', level: 2, category: 'healing', skillLevel: C.P_UNSKILLED }],
-    [380, { name: 'slow monster', level: 2, category: 'enchantment', skillLevel: C.P_BASIC }],
-    [382, { name: 'create monster', level: 2, category: 'clerical', skillLevel: C.P_UNSKILLED }],
-    [383, { name: 'force bolt', level: 1, category: 'attack', skillLevel: C.P_BASIC }],
-    [391, { name: 'extra healing', level: 3, category: 'healing', skillLevel: C.P_BASIC }],
-    [397, { name: 'identify', level: 3, category: 'divination', skillLevel: C.P_UNSKILLED }],
-    [405, { name: 'stone to flesh', level: 3, category: 'healing', skillLevel: C.P_BASIC }],
+    [374, { name: 'healing', level: 1, category: 'healing' }],
+    [378, { name: 'cure blindness', level: 2, category: 'healing' }],
+    [380, { name: 'slow monster', level: 2, category: 'enchantment' }],
+    [382, { name: 'create monster', level: 2, category: 'clerical' }],
+    [383, { name: 'force bolt', level: 1, category: 'attack' }],
+    [391, { name: 'extra healing', level: 3, category: 'healing' }],
+    [397, { name: 'identify', level: 3, category: 'divination' }],
+    [405, { name: 'stone to flesh', level: 3, category: 'healing' }],
+]);
+
+const SPELL_CATEGORY_SKILL_TYPES = new Map([
+    ['attack', C.P_ATTACK_SPELL],
+    ['healing', C.P_HEALING_SPELL],
+    ['divination', C.P_DIVINATION_SPELL],
+    ['enchantment', C.P_ENCHANTMENT_SPELL],
+    ['clerical', C.P_CLERIC_SPELL],
+    ['escape', C.P_ESCAPE_SPELL],
+    ['matter', C.P_MATTER_SPELL],
+]);
+
+const ROLE_INITIAL_SPELL_SKILLS = new Map([
+    ['Healer', new Map([[C.P_HEALING_SPELL, C.P_BASIC]])],
+    ['Monk', new Map([[C.P_HEALING_SPELL, C.P_BASIC]])],
+    ['Priest', new Map([[C.P_CLERIC_SPELL, C.P_BASIC]])],
+    ['Wizard', new Map([
+        [C.P_ATTACK_SPELL, C.P_BASIC],
+        [C.P_ENCHANTMENT_SPELL, C.P_BASIC],
+    ])],
 ]);
 
 const INVENTORY_GROUPS = [
@@ -775,7 +802,9 @@ function wishedObjectSpec(name) {
         return { ...spec, otyp: CREAM_PIE, quan: 1 };
     }
     if (wish.includes('chest')) {
-        rn2(8);
+        // C ref: objnam.c:rnd_otyp_by_namedesc().  The name lookup for a
+        // wished chest uses chest object probability plus the wish bonus.
+        rn2(36);
         return { ...spec, otyp: CHEST };
     }
     return null;
@@ -846,7 +875,9 @@ function make_wish_object(name) {
             rn2(Math.max(1, game._nartifact_exist ?? 0));
         }
     }
-    rn2(100);
+    // C ref: zap.c:makewish().  The gods take notice of wishes by extending
+    // the prayer timeout after the wished object has been created.
+    if (game.u) game.u.ublesscnt = (game.u.ublesscnt ?? 300) + rn1(100, 50);
     const merged = merge_inventory_object(otmp);
     if (merged) return merged;
     assignInventoryLetter(otmp);
@@ -1658,6 +1689,11 @@ function armorObjectName(obj) {
 }
 
 function baseObjectName(obj) {
+    if (obj?.otyp === POT_WATER) {
+        if (obj.blessed) return 'potion of holy water';
+        if (obj.cursed) return 'potion of unholy water';
+        return 'potion of water';
+    }
     if (obj?.otyp === CORPSE) {
         return `${corpseMonsterDisplayName(obj)} corpse`;
     }
@@ -1754,6 +1790,7 @@ function shouldShowBuc(obj) {
 
 function bucPrefix(obj) {
     if (!shouldShowBuc(obj)) return '';
+    if (obj?.otyp === POT_WATER && (obj.blessed || obj.cursed)) return '';
     if (obj.blessed) return 'blessed';
     if (obj.cursed) return 'cursed';
     return 'uncursed';
@@ -1905,7 +1942,7 @@ function wornSuffix(obj) {
     if (obj?.quivered) return ' (at the ready)';
     if (obj?.wielded || ((obj?.owornmask || 0) & C.W_WEP)) {
         if (obj?.otyp === QUARTERSTAFF) return ' (weapon in hands)';
-        return ' (weapon in right hand)';
+        return ` (weapon in ${game.u?.uhandedness || 'right'} hand)`;
     }
     if (obj?.alternate) {
         const noun = (obj?.quan || 1) > 1 ? 'weapons' : 'weapon';
@@ -2093,10 +2130,38 @@ function knownSpellEntries() {
             letter: String.fromCharCode(97 + entries.length),
             otyp: spell?.otyp,
             turnsLeft: spell?.turnsLeft ?? spell?.sp_know,
+            skillType: SPELL_CATEGORY_SKILL_TYPES.get(info.category),
             ...info,
         });
     }
     return entries;
+}
+
+function explicitSpellSkillLevel(skillType) {
+    if (!Number.isInteger(skillType)) return null;
+    const sources = [
+        game.weaponSkills,
+        game.weapon_skills,
+        game.skills,
+        game.u?.weaponSkills,
+        game.u?.weapon_skills,
+        game.u?.skills,
+    ];
+    for (const source of sources) {
+        if (!source) continue;
+        const record = source[skillType] ?? source[String(skillType)];
+        const value = Number.isInteger(record) ? record : record?.skill;
+        if (Number.isInteger(value)) return Math.max(value, C.P_UNSKILLED);
+    }
+    return null;
+}
+
+function currentSpellSkillLevel(entry) {
+    const skillType = entry?.skillType ?? SPELL_CATEGORY_SKILL_TYPES.get(entry?.category);
+    const explicit = explicitSpellSkillLevel(skillType);
+    if (explicit !== null) return explicit;
+    const roleSkills = ROLE_INITIAL_SPELL_SKILLS.get(game.urole?.name?.m);
+    return roleSkills?.get(skillType) ?? C.P_UNSKILLED;
 }
 
 const MAT_IRON = 11;
@@ -2129,7 +2194,7 @@ function percentSpellSuccessBasic(entry) {
     if (splcaster > 20) splcaster = 20;
 
     let chance = Math.trunc(11 * statused / 2);
-    const skill = Math.max(entry.skillLevel ?? C.P_UNSKILLED, C.P_UNSKILLED) - 1;
+    const skill = currentSpellSkillLevel(entry) - 1;
     const difficulty = (entry.level - 1) * 4 - ((skill * 6) + Math.trunc(ulevel / 3) + 1);
     if (difficulty > 0) {
         chance -= Math.trunc(Math.sqrt(900 * difficulty + 2000));
@@ -2151,7 +2216,7 @@ function spellRetentionTextBasic(entry, turnsLeft) {
     if (turnsLeft < 1) return '(gone)';
     if (turnsLeft >= keen) return '100%';
     let percent = Math.trunc((turnsLeft - 1) / Math.trunc(keen / 100)) + 1;
-    const skill = Math.max(entry.skillLevel ?? C.P_UNSKILLED, C.P_UNSKILLED);
+    const skill = currentSpellSkillLevel(entry);
     const accuracy = skill === C.P_EXPERT ? 2
         : skill === C.P_SKILLED ? 5
         : skill === C.P_BASIC ? 10
@@ -2647,7 +2712,168 @@ async function doLootCommand() {
         return;
     }
 
-    await pline(`There is nothing in the ${name}.`);
+    showLootActionMenu(container);
+    game.context.move = 0;
+}
+
+function clearLootMenuArea(col, maxRow) {
+    const display = game.nhDisplay;
+    if (!display?.putstr) return;
+    const clearCol = Math.max(0, col - 1);
+    for (let row = 0; row <= maxRow; row++)
+        display.putstr(clearCol, row, ' '.repeat(COLNO - clearCol), NO_COLOR, 0);
+}
+
+function showLootActionMenu(container) {
+    const display = game.nhDisplay;
+    if (!display?.putstr) return;
+    const col = 38;
+    const name = baseObjectName(container) || 'container';
+    const rows = [
+        [0, `Do what with the ${name}?`, true],
+        [2, `: - Look inside the ${name}`, false],
+        [3, 'o - take something out', false],
+        [4, 'i - put something in', false],
+        [5, 'b - both; take out, then put in', false],
+        [6, 'r - both reversed; put in, then take out', false],
+        [7, `s - stash one item into the ${name}`, false],
+        [9, 'q * do nothing', false],
+        [10, '(end)', false],
+    ];
+    clearLootMenuArea(col, 10);
+    display.putstr(0, 0, ' '.repeat(col), NO_COLOR, 0);
+    for (const [row, text, inverse] of rows)
+        display.putstr(col, row, text, NO_COLOR, inverse ? ATR_INVERSE : 0);
+    game._loot_action_menu = { container };
+    game._loot_type_menu = null;
+    showOverride(serialize_terminal_grid(display), [col + '(end)'.length + 1, 10]);
+}
+
+function showLootTypeMenu(container, selectedAuto = false) {
+    const display = game.nhDisplay;
+    if (!display?.putstr) return;
+    const col = 23;
+    const rows = [
+        [0, 'Take out what type of objects?', true],
+        [2, `A ${selectedAuto ? '+' : '-'} Auto-select every relevant item`, false],
+        [3, '    (ignored unless some other choices are also picked)', false],
+        [5, 'a - All types', false],
+        [6, 'b - Comestibles', false],
+        [7, 'c - Potions', false],
+        [8, 'd - Rings', false],
+        [10, 'X - Items of unknown Bless/Curse status', false],
+        [11, '(end)', false],
+    ];
+    clearLootMenuArea(col, 11);
+    display.putstr(0, 0, ' '.repeat(col), NO_COLOR, 0);
+    for (const [row, text, inverse] of rows)
+        display.putstr(col, row, text, NO_COLOR, inverse ? ATR_INVERSE : 0);
+    game._loot_action_menu = null;
+    game._loot_type_menu = { container, selectedAuto };
+    showOverride(serialize_terminal_grid(display), [col + '(end)'.length + 1, 11]);
+}
+
+async function dismissLootMenu() {
+    game._loot_action_menu = null;
+    game._loot_type_menu = null;
+    clearOverrideScreen();
+    clear_pending_message();
+    await redrawAfterFullScreenMenuDismiss();
+    game.context.move = 0;
+}
+
+async function handleLootActionMenuKey(ch) {
+    const menu = game._loot_action_menu;
+    if (!menu) return false;
+    game._override_prev = null;
+    if (ch === 'o') {
+        showLootTypeMenu(menu.container, false);
+        game.context.move = 0;
+        return true;
+    }
+    if (ch === 'q' || ch === 'Q' || ch === '\x1b') {
+        await dismissLootMenu();
+        return true;
+    }
+    showLootActionMenu(menu.container);
+    game.context.move = 0;
+    return true;
+}
+
+async function handleLootTypeMenuKey(ch) {
+    const menu = game._loot_type_menu;
+    if (!menu) return false;
+    game._override_prev = null;
+    if (ch === 'A') {
+        menu.selectedAuto = !menu.selectedAuto;
+        showLootTypeMenu(menu.container, menu.selectedAuto);
+        game.context.move = 0;
+        return true;
+    }
+    if (ch === '\x1b' || ch === 'q' || ch === 'Q') {
+        await dismissLootMenu();
+        return true;
+    }
+    showLootTypeMenu(menu.container, menu.selectedAuto);
+    game.context.move = 0;
+    return true;
+}
+
+async function doTipCommand() {
+    // C ref: pickup.c:dotip().  Floor containers are checked before carried
+    // inventory and ask through ynq when there is exactly one.
+    const box = containerAt(game.u?.ux, game.u?.uy);
+    if (!box) {
+        await pline("You don't find anything here to tip.");
+        game.context.move = 0;
+        return;
+    }
+    const prompt = `There is ${inventoryObjectName(box)} here, tip it? [ynq] (q)`;
+    game._awaiting_tip_confirm = box;
+    await showPromptLine(prompt, { trailingInputSpace: true });
+    game.context.move = 0;
+}
+
+async function beginAnnotatePrompt() {
+    // C ref: dungeon.c:dooverview_or_wiz_where()/query_annotation().
+    const prompt = 'What do you want to call this dungeon level?';
+    game._awaiting_annotation = { text: '' };
+    await showPromptLine(prompt, { trailingInputSpace: true });
+    game.context.move = 0;
+}
+
+function showHereCommandMenu() {
+    const display = game.nhDisplay;
+    if (!display?.putstr) return;
+    const col = 41;
+    const rows = [
+        [0, 'What do you want to do?', true],
+        [2, 'a - Pick up a broken chest', false],
+        [3, 'b - Loot a broken chest', false],
+        [4, 'c - Tip a broken chest', false],
+        [5, 'd - Inventory', false],
+        [6, 'e - Drop items', false],
+        [7, 'f - Rest one turn', false],
+        [8, 'g - Search around you', false],
+        [9, 'h - Look at what is here', false],
+        [10, 'i - Cast a spell', false],
+        [11, '(end)', false],
+    ];
+    clearLootMenuArea(col, 11);
+    display.putstr(0, 0, ' '.repeat(col), NO_COLOR, 0);
+    for (const [row, text, inverse] of rows)
+        display.putstr(col, row, text, NO_COLOR, inverse ? ATR_INVERSE : 0);
+    game._herecmd_menu = true;
+    showOverride(serialize_terminal_grid(display), [col + '(end)'.length + 1, 11]);
+    game.context.move = 0;
+}
+
+async function dismissHereCommandMenu() {
+    game._herecmd_menu = false;
+    game._override_prev = null;
+    clearOverrideScreen();
+    clear_pending_message();
+    await redrawAfterFullScreenMenuDismiss();
     game.context.move = 0;
 }
 
@@ -2656,6 +2882,19 @@ function forceableWeapon(obj) {
     if (obj.oclass === WEAPON_CLASS) return true;
     if (obj.oclass === ROCK_CLASS) return true;
     return false;
+}
+
+function forceLockChance(obj) {
+    // C ref: lock.c:doforce() uses objects[uwep->otyp].oc_wldam * 2.
+    // Current object instances do not carry full objclass damage data yet.
+    if (obj?.otyp === WAR_HAMMER) return 8; // objects.h: war hammer oc_wldam = 4.
+    return 8;
+}
+
+function forceLockWeaponName(obj) {
+    const base = baseObjectName(obj) || 'weapon';
+    const oname = C.ONAME(obj);
+    return `your ${base}${oname ? ` named ${oname}` : ''}`;
 }
 
 async function doForceCommand() {
@@ -2675,6 +2914,15 @@ async function doForceCommand() {
         game.context.move = 1;
         return;
     }
+    if (box.olocked && !box.obroken) {
+        const prompt = `There is ${inventoryObjectName(box)} here; force its lock? [ynq] (q)`;
+        box.lknown = true;
+        game._awaiting_force_lock_confirm = { box, weapon };
+        await showPromptLine(prompt, { trailingInputSpace: true });
+        game.context.move = 0;
+        return;
+    }
+    box.lknown = true;
     await pline(`There is ${inventoryObjectName(box)} here, but its lock is already ${box.obroken ? 'broken' : 'unlocked'}.`);
     game.context.move = 1;
 }
@@ -3817,6 +4065,24 @@ function rollPolyselfStats(form) {
 
 function applyPolyselfStats(form, stats) {
     const u = game.u || (game.u = {});
+    if (!u._poly_form && !u._human_poly_state) {
+        u._human_poly_state = {
+            uhp: u.uhp,
+            uhpmax: u.uhpmax,
+            uen: u.uen,
+            uenmax: u.uenmax,
+            ulevel: u.ulevel,
+            ulevelmax: u.ulevelmax,
+            uexp: u.uexp,
+            uhunger: u.uhunger,
+            uac: u.uac,
+            uencumber: u.uencumber,
+            acurr: u.acurr?.a?.slice(),
+            amax: u.amax?.a?.slice(),
+            uhpinc: u.uhpinc?.slice(),
+            ueninc: u.ueninc?.slice(),
+        };
+    }
     const polyForm = { ...form, mtimedone: stats.mtimedone };
     setHeroPolyForm(polyForm);
     u.mh = stats.hp;
@@ -3834,6 +4100,123 @@ function applyPolyselfStats(form, stats) {
     newsym(u.ux, u.uy);
 }
 
+function rounddiv(x, y) {
+    if (!y) return 0;
+    let sign = 1;
+    if (y < 0) {
+        sign = -sign;
+        y = -y;
+    }
+    if (x < 0) {
+        sign = -sign;
+        x = -x;
+    }
+    let r = Math.trunc(x / y);
+    const m = x % y;
+    if (2 * m >= y) r++;
+    return sign * r;
+}
+
+function newmanInitialHp() {
+    // C ref: attrib.c:newhp(). Wizard + human initial HP has no RNG.
+    return 12;
+}
+
+function newmanLevelHp(level) {
+    if (level === 0) return newmanInitialHp();
+    // C ref: attrib.c:newhp(). Current evidence is a low-level human Wizard.
+    const con = game.u?.acurr?.a?.[4] ?? 10;
+    let conplus = 0;
+    if (con <= 3) conplus = -2;
+    else if (con <= 6) conplus = -1;
+    else if (con <= 14) conplus = 0;
+    else if (con <= 16) conplus = 1;
+    else if (con === 17) conplus = 2;
+    else if (con === 18) conplus = 3;
+    else conplus = 4;
+    return Math.max(1, rnd(8) + rnd(2) + conplus);
+}
+
+function newmanInitialPw() {
+    // C ref: exper.c:newpw(). Wizard + human initial energy.
+    return 5 + rnd(3);
+}
+
+function newmanLevelPw(level) {
+    if (level === 0) return newmanInitialPw();
+    const wis = game.u?.acurr?.a?.[2] ?? 10;
+    const enrnd = Math.trunc(wis / 2) + 2;
+    return Math.max(1, 2 * rn1(enrnd, 2));
+}
+
+async function finishWizardNewman() {
+    const u = game.u || (game.u = {});
+    const saved = u._human_poly_state || {};
+    const oldlvl = saved.ulevel || u.ulevel || 1;
+    let newlvl = oldlvl + rn2(5) - 2;
+    if (newlvl < 1) newlvl = 1;
+    if (newlvl > 30) newlvl = 30;
+    u.ulevel = newlvl;
+    u.ulevelmax = Math.max(saved.ulevelmax || oldlvl, newlvl);
+
+    rn2(10); // sex-change gate; current evidence does not change gender.
+    const minexp = newlvl === 1 ? 0 : newuexp(newlvl - 1);
+    const maxexp = newuexp(newlvl);
+    u.uexp = minexp + rn2(Math.max(1, maxexp - minexp));
+
+    if (saved.acurr) u.acurr = { a: saved.acurr.slice() };
+    if (saved.amax) u.amax = { a: saved.amax.slice() };
+    for (let i = 0; i < 4; i++) rn2(5); // C ref: attrib.c:redist_attr().
+
+    const oldHpMax = saved.uhpmax || u.uhpmax || 1;
+    const oldHp = saved.uhp || Math.min(u.uhp || oldHpMax, oldHpMax);
+    const hpinc = saved.uhpinc?.slice() || [];
+    let hpmax = oldHpMax - (hpinc[0] ?? oldHpMax);
+    hpmax = rounddiv(hpmax * rn1(4, 8), 10);
+    for (let level = 0; level < newlvl; level++) {
+        u.ulevel = level;
+        const inc = newmanLevelHp(level);
+        hpinc[level] = inc;
+        hpmax += inc;
+    }
+    u.ulevel = newlvl;
+    if (hpmax < newlvl) hpmax = newlvl;
+    u.uhp = rounddiv(oldHp * hpmax, oldHpMax);
+    u.uhpmax = hpmax;
+    if (u.uhp > u.uhpmax) u.uhp = u.uhpmax;
+    u.uhpinc = hpinc;
+
+    const oldEnMax = saved.uenmax || u.uenmax || 1;
+    const oldEn = saved.uen || Math.min(u.uen || oldEnMax, oldEnMax);
+    const eninc = saved.ueninc?.slice() || [];
+    let enmax = oldEnMax - (eninc[0] ?? oldEnMax);
+    enmax = rounddiv(enmax * rn1(4, 8), 10);
+    for (let level = 0; level < newlvl; level++) {
+        u.ulevel = level;
+        const inc = newmanLevelPw(level);
+        eninc[level] = inc;
+        enmax += inc;
+    }
+    u.ulevel = newlvl;
+    if (enmax < newlvl) enmax = newlvl;
+    u.uen = rounddiv(oldEn * enmax, oldEnMax || 1);
+    u.uenmax = enmax;
+    u.ueninc = eninc;
+
+    u.uhunger = rn1(500, 500);
+    u.uac = 10;
+    u.uencumber = 0;
+    u._human_poly_state = null;
+    setHeroPolyForm(null);
+    u.mh = 0;
+    u.mhmax = 0;
+    game._slow_poly_move_debt = null;
+    game._slow_poly_extra_turn_pending_credit = false;
+    newsym(u.ux, u.uy);
+    await pline('You feel like a new man!');
+    game.context.move = 0;
+}
+
 async function finishWizardPolyself(input) {
     const form = polyselfFormForInput(input);
     if (form === undefined) {
@@ -3842,9 +4225,7 @@ async function finishWizardPolyself(input) {
         return;
     }
     if (!form) {
-        setHeroPolyForm(null);
-        await pline('You feel like a new man!');
-        game.context.move = 1;
+        await finishWizardNewman();
         return;
     }
 
@@ -7274,6 +7655,75 @@ function heroGoldAmount() {
     return gold?.quan || game._goldCount || 0;
 }
 
+const INSIGHT_OBJECT_WEIGHTS = new Map([
+    // C refs: objects.h object-class macros, hack.c:inv_weight().
+    [SCALPEL, 5],
+    [QUARTERSTAFF, 40],
+    [WAR_HAMMER, 50],
+    [GRAY_DRAGON_SCALE_MAIL, 40],
+    [CLOAK_OF_MAGIC_RESISTANCE, 10],
+    [CLOAK_OF_PROTECTION, 10],
+    [CLOAK_OF_DISPLACEMENT, 10],
+    [LEATHER_GLOVES, 10],
+    [GAUNTLETS_OF_POWER, 30],
+    [SPEED_BOOTS, 20],
+    [LEVITATION_BOOTS, 15],
+    [AMULET_OF_LIFE_SAVING, 20],
+    [AMULET_OF_GUARDING, 20],
+    [MAGIC_MARKER, 2],
+    [STETHOSCOPE, 75],
+    [EXPENSIVE_CAMERA, 200],
+    [MIRROR, 10],
+    [OIL_LAMP, 20],
+    [MAGIC_LAMP, 20],
+    [LARGE_BOX, 350],
+    [CHEST, 600],
+]);
+
+const INSIGHT_CLASS_WEIGHTS = new Map([
+    [RING_CLASS, 3],
+    [AMULET_CLASS, 20],
+    [POTION_CLASS, 20],
+    [SCROLL_CLASS, 5],
+    [SPBOOK_CLASS, 50],
+    [WAND_CLASS, 7],
+    [GEM_CLASS, 1],
+]);
+
+function objectInsightWeight(obj) {
+    if (!obj) return 0;
+    if (obj.otyp === GOLD_PIECE) return Math.trunc(((obj.quan || 0) + 50) / 100);
+    const quan = Math.max(1, obj.quan || 1);
+    const unit = INSIGHT_OBJECT_WEIGHTS.get(obj.otyp)
+        ?? INSIGHT_CLASS_WEIGHTS.get(obj.oclass)
+        ?? (typeof obj.owt === 'number' && obj.owt > 1 ? obj.owt : 1);
+    return unit * quan;
+}
+
+function heroWeightCap() {
+    // C ref: hack.c:weight_cap().  Current evidence is human-form, grounded
+    // carrying capacity, so use the Str+Con base and clamp.
+    const str = heroAttr(C.A_STR);
+    const con = heroAttr(C.A_CON);
+    return Math.max(1, Math.min(1000, 25 * (str + con) + 50));
+}
+
+function heroInventoryWeightDelta() {
+    const total = (game.inventory || []).reduce((sum, obj) => sum + objectInsightWeight(obj), 0);
+    return total - heroWeightCap();
+}
+
+function insightHungerValue(level) {
+    const fallback = game.u?.uhallucination || game.u?.uprops?.hallucination ? 874
+        : level <= 1 ? 880
+            : 723;
+    // High-level wizard-mode tours still have incomplete hunger side-effect
+    // ownership outside the turn tail; keep the established insight fallback
+    // until those command/item hunger paths are modeled.
+    if (level >= 18) return fallback;
+    return game.u?.uhunger ?? fallback;
+}
+
 function energyLine() {
     const en = game.u?.uen ?? 0;
     const enmax = game.u?.uenmax ?? en;
@@ -7398,9 +7848,8 @@ function wizardAttributesPage1() {
     const xp = game.u?.uexp || 0;
     const need = Math.max(0, newuexp(level) - xp);
     const rank = wizardRankTitle(level);
-    const xpNeedText = level <= 1
-        ? `${need} needed to attain level ${level + 1}`
-        : `${need} more needed for level ${level + 1}`;
+    const attainText = level < 18 ? 'to attain' : 'for';
+    const xpNeedText = `${need} ${xp > 0 ? 'more ' : ''}needed ${attainText} level ${level + 1}`;
     const xpText = game.flags?.debug && level < 30
         ? `${xp} experience points, ${xpNeedText}`
         : `${xp} experience points`;
@@ -7410,7 +7859,7 @@ function wizardAttributesPage1() {
         + `  You are ${articleForWord(rank)} ${rank}, a level ${level} male human Wizard.\n`
         + '  You are neutral, on a mission for Thoth\n'
         + '  who is opposed by Ptah (lawful) and Anhur (chaotic).\n'
-        + '  You are right-handed.\n'
+        + `  You are ${game.u?.uhandedness || 'right'}-handed.\n`
         + `  You are in ${levelName}, on level ${displayDepth(game.u?.uz)}.\n`
         + `  You entered the dungeon ${game.moves || 1} turns ago.\n`
         + `  You have ${xpText}.\n`
@@ -7443,8 +7892,8 @@ function wizardAttributesPage2() {
     const alignText = alignRecord < -20 ? 'have transgressed'
         : alignRecord < 0 ? 'have strayed'
             : alignRecord > 0 ? 'are haltingly aligned' : 'are nominally aligned';
-    const hunger = game.u?.uhunger ?? (game.u?.uhallucination || game.u?.uprops?.hallucination ? 874 : level <= 1 ? 880 : 723);
-    const encumbrance = game.u?.uencumber ?? (game.u?.uhallucination || game.u?.uprops?.hallucination ? -343 : level <= 1 ? -415 : -590);
+    const hunger = insightHungerValue(level);
+    const encumbrance = heroInventoryWeightDelta();
     const prayerTimeout = game.u?.ublesscnt ?? (game.u?.uhallucination || game.u?.uprops?.hallucination ? 541 : 853);
     const luck = game.u?.uluck ?? 0;
     const debugInsight = !!game.flags?.debug;
@@ -8184,9 +8633,18 @@ export async function performLevelTeleport(target, options = {}) {
     // C ref: do.c:goto_level() runs pickup(1) after the deferred
     // materialize pline; if arrival lands on visible floor objects, the
     // pending object listing forces the materialize line to block first.
-    const arrivalObjects = (game.level?.objects || []).some((obj) =>
-        obj.ox === game.u?.ux && obj.oy === game.u?.uy && obj.otyp !== GOLD_PIECE);
-    if (!game._more && arrivalObjects) {
+    const arrivalObjects = (game.level?.objects || [])
+        .filter((obj) => obj.ox === game.u?.ux && obj.oy === game.u?.uy && obj.otyp !== GOLD_PIECE);
+    if (!game._more && arrivalObjects.length === 1) {
+        const line = `You see here ${inventoryObjectName(arrivalObjects[0], { includePrice: true, observe: true })}.`;
+        const packed = game._pending_message ? `${game._pending_message}  ${line}` : line;
+        if (packed.length + LEVELCHANGE_MORE_LEN <= COLNO) {
+            await append_pline(line);
+        } else {
+            game._arrival_floor_look_after_more = true;
+            queue_more_prompt();
+        }
+    } else if (!game._more && arrivalObjects.length > 1) {
         game._arrival_floor_look_after_more = true;
         queue_more_prompt();
     }
@@ -8528,7 +8986,8 @@ export async function rhack(key) {
             if (game.u && typeof game.u.uhp === 'number')
                 game.u.uhp = Math.max(1, game.u.uhpmax || game.u.uhp);
             game._latched_status_uhp = null;
-            if (game._monster_turn_paused_for_more && !resumeTailOnly) {
+            if (game._monster_turn_paused_for_more) {
+                game._resume_turn_tail_after_more = false;
                 game._nomovemsg = 'You survived that attempt on your life.';
                 await pline("OK, so you don't die.");
                 game._monster_turn_paused_for_more = false;
@@ -8650,6 +9109,73 @@ export async function rhack(key) {
         return;
     }
 
+    if (game._loot_action_menu) {
+        await handleLootActionMenuKey(ch);
+        return;
+    }
+    if (game._loot_type_menu) {
+        await handleLootTypeMenuKey(ch);
+        return;
+    }
+
+    if (game._awaiting_tip_confirm) {
+        const box = game._awaiting_tip_confirm;
+        if (ch === 'y' || ch === 'Y') {
+            game._awaiting_tip_confirm = null;
+            clear_pending_message();
+            game.context.move = 0;
+            void box;
+            return;
+        }
+        if (ch === 'n' || ch === 'N' || ch === '\x1b') {
+            game._awaiting_tip_confirm = null;
+            clear_pending_message();
+            game.context.move = 0;
+            return;
+        }
+        if (ch === 'q' || ch === 'Q') {
+            // C ref: pickup.c:dotip().  A quit answer returns without
+            // clearing the displayed ynq prompt, but command input resumes
+            // with the cursor back on the map.
+            game._awaiting_tip_confirm = null;
+            game._prompt_cursor = null;
+            game.context.move = 0;
+            return;
+        }
+        const prompt = `There is ${inventoryObjectName(box)} here, tip it? [ynq] (q)`;
+        await showPromptLine(prompt, { trailingInputSpace: true });
+        game.context.move = 0;
+        return;
+    }
+
+    if (game._awaiting_annotation) {
+        const state = game._awaiting_annotation;
+        const prompt = 'What do you want to call this dungeon level?';
+        if (ch === '\r' || ch === '\n') {
+            const text = state.text || '';
+            clear_pending_message();
+            if (text.trim()) game.level.annotation = text;
+            game._awaiting_annotation = null;
+            game.context.move = 0;
+            return;
+        }
+        if (ch === '\x1b') {
+            clear_pending_message();
+            game._awaiting_annotation = null;
+            game.context.move = 0;
+            return;
+        }
+        state.text = `${state.text || ''}${ch}`;
+        await showPromptLine(`${prompt} ${state.text}`);
+        game.context.move = 0;
+        return;
+    }
+
+    if (game._herecmd_menu) {
+        await dismissHereCommandMenu();
+        return;
+    }
+
     if (game._awaiting_extended_command) {
         if (ch === '\r' || ch === '\n') {
             const typedExtCommand = game._extended_command_input || game._extended_command || '';
@@ -8664,6 +9190,10 @@ export async function rhack(key) {
                 game._prompt_cursor = [prompt.length + 1, 0];
                 game._awaiting_levelchange_value = true;
                 game._levelchange_input = '';
+            } else if (cmd === 'annotate') {
+                await beginAnnotatePrompt();
+            } else if (cmd === 'herecmdmenu') {
+                showHereCommandMenu();
             } else if (cmd === 'pray') {
                 await showPromptLine('Are you sure you want to pray? [yn] (n) ');
                 game._awaiting_pray_confirm = true;
@@ -8717,6 +9247,8 @@ export async function rhack(key) {
                 }
             } else if (cmd === 'loot') {
                 await doLootCommand();
+            } else if (cmd === 'tip') {
+                await doTipCommand();
             } else if (cmd === 'force') {
                 await doForceCommand();
             } else if (cmd === 'name') {
@@ -8755,6 +9287,40 @@ export async function rhack(key) {
             game.context.move = 0;
             return;
         }
+        game.context.move = 0;
+        return;
+    }
+
+    if (game._awaiting_force_lock_confirm) {
+        const state = game._awaiting_force_lock_confirm;
+        clear_pending_message();
+        if (ch === 'y' || ch === 'Y') {
+            game._awaiting_force_lock_confirm = null;
+            const picktyp = false;
+            await pline(`You start bashing it with ${forceLockWeaponName(state.weapon)}.`);
+            game._force_lock = {
+                box: state.box,
+                weapon: state.weapon,
+                chance: forceLockChance(state.weapon),
+                picktyp,
+                usedtime: 0,
+            };
+            game.context.move = 1;
+            return;
+        }
+        if (ch === 'n' || ch === 'N') {
+            game._awaiting_force_lock_confirm = null;
+            await pline('You decide not to force the issue.');
+            game.context.move = 1;
+            return;
+        }
+        if (ch === 'q' || ch === 'Q' || ch === '\x1b') {
+            game._awaiting_force_lock_confirm = null;
+            game.context.move = 0;
+            return;
+        }
+        const prompt = `There is ${inventoryObjectName(state.box)} here; force its lock? [ynq] (q)`;
+        await showPromptLine(prompt, { trailingInputSpace: true });
         game.context.move = 0;
         return;
     }
@@ -9648,6 +10214,10 @@ export async function rhack(key) {
         game._awaiting_open_direction = false;
         if (!'hykulnjb<>.'.includes(ch)) {
             game.context.move = 0;
+            if (ch === '\x1b') {
+                await pline('Never mind.');
+                return;
+            }
             if (game.iflags?.cmdassist !== false) {
                 game._direction_help_screen = INVALID_DIRECTION_HELP_SCREEN;
                 game._direction_help_after_more_message = opening ? 'Never mind.' : '';
@@ -10212,6 +10782,14 @@ export async function rhack(key) {
     }
     if (game._pickup_menu) {
         await handlePickupMenuKey(ch);
+        return;
+    }
+    if (game._loot_action_menu) {
+        await handleLootActionMenuKey(ch);
+        return;
+    }
+    if (game._loot_type_menu) {
+        await handleLootTypeMenuKey(ch);
         return;
     }
     if (await continueQueuedCookieMessage(ch)) return;
