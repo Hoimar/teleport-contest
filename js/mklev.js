@@ -10,7 +10,7 @@ import { GameMap } from './game.js';
 import { rn2, rnd, rn1, rne, rnz, d } from './rng.js';
 import { init_rect, rnd_rect, get_rect, split_rects } from './rect.js';
 import { depth as depth_of_level, distmin, dist2 } from './hacklib.js';
-import { randomEngraving, randomEpitaph } from './random_text.js';
+import { randomEngraving, randomEpitaph, wipeoutText } from './random_text.js';
 import {
     OBJECT_CLASS, OBJECT_PROB, OBJECT_CHARGED, OBJECT_DIR,
     CLASS_BASES, CLASS_TOTALS,
@@ -35,7 +35,7 @@ import {
     ICE, MOAT, POOL, WATER, LAVAPOOL, LAVAWALL, DBWALL, DRAWBRIDGE_UP, THRONE,
     A_LAWFUL, A_NONE, Align2amask,
     LR_DOWNSTAIR, LR_UPSTAIR, LR_BRANCH, LR_TELE, LR_UPTELE, LR_DOWNTELE, NO_MINVENT, MM_IGNOREWATER, MM_IGNORELAVA, MM_ADJACENTOK, MM_ANGRY, MM_EPRI, MM_ASLEEP, MM_NOGRP, MM_NOTAIL, MM_NONAME, MM_NOWAIT, GP_CHECKSCARY, GP_AVOID_MONPOS,
-    MARK as ENGR_MARK, N_ENGRAVE,
+    MARK as ENGR_MARK, DUST as ENGR_DUST, BURN as ENGR_BURN, ENGR_BLOOD, HEADSTONE, N_ENGRAVE,
     M_AP_OBJECT, M_AP_FURNITURE,
     STRAT_APPEARMSG, STRAT_WAITFORU, STRAT_CLOSE,
     M3_WAITFORU, M3_CLOSE, M3_WAITMASK, M3_COVETOUS,
@@ -441,6 +441,11 @@ const HOLE = 13;
 const TRAPDOOR = 14;
 const TELEP_TRAP = 15;
 const LEVEL_TELEP = 16;
+const TRAP_ENGRAVINGS = new Map([
+    [TRAPDOOR, 'Vlad was here'],
+    [TELEP_TRAP, 'ad aerarium'],
+    [LEVEL_TELEP, 'ad aerarium'],
+]);
 const MAGIC_PORTAL = 17;
 const WEB = 18;
 const STATUE_TRAP = 19;
@@ -3284,7 +3289,23 @@ function make_engr_at(x, y, text, pristine, epoch, engr_type) {
     game.level.engravings.unshift(ep);
     return ep;
 }
-function wipe_engr_at(x, y, cnt, perm) { /* stub */ }
+function wipe_engr_at(x, y, cnt, magical) {
+    // C ref: engrave.c:wipe_engr_at().
+    const ep = engr_at(x, y);
+    if (!ep || ep.type === HEADSTONE || ep.nowipeout) return;
+    const loc = game.level?.at(x, y);
+    if (ep.type !== ENGR_BURN || loc?.typ === ICE || (magical && !rn2(2))) {
+        let count = cnt;
+        if (ep.type !== ENGR_DUST && ep.type !== ENGR_BLOOD) {
+            count = rn2(1 + Math.trunc(50 / (cnt + 1))) ? 0 : 1;
+        }
+        ep.text = wipeoutText(ep.text, count, 0).replace(/^ +/, '');
+        if (!ep.text) {
+            game.level.engravings = (game.level.engravings || [])
+                .filter(other => other !== ep);
+        }
+    }
+}
 function make_grave(x, y, text) {
     const loc = game.level?.at(x, y);
     if (!loc || (loc.typ !== ROOM && loc.typ !== GRAVE)) return;
@@ -11326,7 +11347,15 @@ async function makeniche(trap_type) {
             if (trap_type) {
                 let actualTrap = trap_type;
                 if (is_hole(actualTrap)) actualTrap = ROCKTRAP;
-                await maketrap(xx, yy + dy, actualTrap);
+                const trap = await maketrap(xx, yy + dy, actualTrap);
+                if (trap) {
+                    if (actualTrap !== ROCKTRAP) trap.once = true;
+                    const engraving = TRAP_ENGRAVINGS.get(actualTrap);
+                    if (engraving) {
+                        make_engr_at(xx, yy - dy, engraving, null, 0, ENGR_DUST);
+                        wipe_engr_at(xx, yy - dy, 5, false);
+                    }
+                }
             }
             dosdoor(xx, yy, aroom, SDOOR);
         } else {

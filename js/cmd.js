@@ -3710,6 +3710,7 @@ async function handleEatItemKey(ch) {
     const obj = idx >= 0 ? game.inventory?.[idx] : null;
     if (!obj) {
         game.context.move = 0;
+        game._eat_invalid_more = true;
         await pline("You don't have that object.");
         queue_more_prompt();
         return true;
@@ -8831,6 +8832,19 @@ export async function rhack(key) {
         return;
     }
 
+    if (game._eat_invalid_more && game._more) {
+        if (ch === ' ' || ch === '\r' || ch === '\n' || ch === '\x1b') {
+            game._eat_invalid_more = false;
+            clear_pending_message();
+            game._awaiting_eat_item = true;
+            await showPromptLine(`What do you want to eat? [${eatLetters()} or ?*] `);
+            game.context.move = 0;
+            return;
+        }
+        game.context.move = 0;
+        return;
+    }
+
     if (game._terrain_view_done_more) {
         if (ch === ' ' || ch === '\r' || ch === '\n' || ch === '\x1b') {
             game._terrain_view_done_more = false;
@@ -11189,7 +11203,8 @@ export async function rhack(key) {
             await showPromptLine(`What do you want to use or apply? [${letters} or ?*] `);
             game._awaiting_apply_item = true;
         } else {
-            await pline('You have nothing to use or apply.');
+            // C ref: invent.c:getobj().
+            await pline("You don't have anything to use or apply.");
         }
     } else if (ch === 'd') {
         game.context.move = 0;

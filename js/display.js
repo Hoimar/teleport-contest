@@ -605,6 +605,19 @@ function trap_glyph(trap) {
     return { ch, color, dec: false };
 }
 
+function engraving_at(x, y) {
+    return (game.level?.engravings || []).find(ep => ep.x === x && ep.y === y) || null;
+}
+
+function spot_shows_engravings(loc) {
+    return loc?.typ === ROOM || loc?.typ === CORR || loc?.typ === ICE;
+}
+
+function engraving_glyph(loc) {
+    // C refs: include/engrave.h:engraving_to_defsym(), defsym.h:S_engroom.
+    return { ch: loc?.typ === CORR ? '#' : '`', color: CLR_BRIGHT_BLUE, dec: false };
+}
+
 function monster_glyph(mon) {
     if (game.u?.uprops?.hallucination || game.u?.uhallucination) {
         // C ref: display.h:mon_to_glyph() -> what_mon(..., rn2_on_display_rng).
@@ -743,6 +756,13 @@ function mapped_location_memory(loc, x, y, visible) {
     if (trap?.tseen && !covered) {
         const tr = trap_glyph(trap);
         return { ch: tr.ch, color: tr.color, decgfx: tr.dec };
+    }
+
+    const ep = engraving_at(x, y);
+    if (ep && spot_shows_engravings(loc) && !covered && (visible || ep.erevealed)) {
+        if (visible) ep.erevealed = true;
+        const eg = engraving_glyph(loc);
+        return { ch: eg.ch, color: eg.color, decgfx: eg.dec };
     }
 
     const tg = terrain_glyph(loc, x, y);
@@ -955,6 +975,12 @@ export function newsym(x, y) {
     if (trap?.tseen && !covered) {
         const tr = trap_glyph(trap);
         draw_ch = tr.ch; draw_color = tr.color; draw_dec = tr.dec;
+    }
+    const ep = engraving_at(x, y);
+    if (ep && spot_shows_engravings(loc) && !covered && (visible || ep.erevealed)) {
+        if (visible) ep.erevealed = true;
+        const eg = engraving_glyph(loc);
+        draw_ch = eg.ch; draw_color = eg.color; draw_dec = eg.dec;
     }
     if (obj && !covered) {
         const og = object_glyph_for_display(obj, x, y, visible);
