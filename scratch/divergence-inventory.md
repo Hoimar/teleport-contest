@@ -7,57 +7,48 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 
 | Sessions | Buckets | Screens | RNG calls | Errors |
 | --- | --- | --- | --- | --- |
-| 44 | 39 | 1159/11405 | 168347/792838 | 0 |
+| 44 | 30 | 2975/11405 | 265367/792838 | 0 |
 
 ## Bucket Summary
 
 | Count | Phase | Canonical evidence | Subsystem hypothesis | Owner | Needs deeper debug |
 | --- | --- | --- | --- | --- | --- |
-| 3 | passing | seed0116-wizard-wear-shop | Pet behavior: dog_goal() object scan, reachability, carry checks, and object resistance in dogmove.c. | Monsters / pets | yes |
-| 2 | early-startup | seed0106-priest-extcmd-sweep | Chargen, role/race/gender/align selection, options parsing, or early startup RNG ordering. | Player initialization / options | yes |
-| 2 | late-startup | seed0017-samurai-altar-pray | Late startup side effects, special levels, monster/object initialization, or display setup. | Mklev / objects / monsters / display | yes |
-| 2 | mklev-or-uinit | seed0013-friday13-save-then-fullmoon-restore | u_init, mklev, dungeon initialization, initial inventory, or level topology setup. | Startup level generation / u_init | yes |
+| 14 | passing | seed0116-wizard-wear-shop | Pet behavior: dog_goal() object scan, reachability, carry checks, and object resistance in dogmove.c. | Monsters / pets | yes |
+| 2 | late-startup | seed0107-samurai-twoweapon-enhance | Late startup side effects, special levels, monster/object initialization, or display setup. | Mklev / objects / monsters / display | yes |
 | 1 | early-startup | seed0006-wizard-water-demon | Chargen, role/race/gender/align selection, options parsing, or early startup RNG ordering. | Player initialization / options | yes |
-| 1 | early-startup | seed0077-rogue-chargen | Chargen, role/race/gender/align selection, options parsing, or early startup RNG ordering. | Player initialization / options | yes |
 | 1 | early-startup | seed0014-dequa-fountain-explore | Chargen, role/race/gender/align selection, options parsing, or early startup RNG ordering. | Player initialization / options | yes |
+| 1 | early-startup | seed0077-rogue-chargen | Chargen, role/race/gender/align selection, options parsing, or early startup RNG ordering. | Player initialization / options | yes |
 | 1 | early-startup | seed0361-archeologist-tour | Chargen, role/race/gender/align selection, options parsing, or early startup RNG ordering. | Player initialization / options | yes |
-| 1 | early-startup | seed0009-swimmer-mforce | Chargen, role/race/gender/align selection, options parsing, or early startup RNG ordering. | Player initialization / options | yes |
 | 1 | early-startup | seed0007-rogue-snake-swamp | Chargen, role/race/gender/align selection, options parsing, or early startup RNG ordering. | Player initialization / options | yes |
+| 1 | early-startup | seed0009-swimmer-mforce | Chargen, role/race/gender/align selection, options parsing, or early startup RNG ordering. | Player initialization / options | yes |
 | 1 | early-startup | seed0004-feeding-pony | Chargen, role/race/gender/align selection, options parsing, or early startup RNG ordering. | Player initialization / options | yes |
+| 1 | early-startup | seed0501-priest-cast-read-turn | Chargen, role/race/gender/align selection, options parsing, or early startup RNG ordering. | Player initialization / options | yes |
+| 1 | early-startup | seed0106-priest-extcmd-sweep | Chargen, role/race/gender/align selection, options parsing, or early startup RNG ordering. | Player initialization / options | yes |
 | 1 | early-startup | seed0367-priest-quest-tour | Chargen, role/race/gender/align selection, options parsing, or early startup RNG ordering. | Player initialization / options | yes |
-| 1 | late-startup | seed0108-wizard-extcmd-wishlist | Late startup side effects, special levels, monster/object initialization, or display setup. | Mklev / objects / monsters / display | yes |
-| 1 | late-startup | seed2200-wizard-quaff-zap-read | Late startup side effects, special levels, monster/object initialization, or display setup. | Mklev / objects / monsters / display | yes |
-| 1 | late-startup | seed0398-wizard-wandpoly-pile | Late startup side effects, special levels, monster/object initialization, or display setup. | Mklev / objects / monsters / display | yes |
-| 1 | late-startup | seed0060-orc-rogue-kick-search | Late startup side effects, special levels, monster/object initialization, or display setup. | Mklev / objects / monsters / display | yes |
-| 1 | late-startup | seed0107-samurai-twoweapon-enhance | Late startup side effects, special levels, monster/object initialization, or display setup. | Mklev / objects / monsters / display | yes |
-| 1 | late-startup | seed0101-ranger-quiver-throw-travel-engrave | Late startup side effects, special levels, monster/object initialization, or display setup. | Mklev / objects / monsters / display | yes |
-| 1 | late-startup | seed0102-ranger-name-cancel | Late startup side effects, special levels, monster/object initialization, or display setup. | Mklev / objects / monsters / display | yes |
+| 1 | late-startup | seed0017-samurai-altar-pray | Late startup side effects, special levels, monster/object initialization, or display setup. | Mklev / objects / monsters / display | yes |
 | 1 | late-startup | seed5006-tourist-stress-disaster | Late startup side effects, special levels, monster/object initialization, or display setup. | Mklev / objects / monsters / display | yes |
 | 1 | late-startup | seed0016-healer-newmoon-eat-zap | Late startup side effects, special levels, monster/object initialization, or display setup. | Mklev / objects / monsters / display | yes |
-| 1 | late-startup | seed0373-barbarian-quest-tour | Late startup side effects, special levels, monster/object initialization, or display setup. | Mklev / objects / monsters / display | yes |
-| 1 | late-startup | seed1500-rogue-explore-move | Late startup side effects, special levels, monster/object initialization, or display setup. | Mklev / objects / monsters / display | yes |
+| 1 | late-startup | seed0060-orc-rogue-kick-search | Late startup side effects, special levels, monster/object initialization, or display setup. | Mklev / objects / monsters / display | yes |
 | 1 | late-startup | seed0030-ten-diverse-deaths | Late startup side effects, special levels, monster/object initialization, or display setup. | Mklev / objects / monsters / display | yes |
+| 1 | late-startup | seed0373-barbarian-quest-tour | Late startup side effects, special levels, monster/object initialization, or display setup. | Mklev / objects / monsters / display | yes |
 | 1 | mklev-or-uinit | seed0105-valk-chat-lamp-ration | u_init, mklev, dungeon initialization, initial inventory, or level topology setup. | Startup level generation / u_init | yes |
 | 1 | mklev-or-uinit | seed0015-valk-level2-pit-dog-wait | u_init, mklev, dungeon initialization, initial inventory, or level topology setup. | Startup level generation / u_init | yes |
 | 1 | mklev-or-uinit | seed1150-caveman-explore-move | u_init, mklev, dungeon initialization, initial inventory, or level topology setup. | Startup level generation / u_init | yes |
 | 1 | mklev-or-uinit | seed0399-wizard-hallu-actions | u_init, mklev, dungeon initialization, initial inventory, or level topology setup. | Startup level generation / u_init | yes |
-| 1 | mklev-or-uinit | seed0200-monk-north-search | u_init, mklev, dungeon initialization, initial inventory, or level topology setup. | Startup level generation / u_init | yes |
+| 1 | mklev-or-uinit | seed2600-wizard-custom-binds | u_init, mklev, dungeon initialization, initial inventory, or level topology setup. | Startup level generation / u_init | yes |
 | 1 | mklev-or-uinit | seed0012-monk-vault-escort | u_init, mklev, dungeon initialization, initial inventory, or level topology setup. | Startup level generation / u_init | yes |
+| 1 | mklev-or-uinit | seed0200-monk-north-search | u_init, mklev, dungeon initialization, initial inventory, or level topology setup. | Startup level generation / u_init | yes |
 | 1 | mklev-or-uinit | seed4500-knight-coverage | u_init, mklev, dungeon initialization, initial inventory, or level topology setup. | Startup level generation / u_init | yes |
-| 1 | mklev-or-uinit | seed0104-knight-ride-combat | u_init, mklev, dungeon initialization, initial inventory, or level topology setup. | Startup level generation / u_init | yes |
 | 1 | mklev-or-uinit | seed0103-knight-ride-pony | u_init, mklev, dungeon initialization, initial inventory, or level topology setup. | Startup level generation / u_init | yes |
+| 1 | mklev-or-uinit | seed0104-knight-ride-combat | u_init, mklev, dungeon initialization, initial inventory, or level topology setup. | Startup level generation / u_init | yes |
 | 1 | mklev-or-uinit | seed0900-tourist-explore-actions | u_init, mklev, dungeon initialization, initial inventory, or level topology setup. | Startup level generation / u_init | no |
-| 1 | mklev-or-uinit | seed2600-wizard-custom-binds | u_init, mklev, dungeon initialization, initial inventory, or level topology setup. | Startup level generation / u_init | no |
-| 1 | post-startup-live | seed1800-tourist-eat-throw | Message buffer, prompt/menu lifecycle, or command dispatch timing after startup. | Messages / command dispatch | no |
-| 1 | post-startup-live | seed0383-wizard-hallucinate | Special-level monster setup: des.monster() selected-monster initialization, equipment, and hallucination display context. | Special levels / monsters | yes |
-| 1 | post-startup-live | seed0360-wizard-world-tour | Live command effects, movement, pet/monster behavior, or retained object/map state. | Commands / monsters / objects | no |
-| 1 | post-startup-live | seed0002-healer-reflection-drummer | Live command effects, movement, pet/monster behavior, or retained object/map state. | Commands / monsters / objects | no |
+| 1 | post-startup-live | seed0108-wizard-extcmd-wishlist | Mixed live-state divergence spanning display, status, messages, or command side effects. | Display / command dispatch | yes |
 
 ## Bucket Details
 
 ### passing: seed0116-wizard-wear-shop
 
-- Count: 3
+- Count: 14
 - Bucket key: `passing | FS=pass | FR=none | none/none | - | rows=-`
 - Canonical screens: 127/127
 - Canonical RNG: 12562/12562
@@ -67,63 +58,49 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 - Hypothesis: Pet behavior: dog_goal() object scan, reachability, carry checks, and object resistance in dogmove.c.
 - Next owner: Monsters / pets
 - Needs deeper debug: yes
-- Sessions: seed0116-wizard-wear-shop, seed5002-wizard-coverage-pair, seed8000-tourist-starter
+- Sessions: seed0002-healer-reflection-drummer, seed0013-friday13-save-then-fullmoon-restore, seed0013-rogue-friday13-combat, seed0101-ranger-quiver-throw-travel-engrave, seed0102-ranger-name-cancel, seed0116-wizard-wear-shop, seed0360-wizard-world-tour, seed0383-wizard-hallucinate, seed0398-wizard-wandpoly-pile, seed1500-rogue-explore-move, seed1800-tourist-eat-throw, seed2200-wizard-quaff-zap-read, seed5002-wizard-coverage-pair, seed8000-tourist-starter
 
-### early-startup: seed0106-priest-extcmd-sweep
-
-- Count: 2
-- Bucket key: `early-startup | FS=0 | FR=0-250 | char/mixed | rn2(13)=>rn2(3) | rows=0,2,3,4,5,6+11`
-- Canonical screens: 0/267
-- Canonical RNG: 1373/4194
-- First screen mismatch: 0 (char/mixed, rows 0,2,3,4,5,6+11)
-- First RNG mismatch: 199 (rn2(13)=>rn2(3))
-- Sample cells: [0,8] ch I/8 ->  /8; [0,9] ch t/8 ->  /8; [0,11] ch i/8 ->  /8; [0,12] ch s/8 ->  /8; [0,14] ch w/8 ->  /8
-- Hypothesis: Chargen, role/race/gender/align selection, options parsing, or early startup RNG ordering.
-- Next owner: Player initialization / options
-- Needs deeper debug: yes
-- Sessions: seed0106-priest-extcmd-sweep, seed0501-priest-cast-read-turn
-
-### late-startup: seed0017-samurai-altar-pray
+### late-startup: seed0107-samurai-twoweapon-enhance
 
 - Count: 2
 - Bucket key: `late-startup | FS=0 | FR=>1200 | char/mixed | rn2(1)=>rn2(3) | rows=0,2,3,4,5,6+11`
-- Canonical screens: 0/67
-- Canonical RNG: 2609/3465
+- Canonical screens: 0/98
+- Canonical RNG: 2578/2902
 - First screen mismatch: 0 (char/mixed, rows 0,2,3,4,5,6+11)
-- First RNG mismatch: 2595 (rn2(1)=>rn2(3))
-- Sample cells: [0,23] ch  /8 -> I/8; [0,24] ch  /8 -> t/8; [0,26] ch  /8 -> i/8; [0,27] ch  /8 -> s/8; [0,29] ch  /8 -> w/8
+- First RNG mismatch: 2577 (rn2(1)=>rn2(3))
+- Sample cells: [0,8] ch I/8 ->  /8; [0,9] ch t/8 ->  /8; [0,11] ch i/8 ->  /8; [0,12] ch s/8 ->  /8; [0,14] ch w/8 ->  /8
 - Hypothesis: Late startup side effects, special levels, monster/object initialization, or display setup.
 - Next owner: Mklev / objects / monsters / display
 - Needs deeper debug: yes
-- Sessions: seed0017-samurai-altar-pray, seed0700-samurai-explore-descend
-
-### mklev-or-uinit: seed0013-friday13-save-then-fullmoon-restore
-
-- Count: 2
-- Bucket key: `mklev-or-uinit | FS=0 | FR=251-1200 | char/mixed | rn2(1000)=>rn2(4) | rows=15,16,17,18,19,22`
-- Canonical screens: 0/99
-- Canonical RNG: 580/4804
-- First screen mismatch: 0 (char/mixed, rows 15,16,17,18,19,22)
-- First RNG mismatch: 540 (rn2(1000)=>rn2(4))
-- Sample cells: [15,5] ch ┌/8 ->  /8; [15,6] ch ─/8 ->  /8; [15,7] ch ─/8 ->  /8; [15,8] ch ·/8 ->  /8; [15,9] ch ─/8 ->  /8
-- Hypothesis: u_init, mklev, dungeon initialization, initial inventory, or level topology setup.
-- Next owner: Startup level generation / u_init
-- Needs deeper debug: yes
-- Sessions: seed0013-friday13-save-then-fullmoon-restore, seed0013-rogue-friday13-combat
+- Sessions: seed0107-samurai-twoweapon-enhance, seed0700-samurai-explore-descend
 
 ### early-startup: seed0006-wizard-water-demon
 
 - Count: 1
-- Bucket key: `early-startup | FS=0 | FR=0-250 | char/mixed | rn2(1)=>rn2(2) | rows=0,2,3,4,5,6+4`
+- Bucket key: `early-startup | FS=0 | FR=0-250 | char/mixed | rn2(1)=>rn2(2) | rows=0,1,2,3,4,5+5`
 - Canonical screens: 0/123
-- Canonical RNG: 89/6736
-- First screen mismatch: 0 (char/mixed, rows 0,2,3,4,5,6+4)
+- Canonical RNG: 86/6736
+- First screen mismatch: 0 (char/mixed, rows 0,1,2,3,4,5+5)
 - First RNG mismatch: 0 (rn2(1)=>rn2(2))
 - Sample cells: [0,0] ch  /8 -> A/8; [0,1] ch  /8 -> l/8; [0,2] ch  /8 -> o/8; [0,3] ch  /8 -> h/8; [0,4] ch  /8 -> a/8
 - Hypothesis: Chargen, role/race/gender/align selection, options parsing, or early startup RNG ordering.
 - Next owner: Player initialization / options
 - Needs deeper debug: yes
 - Sessions: seed0006-wizard-water-demon
+
+### early-startup: seed0014-dequa-fountain-explore
+
+- Count: 1
+- Bucket key: `early-startup | FS=0 | FR=0-250 | char/mixed | rn2(1)=>rn2(2) | rows=0,1,4,5,6,7+8`
+- Canonical screens: 0/714
+- Canonical RNG: 209/59178
+- First screen mismatch: 0 (char/mixed, rows 0,1,4,5,6,7+8)
+- First RNG mismatch: 0 (rn2(1)=>rn2(2))
+- Sample cells: [0,0] ch  /8 -> A/8; [0,1] ch  /8 -> l/8; [0,2] ch  /8 -> o/8; [0,3] ch  /8 -> h/8; [0,4] ch  /8 -> a/8
+- Hypothesis: Chargen, role/race/gender/align selection, options parsing, or early startup RNG ordering.
+- Next owner: Player initialization / options
+- Needs deeper debug: yes
+- Sessions: seed0014-dequa-fountain-explore
 
 ### early-startup: seed0077-rogue-chargen
 
@@ -139,33 +116,33 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 - Needs deeper debug: yes
 - Sessions: seed0077-rogue-chargen
 
-### early-startup: seed0014-dequa-fountain-explore
-
-- Count: 1
-- Bucket key: `early-startup | FS=0 | FR=0-250 | char/mixed | rn2(1)=>rn2(2) | rows=0,4,5,6,7,12+7`
-- Canonical screens: 0/714
-- Canonical RNG: 185/59178
-- First screen mismatch: 0 (char/mixed, rows 0,4,5,6,7,12+7)
-- First RNG mismatch: 0 (rn2(1)=>rn2(2))
-- Sample cells: [0,0] ch  /8 -> A/8; [0,1] ch  /8 -> l/8; [0,2] ch  /8 -> o/8; [0,3] ch  /8 -> h/8; [0,4] ch  /8 -> a/8
-- Hypothesis: Chargen, role/race/gender/align selection, options parsing, or early startup RNG ordering.
-- Next owner: Player initialization / options
-- Needs deeper debug: yes
-- Sessions: seed0014-dequa-fountain-explore
-
 ### early-startup: seed0361-archeologist-tour
 
 - Count: 1
-- Bucket key: `early-startup | FS=0 | FR=0-250 | char/mixed | rn2(100)=>rn2(3) | rows=0,2,3,4,5,6+11`
+- Bucket key: `early-startup | FS=0 | FR=0-250 | char/mixed | rn2(100)=>rn2(3) | rows=0,2,3,4,5,6+13`
 - Canonical screens: 0/366
-- Canonical RNG: 362/53865
-- First screen mismatch: 0 (char/mixed, rows 0,2,3,4,5,6+11)
+- Canonical RNG: 310/53865
+- First screen mismatch: 0 (char/mixed, rows 0,2,3,4,5,6+13)
 - First RNG mismatch: 199 (rn2(100)=>rn2(3))
 - Sample cells: [0,20] ch I/8 ->  /8; [0,21] ch t/8 ->  /8; [0,23] ch i/8 -> I/8; [0,24] ch s/8 -> t/8; [0,26] ch w/8 -> i/8
 - Hypothesis: Chargen, role/race/gender/align selection, options parsing, or early startup RNG ordering.
 - Next owner: Player initialization / options
 - Needs deeper debug: yes
 - Sessions: seed0361-archeologist-tour
+
+### early-startup: seed0007-rogue-snake-swamp
+
+- Count: 1
+- Bucket key: `early-startup | FS=0 | FR=0-250 | char/mixed | rn2(13)=>rn2(2) | rows=0,1,4,5,6,7+6`
+- Canonical screens: 0/302
+- Canonical RNG: 200/16373
+- First screen mismatch: 0 (char/mixed, rows 0,1,4,5,6,7+6)
+- First RNG mismatch: 0 (rn2(13)=>rn2(2))
+- Sample cells: [0,0] ch  /8 -> A/8; [0,1] ch  /8 -> l/8; [0,2] ch  /8 -> o/8; [0,3] ch  /8 -> h/8; [0,4] ch  /8 -> a/8
+- Hypothesis: Chargen, role/race/gender/align selection, options parsing, or early startup RNG ordering.
+- Next owner: Player initialization / options
+- Needs deeper debug: yes
+- Sessions: seed0007-rogue-snake-swamp
 
 ### early-startup: seed0009-swimmer-mforce
 
@@ -181,26 +158,12 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 - Needs deeper debug: yes
 - Sessions: seed0009-swimmer-mforce
 
-### early-startup: seed0007-rogue-snake-swamp
-
-- Count: 1
-- Bucket key: `early-startup | FS=0 | FR=0-250 | char/mixed | rn2(13)=>rn2(2) | rows=0,4,5,6,7,12+5`
-- Canonical screens: 0/302
-- Canonical RNG: 187/16373
-- First screen mismatch: 0 (char/mixed, rows 0,4,5,6,7,12+5)
-- First RNG mismatch: 0 (rn2(13)=>rn2(2))
-- Sample cells: [0,0] ch  /8 -> A/8; [0,1] ch  /8 -> l/8; [0,2] ch  /8 -> o/8; [0,3] ch  /8 -> h/8; [0,4] ch  /8 -> a/8
-- Hypothesis: Chargen, role/race/gender/align selection, options parsing, or early startup RNG ordering.
-- Next owner: Player initialization / options
-- Needs deeper debug: yes
-- Sessions: seed0007-rogue-snake-swamp
-
 ### early-startup: seed0004-feeding-pony
 
 - Count: 1
 - Bucket key: `early-startup | FS=0 | FR=0-250 | char/mixed | rn2(13)=>rn2(2) | rows=0,4,5,6,7,12+7`
 - Canonical screens: 0/409
-- Canonical RNG: 174/12084
+- Canonical RNG: 194/12084
 - First screen mismatch: 0 (char/mixed, rows 0,4,5,6,7,12+7)
 - First RNG mismatch: 0 (rn2(13)=>rn2(2))
 - Sample cells: [0,0] ch  /8 -> A/8; [0,1] ch  /8 -> l/8; [0,2] ch  /8 -> o/8; [0,3] ch  /8 -> h/8; [0,4] ch  /8 -> a/8
@@ -209,13 +172,41 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 - Needs deeper debug: yes
 - Sessions: seed0004-feeding-pony
 
+### early-startup: seed0501-priest-cast-read-turn
+
+- Count: 1
+- Bucket key: `early-startup | FS=0 | FR=0-250 | char/mixed | rn2(13)=>rn2(3) | rows=0,2,3,4,5,6+11`
+- Canonical screens: 0/28
+- Canonical RNG: 299/2238
+- First screen mismatch: 0 (char/mixed, rows 0,2,3,4,5,6+11)
+- First RNG mismatch: 199 (rn2(13)=>rn2(3))
+- Sample cells: [0,17] ch I/8 ->  /8; [0,18] ch t/8 ->  /8; [0,20] ch i/8 ->  /8; [0,21] ch s/8 ->  /8; [0,23] ch w/8 -> I/8
+- Hypothesis: Chargen, role/race/gender/align selection, options parsing, or early startup RNG ordering.
+- Next owner: Player initialization / options
+- Needs deeper debug: yes
+- Sessions: seed0501-priest-cast-read-turn
+
+### early-startup: seed0106-priest-extcmd-sweep
+
+- Count: 1
+- Bucket key: `early-startup | FS=0 | FR=0-250 | char/mixed | rn2(13)=>rn2(3) | rows=0,2,3,4,5,6+12`
+- Canonical screens: 0/267
+- Canonical RNG: 1371/4194
+- First screen mismatch: 0 (char/mixed, rows 0,2,3,4,5,6+12)
+- First RNG mismatch: 199 (rn2(13)=>rn2(3))
+- Sample cells: [0,8] ch I/8 ->  /8; [0,9] ch t/8 ->  /8; [0,11] ch i/8 ->  /8; [0,12] ch s/8 ->  /8; [0,14] ch w/8 ->  /8
+- Hypothesis: Chargen, role/race/gender/align selection, options parsing, or early startup RNG ordering.
+- Next owner: Player initialization / options
+- Needs deeper debug: yes
+- Sessions: seed0106-priest-extcmd-sweep
+
 ### early-startup: seed0367-priest-quest-tour
 
 - Count: 1
-- Bucket key: `early-startup | FS=0 | FR=0-250 | char/mixed | rn2(13)=>rn2(3) | rows=0,9,13,16,18,19+2`
+- Bucket key: `early-startup | FS=0 | FR=0-250 | char/mixed | rn2(13)=>rn2(3) | rows=0,9,13,15,16,17+4`
 - Canonical screens: 0/324
-- Canonical RNG: 407/50125
-- First screen mismatch: 0 (char/mixed, rows 0,9,13,16,18,19+2)
+- Canonical RNG: 403/50125
+- First screen mismatch: 0 (char/mixed, rows 0,9,13,15,16,17+4)
 - First RNG mismatch: 199 (rn2(13)=>rn2(3))
 - Sample cells: [0,52] ch L/8 -> M/8; [0,53] ch o/8 -> a/8; [0,54] ch k/8 -> r/8; [0,55] ch i/8 -> d/8; [0,56] ch :/8 -> u/8
 - Hypothesis: Chargen, role/race/gender/align selection, options parsing, or early startup RNG ordering.
@@ -223,110 +214,26 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 - Needs deeper debug: yes
 - Sessions: seed0367-priest-quest-tour
 
-### late-startup: seed0108-wizard-extcmd-wishlist
-
-- Count: 1
-- Bucket key: `late-startup | FS=0 | FR=>1200 | char/map | rn2(16)=>rn2(5) | rows=18,19,20`
-- Canonical screens: 3/303
-- Canonical RNG: 2786/16958
-- First screen mismatch: 0 (char/map, rows 18,19,20)
-- First RNG mismatch: 2772 (rn2(16)=>rn2(5))
-- Sample cells: [18,38] ch |/8 ->  /8; [18,39] ch ./8 ->  /8; [18,40] ch ./8 ->  /8; [18,41] ch @/15 ->  /8; [18,42] ch ./8 ->  /8
-- Hypothesis: Late startup side effects, special levels, monster/object initialization, or display setup.
-- Next owner: Mklev / objects / monsters / display
-- Needs deeper debug: yes
-- Sessions: seed0108-wizard-extcmd-wishlist
-
-### late-startup: seed2200-wizard-quaff-zap-read
-
-- Count: 1
-- Bucket key: `late-startup | FS=0 | FR=>1200 | char/map | rn2(2)=>rn2(12) | rows=9,10,11,12,13,14`
-- Canonical screens: 4/230
-- Canonical RNG: 2802/3018
-- First screen mismatch: 0 (char/map, rows 9,10,11,12,13,14)
-- First RNG mismatch: 2724 (rn2(2)=>rn2(12))
-- Sample cells: [9,9] ch ┌/8 ->  /8; [9,10] ch ─/8 ->  /8; [9,11] ch ─/8 ->  /8; [9,12] ch ─/8 ->  /8; [9,13] ch ─/8 ->  /8
-- Hypothesis: Late startup side effects, special levels, monster/object initialization, or display setup.
-- Next owner: Mklev / objects / monsters / display
-- Needs deeper debug: yes
-- Sessions: seed2200-wizard-quaff-zap-read
-
-### late-startup: seed0398-wizard-wandpoly-pile
-
-- Count: 1
-- Bucket key: `late-startup | FS=0 | FR=>1200 | char/map | rn2(46)=>rn2(12) | rows=1`
-- Canonical screens: 0/87
-- Canonical RNG: 2773/3026
-- First screen mismatch: 0 (char/map, rows 1)
-- First RNG mismatch: 2764 (rn2(46)=>rn2(12))
-- Sample cells: [1,0] ch  /8 -> -/8; [1,1] ch  /8 -> -/8; [1,2] ch  /8 -> M/8; [1,3] ch  /8 -> o/8; [1,4] ch  /8 -> r/8
-- Hypothesis: Late startup side effects, special levels, monster/object initialization, or display setup.
-- Next owner: Mklev / objects / monsters / display
-- Needs deeper debug: yes
-- Sessions: seed0398-wizard-wandpoly-pile
-
-### late-startup: seed0060-orc-rogue-kick-search
-
-- Count: 1
-- Bucket key: `late-startup | FS=0 | FR=>1200 | char/mixed | rn2(1)=>rn2(100) | rows=11,12,13,14,15,22+1`
-- Canonical screens: 0/41
-- Canonical RNG: 2314/3626
-- First screen mismatch: 0 (char/mixed, rows 11,12,13,14,15,22+1)
-- First RNG mismatch: 2312 (rn2(1)=>rn2(100))
-- Sample cells: [11,3] ch ┌/8 ->  /8; [11,4] ch ─/8 ->  /8; [11,5] ch ─/8 ->  /8; [11,6] ch ─/8 ->  /8; [11,7] ch ─/8 ->  /8
-- Hypothesis: Late startup side effects, special levels, monster/object initialization, or display setup.
-- Next owner: Mklev / objects / monsters / display
-- Needs deeper debug: yes
-- Sessions: seed0060-orc-rogue-kick-search
-
-### late-startup: seed0107-samurai-twoweapon-enhance
+### late-startup: seed0017-samurai-altar-pray
 
 - Count: 1
 - Bucket key: `late-startup | FS=0 | FR=>1200 | char/mixed | rn2(1)=>rn2(3) | rows=0,2,3,4,5,6+12`
-- Canonical screens: 0/98
-- Canonical RNG: 2578/2902
+- Canonical screens: 0/67
+- Canonical RNG: 2613/3465
 - First screen mismatch: 0 (char/mixed, rows 0,2,3,4,5,6+12)
-- First RNG mismatch: 2577 (rn2(1)=>rn2(3))
-- Sample cells: [0,8] ch I/8 ->  /8; [0,9] ch t/8 ->  /8; [0,11] ch i/8 ->  /8; [0,12] ch s/8 ->  /8; [0,14] ch w/8 ->  /8
+- First RNG mismatch: 2595 (rn2(1)=>rn2(3))
+- Sample cells: [0,23] ch  /8 -> I/8; [0,24] ch  /8 -> t/8; [0,26] ch  /8 -> i/8; [0,27] ch  /8 -> s/8; [0,29] ch  /8 -> w/8
 - Hypothesis: Late startup side effects, special levels, monster/object initialization, or display setup.
 - Next owner: Mklev / objects / monsters / display
 - Needs deeper debug: yes
-- Sessions: seed0107-samurai-twoweapon-enhance
-
-### late-startup: seed0101-ranger-quiver-throw-travel-engrave
-
-- Count: 1
-- Bucket key: `late-startup | FS=0 | FR=>1200 | char/mixed | rn2(1)=>rn2(3) | rows=0,3,4,5,6,9+4`
-- Canonical screens: 0/27
-- Canonical RNG: 2238/2371
-- First screen mismatch: 0 (char/mixed, rows 0,3,4,5,6,9+4)
-- First RNG mismatch: 2232 (rn2(1)=>rn2(3))
-- Sample cells: [0,55] ch s/8 -> d/8; [0,56] ch :/8 -> u/8; [0,57] ch  /8 -> k/8; [0,58] ch  /8 -> :/8; [3,19] ch ┌/8 ->  /8
-- Hypothesis: Late startup side effects, special levels, monster/object initialization, or display setup.
-- Next owner: Mklev / objects / monsters / display
-- Needs deeper debug: yes
-- Sessions: seed0101-ranger-quiver-throw-travel-engrave
-
-### late-startup: seed0102-ranger-name-cancel
-
-- Count: 1
-- Bucket key: `late-startup | FS=0 | FR=>1200 | char/mixed | rn2(1)=>rn2(3) | rows=0,7,8,9,10,11+5`
-- Canonical screens: 0/25
-- Canonical RNG: 4383/4485
-- First screen mismatch: 0 (char/mixed, rows 0,7,8,9,10,11+5)
-- First RNG mismatch: 4382 (rn2(1)=>rn2(3))
-- Sample cells: [0,55] ch s/8 -> d/8; [0,56] ch :/8 -> u/8; [0,57] ch  /8 -> k/8; [0,58] ch  /8 -> :/8; [7,20] ch ┌/8 ->  /8
-- Hypothesis: Late startup side effects, special levels, monster/object initialization, or display setup.
-- Next owner: Mklev / objects / monsters / display
-- Needs deeper debug: yes
-- Sessions: seed0102-ranger-name-cancel
+- Sessions: seed0017-samurai-altar-pray
 
 ### late-startup: seed5006-tourist-stress-disaster
 
 - Count: 1
 - Bucket key: `late-startup | FS=0 | FR=>1200 | char/mixed | rn2(16)=>rn2(12) | rows=0,22,23`
 - Canonical screens: 0/249
-- Canonical RNG: 8343/13923
+- Canonical RNG: 8365/13923
 - First screen mismatch: 0 (char/mixed, rows 0,22,23)
 - First RNG mismatch: 8315 (rn2(16)=>rn2(12))
 - Sample cells: [0,6] ch w/8 -> t/8; [0,7] ch i/8 -> o/8; [0,8] ch z/8 -> u/8; [0,9] ch a/8 -> r/8; [0,10] ch r/8 -> i/8
@@ -340,7 +247,7 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 - Count: 1
 - Bucket key: `late-startup | FS=0 | FR=>1200 | char/mixed | rn2(26)=>rn2(16) | rows=0,2,3,4,5,6+11`
 - Canonical screens: 0/36
-- Canonical RNG: 2498/3656
+- Canonical RNG: 2572/3656
 - First screen mismatch: 0 (char/mixed, rows 0,2,3,4,5,6+11)
 - First RNG mismatch: 2404 (rn2(26)=>rn2(16))
 - Sample cells: [0,22] ch I/8 ->  /8; [0,23] ch t/8 -> I/8; [0,24] ch  /8 -> t/8; [0,25] ch i/8 ->  /8; [0,26] ch s/8 -> i/8
@@ -349,40 +256,26 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 - Needs deeper debug: yes
 - Sessions: seed0016-healer-newmoon-eat-zap
 
-### late-startup: seed0373-barbarian-quest-tour
+### late-startup: seed0060-orc-rogue-kick-search
 
 - Count: 1
-- Bucket key: `late-startup | FS=0 | FR=>1200 | char/mixed | rn2(26)=>rn2(16) | rows=0,9,13,16,22,23`
-- Canonical screens: 0/124
-- Canonical RNG: 2486/35386
-- First screen mismatch: 0 (char/mixed, rows 0,9,13,16,22,23)
-- First RNG mismatch: 2467 (rn2(26)=>rn2(16))
-- Sample cells: [0,52] ch C/8 -> M/8; [0,53] ch r/8 -> a/8; [0,54] ch o/8 -> r/8; [0,55] ch m/8 -> d/8; [0,56] ch :/8 -> u/8
+- Bucket key: `late-startup | FS=0 | FR=>1200 | char/status | rn2(1)=>rn2(100) | rows=22,23`
+- Canonical screens: 0/41
+- Canonical RNG: 2403/3626
+- First screen mismatch: 0 (char/status, rows 22,23)
+- First RNG mismatch: 2341 (rn2(1)=>rn2(100))
+- Sample cells: [22,35] ch 4/8 -> 1/8; [22,47] ch 2/8 -> 5/8; [22,53] ch 0/8 -> 1/8; [22,59] ch 1/8 -> 0/8; [22,65] ch 1/8 -> 0/8
 - Hypothesis: Late startup side effects, special levels, monster/object initialization, or display setup.
 - Next owner: Mklev / objects / monsters / display
 - Needs deeper debug: yes
-- Sessions: seed0373-barbarian-quest-tour
-
-### late-startup: seed1500-rogue-explore-move
-
-- Count: 1
-- Bucket key: `late-startup | FS=0 | FR=>1200 | char/status | rn2(1)=>rn2(100) | rows=22`
-- Canonical screens: 0/40
-- Canonical RNG: 2272/2768
-- First screen mismatch: 0 (char/status, rows 22)
-- First RNG mismatch: 2212 (rn2(1)=>rn2(100))
-- Sample cells: [22,47] ch 1/8 -> 7/8; [22,58] ch 1/8 -> 9/8; [22,59] ch 1/8 ->  /8; [22,60] ch  /8 -> C/8; [22,61] ch C/8 -> h/8
-- Hypothesis: Late startup side effects, special levels, monster/object initialization, or display setup.
-- Next owner: Mklev / objects / monsters / display
-- Needs deeper debug: yes
-- Sessions: seed1500-rogue-explore-move
+- Sessions: seed0060-orc-rogue-kick-search
 
 ### late-startup: seed0030-ten-diverse-deaths
 
 - Count: 1
 - Bucket key: `late-startup | FS=0 | FR=>1200 | char/status | rn2(100)=>rn2(1) | rows=23`
 - Canonical screens: 0/1953
-- Canonical RNG: 6545/105529
+- Canonical RNG: 6512/105529
 - First screen mismatch: 0 (char/status, rows 23)
 - First RNG mismatch: 6296 (rn2(100)=>rn2(1))
 - Sample cells: [23,34] ch 1/8 -> 0/8; [23,35] ch 0/8 ->  /8; [23,36] ch  /8 -> X/8; [23,37] ch X/8 -> p/8; [23,38] ch p/8 -> :/8
@@ -391,15 +284,29 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 - Needs deeper debug: yes
 - Sessions: seed0030-ten-diverse-deaths
 
+### late-startup: seed0373-barbarian-quest-tour
+
+- Count: 1
+- Bucket key: `late-startup | FS=0 | FR=>1200 | char/status | rn2(26)=>rn2(16) | rows=22,23`
+- Canonical screens: 0/124
+- Canonical RNG: 2486/35386
+- First screen mismatch: 0 (char/status, rows 22,23)
+- First RNG mismatch: 2467 (rn2(26)=>rn2(16))
+- Sample cells: [22,0] ch W/8 -> B/8; [22,1] ch i/8 -> a/8; [22,2] ch z/8 -> r/8; [22,3] ch a/8 -> b/8; [22,4] ch r/8 -> a/8
+- Hypothesis: Late startup side effects, special levels, monster/object initialization, or display setup.
+- Next owner: Mklev / objects / monsters / display
+- Needs deeper debug: yes
+- Sessions: seed0373-barbarian-quest-tour
+
 ### mklev-or-uinit: seed0105-valk-chat-lamp-ration
 
 - Count: 1
-- Bucket key: `mklev-or-uinit | FS=0 | FR=251-1200 | char/mixed | rn2(11)=>rn2(5) | rows=0,9,13,15,16,17+4`
+- Bucket key: `mklev-or-uinit | FS=0 | FR=251-1200 | char/mixed | rn2(11)=>rn2(5) | rows=12,13,14,15,16,17+4`
 - Canonical screens: 0/30
 - Canonical RNG: 988/2499
-- First screen mismatch: 0 (char/mixed, rows 0,9,13,15,16,17+4)
+- First screen mismatch: 0 (char/mixed, rows 12,13,14,15,16,17+4)
 - First RNG mismatch: 974 (rn2(11)=>rn2(5))
-- Sample cells: [0,52] ch O/8 -> M/8; [0,53] ch d/8 -> a/8; [0,54] ch i/8 -> r/8; [0,55] ch n/8 -> d/8; [0,56] ch :/8 -> u/8
+- Sample cells: [12,1] ch  /8 -> ┌/8; [12,2] ch  /8 -> ─/8; [12,3] ch  /8 -> ─/8; [12,4] ch  /8 -> ─/8; [12,5] ch  /8 -> ─/8
 - Hypothesis: u_init, mklev, dungeon initialization, initial inventory, or level topology setup.
 - Next owner: Startup level generation / u_init
 - Needs deeper debug: yes
@@ -408,12 +315,12 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 ### mklev-or-uinit: seed0015-valk-level2-pit-dog-wait
 
 - Count: 1
-- Bucket key: `mklev-or-uinit | FS=0 | FR=251-1200 | char/mixed | rn2(36)=>rn2(1) | rows=0,9,13,16,18,22+1`
+- Bucket key: `mklev-or-uinit | FS=0 | FR=251-1200 | char/mixed | rn2(36)=>rn2(1) | rows=18,22,23`
 - Canonical screens: 0/44
 - Canonical RNG: 391/8563
-- First screen mismatch: 0 (char/mixed, rows 0,9,13,16,18,22+1)
+- First screen mismatch: 0 (char/mixed, rows 18,22,23)
 - First RNG mismatch: 357 (rn2(36)=>rn2(1))
-- Sample cells: [0,52] ch O/8 -> M/8; [0,53] ch d/8 -> a/8; [0,54] ch i/8 -> r/8; [0,55] ch n/8 -> d/8; [0,56] ch :/8 -> u/8
+- Sample cells: [18,59] ch └/8 ->  /8; [18,60] ch ─/8 ->  /8; [18,61] ch ─/8 ->  /8; [18,62] ch ─/8 ->  /8; [18,63] ch ─/8 ->  /8
 - Hypothesis: u_init, mklev, dungeon initialization, initial inventory, or level topology setup.
 - Next owner: Startup level generation / u_init
 - Needs deeper debug: yes
@@ -436,10 +343,10 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 ### mklev-or-uinit: seed0399-wizard-hallu-actions
 
 - Count: 1
-- Bucket key: `mklev-or-uinit | FS=0 | FR=251-1200 | char/mixed | rn2(68)=>rn2(100) | rows=6,7,8,9,10,11+1`
+- Bucket key: `mklev-or-uinit | FS=0 | FR=251-1200 | char/mixed | rn2(68)=>rn2(100) | rows=6,7,8,9,10,11+2`
 - Canonical screens: 1/532
 - Canonical RNG: 1679/11409
-- First screen mismatch: 0 (char/mixed, rows 6,7,8,9,10,11+1)
+- First screen mismatch: 0 (char/mixed, rows 6,7,8,9,10,11+2)
 - First RNG mismatch: 599 (rn2(68)=>rn2(100))
 - Sample cells: [6,11] ch ┌/8 ->  /8; [6,12] ch ─/8 ->  /8; [6,13] ch ─/8 ->  /8; [6,14] ch ─/8 ->  /8; [6,15] ch ─/8 ->  /8
 - Hypothesis: u_init, mklev, dungeon initialization, initial inventory, or level topology setup.
@@ -447,12 +354,40 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 - Needs deeper debug: yes
 - Sessions: seed0399-wizard-hallu-actions
 
+### mklev-or-uinit: seed2600-wizard-custom-binds
+
+- Count: 1
+- Bucket key: `mklev-or-uinit | FS=0 | FR=251-1200 | char/mixed | rn2(8)=>rn2(4) | rows=2,3,4,5,6,7+2`
+- Canonical screens: 1/38
+- Canonical RNG: 420/11647
+- First screen mismatch: 0 (char/mixed, rows 2,3,4,5,6,7+2)
+- First RNG mismatch: 395 (rn2(8)=>rn2(4))
+- Sample cells: [2,5] ch  /8 -> ┌/8; [2,6] ch  /8 -> ─/8; [2,7] ch  /8 -> ─/8; [2,8] ch  /8 -> ─/8; [2,9] ch  /8 -> ─/8
+- Hypothesis: u_init, mklev, dungeon initialization, initial inventory, or level topology setup.
+- Next owner: Startup level generation / u_init
+- Needs deeper debug: yes
+- Sessions: seed2600-wizard-custom-binds
+
+### mklev-or-uinit: seed0012-monk-vault-escort
+
+- Count: 1
+- Bucket key: `mklev-or-uinit | FS=0 | FR=251-1200 | char/mixed | rnd(2)=>rn2(10) | rows=0,1,3,4,5,6+5`
+- Canonical screens: 0/308
+- Canonical RNG: 568/13878
+- First screen mismatch: 0 (char/mixed, rows 0,1,3,4,5,6+5)
+- First RNG mismatch: 300 (rnd(2)=>rn2(10))
+- Sample cells: [0,0] ch  /8 -> A/8; [0,1] ch  /8 -> l/8; [0,2] ch  /8 -> o/8; [0,3] ch  /8 -> h/8; [0,4] ch  /8 -> a/8
+- Hypothesis: u_init, mklev, dungeon initialization, initial inventory, or level topology setup.
+- Next owner: Startup level generation / u_init
+- Needs deeper debug: yes
+- Sessions: seed0012-monk-vault-escort
+
 ### mklev-or-uinit: seed0200-monk-north-search
 
 - Count: 1
 - Bucket key: `mklev-or-uinit | FS=0 | FR=251-1200 | char/mixed | rnd(2)=>rn2(10) | rows=0,2,3,4,5,6+11`
 - Canonical screens: 0/40
-- Canonical RNG: 476/3822
+- Canonical RNG: 469/3822
 - First screen mismatch: 0 (char/mixed, rows 0,2,3,4,5,6+11)
 - First RNG mismatch: 299 (rnd(2)=>rn2(10))
 - Sample cells: [0,15] ch I/8 ->  /8; [0,16] ch t/8 ->  /8; [0,18] ch i/8 ->  /8; [0,19] ch s/8 ->  /8; [0,21] ch w/8 ->  /8
@@ -461,26 +396,12 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 - Needs deeper debug: yes
 - Sessions: seed0200-monk-north-search
 
-### mklev-or-uinit: seed0012-monk-vault-escort
-
-- Count: 1
-- Bucket key: `mklev-or-uinit | FS=0 | FR=251-1200 | char/mixed | rnd(2)=>rn2(10) | rows=0,3,4,5,6,7+4`
-- Canonical screens: 0/308
-- Canonical RNG: 538/13878
-- First screen mismatch: 0 (char/mixed, rows 0,3,4,5,6,7+4)
-- First RNG mismatch: 300 (rnd(2)=>rn2(10))
-- Sample cells: [0,0] ch  /8 -> A/8; [0,1] ch  /8 -> l/8; [0,2] ch  /8 -> o/8; [0,3] ch  /8 -> h/8; [0,4] ch  /8 -> a/8
-- Hypothesis: u_init, mklev, dungeon initialization, initial inventory, or level topology setup.
-- Next owner: Startup level generation / u_init
-- Needs deeper debug: yes
-- Sessions: seed0012-monk-vault-escort
-
 ### mklev-or-uinit: seed4500-knight-coverage
 
 - Count: 1
 - Bucket key: `mklev-or-uinit | FS=0 | FR=251-1200 | char/mixed | rnd(4)=>rn2(10) | rows=0,3,4,5,6,7+11`
 - Canonical screens: 0/1814
-- Canonical RNG: 1681/108275
+- Canonical RNG: 1689/108275
 - First screen mismatch: 0 (char/mixed, rows 0,3,4,5,6,7+11)
 - First RNG mismatch: 254 (rnd(4)=>rn2(10))
 - Sample cells: [0,12] ch w/8 -> k/8; [0,13] ch i/8 -> n/8; [0,14] ch z/8 -> i/8; [0,15] ch a/8 -> g/8; [0,16] ch r/8 -> h/8
@@ -489,33 +410,33 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 - Needs deeper debug: yes
 - Sessions: seed4500-knight-coverage
 
-### mklev-or-uinit: seed0104-knight-ride-combat
-
-- Count: 1
-- Bucket key: `mklev-or-uinit | FS=0 | FR=251-1200 | char/mixed | rnd(4)=>rn2(10) | rows=0,6,7,8,9,10+6`
-- Canonical screens: 0/43
-- Canonical RNG: 1044/3223
-- First screen mismatch: 0 (char/mixed, rows 0,6,7,8,9,10+6)
-- First RNG mismatch: 299 (rnd(4)=>rn2(10))
-- Sample cells: [0,52] ch L/8 -> M/8; [0,53] ch u/8 -> a/8; [0,54] ch g/8 -> r/8; [0,55] ch h/8 -> d/8; [0,56] ch :/8 -> u/8
-- Hypothesis: u_init, mklev, dungeon initialization, initial inventory, or level topology setup.
-- Next owner: Startup level generation / u_init
-- Needs deeper debug: yes
-- Sessions: seed0104-knight-ride-combat
-
 ### mklev-or-uinit: seed0103-knight-ride-pony
 
 - Count: 1
-- Bucket key: `mklev-or-uinit | FS=0 | FR=251-1200 | char/mixed | rnd(4)=>rn2(10) | rows=0,9,13,16,22,23`
+- Bucket key: `mklev-or-uinit | FS=0 | FR=251-1200 | char/mixed | rnd(4)=>rn2(10) | rows=18,19,20,22,23`
 - Canonical screens: 0/60
 - Canonical RNG: 337/2640
-- First screen mismatch: 0 (char/mixed, rows 0,9,13,16,22,23)
+- First screen mismatch: 0 (char/mixed, rows 18,19,20,22,23)
 - First RNG mismatch: 299 (rnd(4)=>rn2(10))
-- Sample cells: [0,52] ch L/8 -> M/8; [0,53] ch u/8 -> a/8; [0,54] ch g/8 -> r/8; [0,55] ch h/8 -> d/8; [0,56] ch :/8 -> u/8
+- Sample cells: [18,52] ch  /8 -> |/8; [18,53] ch  /8 -> %/15; [18,54] ch  /8 -> ./8; [18,55] ch  /8 -> ./8; [18,56] ch  /8 -> ./8
 - Hypothesis: u_init, mklev, dungeon initialization, initial inventory, or level topology setup.
 - Next owner: Startup level generation / u_init
 - Needs deeper debug: yes
 - Sessions: seed0103-knight-ride-pony
+
+### mklev-or-uinit: seed0104-knight-ride-combat
+
+- Count: 1
+- Bucket key: `mklev-or-uinit | FS=0 | FR=251-1200 | char/mixed | rnd(4)=>rn2(10) | rows=6,7,8,9,10,11+3`
+- Canonical screens: 0/43
+- Canonical RNG: 1044/3223
+- First screen mismatch: 0 (char/mixed, rows 6,7,8,9,10,11+3)
+- First RNG mismatch: 299 (rnd(4)=>rn2(10))
+- Sample cells: [6,17] ch -/8 ->  /8; [6,18] ch -/8 ->  /8; [6,19] ch -/8 ->  /8; [6,20] ch -/8 ->  /8; [6,21] ch -/8 ->  /8
+- Hypothesis: u_init, mklev, dungeon initialization, initial inventory, or level topology setup.
+- Next owner: Startup level generation / u_init
+- Needs deeper debug: yes
+- Sessions: seed0104-knight-ride-combat
 
 ### mklev-or-uinit: seed0900-tourist-explore-actions
 
@@ -531,129 +452,73 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 - Needs deeper debug: no
 - Sessions: seed0900-tourist-explore-actions
 
-### mklev-or-uinit: seed2600-wizard-custom-binds
+### post-startup-live: seed0108-wizard-extcmd-wishlist
 
 - Count: 1
-- Bucket key: `mklev-or-uinit | FS=0 | FR=251-1200 | char/status | rn2(8)=>rn2(4) | rows=22`
-- Canonical screens: 1/38
-- Canonical RNG: 419/11647
-- First screen mismatch: 0 (char/status, rows 22)
-- First RNG mismatch: 395 (rn2(8)=>rn2(4))
-- Sample cells: [22,34] ch 1/8 -> 8/8; [22,35] ch 0/8 ->  /8; [22,36] ch  /8 -> D/8; [22,37] ch D/8 -> x/8; [22,38] ch x/8 -> :/8
-- Hypothesis: u_init, mklev, dungeon initialization, initial inventory, or level topology setup.
-- Next owner: Startup level generation / u_init
-- Needs deeper debug: no
-- Sessions: seed2600-wizard-custom-binds
-
-### post-startup-live: seed1800-tourist-eat-throw
-
-- Count: 1
-- Bucket key: `post-startup-live | FS=14 | FR=none | message/message | - | rows=0`
-- Canonical screens: 17/26
-- Canonical RNG: 2458/2458
-- First screen mismatch: 14 (message/message, rows 0)
-- First RNG mismatch: - (-)
-- Sample cells: [0,0] ch Y/8 -> S/8; [0,2] ch u/8 -> r/8; [0,3] ch  /8 -> r/8; [0,4] ch d/8 -> y/8; [0,5] ch o/8 -> ,/8
-- Hypothesis: Message buffer, prompt/menu lifecycle, or command dispatch timing after startup.
-- Next owner: Messages / command dispatch
-- Needs deeper debug: no
-- Sessions: seed1800-tourist-eat-throw
-
-### post-startup-live: seed0383-wizard-hallucinate
-
-- Count: 1
-- Bucket key: `post-startup-live | FS=195 | FR=none | char+attr/map | - | rows=6,7,8`
-- Canonical screens: 196/219
-- Canonical RNG: 16915/16915
-- First screen mismatch: 195 (char+attr/map, rows 6,7,8)
-- First RNG mismatch: - (-)
-- Sample cells: [6,67] ch @/15 -> w/3; [7,67] attr [/11 -> [/6; [8,68] ch [/11 -> (/3
-- Hypothesis: Special-level monster setup: des.monster() selected-monster initialization, equipment, and hallucination display context.
-- Next owner: Special levels / monsters
+- Bucket key: `post-startup-live | FS=170 | FR=>1200 | char/mixed | rn2(36)=>rn2(8) | rows=0,18,19`
+- Canonical screens: 173/303
+- Canonical RNG: 3231/16958
+- First screen mismatch: 170 (char/mixed, rows 0,18,19)
+- First RNG mismatch: 3076 (rn2(36)=>rn2(8))
+- Sample cells: [0,11] ch i/8 -> h/8; [0,12] ch s/8 -> i/8; [0,13] ch  /8 -> t/8; [0,14] ch k/8 -> s/8; [0,15] ch i/8 ->  /8
+- Hypothesis: Mixed live-state divergence spanning display, status, messages, or command side effects.
+- Next owner: Display / command dispatch
 - Needs deeper debug: yes
-- Sessions: seed0383-wizard-hallucinate
-
-### post-startup-live: seed0360-wizard-world-tour
-
-- Count: 1
-- Bucket key: `post-startup-live | FS=274 | FR=>1200 | char/map | rn2(40)=>rn2(100) | rows=10,11,12`
-- Canonical screens: 294/833
-- Canonical RNG: 55426/120639
-- First screen mismatch: 274 (char/map, rows 10,11,12)
-- First RNG mismatch: 53532 (rn2(40)=>rn2(100))
-- Sample cells: [10,28] ch v/8 -> 1/1; [10,29] ch ·/8 ->  /8; [10,30] ch │/8 ->  /8; [11,28] ch ·/8 ->  /7; [11,29] ch D/11 -> 5/13
-- Hypothesis: Live command effects, movement, pet/monster behavior, or retained object/map state.
-- Next owner: Commands / monsters / objects
-- Needs deeper debug: no
-- Sessions: seed0360-wizard-world-tour
-
-### post-startup-live: seed0002-healer-reflection-drummer
-
-- Count: 1
-- Bucket key: `post-startup-live | FS=83 | FR=>1200 | char/map | rn2(100)=>rn2(5) | rows=12,13`
-- Canonical screens: 83/595
-- Canonical RNG: 5669/27158
-- First screen mismatch: 83 (char/map, rows 12,13)
-- First RNG mismatch: 4518 (rn2(100)=>rn2(5))
-- Sample cells: [12,74] ch d/15 -> ·/8; [13,73] ch ·/8 -> d/15
-- Hypothesis: Live command effects, movement, pet/monster behavior, or retained object/map state.
-- Next owner: Commands / monsters / objects
-- Needs deeper debug: no
-- Sessions: seed0002-healer-reflection-drummer
+- Sessions: seed0108-wizard-extcmd-wishlist
 
 ## Known Live Blockers
 
 | Session | Screens | RNG | First screen | First RNG | Hypothesis |
 | --- | --- | --- | --- | --- | --- |
 | seed0116-wizard-wear-shop | 127/127 | 12562/12562 | -:none:none:- | -:- | Pet behavior: dog_goal() object scan, reachability, carry checks, and object resistance in dogmove.c. |
-| seed0383-wizard-hallucinate | 196/219 | 16915/16915 | 195:char+attr:map:c | -:- | Special-level monster setup: des.monster() selected-monster initialization, equipment, and hallucination display context. |
+| seed0383-wizard-hallucinate | 219/219 | 16915/16915 | -:none:none:- | -:- | Special-level monster setup: des.monster() selected-monster initialization, equipment, and hallucination display context. |
 | seed8000-tourist-starter | 23/23 | 3130/3130 | -:none:none:- | -:- | Live turn loop: post-screen monster movement RNG ownership after visible screen parity. |
 
 ## Session Inventory
 
 | Session | Screens | RNG | Phase | First screen | First RNG | Rows | Samples |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| seed0002-healer-reflection-drummer | 83/595 | 5669/27158 | post-startup-live | 83:char:map:Enter | 4518:rn2(100)=>rn2(5) | 12,13 | [12,74] ch d/15 -> ·/8; [13,73] ch ·/8 -> d/15 |
-| seed0004-feeding-pony | 0/409 | 174/12084 | early-startup | 0:char:mixed:init | 0:rn2(13)=>rn2(2) | 0,4,5,6,7,12+7 | [0,0] ch  /8 -> A/8; [0,1] ch  /8 -> l/8; [0,2] ch  /8 -> o/8; [0,3] ch  /8 -> h/8; [0,4] ch  /8 -> a/8 |
-| seed0006-wizard-water-demon | 0/123 | 89/6736 | early-startup | 0:char:mixed:init | 0:rn2(1)=>rn2(2) | 0,2,3,4,5,6+4 | [0,0] ch  /8 -> A/8; [0,1] ch  /8 -> l/8; [0,2] ch  /8 -> o/8; [0,3] ch  /8 -> h/8; [0,4] ch  /8 -> a/8 |
-| seed0007-rogue-snake-swamp | 0/302 | 187/16373 | early-startup | 0:char:mixed:init | 0:rn2(13)=>rn2(2) | 0,4,5,6,7,12+5 | [0,0] ch  /8 -> A/8; [0,1] ch  /8 -> l/8; [0,2] ch  /8 -> o/8; [0,3] ch  /8 -> h/8; [0,4] ch  /8 -> a/8 |
+| seed0002-healer-reflection-drummer | 595/595 | 27158/27158 | passing | -:none:none:- | -:- | - | - |
+| seed0004-feeding-pony | 0/409 | 194/12084 | early-startup | 0:char:mixed:init | 0:rn2(13)=>rn2(2) | 0,4,5,6,7,12+7 | [0,0] ch  /8 -> A/8; [0,1] ch  /8 -> l/8; [0,2] ch  /8 -> o/8; [0,3] ch  /8 -> h/8; [0,4] ch  /8 -> a/8 |
+| seed0006-wizard-water-demon | 0/123 | 86/6736 | early-startup | 0:char:mixed:init | 0:rn2(1)=>rn2(2) | 0,1,2,3,4,5+5 | [0,0] ch  /8 -> A/8; [0,1] ch  /8 -> l/8; [0,2] ch  /8 -> o/8; [0,3] ch  /8 -> h/8; [0,4] ch  /8 -> a/8 |
+| seed0007-rogue-snake-swamp | 0/302 | 200/16373 | early-startup | 0:char:mixed:init | 0:rn2(13)=>rn2(2) | 0,1,4,5,6,7+6 | [0,0] ch  /8 -> A/8; [0,1] ch  /8 -> l/8; [0,2] ch  /8 -> o/8; [0,3] ch  /8 -> h/8; [0,4] ch  /8 -> a/8 |
 | seed0009-swimmer-mforce | 0/73 | 123/3713 | early-startup | 0:char:mixed:init | 0:rn2(13)=>rn2(2) | 0,2,3,4,5,6+4 | [0,0] ch  /8 -> A/8; [0,1] ch  /8 -> l/8; [0,2] ch  /8 -> o/8; [0,3] ch  /8 -> h/8; [0,4] ch  /8 -> a/8 |
-| seed0012-monk-vault-escort | 0/308 | 538/13878 | mklev-or-uinit | 0:char:mixed:init | 300:rnd(2)=>rn2(10) | 0,3,4,5,6,7+4 | [0,0] ch  /8 -> A/8; [0,1] ch  /8 -> l/8; [0,2] ch  /8 -> o/8; [0,3] ch  /8 -> h/8; [0,4] ch  /8 -> a/8 |
-| seed0013-friday13-save-then-fullmoon-restore | 0/99 | 580/4804 | mklev-or-uinit | 0:char:mixed:init | 540:rn2(1000)=>rn2(4) | 15,16,17,18,19,22 | [15,5] ch ┌/8 ->  /8; [15,6] ch ─/8 ->  /8; [15,7] ch ─/8 ->  /8; [15,8] ch ·/8 ->  /8; [15,9] ch ─/8 ->  /8 |
-| seed0013-rogue-friday13-combat | 0/59 | 572/4838 | mklev-or-uinit | 0:char:mixed:init | 540:rn2(1000)=>rn2(4) | 15,16,17,18,19,22 | [15,5] ch ┌/8 ->  /8; [15,6] ch ─/8 ->  /8; [15,7] ch ─/8 ->  /8; [15,8] ch ·/8 ->  /8; [15,9] ch ─/8 ->  /8 |
-| seed0014-dequa-fountain-explore | 0/714 | 185/59178 | early-startup | 0:char:mixed:init | 0:rn2(1)=>rn2(2) | 0,4,5,6,7,12+7 | [0,0] ch  /8 -> A/8; [0,1] ch  /8 -> l/8; [0,2] ch  /8 -> o/8; [0,3] ch  /8 -> h/8; [0,4] ch  /8 -> a/8 |
-| seed0015-valk-level2-pit-dog-wait | 0/44 | 391/8563 | mklev-or-uinit | 0:char:mixed:init | 357:rn2(36)=>rn2(1) | 0,9,13,16,18,22+1 | [0,52] ch O/8 -> M/8; [0,53] ch d/8 -> a/8; [0,54] ch i/8 -> r/8; [0,55] ch n/8 -> d/8; [0,56] ch :/8 -> u/8 |
-| seed0016-healer-newmoon-eat-zap | 0/36 | 2498/3656 | late-startup | 0:char:mixed:init | 2404:rn2(26)=>rn2(16) | 0,2,3,4,5,6+11 | [0,22] ch I/8 ->  /8; [0,23] ch t/8 -> I/8; [0,24] ch  /8 -> t/8; [0,25] ch i/8 ->  /8; [0,26] ch s/8 -> i/8 |
-| seed0017-samurai-altar-pray | 0/67 | 2609/3465 | late-startup | 0:char:mixed:init | 2595:rn2(1)=>rn2(3) | 0,2,3,4,5,6+11 | [0,23] ch  /8 -> I/8; [0,24] ch  /8 -> t/8; [0,26] ch  /8 -> i/8; [0,27] ch  /8 -> s/8; [0,29] ch  /8 -> w/8 |
-| seed0030-ten-diverse-deaths | 0/1953 | 6545/105529 | late-startup | 0:char:status:init | 6296:rn2(100)=>rn2(1) | 23 | [23,34] ch 1/8 -> 0/8; [23,35] ch 0/8 ->  /8; [23,36] ch  /8 -> X/8; [23,37] ch X/8 -> p/8; [23,38] ch p/8 -> :/8 |
-| seed0060-orc-rogue-kick-search | 0/41 | 2314/3626 | late-startup | 0:char:mixed:init | 2312:rn2(1)=>rn2(100) | 11,12,13,14,15,22+1 | [11,3] ch ┌/8 ->  /8; [11,4] ch ─/8 ->  /8; [11,5] ch ─/8 ->  /8; [11,6] ch ─/8 ->  /8; [11,7] ch ─/8 ->  /8 |
+| seed0012-monk-vault-escort | 0/308 | 568/13878 | mklev-or-uinit | 0:char:mixed:init | 300:rnd(2)=>rn2(10) | 0,1,3,4,5,6+5 | [0,0] ch  /8 -> A/8; [0,1] ch  /8 -> l/8; [0,2] ch  /8 -> o/8; [0,3] ch  /8 -> h/8; [0,4] ch  /8 -> a/8 |
+| seed0013-friday13-save-then-fullmoon-restore | 99/99 | 4804/4804 | passing | -:none:none:- | -:- | - | - |
+| seed0013-rogue-friday13-combat | 59/59 | 4838/4838 | passing | -:none:none:- | -:- | - | - |
+| seed0014-dequa-fountain-explore | 0/714 | 209/59178 | early-startup | 0:char:mixed:init | 0:rn2(1)=>rn2(2) | 0,1,4,5,6,7+8 | [0,0] ch  /8 -> A/8; [0,1] ch  /8 -> l/8; [0,2] ch  /8 -> o/8; [0,3] ch  /8 -> h/8; [0,4] ch  /8 -> a/8 |
+| seed0015-valk-level2-pit-dog-wait | 0/44 | 391/8563 | mklev-or-uinit | 0:char:mixed:init | 357:rn2(36)=>rn2(1) | 18,22,23 | [18,59] ch └/8 ->  /8; [18,60] ch ─/8 ->  /8; [18,61] ch ─/8 ->  /8; [18,62] ch ─/8 ->  /8; [18,63] ch ─/8 ->  /8 |
+| seed0016-healer-newmoon-eat-zap | 0/36 | 2572/3656 | late-startup | 0:char:mixed:init | 2404:rn2(26)=>rn2(16) | 0,2,3,4,5,6+11 | [0,22] ch I/8 ->  /8; [0,23] ch t/8 -> I/8; [0,24] ch  /8 -> t/8; [0,25] ch i/8 ->  /8; [0,26] ch s/8 -> i/8 |
+| seed0017-samurai-altar-pray | 0/67 | 2613/3465 | late-startup | 0:char:mixed:init | 2595:rn2(1)=>rn2(3) | 0,2,3,4,5,6+12 | [0,23] ch  /8 -> I/8; [0,24] ch  /8 -> t/8; [0,26] ch  /8 -> i/8; [0,27] ch  /8 -> s/8; [0,29] ch  /8 -> w/8 |
+| seed0030-ten-diverse-deaths | 0/1953 | 6512/105529 | late-startup | 0:char:status:init | 6296:rn2(100)=>rn2(1) | 23 | [23,34] ch 1/8 -> 0/8; [23,35] ch 0/8 ->  /8; [23,36] ch  /8 -> X/8; [23,37] ch X/8 -> p/8; [23,38] ch p/8 -> :/8 |
+| seed0060-orc-rogue-kick-search | 0/41 | 2403/3626 | late-startup | 0:char:status:init | 2341:rn2(1)=>rn2(100) | 22,23 | [22,35] ch 4/8 -> 1/8; [22,47] ch 2/8 -> 5/8; [22,53] ch 0/8 -> 1/8; [22,59] ch 1/8 -> 0/8; [22,65] ch 1/8 -> 0/8 |
 | seed0077-rogue-chargen | 0/33 | 95/3242 | early-startup | 0:char:mixed:init | 0:rn2(1)=>rn2(2) | 0,3,4,5,6,7+4 | [0,0] ch  /8 -> A/8; [0,1] ch  /8 -> l/8; [0,2] ch  /8 -> o/8; [0,3] ch  /8 -> h/8; [0,4] ch  /8 -> a/8 |
-| seed0101-ranger-quiver-throw-travel-engrave | 0/27 | 2238/2371 | late-startup | 0:char:mixed:init | 2232:rn2(1)=>rn2(3) | 0,3,4,5,6,9+4 | [0,55] ch s/8 -> d/8; [0,56] ch :/8 -> u/8; [0,57] ch  /8 -> k/8; [0,58] ch  /8 -> :/8; [3,19] ch ┌/8 ->  /8 |
-| seed0102-ranger-name-cancel | 0/25 | 4383/4485 | late-startup | 0:char:mixed:init | 4382:rn2(1)=>rn2(3) | 0,7,8,9,10,11+5 | [0,55] ch s/8 -> d/8; [0,56] ch :/8 -> u/8; [0,57] ch  /8 -> k/8; [0,58] ch  /8 -> :/8; [7,20] ch ┌/8 ->  /8 |
-| seed0103-knight-ride-pony | 0/60 | 337/2640 | mklev-or-uinit | 0:char:mixed:init | 299:rnd(4)=>rn2(10) | 0,9,13,16,22,23 | [0,52] ch L/8 -> M/8; [0,53] ch u/8 -> a/8; [0,54] ch g/8 -> r/8; [0,55] ch h/8 -> d/8; [0,56] ch :/8 -> u/8 |
-| seed0104-knight-ride-combat | 0/43 | 1044/3223 | mklev-or-uinit | 0:char:mixed:init | 299:rnd(4)=>rn2(10) | 0,6,7,8,9,10+6 | [0,52] ch L/8 -> M/8; [0,53] ch u/8 -> a/8; [0,54] ch g/8 -> r/8; [0,55] ch h/8 -> d/8; [0,56] ch :/8 -> u/8 |
-| seed0105-valk-chat-lamp-ration | 0/30 | 988/2499 | mklev-or-uinit | 0:char:mixed:init | 974:rn2(11)=>rn2(5) | 0,9,13,15,16,17+4 | [0,52] ch O/8 -> M/8; [0,53] ch d/8 -> a/8; [0,54] ch i/8 -> r/8; [0,55] ch n/8 -> d/8; [0,56] ch :/8 -> u/8 |
-| seed0106-priest-extcmd-sweep | 0/267 | 1373/4194 | early-startup | 0:char:mixed:init | 199:rn2(13)=>rn2(3) | 0,2,3,4,5,6+11 | [0,8] ch I/8 ->  /8; [0,9] ch t/8 ->  /8; [0,11] ch i/8 ->  /8; [0,12] ch s/8 ->  /8; [0,14] ch w/8 ->  /8 |
-| seed0107-samurai-twoweapon-enhance | 0/98 | 2578/2902 | late-startup | 0:char:mixed:init | 2577:rn2(1)=>rn2(3) | 0,2,3,4,5,6+12 | [0,8] ch I/8 ->  /8; [0,9] ch t/8 ->  /8; [0,11] ch i/8 ->  /8; [0,12] ch s/8 ->  /8; [0,14] ch w/8 ->  /8 |
-| seed0108-wizard-extcmd-wishlist | 3/303 | 2786/16958 | late-startup | 0:char:map:init | 2772:rn2(16)=>rn2(5) | 18,19,20 | [18,38] ch \|/8 ->  /8; [18,39] ch ./8 ->  /8; [18,40] ch ./8 ->  /8; [18,41] ch @/15 ->  /8; [18,42] ch ./8 ->  /8 |
+| seed0101-ranger-quiver-throw-travel-engrave | 27/27 | 2371/2371 | passing | -:none:none:- | -:- | - | - |
+| seed0102-ranger-name-cancel | 25/25 | 4485/4485 | passing | -:none:none:- | -:- | - | - |
+| seed0103-knight-ride-pony | 0/60 | 337/2640 | mklev-or-uinit | 0:char:mixed:init | 299:rnd(4)=>rn2(10) | 18,19,20,22,23 | [18,52] ch  /8 -> \|/8; [18,53] ch  /8 -> %/15; [18,54] ch  /8 -> ./8; [18,55] ch  /8 -> ./8; [18,56] ch  /8 -> ./8 |
+| seed0104-knight-ride-combat | 0/43 | 1044/3223 | mklev-or-uinit | 0:char:mixed:init | 299:rnd(4)=>rn2(10) | 6,7,8,9,10,11+3 | [6,17] ch -/8 ->  /8; [6,18] ch -/8 ->  /8; [6,19] ch -/8 ->  /8; [6,20] ch -/8 ->  /8; [6,21] ch -/8 ->  /8 |
+| seed0105-valk-chat-lamp-ration | 0/30 | 988/2499 | mklev-or-uinit | 0:char:mixed:init | 974:rn2(11)=>rn2(5) | 12,13,14,15,16,17+4 | [12,1] ch  /8 -> ┌/8; [12,2] ch  /8 -> ─/8; [12,3] ch  /8 -> ─/8; [12,4] ch  /8 -> ─/8; [12,5] ch  /8 -> ─/8 |
+| seed0106-priest-extcmd-sweep | 0/267 | 1371/4194 | early-startup | 0:char:mixed:init | 199:rn2(13)=>rn2(3) | 0,2,3,4,5,6+12 | [0,8] ch I/8 ->  /8; [0,9] ch t/8 ->  /8; [0,11] ch i/8 ->  /8; [0,12] ch s/8 ->  /8; [0,14] ch w/8 ->  /8 |
+| seed0107-samurai-twoweapon-enhance | 0/98 | 2578/2902 | late-startup | 0:char:mixed:init | 2577:rn2(1)=>rn2(3) | 0,2,3,4,5,6+11 | [0,8] ch I/8 ->  /8; [0,9] ch t/8 ->  /8; [0,11] ch i/8 ->  /8; [0,12] ch s/8 ->  /8; [0,14] ch w/8 ->  /8 |
+| seed0108-wizard-extcmd-wishlist | 173/303 | 3231/16958 | post-startup-live | 170:char:mixed:Space | 3076:rn2(36)=>rn2(8) | 0,18,19 | [0,11] ch i/8 -> h/8; [0,12] ch s/8 -> i/8; [0,13] ch  /8 -> t/8; [0,14] ch k/8 -> s/8; [0,15] ch i/8 ->  /8 |
 | seed0116-wizard-wear-shop | 127/127 | 12562/12562 | passing | -:none:none:- | -:- | - | - |
-| seed0200-monk-north-search | 0/40 | 476/3822 | mklev-or-uinit | 0:char:mixed:init | 299:rnd(2)=>rn2(10) | 0,2,3,4,5,6+11 | [0,15] ch I/8 ->  /8; [0,16] ch t/8 ->  /8; [0,18] ch i/8 ->  /8; [0,19] ch s/8 ->  /8; [0,21] ch w/8 ->  /8 |
-| seed0360-wizard-world-tour | 294/833 | 55426/120639 | post-startup-live | 274:char:map:I | 53532:rn2(40)=>rn2(100) | 10,11,12 | [10,28] ch v/8 -> 1/1; [10,29] ch ·/8 ->  /8; [10,30] ch │/8 ->  /8; [11,28] ch ·/8 ->  /7; [11,29] ch D/11 -> 5/13 |
-| seed0361-archeologist-tour | 0/366 | 362/53865 | early-startup | 0:char:mixed:init | 199:rn2(100)=>rn2(3) | 0,2,3,4,5,6+11 | [0,20] ch I/8 ->  /8; [0,21] ch t/8 ->  /8; [0,23] ch i/8 -> I/8; [0,24] ch s/8 -> t/8; [0,26] ch w/8 -> i/8 |
-| seed0367-priest-quest-tour | 0/324 | 407/50125 | early-startup | 0:char:mixed:init | 199:rn2(13)=>rn2(3) | 0,9,13,16,18,19+2 | [0,52] ch L/8 -> M/8; [0,53] ch o/8 -> a/8; [0,54] ch k/8 -> r/8; [0,55] ch i/8 -> d/8; [0,56] ch :/8 -> u/8 |
-| seed0373-barbarian-quest-tour | 0/124 | 2486/35386 | late-startup | 0:char:mixed:init | 2467:rn2(26)=>rn2(16) | 0,9,13,16,22,23 | [0,52] ch C/8 -> M/8; [0,53] ch r/8 -> a/8; [0,54] ch o/8 -> r/8; [0,55] ch m/8 -> d/8; [0,56] ch :/8 -> u/8 |
-| seed0383-wizard-hallucinate | 196/219 | 16915/16915 | post-startup-live | 195:char+attr:map:c | -:- | 6,7,8 | [6,67] ch @/15 -> w/3; [7,67] attr [/11 -> [/6; [8,68] ch [/11 -> (/3 |
-| seed0398-wizard-wandpoly-pile | 0/87 | 2773/3026 | late-startup | 0:char:map:init | 2764:rn2(46)=>rn2(12) | 1 | [1,0] ch  /8 -> -/8; [1,1] ch  /8 -> -/8; [1,2] ch  /8 -> M/8; [1,3] ch  /8 -> o/8; [1,4] ch  /8 -> r/8 |
-| seed0399-wizard-hallu-actions | 1/532 | 1679/11409 | mklev-or-uinit | 0:char:mixed:init | 599:rn2(68)=>rn2(100) | 6,7,8,9,10,11+1 | [6,11] ch ┌/8 ->  /8; [6,12] ch ─/8 ->  /8; [6,13] ch ─/8 ->  /8; [6,14] ch ─/8 ->  /8; [6,15] ch ─/8 ->  /8 |
+| seed0200-monk-north-search | 0/40 | 469/3822 | mklev-or-uinit | 0:char:mixed:init | 299:rnd(2)=>rn2(10) | 0,2,3,4,5,6+11 | [0,15] ch I/8 ->  /8; [0,16] ch t/8 ->  /8; [0,18] ch i/8 ->  /8; [0,19] ch s/8 ->  /8; [0,21] ch w/8 ->  /8 |
+| seed0360-wizard-world-tour | 833/833 | 120639/120639 | passing | -:none:none:- | -:- | - | - |
+| seed0361-archeologist-tour | 0/366 | 310/53865 | early-startup | 0:char:mixed:init | 199:rn2(100)=>rn2(3) | 0,2,3,4,5,6+13 | [0,20] ch I/8 ->  /8; [0,21] ch t/8 ->  /8; [0,23] ch i/8 -> I/8; [0,24] ch s/8 -> t/8; [0,26] ch w/8 -> i/8 |
+| seed0367-priest-quest-tour | 0/324 | 403/50125 | early-startup | 0:char:mixed:init | 199:rn2(13)=>rn2(3) | 0,9,13,15,16,17+4 | [0,52] ch L/8 -> M/8; [0,53] ch o/8 -> a/8; [0,54] ch k/8 -> r/8; [0,55] ch i/8 -> d/8; [0,56] ch :/8 -> u/8 |
+| seed0373-barbarian-quest-tour | 0/124 | 2486/35386 | late-startup | 0:char:status:init | 2467:rn2(26)=>rn2(16) | 22,23 | [22,0] ch W/8 -> B/8; [22,1] ch i/8 -> a/8; [22,2] ch z/8 -> r/8; [22,3] ch a/8 -> b/8; [22,4] ch r/8 -> a/8 |
+| seed0383-wizard-hallucinate | 219/219 | 16915/16915 | passing | -:none:none:- | -:- | - | - |
+| seed0398-wizard-wandpoly-pile | 87/87 | 3026/3026 | passing | -:none:none:- | -:- | - | - |
+| seed0399-wizard-hallu-actions | 1/532 | 1679/11409 | mklev-or-uinit | 0:char:mixed:init | 599:rn2(68)=>rn2(100) | 6,7,8,9,10,11+2 | [6,11] ch ┌/8 ->  /8; [6,12] ch ─/8 ->  /8; [6,13] ch ─/8 ->  /8; [6,14] ch ─/8 ->  /8; [6,15] ch ─/8 ->  /8 |
 | seed0501-priest-cast-read-turn | 0/28 | 299/2238 | early-startup | 0:char:mixed:init | 199:rn2(13)=>rn2(3) | 0,2,3,4,5,6+11 | [0,17] ch I/8 ->  /8; [0,18] ch t/8 ->  /8; [0,20] ch i/8 ->  /8; [0,21] ch s/8 ->  /8; [0,23] ch w/8 -> I/8 |
-| seed0700-samurai-explore-descend | 0/51 | 2677/3230 | late-startup | 0:char:mixed:init | 2667:rn2(1)=>rn2(3) | 0,2,3,4,5,6+11 | [0,8] ch I/8 ->  /8; [0,9] ch t/8 ->  /8; [0,11] ch i/8 ->  /8; [0,12] ch s/8 ->  /8; [0,14] ch w/8 ->  /8 |
+| seed0700-samurai-explore-descend | 0/51 | 2676/3230 | late-startup | 0:char:mixed:init | 2667:rn2(1)=>rn2(3) | 0,2,3,4,5,6+11 | [0,8] ch I/8 ->  /8; [0,9] ch t/8 ->  /8; [0,11] ch i/8 ->  /8; [0,12] ch s/8 ->  /8; [0,14] ch w/8 ->  /8 |
 | seed0900-tourist-explore-actions | 0/84 | 356/2983 | mklev-or-uinit | 0:char:status:init | 302:rn2(5)=>rn2(3) | 22,23 | [22,35] ch 3/8 -> 5/8; [22,47] ch 2/8 -> 7/8; [22,53] ch 2/8 -> 4/8; [22,58] ch 1/8 -> 8/8; [22,59] ch 1/8 ->  /8 |
 | seed1150-caveman-explore-move | 0/51 | 361/3137 | mklev-or-uinit | 0:char:mixed:init | 302:rn2(5)=>rn2(3) | 0,2,3,4,5,6+14 | [0,19] ch I/8 ->  /8; [0,20] ch t/8 ->  /8; [0,22] ch i/8 ->  /8; [0,23] ch s/8 -> I/8; [0,24] ch  /8 -> t/8 |
-| seed1500-rogue-explore-move | 0/40 | 2272/2768 | late-startup | 0:char:status:init | 2212:rn2(1)=>rn2(100) | 22 | [22,47] ch 1/8 -> 7/8; [22,58] ch 1/8 -> 9/8; [22,59] ch 1/8 ->  /8; [22,60] ch  /8 -> C/8; [22,61] ch C/8 -> h/8 |
-| seed1800-tourist-eat-throw | 17/26 | 2458/2458 | post-startup-live | 14:message:message:i | -:- | 0 | [0,0] ch Y/8 -> S/8; [0,2] ch u/8 -> r/8; [0,3] ch  /8 -> r/8; [0,4] ch d/8 -> y/8; [0,5] ch o/8 -> ,/8 |
-| seed2200-wizard-quaff-zap-read | 4/230 | 2802/3018 | late-startup | 0:char:map:init | 2724:rn2(2)=>rn2(12) | 9,10,11,12,13,14 | [9,9] ch ┌/8 ->  /8; [9,10] ch ─/8 ->  /8; [9,11] ch ─/8 ->  /8; [9,12] ch ─/8 ->  /8; [9,13] ch ─/8 ->  /8 |
-| seed2600-wizard-custom-binds | 1/38 | 419/11647 | mklev-or-uinit | 0:char:status:init | 395:rn2(8)=>rn2(4) | 22 | [22,34] ch 1/8 -> 8/8; [22,35] ch 0/8 ->  /8; [22,36] ch  /8 -> D/8; [22,37] ch D/8 -> x/8; [22,38] ch x/8 -> :/8 |
-| seed4500-knight-coverage | 0/1814 | 1681/108275 | mklev-or-uinit | 0:char:mixed:init | 254:rnd(4)=>rn2(10) | 0,3,4,5,6,7+11 | [0,12] ch w/8 -> k/8; [0,13] ch i/8 -> n/8; [0,14] ch z/8 -> i/8; [0,15] ch a/8 -> g/8; [0,16] ch r/8 -> h/8 |
+| seed1500-rogue-explore-move | 40/40 | 2768/2768 | passing | -:none:none:- | -:- | - | - |
+| seed1800-tourist-eat-throw | 26/26 | 2458/2458 | passing | -:none:none:- | -:- | - | - |
+| seed2200-wizard-quaff-zap-read | 230/230 | 3018/3018 | passing | -:none:none:- | -:- | - | - |
+| seed2600-wizard-custom-binds | 1/38 | 420/11647 | mklev-or-uinit | 0:char:mixed:init | 395:rn2(8)=>rn2(4) | 2,3,4,5,6,7+2 | [2,5] ch  /8 -> ┌/8; [2,6] ch  /8 -> ─/8; [2,7] ch  /8 -> ─/8; [2,8] ch  /8 -> ─/8; [2,9] ch  /8 -> ─/8 |
+| seed4500-knight-coverage | 0/1814 | 1689/108275 | mklev-or-uinit | 0:char:mixed:init | 254:rnd(4)=>rn2(10) | 0,3,4,5,6,7+11 | [0,12] ch w/8 -> k/8; [0,13] ch i/8 -> n/8; [0,14] ch z/8 -> i/8; [0,15] ch a/8 -> g/8; [0,16] ch r/8 -> h/8 |
 | seed5002-wizard-coverage-pair | 410/410 | 12167/12167 | passing | -:none:none:- | -:- | - | - |
-| seed5006-tourist-stress-disaster | 0/249 | 8343/13923 | late-startup | 0:char:mixed:init | 8315:rn2(16)=>rn2(12) | 0,22,23 | [0,6] ch w/8 -> t/8; [0,7] ch i/8 -> o/8; [0,8] ch z/8 -> u/8; [0,9] ch a/8 -> r/8; [0,10] ch r/8 -> i/8 |
+| seed5006-tourist-stress-disaster | 0/249 | 8365/13923 | late-startup | 0:char:mixed:init | 8315:rn2(16)=>rn2(12) | 0,22,23 | [0,6] ch w/8 -> t/8; [0,7] ch i/8 -> o/8; [0,8] ch z/8 -> u/8; [0,9] ch a/8 -> r/8; [0,10] ch r/8 -> i/8 |
 | seed8000-tourist-starter | 23/23 | 3130/3130 | passing | -:none:none:- | -:- | - | - |
