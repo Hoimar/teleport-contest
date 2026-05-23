@@ -419,13 +419,20 @@ export async function newgame() {
         g._deferred_startup_uac = 7;
     } else if (!ff && g.flags?.legacy !== false && g.urole?.name?.m === 'Rogue') {
         g._deferred_startup_uac = 7;
+    } else if (!ff && g.flags?.legacy !== false && g.urole?.name?.m === 'Valkyrie') {
+        g._deferred_startup_uac = 6;
     }
 
     // Welcome message
-    const genderAdj = g.flags?.female ? 'female' : 'male';
     const roleName = g.flags?.female ? (g.urole.name.f || g.urole.name.m) : g.urole.name.m;
+    // C ref: allmain.c:welcome(): forced-gender roles and distinct female
+    // role names do not also print a separate gender adjective.
+    const hasDistinctFemaleRoleName = !!(g.flags?.female && g.urole.name.f && g.urole.name.f !== g.urole.name.m);
+    const roleForcesGender = g.urole?.mnum === 11; // Valkyrie
+    const genderAdj = g.flags?.female ? 'female' : 'male';
+    const genderText = (!hasDistinctFemaleRoleName && !roleForcesGender) ? `${genderAdj} ` : '';
     const greetingName = g._startupGreetingName || g.plname;
-    const welcome = `${roleGreeting(g.urole)} ${greetingName}, welcome to NetHack!  You are a ${alignName} ${genderAdj} ${g.urace.adj} ${roleName}.`;
+    const welcome = `${roleGreeting(g.urole)} ${greetingName}, welcome to NetHack!  You are a ${alignName} ${genderText}${g.urace.adj} ${roleName}.`;
     await pline(welcome);
     if (!ff && (showedQuestIntro || (g._startup_preamble_messages || []).length > 0)) {
         g._more = true;

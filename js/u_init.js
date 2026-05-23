@@ -32,6 +32,12 @@ const ROLE_INIT = new Map([
         attrdist: [15, 10, 10, 15, 30, 20],
         hp: 10, pwBase: 2, pwRnd: 0, ac: 0, gold: 757,
     }],
+    ['Valkyrie', {
+        attrbase: [10, 7, 7, 7, 10, 7],
+        attrmax: [30, 6, 7, 20, 30, 7],
+        attrdist: [30, 6, 7, 20, 30, 7],
+        hp: 16, pwBase: 2, pwRnd: 0, ac: 0, gold: 0,
+    }],
     ['Wizard', {
         attrbase: [7, 10, 7, 7, 7, 7],
         attrmax: [10, 30, 10, 20, 20, 10],
@@ -48,6 +54,12 @@ const LEVEL_ADV = new Map([
         hpadv: { infix: 10, inrnd: 0, lofix: 0, lornd: 8, hifix: 1, hirnd: 0 },
         enadv: { infix: 4, inrnd: 3, lofix: 0, lornd: 2, hifix: 0, hirnd: 3 },
         energyMod: 'wizard',
+    }],
+    ['Valkyrie', {
+        xlev: 10,
+        hpadv: { infix: 14, inrnd: 0, lofix: 0, lornd: 8, hifix: 2, hirnd: 0 },
+        enadv: { infix: 1, inrnd: 0, lofix: 0, lornd: 1, hifix: 0, hirnd: 1 },
+        energyMod: 'valkyrie',
     }],
 ]);
 
@@ -80,6 +92,8 @@ const ELVEN_ARROW = 19;
 const ORCISH_ARROW = 20;
 const YA = 22;
 const DART = 24;
+const SHURIKEN = 25;
+const SPEAR = 27;
 const DAGGER = 34;
 const ELVEN_DAGGER = 35;
 const ORCISH_DAGGER = 36;
@@ -87,7 +101,17 @@ const ELVEN_SPEAR = 28;
 const ORCISH_SPEAR = 29;
 const DWARVISH_SPEAR = 30;
 const JAVELIN = 32;
+const BATTLE_AXE = 45;
 const SHORT_SWORD = 46;
+const ELVEN_SHORT_SWORD = 47;
+const ORCISH_SHORT_SWORD = 48;
+const DWARVISH_SHORT_SWORD = 49;
+const SCIMITAR = 50;
+const ELVEN_BROADSWORD = 53;
+const KATANA = 56;
+const TSURUGI = 57;
+const RUNESWORD = 58;
+const DWARVISH_MATTOCK = 71;
 const QUARTERSTAFF = 79;
 const BOW = 83;
 const ELVEN_BOW = 84;
@@ -97,6 +121,7 @@ const HAWAIIAN_SHIRT = 136;
 const LEATHER_ARMOR = 134;
 const CLOAK_OF_MAGIC_RESISTANCE = 148;
 const CLOAK_OF_DISPLACEMENT = 149;
+const SMALL_SHIELD = 150;
 const SCALPEL = 39;
 const LEATHER_GLOVES = 159;
 const LARGE_BOX = 214;
@@ -110,10 +135,12 @@ const LEASH = 236;
 const STETHOSCOPE = 237;
 const TIN_OPENER = 239;
 const SACK = 217;
+const OIL_LAMP = 227;
 const MAGIC_MARKER = 242;
 const SPE_FORCE_BOLT = 383;
 const APPLE = 277;
 const CRAM_RATION = 292;
+const FOOD_RATION = 293;
 const RIN_LEVITATION = 183;
 const RIN_HUNGER = 184;
 const RIN_AGGRAVATE_MONSTER = 185;
@@ -188,6 +215,13 @@ const TOURIST_INVENTORY = [
     { typ: CREDIT_CARD, spe: 0, cls: TOOL_CLASS, min: 1, max: 1, bless: 0 },
 ];
 
+const VALKYRIE_INVENTORY = [
+    { typ: SPEAR, spe: 1, cls: WEAPON_CLASS, min: 1, max: 1, bless: UNDEF_BLESS, wielded: true },
+    { typ: DAGGER, spe: 0, cls: WEAPON_CLASS, min: 1, max: 1, bless: UNDEF_BLESS, alternate: true },
+    { typ: SMALL_SHIELD, spe: 3, cls: ARMOR_CLASS, min: 1, max: 1, bless: UNDEF_BLESS, worn: true },
+    { typ: FOOD_RATION, spe: 0, cls: FOOD_CLASS, min: 1, max: 1, bless: 0 },
+];
+
 const MONEY_INVENTORY = [
     { typ: GOLD_PIECE, spe: 0, cls: COIN_CLASS, min: 1, max: 1, bless: 0 },
 ];
@@ -210,6 +244,10 @@ const TOWEL_INVENTORY = [
 
 const MAGIC_MARKER_INVENTORY = [
     { typ: MAGIC_MARKER, spe: 19, cls: TOOL_CLASS, min: 1, max: 1, bless: 0 },
+];
+
+const LAMP_INVENTORY = [
+    { typ: OIL_LAMP, spe: 1, cls: TOOL_CLASS, min: 1, max: 1, bless: 0 },
 ];
 
 const RANGER_INVENTORY = [
@@ -238,6 +276,18 @@ const RANGER_KNOWN_WEAPONS = [
 
 const ROGUE_KNOWN_WEAPONS = [
     ELVEN_DAGGER, ORCISH_DAGGER,
+];
+
+const VALKYRIE_KNOWN_WEAPONS = [
+    // C ref: u_init.c:knows_class(WEAPON_CLASS), excluding polearms for
+    // non-Knight/non-Samurai roles. Discovery output only shows types with
+    // descriptions, but order still follows objects[].
+    ELVEN_ARROW, ORCISH_ARROW, YA, SHURIKEN,
+    ELVEN_SPEAR, ORCISH_SPEAR, DWARVISH_SPEAR, JAVELIN,
+    ELVEN_DAGGER, ORCISH_DAGGER, BATTLE_AXE,
+    ELVEN_SHORT_SWORD, ORCISH_SHORT_SWORD, DWARVISH_SHORT_SWORD,
+    SCIMITAR, ELVEN_BROADSWORD, KATANA, TSURUGI,
+    RUNESWORD, DWARVISH_MATTOCK,
 ];
 
 function trquan(trop) {
@@ -487,6 +537,12 @@ export function u_init_role_inventory() {
         if (!rn2(5)) {
             ini_inv(BLINDFOLD_INVENTORY, noCreate, role.name.m);
         }
+    } else if (role?.name?.m === 'Valkyrie') {
+        ini_inv(VALKYRIE_INVENTORY, noCreate, role.name.m);
+        if (!rn2(6)) {
+            ini_inv(LAMP_INVENTORY, noCreate, role.name.m);
+        }
+        for (const otyp of VALKYRIE_KNOWN_WEAPONS) discover_role_known_object(otyp);
     } else if (role?.name?.m === 'Ranger') {
         ini_inv(RANGER_INVENTORY, noCreate, role.name.m);
         // C ref: u_init.c:u_init_role() -> knows_class(WEAPON_CLASS).
@@ -605,6 +661,7 @@ function currentAttr(index) {
 
 function energyMod(en, adv) {
     if (adv?.energyMod === 'wizard') return 2 * en;
+    if (adv?.energyMod === 'valkyrie') return Math.trunc((3 * en) / 4);
     return en;
 }
 

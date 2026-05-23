@@ -10203,8 +10203,76 @@ function choose_themeroom_fill(croom) {
     return pick?.name || null;
 }
 
+function roomSelectionPoints(croom) {
+    const points = [];
+    if (!croom) return points;
+    const rmno = game.level?.rooms?.indexOf(croom) + ROOMOFFSET;
+    if (!rmno || rmno < ROOMOFFSET) return points;
+    // C ref: selvar.c:selection_from_mkroom(), selvar.c:selection_rndcoord().
+    // Lua room selections are counted and picked in x-major order.
+    for (let x = croom.lx; x <= croom.hx; x++)
+        for (let y = croom.ly; y <= croom.hy; y++) {
+            const loc = game.level?.at(x, y);
+            if (loc && !loc.edge && loc.roomno === rmno) points.push({ x, y });
+        }
+    return points;
+}
+
+function roomSelectionRndcoord(croom) {
+    const points = roomSelectionPoints(croom);
+    if (!points.length) return { x: -1, y: -1 };
+    return points[rn2(points.length)];
+}
+
+function unblessSpecialObject(otmp) {
+    if (otmp) otmp.blessed = false;
+    return otmp;
+}
+
+function createNotBlessedObjectAt(otyp, x, y) {
+    // C ref: sp_lev.c:create_object() applies buc="not-blessed" after
+    // ordinary mksobj_at(..., TRUE, !named) initialization.
+    return unblessSpecialObject(mksobj_at(otyp, x, y, true, true));
+}
+
+function createNotBlessedObjectClassAt(oclass, x, y) {
+    return unblessSpecialObject(mkobj_at(oclass, x, y, true));
+}
+
+function applyGhostAdventurerFill(croom) {
+    // C ref: dat/themerms.lua Ghost of an Adventurer, sp_lev.c:create_monster().
+    const loc = roomSelectionRndcoord(croom);
+    if (loc.x < 0 || loc.y < 0) return;
+
+    const ghostPtr = monster_by_user_name('ghost');
+    let scriptedFemale = false;
+    if (monster_name_needs_find_gender_roll('ghost', ghostPtr)) scriptedFemale = !!rn2(2);
+    induced_align_80();
+    const mon = makemon(ghostPtr, loc.x, loc.y, 0);
+    if (mon) {
+        mon.female = scriptedFemale;
+        mon.msleeping = 1;
+        mon.mstrategy |= STRAT_WAITFORU;
+        mon.mstrategy_waiting = 1;
+    }
+
+    if (rn2(100) < 65) createNotBlessedObjectAt(DAGGER, loc.x, loc.y);
+    if (rn2(100) < 55) createNotBlessedObjectClassAt(WEAPON_CLASS, loc.x, loc.y);
+    if (rn2(100) < 45) {
+        createNotBlessedObjectAt(BOW, loc.x, loc.y);
+        createNotBlessedObjectAt(ARROW, loc.x, loc.y);
+    }
+    if (rn2(100) < 65) createNotBlessedObjectClassAt(ARMOR_CLASS, loc.x, loc.y);
+    if (rn2(100) < 20) createNotBlessedObjectClassAt(RING_CLASS, loc.x, loc.y);
+    if (rn2(100) < 20) createNotBlessedObjectClassAt(SCROLL_CLASS, loc.x, loc.y);
+}
+
 function apply_themeroom_fill(croom) {
     const fill = choose_themeroom_fill(croom);
+    if (fill === 'Ghost of an Adventurer') {
+        applyGhostAdventurerFill(croom);
+        return;
+    }
     if (fill === 'Storeroom') {
         const locs = [];
         for (let y = croom.ly; y <= croom.hy; y++)

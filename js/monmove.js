@@ -88,7 +88,10 @@ const SCROLL_CLASS = 9;
 const SPBOOK_CLASS = 10;
 const WAND_CLASS = 11;
 const GEM_CLASS = 13;
+const G_FREQ = 0x0007;
+const G_NOCORPSE = 0x0010;
 const SPRIG_OF_WOLFSBANE = 283;
+const CORPSE = 265;
 const ROCK = 474;
 const BOULDER = 475;
 const AXE = 44;
@@ -1949,6 +1952,56 @@ async function mintrap_missile_basic(mtmp, trap, otyp, tlev) {
     return (await thitm_basic(tlev, mtmp, otmp)) ? MMOVE_DIED : MMOVE_MOVED;
 }
 
+function corpse_chance_basic(mon) {
+    // C ref: mon.c:corpse_chance().
+    const mdat = mon?.data || {};
+    if ((mdat.geno || 0) & G_NOCORPSE) return false;
+    const freq = (mdat.geno ?? 0) & G_FREQ;
+    const verySmall = typeof mdat.msize === 'number' && mdat.msize < 1;
+    const chance = 2 + (freq < 2 ? 1 : 0) + (verySmall ? 1 : 0);
+    return !rn2(chance);
+}
+
+function make_monster_corpse_basic(mon) {
+    // C ref: mon.c:mondied() -> mkobj.c:mkcorpstat(CORPSE, CORPSTAT_INIT).
+    const wasInMklev = game.in_mklev;
+    const oldLiveCorpseTimeout = game._live_corpse_timeout;
+    game.in_mklev = false;
+    game._live_corpse_timeout = true;
+    let corpse;
+    try {
+        corpse = mksobj(CORPSE, true, false);
+    } finally {
+        game.in_mklev = wasInMklev;
+        game._live_corpse_timeout = oldLiveCorpseTimeout;
+    }
+    if (!corpse) return null;
+    corpse.corpsenm = mon?.data?.name || corpse.corpsenm;
+    return place_object(corpse, mon.mx, mon.my);
+}
+
+async function mintrap_pit_basic(mtmp, trap) {
+    // C ref: trap.c:trapeffect_pit().
+    const inSight = cansee(mtmp.mx, mtmp.my);
+    if (!mon_passes_walls(mtmp)) mtmp.mtrapped = 1;
+    if (inSight) {
+        await append_trap_topline(`${monster_subject(mtmp)} falls into a pit!`);
+        trap.tseen = true;
+        newsym(trap.tx, trap.ty);
+    }
+    const damage = rnd(trap.ttyp === SPIKED_PIT ? 10 : 6);
+    mtmp.mhp = (mtmp.mhp ?? mtmp.mhpmax ?? 1) - damage;
+    if (mtmp.mhp > 0) return mtmp.mtrapped ? MMOVE_DONE : MMOVE_MOVED;
+
+    if (inSight) await append_pline(`${monster_subject(mtmp)} is killed!`);
+    remove_dead_monster(mtmp);
+    if (corpse_chance_basic(mtmp)) {
+        make_monster_corpse_basic(mtmp);
+        newsym(mtmp.mx, mtmp.my);
+    }
+    return MMOVE_DIED;
+}
+
 async function mintrap_basic(mtmp) {
     const trap = trap_at_basic(mtmp.mx, mtmp.my);
     if (!trap) return MMOVE_MOVED;
@@ -1967,6 +2020,7 @@ async function mintrap_basic(mtmp) {
     if (trap.ttyp === SLP_GAS_TRAP) return mintrap_sleep_gas_basic(mtmp);
     if (trap.ttyp === ARROW_TRAP) return mintrap_missile_basic(mtmp, trap, ARROW, 8);
     if (trap.ttyp === DART_TRAP) return mintrap_missile_basic(mtmp, trap, DART, 7);
+    if (trap.ttyp === PIT || trap.ttyp === SPIKED_PIT) return mintrap_pit_basic(mtmp, trap);
     return MMOVE_MOVED;
 }
 

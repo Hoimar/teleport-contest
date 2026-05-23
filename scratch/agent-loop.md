@@ -14,71 +14,58 @@ and `feature_map.md`.
 
 - Current branch in this workspace: `main`.
 - Baseline commit before the current JS batch: `c1611df`.
-- Current target: `seed2200-wizard-quaff-zap-read` has advanced from
-  `S 108/230 R 2983/3018 C 5` at the help-menu frontier to full focused
-  cell/RNG/cursor parity `S 230/230 R 3018/3018 C 0`.
-- `seed0360-wizard-world-tour` remains a full focused/frozen pass after the
-  pet-combat status-latch cleanup (`S 833/833 R 120639/120639 C 0`).
+- Current completed target: `seed0015-valk-level2-pit-dog-wait` advanced from
+  `S 0/44 R 391/8563 C 0` to full focused/frozen parity
+  `S 44/44 R 8563/8563 C 0`.
+- `seed0360-wizard-world-tour`, `seed0108-wizard-extcmd-wishlist`, and the
+  standing sentinel set remain full focused passes after the Valkyrie/pit
+  batch.
 - Frozen public passes in this workspace are `seed0002`, both `seed0013`
-  sessions, `seed0101`, `seed0102`, `seed0116`, `seed0360`, `seed0383`,
-  `seed0398`, `seed1500`, `seed1800`, `seed2200`, `seed5002`, and `seed8000`.
+  sessions, `seed0015`, `seed0101`, `seed0102`, `seed0108`, `seed0116`,
+  `seed0360`, `seed0383`, `seed0398`, `seed1500`, `seed1800`, `seed2200`,
+  `seed5002`, and `seed8000`.
 
 ## Latest Loop Checkpoint
 
-- Target: `seed2200-wizard-quaff-zap-read`, with `seed0360` regression
-  cleanup before commit.
-- Current verification: `seed2200` focused `S 230/230 R 3018/3018 C 0`;
-  `seed0360` focused `S 833/833 R 120639/120639 C 0`.
-- Sentinel verification after the seed2200 pass and status-latch cleanup:
-  total `S 1063/1063 R 64569/64569`.
-- Full verification totals after this pass are `S 2975/11405 R 265367/792838`.
-- Frozen public score after this pass is `14/44` passing. Exact frozen passes:
+- Target: `seed0015-valk-level2-pit-dog-wait`.
+- Current verification: focused target `S 44/44 R 8563/8563 C 0`.
+- Sentinel verification after the seed0015 pass: total
+  `S 1063/1063 R 64569/64569`.
+- Full verification totals after this pass are `S 3149/11405 R 287378/792838`.
+- Frozen public score after this pass is `16/44` passing. Exact frozen passes:
   `seed0002`, `seed0013-friday13-save-then-fullmoon-restore`,
-  `seed0013-rogue-friday13-combat`, `seed0101`, `seed0102`, `seed0116`,
-  `seed0360`, `seed0383`, `seed0398`, `seed1500`, `seed1800`, `seed2200`,
-  `seed5002`, and `seed8000`.
+  `seed0013-rogue-friday13-combat`, `seed0015`, `seed0101`, `seed0102`,
+  `seed0108`, `seed0116`, `seed0360`, `seed0383`, `seed0398`, `seed1500`,
+  `seed1800`, `seed2200`, `seed5002`, and `seed8000`.
 - Harness checks: hack audit `hard=0 suspicious=40`; memory lint is clean.
-  The sandboxed `npm run score` failed with `spawnSync ... node EPERM`; the
-  frozen scorer succeeded when rerun as approved `bash frozen/score.sh`
-  outside the sandbox.
+  The frozen scorer reports `16/44 passing`.
 - Implemented subsystem truth in this iteration:
-  - Wizard legacy quest-intro pager preserves the map left of the text window,
-    matching `allmain.c:newgame()`/`com_pager("legacy")`.
-  - Potion oil, directionless secret-door-detection wand, magic mapping scroll,
-    invalid inventory-letter gaps, and fingertip dust engraving now follow the
-    relevant C front doors (`potion.c:peffect_oil()`,
-    `zap.c:zapnodir()`, `read.c:seffect_magic_mapping()`,
-    `invent.c:getobj()`, `engrave.c:doengrave()`).
-  - Wizard mapping uses `detect.c:do_mapping()`/`show_map_spot()` behavior:
-    secret corridors become corridors, dark mapped corridors stay dark, and new
-    traps/objects are not invented.
-  - `/` look, farlook, typed data lookup, inventory lookup, object/monster/
-    engraving lists, and uppercase getpos movement now use C-shaped tty/menu
-    lifecycles (`pager.c:dowhatis()`, `getpos.c:getpos()`).
-  - Global `?` help now covers the help menu, local data-file pager,
-    generated options/key/menu-control/support/about pages, `dowhatdoes()`,
-    and the one-time Lua runtime-info shuffle from `version.c:doextversion()`.
-  - Spell, discovery, and attribute menus gained the current seed2200
-    non-debug Wizard details, including create monster spell rows, magic
-    mapping discovery names, and non-debug insight pages.
-  - `:` look-here reads dust engravings via the `engrave.c:read_engr_at()`
-    shape before ordinary feature text.
-  - Monster-thrown projectiles roll the `mthrowu.c:ohitmon()` hit check
-    before `weapon.c:dmgval()` damage when they hit another monster.
-  - Pet inventory plines that block on tty More now resume the same monster
-    turn before the next command reaches `dog_goal()`/attacks
-    (`C ref: dogmove.c:dog_invent()`, `dogmove.c:dog_move()`).
-  - Monster-to-hero hits whose pline is deferred behind a pet-combat More
-    latch the old HP on that older More frame and clear the latch when the
-    deferred hit line is displayed (`C ref: mhitu.c:hitmsg()`,
-    `win/tty/topl.c:more()`).
+  - `Ghost of an Adventurer` themed-room fill now follows Lua selection
+    coordinate order, scripted ghost creation, induced alignment, and
+    percent-gated not-blessed loot object creation (`C refs:
+    dat/themerms.lua`, `selvar.c:selection_rndcoord()`,
+    `sp_lev.c:create_monster()`, `sp_lev.c:create_object()`).
+  - Valkyrie startup now creates the spear/dagger/shield/ration inventory,
+    optional oil-lamp gate, current weapon discovery rows, role HP/Pw/attrs,
+    deferred legacy AC, forced-gender welcome/insight wording, and basic
+    starting spear skill (`C refs: u_init.c:Valkyrie[]`,
+    `u_init.c:u_init_role()`, `allmain.c:welcome()`,
+    `insight.c:background_enlightenment()`, `weapon.c:skill_init()`).
+  - Monster pit/spiked-pit `mintrap()` now owns visible fall/death plines,
+    trap damage, `corpse_chance()`, and runtime corpse timeout creation for
+    current evidence (`C refs: trap.c:mintrap()`,
+    `trap.c:trapeffect_pit()`, `mon.c:corpse_chance()`,
+    `mkobj.c:start_corpse_timeout()`).
 - Current frontier:
-  - Seed2200 has no focused cell/RNG/cursor frontier.
+  - Seed0015 has no focused cell/RNG/cursor frontier.
 - Production `js/` has no intentional debug I/O or frozen imports.
-- This batch is verified but not yet committed in this checkpoint file.
+- This batch is verified and ready to commit; do not stage
+  `scratch/divergence-inventory.md` unless intentionally refreshing corpus
+  inventory.
 - Next queue:
-  - `seed0108-wizard-extcmd-wishlist` is the highest current post-startup
-    near-pass (`S 173/303 R 3231/16958`, first mismatch
-    `170:char:mixed:Space`, `FR 3076:rn2(36)=>rn2(8)`).
-  - Otherwise pick a startup bucket from `scratch/divergence-inventory.md`
-    and start with `npm run agent:brief -- --target <session>`.
+  - `seed0105-valk-chat-lamp-ration` is a narrow Valkyrie follow-up
+    (`0/30`, frozen RNG `987/2499`) that may reuse seed0015 startup truth and
+    expose chat/lamp/ration command work.
+  - Otherwise pick a startup/role bucket from
+    `scratch/divergence-inventory.md` and start with
+    `npm run agent:brief -- --target <session>`.

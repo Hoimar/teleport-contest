@@ -124,15 +124,27 @@ const ARROW = 18;
 const ELVEN_ARROW = 19;
 const ORCISH_ARROW = 20;
 const YA = 22;
+const SHURIKEN = 25;
+const SPEAR = 27;
 const SCALPEL = 39;
 const DART = 24;
 const DAGGER = 34;
 const ELVEN_DAGGER = 35;
 const SHORT_SWORD = 46;
+const BATTLE_AXE = 45;
 const ELVEN_SPEAR = 28;
 const ORCISH_SPEAR = 29;
 const DWARVISH_SPEAR = 30;
 const JAVELIN = 32;
+const ELVEN_SHORT_SWORD = 47;
+const ORCISH_SHORT_SWORD = 48;
+const DWARVISH_SHORT_SWORD = 49;
+const SCIMITAR = 50;
+const ELVEN_BROADSWORD = 53;
+const KATANA = 56;
+const TSURUGI = 57;
+const RUNESWORD = 58;
+const DWARVISH_MATTOCK = 71;
 const BOW = 83;
 const ELVEN_BOW = 84;
 const ORCISH_BOW = 85;
@@ -325,6 +337,8 @@ const OBJECT_BASE_NAMES = new Map([
     [ORCISH_ARROW, 'orcish arrow'],
     [YA, 'ya'],
     [DART, 'dart'],
+    [SHURIKEN, 'shuriken'],
+    [SPEAR, 'spear'],
     [DAGGER, 'dagger'],
     [ELVEN_DAGGER, 'elven dagger'],
     [SHORT_SWORD, 'short sword'],
@@ -334,6 +348,16 @@ const OBJECT_BASE_NAMES = new Map([
     [JAVELIN, 'javelin'],
     [SCALPEL, 'scalpel'],
     [ORCISH_DAGGER, 'crude dagger'],
+    [BATTLE_AXE, 'battle-axe'],
+    [ELVEN_SHORT_SWORD, 'elven short sword'],
+    [ORCISH_SHORT_SWORD, 'orcish short sword'],
+    [DWARVISH_SHORT_SWORD, 'dwarvish short sword'],
+    [SCIMITAR, 'scimitar'],
+    [ELVEN_BROADSWORD, 'elven broadsword'],
+    [KATANA, 'katana'],
+    [TSURUGI, 'tsurugi'],
+    [RUNESWORD, 'runesword'],
+    [DWARVISH_MATTOCK, 'dwarvish mattock'],
     [WAR_HAMMER, 'war hammer'],
     [QUARTERSTAFF, 'quarterstaff'],
     [BOW, 'bow'],
@@ -1699,6 +1723,9 @@ function baseObjectName(obj) {
     }
     if (obj?.otyp === STATUE) {
         return statueObjectName(obj);
+    }
+    if (obj?.otyp === OIL_LAMP && (obj.knownName || knownObjectType(obj.otyp))) {
+        return 'oil lamp';
     }
     if (obj?.oclass === ARMOR_CLASS) {
         const armorName = armorObjectName(obj);
@@ -5105,11 +5132,22 @@ const DISCOVERY_DESCRIPTION_SLOT = new Map([
     [ORCISH_SPEAR, 'crude spear'],
     [DWARVISH_SPEAR, 'stout spear'],
     [JAVELIN, 'throwing spear'],
+    [SHURIKEN, 'throwing star'],
     [ELVEN_BOW, 'runed bow'],
     [ORCISH_BOW, 'crude bow'],
     [YUMI, 'long bow'],
     [ELVEN_DAGGER, 'runed dagger'],
     [ORCISH_DAGGER, 'crude dagger'],
+    [BATTLE_AXE, 'double-headed axe'],
+    [ELVEN_SHORT_SWORD, 'runed short sword'],
+    [ORCISH_SHORT_SWORD, 'crude short sword'],
+    [DWARVISH_SHORT_SWORD, 'broad short sword'],
+    [SCIMITAR, 'curved sword'],
+    [ELVEN_BROADSWORD, 'runed broadsword'],
+    [KATANA, 'samurai sword'],
+    [TSURUGI, 'long samurai sword'],
+    [RUNESWORD, 'runed broadsword'],
+    [DWARVISH_MATTOCK, 'broad pick'],
     [SACK, 'bag'],
     [QUARTERSTAFF, 'staff'],
     [CLOAK_OF_MAGIC_RESISTANCE, 148],
@@ -7752,7 +7790,17 @@ function weaponSkillLevelName(obj) {
     if (obj?.otyp === SCALPEL || obj?.otyp === QUARTERSTAFF) return 'basic';
     if (game.urole?.name?.m === 'Ranger' && (obj?.otyp === DAGGER || obj?.otyp === BOW)) return 'basic';
     if (game.urole?.name?.m === 'Rogue' && obj?.otyp === SHORT_SWORD) return 'basic';
+    if (game.urole?.name?.m === 'Valkyrie' && obj?.otyp === SPEAR) return 'basic';
     return 'no';
+}
+
+function roleInsightGenderPrefix(role, female) {
+    // C ref: insight.c:background_enlightenment().  Role titles with distinct
+    // gendered names and forced-gender roles do not repeat the gender word.
+    const hasDistinctFemaleRoleName = !!(role?.name?.f && role.name.f !== role.name.m);
+    const roleForcesGender = role?.mnum === 11; // Valkyrie
+    if (hasDistinctFemaleRoleName || roleForcesGender) return '';
+    return `${female ? 'female' : 'male'} `;
 }
 
 function encumbranceInsightLine() {
@@ -7778,7 +7826,7 @@ function roleAttributesPageParts() {
         ` ${game.plname || 'Adventurer'} the ${roleName}'s attributes:`,
         '',
         ' Background:',
-        `  You are ${articleForWord(rank)} ${rank}, a level ${game.u?.ulevel || 1} ${female ? 'female' : 'male'} ${game.urace?.name || 'human'} ${roleName}.`,
+        `  You are ${articleForWord(rank)} ${rank}, a level ${game.u?.ulevel || 1} ${roleInsightGenderPrefix(role, female)}${game.urace?.name || 'human'} ${roleName}.`,
         `  You are ${alignName}, on a mission for ${roleGod(role, alignName)}`,
         roleOppositionLine(role, alignName),
         `  You are ${game.u?.uhandedness || 'right'}-handed.`,
