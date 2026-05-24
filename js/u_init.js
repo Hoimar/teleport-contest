@@ -15,8 +15,8 @@ const ROLE_INIT = new Map([
     ['Healer', {
         attrbase: [7, 7, 13, 7, 11, 16],
         attrmax: [15, 20, 20, 15, 25, 5],
-        attrdist: [15, 10, 20, 15, 25, 15],
-        hp: 13, pwBase: 1, pwRnd: 4, ac: 8, gold: 1218,
+        attrdist: [15, 20, 20, 15, 25, 5],
+        hp: 13, pwBase: 1, pwRnd: 4, ac: 0, gold: 1218,
     }],
     ['Priest', {
         attrbase: [7, 7, 10, 7, 7, 7],
@@ -65,6 +65,36 @@ const ROLE_INIT = new Map([
 const HUMAN_ATTRMAX = [118, 18, 18, 18, 18, 18];
 
 const LEVEL_ADV = new Map([
+    ['Healer', {
+        xlev: 20,
+        hpadv: { infix: 11, inrnd: 0, lofix: 0, lornd: 8, hifix: 1, hirnd: 0 },
+        enadv: { infix: 1, inrnd: 4, lofix: 0, lornd: 1, hifix: 0, hirnd: 2 },
+    }],
+    ['Priest', {
+        xlev: 10,
+        hpadv: { infix: 12, inrnd: 0, lofix: 0, lornd: 8, hifix: 1, hirnd: 0 },
+        enadv: { infix: 4, inrnd: 3, lofix: 0, lornd: 2, hifix: 0, hirnd: 2 },
+    }],
+    ['Ranger', {
+        xlev: 10,
+        hpadv: { infix: 13, inrnd: 0, lofix: 0, lornd: 6, hifix: 1, hirnd: 0 },
+        enadv: { infix: 1, inrnd: 0, lofix: 0, lornd: 1, hifix: 0, hirnd: 1 },
+    }],
+    ['Rogue', {
+        xlev: 11,
+        hpadv: { infix: 10, inrnd: 0, lofix: 0, lornd: 8, hifix: 1, hirnd: 0 },
+        enadv: { infix: 1, inrnd: 0, lofix: 0, lornd: 1, hifix: 0, hirnd: 1 },
+    }],
+    ['Samurai', {
+        xlev: 11,
+        hpadv: { infix: 13, inrnd: 0, lofix: 0, lornd: 8, hifix: 1, hirnd: 0 },
+        enadv: { infix: 1, inrnd: 0, lofix: 0, lornd: 1, hifix: 0, hirnd: 1 },
+    }],
+    ['Tourist', {
+        xlev: 14,
+        hpadv: { infix: 8, inrnd: 0, lofix: 0, lornd: 8, hifix: 0, hirnd: 0 },
+        enadv: { infix: 1, inrnd: 0, lofix: 0, lornd: 1, hifix: 0, hirnd: 1 },
+    }],
     ['Wizard', {
         xlev: 12,
         hpadv: { infix: 10, inrnd: 0, lofix: 0, lornd: 8, hifix: 1, hirnd: 0 },
@@ -81,8 +111,29 @@ const LEVEL_ADV = new Map([
 
 const RACE_LEVEL_ADV = new Map([
     ['human', {
+        attrmax: HUMAN_ATTRMAX,
         hpadv: { infix: 2, inrnd: 0, lofix: 0, lornd: 2, hifix: 1, hirnd: 0 },
         enadv: { infix: 1, inrnd: 0, lofix: 2, lornd: 0, hifix: 2, hirnd: 0 },
+    }],
+    ['elf', {
+        attrmax: [18, 20, 20, 18, 16, 18],
+        hpadv: { infix: 1, inrnd: 0, lofix: 0, lornd: 1, hifix: 1, hirnd: 0 },
+        enadv: { infix: 2, inrnd: 0, lofix: 3, lornd: 0, hifix: 3, hirnd: 0 },
+    }],
+    ['dwarf', {
+        attrmax: [118, 16, 16, 20, 20, 16],
+        hpadv: { infix: 4, inrnd: 0, lofix: 0, lornd: 3, hifix: 2, hirnd: 0 },
+        enadv: { infix: 0, inrnd: 0, lofix: 0, lornd: 0, hifix: 0, hirnd: 0 },
+    }],
+    ['gnome', {
+        attrmax: [68, 19, 18, 18, 18, 18],
+        hpadv: { infix: 1, inrnd: 0, lofix: 0, lornd: 1, hifix: 0, hirnd: 0 },
+        enadv: { infix: 2, inrnd: 0, lofix: 2, lornd: 0, hifix: 2, hirnd: 0 },
+    }],
+    ['orc', {
+        attrmax: [68, 16, 16, 18, 18, 16],
+        hpadv: { infix: 1, inrnd: 0, lofix: 0, lornd: 1, hifix: 0, hirnd: 0 },
+        enadv: { infix: 1, inrnd: 0, lofix: 1, lornd: 0, hifix: 1, hirnd: 0 },
     }],
 ]);
 
@@ -682,12 +733,22 @@ export function u_init_role_inventory() {
 }
 
 export function u_init_misc_rng() {
-    const role = findRole(game._nhopts?.role);
-    const init = ROLE_INIT.get(role?.name?.m);
-    let initialPower = init?.pwBase ?? 2;
-    if ((init?.pwRnd ?? 0) > 0) initialPower += rnd(init.pwRnd);
+    const role = roleLevelAdv();
+    const race = raceLevelAdv();
+    const fallbackRole = findRole(game._nhopts?.role);
+    const init = ROLE_INIT.get(fallbackRole?.name?.m);
+    if (role && race) {
+        // C refs: src/u_init.c:u_init_misc(), src/attrib.c:newhp(),
+        // src/exper.c:newpw(); level-0 HP/Pw combine role and race advances.
+        game._initialHp = initialHitPoints(role, race);
+        game._initialPower = initialPower(role, race);
+    } else {
+        game._initialHp = init?.hp ?? 10;
+        let fallbackPower = init?.pwBase ?? 2;
+        if ((init?.pwRnd ?? 0) > 0) fallbackPower += rnd(init.pwRnd);
+        game._initialPower = fallbackPower;
+    }
     if (game.u) game.u.uhandedness = rn2(10) ? 'right' : 'left';
-    game._initialPower = initialPower;
 }
 
 function rndAttr(init) {
@@ -716,13 +777,13 @@ function redist(attrs, maxes, init, np, addition) {
     return np;
 }
 
-function varyInitAttr(attrs, maxes) {
+function varyInitAttr(attrs, maxes, limits) {
     for (let i = 0; i < attrs.length; i++) {
         if (!rn2(20)) {
             const xd = rn2(7) - 2;
             attrs[i] += xd;
             if (xd > 0 && attrs[i] > maxes[i]) {
-                maxes[i] = Math.min(HUMAN_ATTRMAX[i], attrs[i]);
+                maxes[i] = Math.min(limits[i], attrs[i]);
                 attrs[i] = maxes[i];
             } else if (xd < 0) {
                 attrs[i] = Math.max(3, attrs[i]);
@@ -735,23 +796,26 @@ function varyInitAttr(attrs, maxes) {
 function initialAttributes(init) {
     const attrs = init.attrbase.slice();
     const maxes = init.attrbase.slice();
-    const limits = HUMAN_ATTRMAX;
+    // C ref: include/attrib.h:ATTRMAX(); initial redistribution is bounded
+    // by race maxima, not by the role's attribute distribution weights.
+    const limits = raceLevelAdv()?.attrmax || HUMAN_ATTRMAX;
     let np = 75 - attrs.reduce((a, b) => a + b, 0);
     const redistInit = { ...init, attrmax: limits };
     np = redist(attrs, maxes, redistInit, np, true);
     redist(attrs, maxes, redistInit, np, false);
-    varyInitAttr(attrs, maxes);
-    return { attrs, maxes };
+    varyInitAttr(attrs, maxes, limits);
+    return { attrs, maxes, limits };
 }
 
 export function apply_startup_role_state() {
     const role = findRole(game._nhopts?.role);
     const init = ROLE_INIT.get(role?.name?.m);
     if (!init) return;
-    const { attrs, maxes } = initialAttributes(init);
+    const { attrs, maxes, limits } = initialAttributes(init);
     if (!game._startupRoleGoldInitialized) game._goldCount = init.gold;
-    game.u.uhp = init.hp;
-    game.u.uhpmax = init.hp;
+    const initialHp = game._initialHp ?? init.hp;
+    game.u.uhp = initialHp;
+    game.u.uhpmax = initialHp;
     game.u.uen = game._initialPower ?? init.pwBase;
     game.u.uenmax = game.u.uen;
     game.u.uac = init.ac;
@@ -760,6 +824,7 @@ export function apply_startup_role_state() {
     game.u.uencumber = 0;
     game.u.acurr = { a: attrs };
     game.u.amax = { a: maxes };
+    game.u.attrmax = { a: limits.slice() };
     if (role?.name?.m === 'Samurai') {
         // C ref: src/attrib.c:sam_abil[] grants level-1 intrinsic HFast.
         game.u.uprops = game.u.uprops || {};
@@ -777,6 +842,10 @@ function raceLevelAdv() {
     return RACE_LEVEL_ADV.get(String(raceName).toLowerCase()) || RACE_LEVEL_ADV.get('human');
 }
 
+function currentLevel(u) {
+    return u.ulevel == null ? 1 : Number(u.ulevel);
+}
+
 function currentAttr(index) {
     return game.u?.acurr?.a?.[index] ?? 10;
 }
@@ -787,13 +856,33 @@ function energyMod(en, adv) {
     return en;
 }
 
+function initialHitPoints(role, race) {
+    let hp = role.hpadv.infix + race.hpadv.infix;
+    if (role.hpadv.inrnd > 0) hp += rnd(role.hpadv.inrnd);
+    if (race.hpadv.inrnd > 0) hp += rnd(race.hpadv.inrnd);
+    return Math.max(hp, 1);
+}
+
+function initialPower(role, race) {
+    let en = role.enadv.infix + race.enadv.infix;
+    if (role.enadv.inrnd > 0) en += rnd(role.enadv.inrnd);
+    if (race.enadv.inrnd > 0) en += rnd(race.enadv.inrnd);
+    return Math.max(en, 1);
+}
+
 export function newhp() {
     const u = game.u || {};
     const role = roleLevelAdv();
     const race = raceLevelAdv();
     if (!role || !race) return 1;
-    const lvl = u.ulevel || 1;
+    const lvl = currentLevel(u);
     let hp;
+    if (lvl === 0) {
+        hp = initialHitPoints(role, race);
+        u.uhpinc = u.uhpinc || [];
+        u.uhpinc[0] = hp;
+        return hp;
+    }
     if (lvl < role.xlev) {
         hp = role.hpadv.lofix + race.hpadv.lofix;
         if (role.hpadv.lornd > 0) hp += rnd(role.hpadv.lornd);
@@ -826,7 +915,13 @@ export function newpw() {
     const role = roleLevelAdv();
     const race = raceLevelAdv();
     if (!role || !race) return 1;
-    const lvl = u.ulevel || 1;
+    const lvl = currentLevel(u);
+    if (lvl === 0) {
+        const en = initialPower(role, race);
+        u.ueninc = u.ueninc || [];
+        u.ueninc[0] = en;
+        return en;
+    }
     let enrnd = Math.trunc(currentAttr(2) / 2);
     let enfix;
     if (lvl < role.xlev) {
