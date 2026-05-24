@@ -363,7 +363,7 @@ const OBJECT_BASE_NAMES = new Map([
     [JAVELIN, 'javelin'],
     [SCALPEL, 'scalpel'],
     [KNIFE, 'knife'],
-    [ORCISH_DAGGER, 'crude dagger'],
+    [ORCISH_DAGGER, 'orcish dagger'],
     [BATTLE_AXE, 'battle-axe'],
     [ELVEN_SHORT_SWORD, 'elven short sword'],
     [ORCISH_SHORT_SWORD, 'orcish short sword'],
@@ -5267,6 +5267,8 @@ async function kickDirection(ch) {
     }
     const x = (game.u?.ux ?? 0) + dx;
     const y = (game.u?.uy ?? 0) + dy;
+    game._kickedloc = { x, y };
+    game._command_was_kick = true;
     for (const mon of game.level?.monsters || []) {
         if (dist2(game.u?.ux ?? 0, game.u?.uy ?? 0, mon.mx, mon.my) <= 25)
             mon.msleeping = false;
@@ -8740,6 +8742,8 @@ function roleOppositionLine(role, alignName) {
 function weaponSkillName(obj) {
     // C ref: src/insight.c:attributes_enlightenment().  Most wielded weapons
     // are described by skill class rather than exact object name.
+    if ([SHORT_SWORD, ELVEN_SHORT_SWORD, ORCISH_SHORT_SWORD, DWARVISH_SHORT_SWORD].includes(obj?.otyp))
+        return 'short sword';
     if (obj?.otyp === KATANA) return 'long sword';
     if (obj?.otyp === SCALPEL) return 'knife';
     if (obj?.otyp === WAR_HAMMER) return 'hammer';
@@ -8749,9 +8753,14 @@ function weaponSkillName(obj) {
 function weaponSkillLevelName(obj) {
     if (obj?.otyp === SCALPEL || obj?.otyp === QUARTERSTAFF) return 'basic';
     if (game.urole?.name?.m === 'Ranger' && (obj?.otyp === DAGGER || obj?.otyp === BOW)) return 'basic';
-    if (game.urole?.name?.m === 'Rogue' && obj?.otyp === SHORT_SWORD) return 'basic';
+    if (game.urole?.name?.m === 'Rogue'
+        && [SHORT_SWORD, ELVEN_SHORT_SWORD, ORCISH_SHORT_SWORD, DWARVISH_SHORT_SWORD].includes(obj?.otyp))
+        return 'basic';
     if (game.urole?.name?.m === 'Priest' && obj?.otyp === MACE) return 'basic';
-    if (game.urole?.name?.m === 'Samurai' && (obj?.otyp === KATANA || obj?.otyp === SHORT_SWORD)) return 'basic';
+    if (game.urole?.name?.m === 'Samurai'
+        && (obj?.otyp === KATANA
+            || [SHORT_SWORD, ELVEN_SHORT_SWORD, ORCISH_SHORT_SWORD, DWARVISH_SHORT_SWORD].includes(obj?.otyp)))
+        return 'basic';
     if (game.urole?.name?.m === 'Valkyrie' && obj?.otyp === SPEAR) return 'basic';
     return 'no';
 }
@@ -8933,9 +8942,9 @@ function wizardAttributesPage2() {
     lines.push(debugInsight ? `  You are unencumbered <${encumbrance}>.` : '  You are unencumbered.');
 
     if (wielded) {
-        const weaponName = wielded.otyp === WAR_HAMMER ? 'hammer' : baseObjectName(wielded);
-        lines.push(`  You are wielding a ${weaponName}.`);
-        lines.push(`  You have ${wielded.otyp === QUARTERSTAFF ? 'basic' : 'no'} skill with ${weaponName}.`);
+        const weaponName = weaponSkillName(wielded);
+        lines.push(`  You are wielding ${articleForWord(weaponName)} ${weaponName}.`);
+        lines.push(`  You have ${weaponSkillLevelName(wielded)} skill with ${weaponName}.`);
     } else {
         lines.push('  You are bare handed.');
         lines.push('  You are unskilled in bare handed combat.');

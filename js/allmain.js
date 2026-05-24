@@ -1084,6 +1084,7 @@ export async function moveloop_core() {
     g.context = g.context || {};
     g.context.move = 0; // Reset before rhack
     g.context.mv = 0;
+    g._command_was_kick = false;
 
     if ((g._simple_timed_repeats_remaining || 0) > 0 && !g._more) {
         await continueSimpleTimedRepeats(g);
@@ -1111,6 +1112,7 @@ export async function moveloop_core() {
     // Advance turn; run/rush movement may consume multiple turns before
     // returning to the input boundary.
     if (g.context?.move) {
+        if (!g._command_was_kick) g._kickedloc = null;
         if (g._resume_run_after_more) {
             g._resume_run_after_more = false;
             if (!g._more) {

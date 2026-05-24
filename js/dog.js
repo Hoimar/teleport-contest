@@ -1037,6 +1037,7 @@ function pet_can_enter_square(mtmp, x, y, { ignoreMonster = false } = {}) {
         return false;
     }
     if (x === game.u?.ux && y === game.u?.uy) return false;
+    if (x === mtmp.mux && y === mtmp.muy) return false;
     if (!ignoreMonster && mon_at(x, y, mtmp)) return false;
     if (is_boulder_at(x, y)) return false;
     const loc = game.level?.at(x, y);
@@ -1046,6 +1047,17 @@ function pet_can_enter_square(mtmp, x, y, { ignoreMonster = false } = {}) {
 
 function pet_can_step(mtmp, x, y) {
     return pet_can_enter_square(mtmp, x, y);
+}
+
+function m_avoid_kicked_loc(mtmp, nx, ny) {
+    const kicked = game._kickedloc;
+    if (!kicked || !isok(kicked.x, kicked.y)) return false;
+    return (mtmp.mpeaceful || mtmp.mtame)
+        && mtmp.mcansee !== 0
+        && !mtmp.mconf && !mtmp.mstun
+        && !game.u?.uprops?.conflict
+        && nx === kicked.x && ny === kicked.y
+        && dist2(nx, ny, game.u?.ux ?? nx, game.u?.uy ?? ny) <= 2;
 }
 
 function pet_should_attack(mtmp, target) {
@@ -1320,6 +1332,7 @@ async function dog_move_after_inventory_core(mtmp, after, udist, edog) {
                 continue;
             }
             if (avoid_soko_push_loc(mtmp, nx, ny)) continue;
+            if (m_avoid_kicked_loc(mtmp, nx, ny)) continue;
 
             // C ref: dogmove.c:dog_move(). Seen traps are retained as
             // candidates by mfndpos(ALLOW_TRAPS), then pets usually avoid

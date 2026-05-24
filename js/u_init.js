@@ -5,7 +5,7 @@ import { game } from './gstate.js';
 import { rnd, rn2, rn1, rne } from './rng.js';
 import { findRole } from './roles.js';
 import { mkobj, mksobj } from './mklev.js';
-import { OBJECT_CHARGED } from './object_data.js';
+import { OBJECT_CHARGED, OBJECT_CLASS } from './object_data.js';
 import {
     P_ATTACK_SPELL, P_HEALING_SPELL, P_DIVINATION_SPELL, P_ENCHANTMENT_SPELL,
     P_CLERIC_SPELL, P_ESCAPE_SPELL, P_MATTER_SPELL,
@@ -187,14 +187,26 @@ const BOW = 83;
 const ELVEN_BOW = 84;
 const ORCISH_BOW = 85;
 const YUMI = 86;
+const ELVEN_LEATHER_HELM = 89;
+const ORCISH_HELM = 90;
+const DWARVISH_IRON_HELM = 91;
+const HELMET = 97;
 const PLATE_MAIL = 121;
 const SPLINT_MAIL = 124;
+const CHAIN_MAIL = 128;
+const ORCISH_CHAIN_MAIL = 129;
+const RING_MAIL = 132;
+const ORCISH_RING_MAIL = 133;
 const HAWAIIAN_SHIRT = 136;
 const LEATHER_ARMOR = 134;
+const ELVEN_CLOAK = 139;
+const ORCISH_CLOAK = 140;
 const ROBE = 143;
 const CLOAK_OF_MAGIC_RESISTANCE = 148;
 const CLOAK_OF_DISPLACEMENT = 149;
 const SMALL_SHIELD = 150;
+const URUK_HAI_SHIELD = 154;
+const ORCISH_SHIELD = 155;
 const SCALPEL = 39;
 const LEATHER_GLOVES = 159;
 const LARGE_BOX = 214;
@@ -214,6 +226,8 @@ const SPE_FORCE_BOLT = 383;
 const APPLE = 277;
 const SPRIG_OF_WOLFSBANE = 283;
 const CLOVE_OF_GARLIC = 284;
+const TRIPE_RATION = 264;
+const LEMBAS_WAFER = 291;
 const CRAM_RATION = 292;
 const FOOD_RATION = 293;
 const RIN_LEVITATION = 183;
@@ -339,6 +353,10 @@ const BLINDFOLD_INVENTORY = [
     { typ: BLINDFOLD, spe: 0, cls: TOOL_CLASS, min: 1, max: 1, bless: 0 },
 ];
 
+const XTRA_FOOD_INVENTORY = [
+    { typ: UNDEF_TYP, spe: UNDEF_SPE, cls: FOOD_CLASS, min: 2, max: 2, bless: 0 },
+];
+
 const TIN_OPENER_INVENTORY = [
     { typ: TIN_OPENER, spe: 0, cls: TOOL_CLASS, min: 1, max: 1, bless: 0 },
 ];
@@ -422,6 +440,47 @@ const SAMURAI_KNOWN_ARMOR = [
     // C ref: src/u_init.c:u_init_role() -> knows_class(ARMOR_CLASS).
     PLATE_MAIL, SPLINT_MAIL, LEATHER_GLOVES,
 ];
+
+const ORC_KNOWN_OBJECTS = [
+    // C ref: src/u_init.c:u_init_race().
+    ORCISH_SHORT_SWORD, ORCISH_ARROW, ORCISH_BOW, ORCISH_SPEAR,
+    ORCISH_DAGGER, ORCISH_CHAIN_MAIL, ORCISH_RING_MAIL, ORCISH_HELM,
+    ORCISH_SHIELD, URUK_HAI_SHIELD, ORCISH_CLOAK,
+];
+
+const INFRAVISION_RACES = new Set(['elf', 'dwarf', 'gnome', 'orc']);
+
+const RACE_INVENTORY_SUBSTITUTIONS = new Map([
+    // C ref: src/u_init.c:ini_inv_obj_substitution().
+    ['elf', new Map([
+        [DAGGER, ELVEN_DAGGER],
+        [SPEAR, ELVEN_SPEAR],
+        [SHORT_SWORD, ELVEN_SHORT_SWORD],
+        [BOW, ELVEN_BOW],
+        [ARROW, ELVEN_ARROW],
+        [HELMET, ELVEN_LEATHER_HELM],
+        [CLOAK_OF_DISPLACEMENT, ELVEN_CLOAK],
+        [CRAM_RATION, LEMBAS_WAFER],
+    ])],
+    ['orc', new Map([
+        [DAGGER, ORCISH_DAGGER],
+        [SPEAR, ORCISH_SPEAR],
+        [SHORT_SWORD, ORCISH_SHORT_SWORD],
+        [BOW, ORCISH_BOW],
+        [ARROW, ORCISH_ARROW],
+        [HELMET, ORCISH_HELM],
+        [SMALL_SHIELD, ORCISH_SHIELD],
+        [RING_MAIL, ORCISH_RING_MAIL],
+        [CHAIN_MAIL, ORCISH_CHAIN_MAIL],
+        [CRAM_RATION, TRIPE_RATION],
+        [LEMBAS_WAFER, TRIPE_RATION],
+    ])],
+    ['dwarf', new Map([
+        [SPEAR, DWARVISH_SPEAR],
+        [SHORT_SWORD, DWARVISH_SHORT_SWORD],
+        [HELMET, DWARVISH_IRON_HELM],
+    ])],
+]);
 
 function trquan(trop) {
     if (!trop.min) return 1;
@@ -521,14 +580,28 @@ export function add_inventory_object(obj) {
 
 function discover_starting_object(obj) {
     if (!obj?.knownName || typeof obj.otyp !== 'number') return;
+    const pending = Array.isArray(game._startingObjectDiscoveries)
+        ? game._startingObjectDiscoveries
+        : (game._startingObjectDiscoveries = []);
+    pending.push(obj.otyp);
+}
+
+function flush_starting_object_discoveries() {
+    const pending = Array.isArray(game._startingObjectDiscoveries)
+        ? game._startingObjectDiscoveries
+        : [];
     const order = Array.isArray(game.discoveryOrder)
         ? game.discoveryOrder
         : (game.discoveryOrder = []);
-    if (!order.includes(obj.otyp)) order.push(obj.otyp);
     game.discoveredObjects = game.discoveredObjects || new Set();
-    if (typeof game.discoveredObjects.add === 'function') game.discoveredObjects.add(obj.otyp);
     game.encounteredObjects = game.encounteredObjects || new Set();
-    if (typeof game.encounteredObjects.add === 'function') game.encounteredObjects.add(obj.otyp);
+    for (const otyp of pending) {
+        if (!Number.isInteger(otyp)) continue;
+        if (!order.includes(otyp)) order.push(otyp);
+        if (typeof game.discoveredObjects.add === 'function') game.discoveredObjects.add(otyp);
+        if (typeof game.encounteredObjects.add === 'function') game.encounteredObjects.add(otyp);
+    }
+    game._startingObjectDiscoveries = [];
 }
 
 function discover_role_known_object(otyp) {
@@ -553,6 +626,17 @@ function reorder_samurai_known_discoveries() {
 
 function is_container_type(otyp) {
     return otyp >= LARGE_BOX && otyp <= BAG_OF_TRICKS;
+}
+
+function currentRaceName() {
+    return String(game.urace?.name || game._nhopts?.race || 'human').toLowerCase();
+}
+
+function substitute_initial_inventory_object(obj) {
+    const replacement = RACE_INVENTORY_SUBSTITUTIONS.get(currentRaceName())?.get(obj?.otyp);
+    if (!replacement) return;
+    obj.otyp = replacement;
+    obj.oclass = OBJECT_CLASS[obj.otyp] || obj.oclass;
 }
 
 function ini_inv_adjust_obj(trop, obj) {
@@ -629,6 +713,7 @@ function ini_inv(trobs, noCreate, roleName) {
                 noCreate.nocreate4 = obj.otyp;
             }
         }
+        substitute_initial_inventory_object(obj);
         if (ini_inv_adjust_obj(trop, obj)) quan = 1;
         const invObj = add_inventory_object(obj);
         if (trop.wielded) invObj.wielded = true;
@@ -644,6 +729,20 @@ function ini_inv(trobs, noCreate, roleName) {
         idx++;
         if (idx < trobs.length) quan = trquan(trobs[idx]);
     }
+}
+
+function reset_no_create(noCreate) {
+    noCreate.nocreate = UNDEF_TYP;
+    noCreate.nocreate2 = UNDEF_TYP;
+    noCreate.nocreate3 = UNDEF_TYP;
+    noCreate.nocreate4 = UNDEF_TYP;
+}
+
+function u_init_race_inventory(noCreate, roleName) {
+    // C ref: src/u_init.c:u_init_race().
+    if (currentRaceName() !== 'orc') return;
+    if (roleName !== 'Wizard') ini_inv(XTRA_FOOD_INVENTORY, noCreate, roleName);
+    for (const otyp of ORC_KNOWN_OBJECTS) discover_role_known_object(otyp);
 }
 
 export function u_init_role_inventory() {
@@ -710,13 +809,13 @@ export function u_init_role_inventory() {
         for (const otyp of RANGER_KNOWN_WEAPONS) discover_role_known_object(otyp);
     } else if (role?.name?.m === 'Rogue') {
         ini_inv(ROGUE_INVENTORY, noCreate, role.name.m);
+        if (!rn2(5)) {
+            ini_inv(BLINDFOLD_INVENTORY, noCreate, role.name.m);
+        }
         // C ref: u_init.c:u_init_role() -> knows_class(WEAPON_CLASS).
         // Rogues know dagger appearances even before encountering those
         // object types, so discoveries marks them with '*'.
         for (const otyp of ROGUE_KNOWN_WEAPONS) discover_role_known_object(otyp);
-        if (!rn2(5)) {
-            ini_inv(BLINDFOLD_INVENTORY, noCreate, role.name.m);
-        }
     } else if (role?.name?.m === 'Samurai') {
         ini_inv(SAMURAI_INVENTORY, noCreate, role.name.m);
         if (!rn2(5)) {
@@ -727,9 +826,14 @@ export function u_init_role_inventory() {
         discover_role_known_object(FOOD_RATION);
         reorder_samurai_known_discoveries();
     }
+    reset_no_create(noCreate);
+    u_init_race_inventory(noCreate, role?.name?.m);
     if (roleStartingGold > 0) {
         ini_inv(MONEY_INVENTORY, noCreate, role?.name?.m);
     }
+    // C ref: src/u_init.c:u_init_skills_discoveries().  Starting inventory
+    // is added to discoveries after role and race pre-knowledge.
+    flush_starting_object_discoveries();
 }
 
 export function u_init_misc_rng() {
@@ -825,9 +929,12 @@ export function apply_startup_role_state() {
     game.u.acurr = { a: attrs };
     game.u.amax = { a: maxes };
     game.u.attrmax = { a: limits.slice() };
+    game.u.uprops = game.u.uprops || {};
+    // C ref: src/polyself.c:set_uasmon().  Hero infravision comes from the
+    // physical race's monster form while unpolymorphed.
+    if (INFRAVISION_RACES.has(currentRaceName())) game.u.uprops.infravision = true;
     if (role?.name?.m === 'Samurai') {
         // C ref: src/attrib.c:sam_abil[] grants level-1 intrinsic HFast.
-        game.u.uprops = game.u.uprops || {};
         game.u.uprops.intrinsic_fast = true;
     }
 }
