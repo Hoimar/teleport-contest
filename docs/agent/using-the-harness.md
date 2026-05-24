@@ -71,6 +71,8 @@ For broad/shared changes, rerun `npm run parity:state -- --refresh-live --full`
 before handoff. Public sessions are useful evidence, but the hidden held-out
 sessions are the later cleanliness benchmark; do not optimize for public-score
 surface gains at the expense of general systems.
+When public/local scores differ, use the Local Vs Hosted and Local Vs
+Leaderboard delta sections before choosing a subsystem target.
 
 ## Expected Feedback
 

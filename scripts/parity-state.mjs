@@ -251,6 +251,104 @@ function sessionRecord(result) {
     };
 }
 
+function metricDelta(left, right) {
+    if (!left || !right) return null;
+    return {
+        matched: left.matched - right.matched,
+        total: left.total - right.total,
+    };
+}
+
+function formatSigned(n) {
+    return n > 0 ? `+${n}` : String(n);
+}
+
+function sameMetric(left, right) {
+    return left?.matched === right?.matched && left?.total === right?.total;
+}
+
+function compareCorpusScores(leftCorpus, rightCorpus, leftLabel, rightLabel, fingerprints = {}) {
+    if (!leftCorpus.available || !rightCorpus.available) {
+        return {
+            available: false,
+            reason: 'one or both corpora are unavailable',
+            leftLabel,
+            rightLabel,
+        };
+    }
+
+    const leftBySession = new Map(leftCorpus.sessions.map((session) => [session.session, session]));
+    const rightBySession = new Map(rightCorpus.sessions.map((session) => [session.session, session]));
+    const leftHashes = new Map((fingerprints.left?.files || []).map((file) => [file.name, file.sha256]));
+    const rightHashes = new Map((fingerprints.right?.files || []).map((file) => [file.name, file.sha256]));
+    const sessions = [...new Set([...leftBySession.keys(), ...rightBySession.keys()])].sort();
+    const rows = [];
+
+    for (const session of sessions) {
+        const left = leftBySession.get(session);
+        const right = rightBySession.get(session);
+        if (!left || !right) {
+            rows.push({
+                session,
+                class: left ? 'missing-right' : 'missing-left',
+                left,
+                right,
+            });
+            continue;
+        }
+        const hashChanged = leftHashes.has(session) && rightHashes.has(session) &&
+            leftHashes.get(session) !== rightHashes.get(session);
+        const screenDelta = metricDelta(left.screen, right.screen);
+        const rngDelta = metricDelta(left.rng, right.rng);
+        const exactDelta = Number(left.exact) - Number(right.exact);
+        const scoreChanged = exactDelta !== 0 ||
+            !sameMetric(left.screen, right.screen) ||
+            !sameMetric(left.rng, right.rng) ||
+            left.cursorOnly !== right.cursorOnly;
+        if (!hashChanged && !scoreChanged) continue;
+        rows.push({
+            session,
+            class: hashChanged && scoreChanged ? 'session-and-score-drift'
+                : hashChanged ? 'session-file-drift'
+                    : 'score-drift',
+            hashChanged,
+            exact: { left: left.exact, right: right.exact, delta: exactDelta },
+            screen: { left: left.screen, right: right.screen, delta: screenDelta },
+            rng: { left: left.rng, right: right.rng, delta: rngDelta },
+            cursorOnly: {
+                left: left.cursorOnly,
+                right: right.cursorOnly,
+                delta: left.cursorOnly - right.cursorOnly,
+            },
+            first: {
+                leftScreen: left.firstScreen,
+                rightScreen: right.firstScreen,
+                leftRng: left.firstRng,
+                rightRng: right.firstRng,
+            },
+        });
+    }
+
+    const summary = {
+        exact: leftCorpus.summary.exact - rightCorpus.summary.exact,
+        sessions: leftCorpus.summary.sessions - rightCorpus.summary.sessions,
+        screenMatched: leftCorpus.summary.screenMatched - rightCorpus.summary.screenMatched,
+        screenTotal: leftCorpus.summary.screenTotal - rightCorpus.summary.screenTotal,
+        rngMatched: leftCorpus.summary.rngMatched - rightCorpus.summary.rngMatched,
+        rngTotal: leftCorpus.summary.rngTotal - rightCorpus.summary.rngTotal,
+        cursorOnly: leftCorpus.summary.cursorOnly - rightCorpus.summary.cursorOnly,
+    };
+
+    return {
+        available: true,
+        leftLabel,
+        rightLabel,
+        summary,
+        differingSessions: rows.length,
+        rows,
+    };
+}
+
 async function analyzeCorpus(dir, label) {
     const loaded = loadManifest(dir);
     if (!loaded.available) return { available: false, label, dir, error: loaded.error };
@@ -362,6 +460,53 @@ function compactLeaderboardTeam(team) {
     };
 }
 
+function leaderboardSessionRecords(team) {
+    if (!Array.isArray(team?.sessions)) return [];
+    return team.sessions.map((session) => ({
+        session: session.name,
+        exact: Boolean(session.passed),
+        screen: {
+            matched: Number(session.screen?.matched ?? 0),
+            total: Number(session.screen?.total ?? 0),
+        },
+        cellsOnly: {
+            matched: Number(session.cellsOnly?.matched ?? session.screen?.matched ?? 0),
+            total: Number(session.cellsOnly?.total ?? session.screen?.total ?? 0),
+        },
+        cursorOnly: 0,
+        rng: {
+            matched: Number(session.rng?.matched ?? 0),
+            total: Number(session.rng?.total ?? 0),
+        },
+        firstScreen: '-',
+        firstRng: '-',
+        error: null,
+        warnings: [],
+    }));
+}
+
+function makeLeaderboardCorpus(team) {
+    const sessions = leaderboardSessionRecords(team);
+    if (!sessions.length) return null;
+    return {
+        available: true,
+        label: 'leaderboard public',
+        dir: null,
+        summary: {
+            sessions: sessions.length,
+            exact: sessions.filter((session) => session.exact).length,
+            errors: 0,
+            screenMatched: sessions.reduce((acc, session) => acc + session.screen.matched, 0),
+            screenTotal: sessions.reduce((acc, session) => acc + session.screen.total, 0),
+            cellMatched: sessions.reduce((acc, session) => acc + session.cellsOnly.matched, 0),
+            cursorOnly: sessions.reduce((acc, session) => acc + session.cursorOnly, 0),
+            rngMatched: sessions.reduce((acc, session) => acc + session.rng.matched, 0),
+            rngTotal: sessions.reduce((acc, session) => acc + session.rng.total, 0),
+        },
+        sessions,
+    };
+}
+
 function scoresEqual(localSummary, leaderboardSummary) {
     if (!localSummary || !leaderboardSummary) return false;
     const screenEqual = localSummary.screenMatched === leaderboardSummary.screenMatched &&
@@ -383,27 +528,31 @@ function classifyLeaderboard({ leaderboard, teamName, scoreCorpus, corpusCompari
     if (!scoreCorpus?.available) {
         return { class: 'unknown', reason: 'no local/live corpus score available', url: leaderboard.url, team: compactLeaderboardTeam(team) };
     }
+    const leaderboardCorpus = makeLeaderboardCorpus(team);
+    const sessionDelta = leaderboardCorpus
+        ? compareCorpusScores(scoreCorpus, leaderboardCorpus, scoreCorpus.label, 'leaderboard public')
+        : null;
+    const publicSummary = summarizeLeaderboardSessions(team);
     if (corpusComparison?.class === 'public-session-drift') {
-        return { class: 'public-session-drift', reason: corpusComparison.reason, url: leaderboard.url, team: compactLeaderboardTeam(team) };
+        return { class: 'public-session-drift', reason: corpusComparison.reason, url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta };
     }
     if (git.dirty) {
-        return { class: 'local-dirty-or-unpushed', reason: 'working tree has local changes not represented by leaderboard', url: leaderboard.url, team: compactLeaderboardTeam(team) };
+        return { class: 'local-dirty-or-unpushed', reason: 'working tree has local changes not represented by leaderboard', url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta };
     }
 
-    const publicSummary = summarizeLeaderboardSessions(team);
     const publicEqual = scoresEqual(scoreCorpus.summary, publicSummary);
     if (publicEqual) {
         const held = team.heldOut;
         if (held && Number(held.points ?? 0) !== Number(held.maxPoints ?? 0)) {
-            return { class: 'heldout-only-gap', reason: 'public score matches; held-out sessions remain private cleanliness evidence', url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary };
+            return { class: 'heldout-only-gap', reason: 'public score matches; held-out sessions remain private cleanliness evidence', url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta };
         }
-        return { class: 'same', reason: 'leaderboard public score matches local hosted-public score', url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary };
+        return { class: 'same', reason: 'leaderboard public score matches local hosted-public score', url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta };
     }
 
     if (team.lastScored && git.commitTime && Date.parse(team.lastScored) < Date.parse(git.commitTime)) {
-        return { class: 'leaderboard-lag', reason: 'leaderboard lastScored is older than local HEAD commit time', url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary };
+        return { class: 'leaderboard-lag', reason: 'leaderboard lastScored is older than local HEAD commit time', url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta };
     }
-    return { class: 'scorer-drift', reason: 'same public corpus but leaderboard public score differs from local scorer output', url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary };
+    return { class: 'scorer-drift', reason: 'same public corpus but leaderboard public score differs from local scorer output', url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta };
 }
 
 function auditSummary() {
@@ -447,6 +596,36 @@ function printNonExact(title, corpus, limit) {
     }
 }
 
+function printScoreDelta(title, delta, options = {}) {
+    if (!delta?.available) return;
+    const limit = options.limit ?? 10;
+    console.log(`\n## ${title}`);
+    console.log(
+        `- ${delta.leftLabel} minus ${delta.rightLabel}: ` +
+        `exact ${formatSigned(delta.summary.exact)} sessions ${formatSigned(delta.summary.sessions)} ` +
+        `S ${formatSigned(delta.summary.screenMatched)}/${formatSigned(delta.summary.screenTotal)} ` +
+        `R ${formatSigned(delta.summary.rngMatched)}/${formatSigned(delta.summary.rngTotal)} ` +
+        `C ${formatSigned(delta.summary.cursorOnly)}`
+    );
+    console.log(`- differing sessions: ${delta.differingSessions}`);
+    const rows = delta.rows.slice(0, limit);
+    for (const row of rows) {
+        if (row.class === 'missing-left' || row.class === 'missing-right') {
+            console.log(`- ${row.session}: ${row.class}`);
+            continue;
+        }
+        console.log(
+            `- ${row.session}: ${row.class} ` +
+            `S ${formatSigned(row.screen.delta.matched)}/${formatSigned(row.screen.delta.total)} ` +
+            `R ${formatSigned(row.rng.delta.matched)}/${formatSigned(row.rng.delta.total)} ` +
+            `C ${formatSigned(row.cursorOnly.delta)}`
+        );
+    }
+    if (rows.length < delta.rows.length) {
+        console.log(`- showing ${rows.length}/${delta.rows.length}; rerun with --full for all rows`);
+    }
+}
+
 function printHuman(payload) {
     console.log('# Parity State');
     console.log(`- commit: ${payload.git.commit}${payload.git.dirty ? ' dirty' : ''}`);
@@ -463,6 +642,9 @@ function printHuman(payload) {
     if (drift.changed?.length || drift.added?.length || drift.removed?.length || drift.missing?.length) {
         console.log(`- changed=${drift.changed.length} added=${drift.added.length} removed=${drift.removed.length} missing=${drift.missing.length}`);
     }
+    printScoreDelta('Local Vs Hosted Score Delta', payload.localVsLiveDelta, {
+        limit: payload.options.full ? Number.POSITIVE_INFINITY : 10,
+    });
 
     console.log('\n## Sentinel');
     console.log(`- strict: ${payload.sentinel.ok ? 'ok' : 'regression'} ${summarizeLine(payload.sentinel.summary)}`);
@@ -485,6 +667,9 @@ function printHuman(payload) {
             if (team.heldOut) {
                 console.log(`- held-out: points ${fmtCount(team.heldOut.points, team.heldOut.maxPoints)} passing ${fmtCount(team.heldOut.passing, team.heldOut.total)}; private sessions are the cleanliness benchmark`);
             }
+            printScoreDelta('Local Vs Leaderboard Public Delta', payload.leaderboard.sessionDelta, {
+                limit: payload.options.full ? Number.POSITIVE_INFINITY : 10,
+            });
         }
     }
 
@@ -512,6 +697,10 @@ async function main() {
     const liveCorpus = liveFingerprint.available
         ? await analyzeCorpus(options.liveDir, 'hosted public')
         : { available: false, label: 'hosted public', dir: options.liveDir, error: liveFingerprint.error };
+    const localVsLiveDelta = compareCorpusScores(localCorpus, liveCorpus, 'checked-in public', 'hosted public', {
+        left: localFingerprint,
+        right: liveFingerprint,
+    });
     const sentinel = await analyzeSentinels();
     const audits = auditSummary();
 
@@ -544,6 +733,7 @@ async function main() {
         localFingerprint,
         liveFingerprint,
         corpusComparison,
+        localVsLiveDelta,
         localCorpus,
         liveCorpus,
         sentinel,

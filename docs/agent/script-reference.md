@@ -32,6 +32,10 @@ compares their hashes and score totals with checked-in `sessions/`, checks the
 sentinel invariant, and best-effort compares the inferred fork owner with the
 online leaderboard. Use `--team <name>` when the fork owner is not the
 leaderboard name, `--full` for non-exact rows, and `--json` for automation.
+Delta sections are always `left minus right`; for example
+`S +4/+8` means four more matched screens over eight more total screens in the
+left corpus. Per-session rows distinguish `session-file-drift`,
+`session-and-score-drift`, and pure `score-drift`.
 
 Important classifications:
 
