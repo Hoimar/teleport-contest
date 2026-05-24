@@ -574,6 +574,13 @@ export function merge_inventory_object(obj) {
 export function add_inventory_object(obj) {
     const target = merge_inventory_object(obj);
     if (target) return target;
+    // C ref: src/invent.c:assigninvlet(), reorder_invent().  Gold uses '$',
+    // which sorts before lettered inventory and is scanned first by systems
+    // that walk gi.invent directly, such as dogmove.c:dog_goal().
+    if (obj.oclass === COIN_CLASS) {
+        game.inventory.unshift(obj);
+        return obj;
+    }
     game.inventory.push(obj);
     return obj;
 }

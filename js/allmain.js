@@ -505,6 +505,8 @@ export async function newgame() {
             g.u.uac = 9;
         } else if (g.flags?.legacy === false && g.urole?.name?.m === 'Healer') {
             g.u.uac = 8;
+        } else if (g.flags?.legacy === false && g.urole?.name?.m === 'Tourist') {
+            g.u.uac = 10;
         }
     }
 
