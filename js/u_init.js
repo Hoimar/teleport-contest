@@ -14,6 +14,12 @@ const ROLE_INIT = new Map([
         attrdist: [15, 10, 20, 15, 25, 15],
         hp: 13, pwBase: 1, pwRnd: 4, ac: 8, gold: 1218,
     }],
+    ['Priest', {
+        attrbase: [7, 7, 10, 7, 7, 7],
+        attrmax: [15, 10, 30, 15, 20, 10],
+        attrdist: [15, 10, 30, 15, 20, 10],
+        hp: 14, pwBase: 5, pwRnd: 3, ac: 0, gold: 0,
+    }],
     ['Rogue', {
         attrbase: [7, 7, 7, 10, 7, 6],
         attrmax: [20, 10, 10, 30, 20, 10],
@@ -120,6 +126,7 @@ const KATANA = 56;
 const TSURUGI = 57;
 const RUNESWORD = 58;
 const DWARVISH_MATTOCK = 71;
+const MACE = 73;
 const QUARTERSTAFF = 79;
 const BOW = 83;
 const ELVEN_BOW = 84;
@@ -129,6 +136,7 @@ const PLATE_MAIL = 121;
 const SPLINT_MAIL = 124;
 const HAWAIIAN_SHIRT = 136;
 const LEATHER_ARMOR = 134;
+const ROBE = 143;
 const CLOAK_OF_MAGIC_RESISTANCE = 148;
 const CLOAK_OF_DISPLACEMENT = 149;
 const SMALL_SHIELD = 150;
@@ -149,6 +157,8 @@ const OIL_LAMP = 227;
 const MAGIC_MARKER = 242;
 const SPE_FORCE_BOLT = 383;
 const APPLE = 277;
+const SPRIG_OF_WOLFSBANE = 283;
+const CLOVE_OF_GARLIC = 284;
 const CRAM_RATION = 292;
 const FOOD_RATION = 293;
 const RIN_LEVITATION = 183;
@@ -163,6 +173,7 @@ const POT_FULL_HEALING = 315;
 const POT_POLYMORPH = 316;
 const POT_SICKNESS = 318;
 const POT_ACID = 320;
+const POT_WATER = 322;
 const STATUE = 476;
 const SCR_ENCHANT_WEAPON = 328;
 const SCR_MAGIC_MAPPING = 337;
@@ -213,6 +224,17 @@ const HEALER_INVENTORY = [
     { typ: SPE_EXTRA_HEALING, spe: 0, cls: SPBOOK_CLASS, min: 1, max: 1, bless: 1 },
     { typ: SPE_STONE_TO_FLESH, spe: 0, cls: SPBOOK_CLASS, min: 1, max: 1, bless: 1 },
     { typ: APPLE, spe: 0, cls: FOOD_CLASS, min: 5, max: 5, bless: 0 },
+];
+
+const PRIEST_INVENTORY = [
+    // C ref: src/u_init.c:Priest[].
+    { typ: MACE, spe: 1, cls: WEAPON_CLASS, min: 1, max: 1, bless: 1, wielded: true },
+    { typ: ROBE, spe: 0, cls: ARMOR_CLASS, min: 1, max: 1, bless: UNDEF_BLESS, worn: true },
+    { typ: SMALL_SHIELD, spe: 0, cls: ARMOR_CLASS, min: 1, max: 1, bless: UNDEF_BLESS, worn: true },
+    { typ: POT_WATER, spe: 0, cls: POTION_CLASS, min: 4, max: 4, bless: 1 },
+    { typ: CLOVE_OF_GARLIC, spe: 0, cls: FOOD_CLASS, min: 1, max: 1, bless: 0 },
+    { typ: SPRIG_OF_WOLFSBANE, spe: 0, cls: FOOD_CLASS, min: 1, max: 1, bless: 0 },
+    { typ: UNDEF_TYP, spe: UNDEF_SPE, cls: SPBOOK_CLASS, min: 2, max: 2, bless: UNDEF_BLESS },
 ];
 
 const TOURIST_INVENTORY = [
@@ -562,6 +584,14 @@ export function u_init_role_inventory() {
         if (!rn2(25)) {
             // C may add an oil lamp here; object creation is still unported.
         }
+    } else if (role?.name?.m === 'Priest') {
+        ini_inv(PRIEST_INVENTORY, noCreate, role.name.m);
+        if (!rn2(5)) {
+            ini_inv(MAGIC_MARKER_INVENTORY, noCreate, role.name.m);
+        } else if (!rn2(10)) {
+            ini_inv(LAMP_INVENTORY, noCreate, role.name.m);
+        }
+        discover_role_known_object(POT_WATER);
     } else if (role?.name?.m === 'Tourist') {
         game._goldCount = rnd(1000);
         game._startupRoleGoldInitialized = true;

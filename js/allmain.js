@@ -25,7 +25,7 @@ import {
     queue_more_prompt, see_monsters, see_objects, see_traps,
 } from './display.js';
 import { vision_recalc, vision_reset, init_vision_globals } from './vision.js';
-import { findAlign, findRace, findRole, roleGod, roleGreeting, roleWithStartingRank } from './roles.js';
+import { roles, findAlign, findRace, findRole, roleGod, roleGreeting, roleWithStartingRank } from './roles.js';
 import { NO_COLOR } from './terminal.js';
 import { A_DEX, A_STR, A_WIS, COLNO, NORMAL_SPEED } from './const.js';
 import * as ff8000 from './fastforward.js';
@@ -77,10 +77,23 @@ function startupReplayForCurrentSeed() {
 }
 
 function preLuaRoleInitRng() {
+    const role = findRole(game._nhopts?.role);
     // C ref: role.c:role_init(). Wizard's quest leader/nemesis setup has a
     // random gender choice before nhcore Lua shuffles run.
-    const role = findRole(game._nhopts?.role);
     if (role?.name?.m === 'Wizard') rn2(100);
+    // C ref: role.c:role_init(). Priests have no own pantheon; new games roll
+    // random roles until one with gods is found and copy that pantheon.
+    if (role?.name?.m === 'Priest' && !role.gods) {
+        let pantheon = role;
+        let trycnt = 0;
+        while (!pantheon?.gods && ++trycnt < 100) {
+            pantheon = roles[rn2(roles.length)];
+        }
+        if (!pantheon?.gods) pantheon = roles.find(r => r.gods);
+        game._startup_pantheon_gods = pantheon?.gods || null;
+    } else {
+        game._startup_pantheon_gods = null;
+    }
 }
 
 function postInventoryStartupRng() {
@@ -111,7 +124,12 @@ function postInventoryStartupRng() {
 
 function startupRole() {
     const configured = findRole(game._nhopts?.role);
-    if (configured) return roleWithStartingRank(configured);
+    if (configured) {
+        const role = game._startup_pantheon_gods && !configured.gods
+            ? { ...configured, gods: game._startup_pantheon_gods }
+            : configured;
+        return roleWithStartingRank(role);
+    }
 
     // Random chargen is still not ported; seed 2 currently records the
     // observed random Healer selection until pick4u() is implemented.
@@ -442,6 +460,8 @@ export async function newgame() {
         g._deferred_startup_uac = 9;
     } else if (!ff && g.flags?.legacy !== false && g.urole?.name?.m === 'Tourist') {
         g._deferred_startup_uac = 10;
+    } else if (!ff && g.flags?.legacy !== false && g.urole?.name?.m === 'Priest') {
+        g._deferred_startup_uac = 7;
     } else if (!ff && g.flags?.legacy !== false && g.urole?.name?.m === 'Ranger') {
         g._deferred_startup_uac = 7;
     } else if (!ff && g.flags?.legacy !== false && g.urole?.name?.m === 'Rogue') {
@@ -456,10 +476,10 @@ export async function newgame() {
     const roleName = g.flags?.female ? (g.urole.name.f || g.urole.name.m) : g.urole.name.m;
     // C ref: allmain.c:welcome(): forced-gender roles and distinct female
     // role names do not also print a separate gender adjective.
-    const hasDistinctFemaleRoleName = !!(g.flags?.female && g.urole.name.f && g.urole.name.f !== g.urole.name.m);
+    const roleHasGenderedName = !!(g.urole.name.f && g.urole.name.f !== g.urole.name.m);
     const roleForcesGender = g.urole?.mnum === 11; // Valkyrie
     const genderAdj = g.flags?.female ? 'female' : 'male';
-    const genderText = (!hasDistinctFemaleRoleName && !roleForcesGender) ? `${genderAdj} ` : '';
+    const genderText = (!roleHasGenderedName && !roleForcesGender) ? `${genderAdj} ` : '';
     const greetingName = g._startupGreetingName || g.plname;
     const welcome = `${roleGreeting(g.urole)} ${greetingName}, welcome to NetHack!  You are a ${alignName} ${genderText}${g.urace.adj} ${roleName}.`;
     await pline(welcome);
@@ -1130,11 +1150,13 @@ export async function moveloop_core() {
             g._more_dismissals_remaining = 0;
         }
         finishDeferredSeerTurnUpdate(g);
-        if (g.u?.uinvulnerable && g._pending_message === 'You are surrounded by a shimmering light.') {
-            g._pending_message = 'You are surrounded by a shimmering light.  You finish your prayer.';
+        if (g._pending_prayer_finish_message) {
+            g._pending_prayer_finish_message = false;
+            if (g._pending_message) await append_pline('You finish your prayer.');
+            else await pline('You finish your prayer.');
             g._more = true;
             g._awaiting_prayer_done_more = true;
-            g.u.uinvulnerable = false;
+            if (g.u?.uinvulnerable) g.u.uinvulnerable = false;
         }
         // C ref: topl.c:pline()/more() blocks the current command before a
         // run/travel multi can consume another movement turn.  Prayer's
