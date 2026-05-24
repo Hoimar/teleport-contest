@@ -28,24 +28,15 @@ hardcoding this screen?" If it is hardcoding, stop and choose a subsystem fix.
 
 ## Files Never To Modify
 
-- `frozen/ps_test_runner.mjs`
-- `js/isaac64.js`
-- `js/terminal.js`
-- `js/storage.js`
-
-Production `js/` must not leave debug I/O, filesystem writes, or imports from
-`frozen/`.
+Never modify `frozen/ps_test_runner.mjs`, `js/isaac64.js`,
+`js/terminal.js`, or `js/storage.js`. Production `js/` must not leave debug
+I/O, filesystem writes, or imports from `frozen/`.
 
 ## Memory Routing
 
-Start with:
-
-```bash
-npm run agent:brief -- --target <session-or-subsystem>
-```
-
-Then open only the files it points to. `npm run` entries are short aliases for
-the `node scripts/*.mjs` commands listed in `package.json`.
+Start with `npm run agent:brief -- --target <session-or-subsystem>`. Use brief
+hits as a read filter; open named files only around relevant sections. `npm run`
+entries are aliases for `node scripts/*.mjs`.
 
 | File | Role | Default access |
 |---|---|---|
@@ -70,8 +61,7 @@ npm run hack:audit
 npm run memory:lint
 ```
 
-Use compact tools before ad hoc scripts. See `docs/agent/debugging.md` and
-`docs/agent/using-the-harness.md`.
+Use compact tools before ad hoc scripts. More: `docs/agent/debugging.md`.
 
 ## Implementation Loop
 
@@ -79,7 +69,7 @@ For sustained work, follow `docs/agent/loop-contract.md`. Required cycle:
 
 1. Triage first mismatch.
 2. State a subsystem hypothesis.
-3. Check relevant local C source, JS files, feature-map rows, lessons, and git history.
+3. Check targeted local C source, JS files, feature-map rows, lessons, and git history.
 4. Implement or dehack a general subsystem behavior.
 5. Run `npm run verify -- --target <session>` and `npm run sentinel:strict`.
 6. Classify regressions.
@@ -88,8 +78,7 @@ For sustained work, follow `docs/agent/loop-contract.md`. Required cycle:
 9. Commit coherent truth or harness changes after verification.
 10. Continue unless a valid stop condition applies.
 
-Use sessions as evidence. The unit of progress is subsystem truth. Progress
-rules: `docs/agent/progress-model.md`.
+Use sessions as evidence. The unit of progress is subsystem truth.
 
 ## Verification Contract
 
@@ -102,12 +91,11 @@ Every meaningful change report needs:
 - hacks/stubs removed, reduced, or introduced
 - regression classification
 
-Run the full suite at startup for marathon loops, after broad shared changes,
-after every 3-5 meaningful implementation iterations, and before valid final
-handoff when the loop budget is met.
+Run `parity:state` at startup for marathon loops, after broad shared changes,
+after every 3-5 meaningful implementation iterations, and before final handoff.
 
-Use `npm run parity:state -- --refresh-live` for local-vs-hosted-public and
-leaderboard sanity. Hidden held-out sessions are the later cleanliness benchmark.
+Use `npm run parity:state -- --refresh-live` for local/public/leaderboard sanity.
+Hidden held-out sessions are the later cleanliness benchmark.
 
 ## Stop Conditions
 

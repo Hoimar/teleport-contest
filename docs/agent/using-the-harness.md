@@ -55,7 +55,7 @@ verify, update memory if truth changed, and commit the coherent cleanup.
 1. Agent runs `npm run agent:brief -- --target <target>`.
 2. Agent runs `npm run parity:state -- --refresh-live` unless fresh state
    exists in the current turn.
-3. Agent reads only the docs/files named by the brief.
+3. Agent reads only relevant sections from docs/files named by the brief.
 4. Agent runs triage or screen diff to extract first mismatch facts.
 5. Agent states a subsystem hypothesis before editing.
 6. Agent implements or dehacks a general behavior.

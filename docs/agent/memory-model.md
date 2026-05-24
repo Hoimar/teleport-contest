@@ -6,6 +6,10 @@ The harness should retrieve context, not preload history.
 
 See `AGENTS.md` under "## Memory Routing"
 
+Treat memory files as indexes first: search by session, subsystem, C ref, JS
+path, or tag before opening broad ranges. Full reads are for
+`scratch/agent-loop.md` and genuinely ambiguous cases.
+
 ## Budgets
 
 - `AGENTS.md`: target 90-140 lines.

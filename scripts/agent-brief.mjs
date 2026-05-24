@@ -137,13 +137,14 @@ function main() {
     printBlock('Recent Git', sh(logArgs).split('\n').filter(Boolean).map((line) => `- ${line}`));
 
     console.log('\n## Next Commands');
+    console.log('- npm run parity:state -- --refresh-live');
     if (target && target.includes('seed')) {
         console.log(`- npm run triage -- ${target}`);
         console.log(`- npm run verify -- --target ${target}`);
     } else {
-        console.log('- npm run sentinel');
         console.log('- node scripts/triage-corpus.mjs --markdown scratch/divergence-inventory.md');
     }
+    console.log('- npm run sentinel:strict');
     console.log('- npm run hack:audit');
     console.log('- docs/agent/script-reference.md explains output fields and direct node commands');
 }

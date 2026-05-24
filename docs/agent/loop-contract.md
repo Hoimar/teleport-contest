@@ -11,13 +11,14 @@ the optimization target.
    - `npm run parity:state -- --refresh-live`
    - `npm run verify -- --target <session>`
    - add `npm run parity:state -- --refresh-live --full` after broad shared changes.
-4. Update `scratch/agent-loop.md` with only current state and queue.
+4. Read only brief-linked docs/files and only the relevant sections.
+5. Update `scratch/agent-loop.md` with only current state and queue.
 
 ## Work Cycle
 
 1. Triage the first mismatch with compact tools.
 2. State a subsystem hypothesis.
-3. Check relevant local C refs, JS files, feature-map rows, lessons, and git history.
+3. Check targeted local C refs, JS files, feature-map rows, lessons, and git history.
 4. Implement general subsystem behavior or remove hack debt.
 5. Run `npm run verify -- --target <session>`.
 6. Run `npm run sentinel:strict` before commit and classify regressions.
