@@ -2,7 +2,13 @@
 
 import { readFileSync } from 'node:fs';
 
-import { analyzeSession, DEFAULT_SENTINEL_SUITE } from './triage-lib.mjs';
+import {
+    analyzeSession,
+    DEFAULT_SENTINEL_SUITE,
+    isExactSession,
+    scoredScreenMatched,
+    summarizeSessionResults,
+} from './triage-lib.mjs';
 import { auditHackDebt, renderHackDebt } from './hack-debt-audit.mjs';
 import { collectMemoryIssues, renderMemoryLint } from './memory-lint.mjs';
 
@@ -25,24 +31,16 @@ function short(result) {
     const fr = result.firstRngMismatch;
     return {
         session: result.session,
-        screens: `${result.metrics.screens.matched}/${result.metrics.screens.total}`,
+        screens: `${scoredScreenMatched(result)}/${result.metrics.screens.total}`,
+        cells: `${result.metrics.screens.matched}/${result.metrics.screens.total}`,
         rng: `${result.metrics.rngCalls.matched}/${result.metrics.rngCalls.total}`,
         firstScreen: fs ? `${fs.index}:${fs.mismatchClass}:${fs.screen.surface}:${fs.keyDisplay}` : '-',
         firstRng: fr ? `${fr.index}:${fr.expected ?? 'null'}=>${fr.actual ?? 'null'}` : '-',
         cursorOnly: result.metrics.cursorOnly.count,
+        exact: isExactSession(result),
         error: result.error,
         warnings: result.warnings,
     };
-}
-
-function totals(results) {
-    return results.reduce((acc, result) => {
-        acc.screenMatched += result.metrics.screens.matched;
-        acc.screenTotal += result.metrics.screens.total;
-        acc.rngMatched += result.metrics.rngCalls.matched;
-        acc.rngTotal += result.metrics.rngCalls.total;
-        return acc;
-    }, { screenMatched: 0, screenTotal: 0, rngMatched: 0, rngTotal: 0 });
 }
 
 function hackCounts(findings) {
@@ -58,7 +56,7 @@ function printRows(title, rows) {
 }
 
 function formatSession(row) {
-    return `- ${row.session}: S ${row.screens} R ${row.rng} FS ${row.firstScreen} FR ${row.firstRng} C ${row.cursorOnly}`;
+    return `- ${row.session}: S ${row.screens} R ${row.rng} FS ${row.firstScreen} FR ${row.firstRng} C ${row.cursorOnly}${row.exact ? ' OK' : ''}`;
 }
 
 async function main() {
@@ -69,7 +67,8 @@ async function main() {
         sentinels.push(await analyzeSession(ref, { sampleLimit: 3, cursorStepLimit: 6 }));
     }
     const sentinelShort = sentinels.map(short);
-    const total = totals(sentinels);
+    const total = summarizeSessionResults(sentinels);
+    const sentinelOk = sentinels.every(isExactSession);
     const hackFindings = auditHackDebt();
     const hackDebt = hackCounts(hackFindings);
     const memoryIssues = collectMemoryIssues();
@@ -86,7 +85,7 @@ async function main() {
         const refs = JSON.parse(readFileSync('sessions/manifest.json', 'utf8'));
         const fullResults = [];
         for (const ref of refs) fullResults.push(await analyzeSession(ref, { sampleLimit: 1, cursorStepLimit: 3 }));
-        const fullTotals = totals(fullResults);
+        const fullTotals = summarizeSessionResults(fullResults);
         full = {
             status: 0,
             total: {
@@ -103,7 +102,10 @@ async function main() {
             total: {
                 screens: `${total.screenMatched}/${total.screenTotal}`,
                 rng: `${total.rngMatched}/${total.rngTotal}`,
+                exact: `${total.exact}/${total.sessions}`,
+                cursorOnly: total.cursorOnly,
             },
+            status: sentinelOk ? 0 : 1,
         },
         audits: {
             hackDebtStatus: hack.status,
@@ -125,7 +127,7 @@ async function main() {
         ? [formatSession(target)]
         : ['- no target supplied']);
     printRows('Sentinels', [
-        `- total: S ${payload.sentinel.total.screens} R ${payload.sentinel.total.rng}`,
+        `- strict: ${sentinelOk ? 'ok' : 'regression'} exact ${payload.sentinel.total.exact} S ${payload.sentinel.total.screens} R ${payload.sentinel.total.rng} C ${payload.sentinel.total.cursorOnly}`,
         ...sentinelShort.map(formatSession),
     ]);
     printRows('Harness Checks', [
@@ -134,15 +136,15 @@ async function main() {
         ...(full ? [`- full suite: S ${full.total.screens} R ${full.total.rng}`] : []),
     ]);
     printRows('Human Report Checklist', [
-        '- compare target and sentinel numbers to the pre-change baseline',
-        '- classify every sentinel movement before handoff',
+        '- compare target numbers to the pre-change baseline',
+        '- fix or explicitly classify any sentinel regression before handoff',
         '- name the subsystem truth or harness rule that changed',
         '- commit the coherent change after verification when truth changed',
     ]);
     if (hack.stdout && hack.status !== 0) printRows('Blocking Hack Debt', hack.stdout.split('\n').slice(0, 12));
     if (memory.stdout && memoryIssues.length) printRows('Memory Lint Details', memory.stdout.split('\n').slice(0, 12));
 
-    if (hack.status !== 0 || memory.status !== 0 || (full && full.status !== 0)) process.exit(1);
+    if (sentinelOk === false || hack.status !== 0 || memory.status !== 0 || (full && full.status !== 0)) process.exit(1);
 }
 
 main().catch((err) => {

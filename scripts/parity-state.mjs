@@ -1,0 +1,561 @@
+#!/usr/bin/env node
+
+import { createHash } from 'node:crypto';
+import { existsSync, readFileSync } from 'node:fs';
+import path from 'node:path';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+
+import {
+    analyzeSession,
+    DEFAULT_SENTINEL_SUITE,
+    isExactSession,
+    scoredScreenMatched,
+    summarizeSessionResults,
+} from './triage-lib.mjs';
+import { auditHackDebt } from './hack-debt-audit.mjs';
+import { collectMemoryIssues } from './memory-lint.mjs';
+
+const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
+const PROJECT_ROOT = path.resolve(SCRIPT_DIR, '..');
+const DEFAULT_BASE_URL = 'https://mazesofmenace.ai';
+const DEFAULT_LOCAL_DIR = 'sessions';
+const DEFAULT_LIVE_DIR = '.cache/live-sessions';
+
+function usage() {
+    return [
+        'Usage: node scripts/parity-state.mjs [--refresh-live] [--full] [--json] [--team <name>]',
+        '',
+        'Options:',
+        '  --refresh-live       Fetch hosted public sessions into .cache/live-sessions first.',
+        '  --leaderboard        Fetch leaderboard data even without --refresh-live.',
+        '  --no-leaderboard     Skip leaderboard fetch/classification.',
+        '  --team <name>        Leaderboard team name or fork owner to compare.',
+        '  --base-url <url>     Override public site base URL.',
+        '  --local-dir <dir>    Override checked-in public session directory.',
+        '  --live-dir <dir>     Override cached live-public session directory.',
+        '  --full               Print per-session non-exact rows.',
+        '  --json               Emit machine-readable JSON only.',
+    ].join('\n');
+}
+
+function parseArgs(argv) {
+    const options = {
+        refreshLive: false,
+        full: false,
+        json: false,
+        leaderboard: null,
+        team: null,
+        baseUrl: process.env.MOM_BASE_URL || DEFAULT_BASE_URL,
+        localDir: DEFAULT_LOCAL_DIR,
+        liveDir: DEFAULT_LIVE_DIR,
+        explicitTeam: false,
+    };
+
+    for (let i = 0; i < argv.length; i++) {
+        const arg = argv[i];
+        if (arg === '--help' || arg === '-h') {
+            console.log(usage());
+            process.exit(0);
+        } else if (arg === '--refresh-live') options.refreshLive = true;
+        else if (arg === '--full') options.full = true;
+        else if (arg === '--json') options.json = true;
+        else if (arg === '--leaderboard') options.leaderboard = true;
+        else if (arg === '--no-leaderboard') options.leaderboard = false;
+        else if (arg === '--team') {
+            options.team = argv[++i] || null;
+            options.explicitTeam = true;
+        } else if (arg.startsWith('--team=')) {
+            options.team = arg.slice('--team='.length);
+            options.explicitTeam = true;
+        }
+        else if (arg === '--base-url') options.baseUrl = argv[++i] || options.baseUrl;
+        else if (arg.startsWith('--base-url=')) options.baseUrl = arg.slice('--base-url='.length);
+        else if (arg === '--local-dir') options.localDir = argv[++i] || options.localDir;
+        else if (arg.startsWith('--local-dir=')) options.localDir = arg.slice('--local-dir='.length);
+        else if (arg === '--live-dir') options.liveDir = argv[++i] || options.liveDir;
+        else if (arg.startsWith('--live-dir=')) options.liveDir = arg.slice('--live-dir='.length);
+        else throw new Error(`unknown argument ${arg}\n${usage()}`);
+    }
+
+    if (options.leaderboard == null) {
+        options.leaderboard = options.refreshLive || options.explicitTeam;
+    }
+    if (options.leaderboard && !options.team) options.team = inferTeamFromGitRemote();
+    options.baseUrl = options.baseUrl.replace(/\/+$/, '');
+    return options;
+}
+
+function sha256(text) {
+    return createHash('sha256').update(text).digest('hex');
+}
+
+function readJson(file) {
+    return JSON.parse(readFileSync(file, 'utf8'));
+}
+
+function relPath(p) {
+    return path.relative(PROJECT_ROOT, p) || '.';
+}
+
+function gitOutput(args) {
+    try {
+        return execFileSync('git', args, {
+            cwd: PROJECT_ROOT,
+            encoding: 'utf8',
+            stdio: ['ignore', 'pipe', 'ignore'],
+        }).trim();
+    } catch (_) {
+        return null;
+    }
+}
+
+function inferTeamFromGitRemote() {
+    const url = gitOutput(['remote', 'get-url', 'origin']);
+    if (!url) return null;
+    const ssh = url.match(/github\.com[:/]([^/]+)\/teleport-contest(?:\.git)?$/i);
+    if (ssh) return ssh[1];
+    const generic = url.match(/github\.com[:/]([^/]+)\/([^/]+?)(?:\.git)?$/i);
+    return generic ? generic[1] : null;
+}
+
+function gitState() {
+    return {
+        commit: gitOutput(['rev-parse', '--short', 'HEAD']) ?? 'unknown',
+        commitTime: gitOutput(['log', '-1', '--format=%cI']),
+        dirty: Boolean(gitOutput(['status', '--short'])),
+    };
+}
+
+function loadManifest(dir) {
+    const manifestPath = path.join(PROJECT_ROOT, dir, 'manifest.json');
+    if (!existsSync(manifestPath)) {
+        return { available: false, dir, error: `missing ${relPath(manifestPath)}` };
+    }
+    const manifest = readJson(manifestPath);
+    if (!Array.isArray(manifest)) {
+        return { available: false, dir, error: `manifest is not an array: ${relPath(manifestPath)}` };
+    }
+    return { available: true, dir, manifest };
+}
+
+function corpusFingerprint(dir) {
+    const loaded = loadManifest(dir);
+    if (!loaded.available) return loaded;
+
+    const files = [];
+    for (const name of loaded.manifest) {
+        const file = path.join(PROJECT_ROOT, dir, name);
+        if (!existsSync(file)) {
+            files.push({ name, missing: true, sha256: null });
+            continue;
+        }
+        files.push({ name, sha256: sha256(readFileSync(file)) });
+    }
+    const metadataPath = path.join(PROJECT_ROOT, dir, 'metadata.json');
+    const metadata = existsSync(metadataPath) ? readJson(metadataPath) : null;
+    return {
+        available: true,
+        dir,
+        sessions: loaded.manifest.length,
+        manifestHash: sha256(JSON.stringify(loaded.manifest)),
+        corpusHash: sha256(JSON.stringify(files)),
+        files,
+        metadata,
+    };
+}
+
+function compareCorpora(local, live) {
+    if (!local.available) return { class: 'unknown', reason: local.error };
+    if (!live.available) return { class: 'unknown', reason: live.error };
+
+    const localFiles = new Map(local.files.map((file) => [file.name, file]));
+    const liveFiles = new Map(live.files.map((file) => [file.name, file]));
+    const added = [];
+    const removed = [];
+    const changed = [];
+    const missing = [];
+
+    for (const name of liveFiles.keys()) {
+        if (!localFiles.has(name)) added.push(name);
+    }
+    for (const name of localFiles.keys()) {
+        if (!liveFiles.has(name)) removed.push(name);
+    }
+    for (const [name, liveFile] of liveFiles.entries()) {
+        const localFile = localFiles.get(name);
+        if (!localFile) continue;
+        if (localFile.missing || liveFile.missing) missing.push(name);
+        else if (localFile.sha256 !== liveFile.sha256) changed.push(name);
+    }
+
+    const same = added.length === 0 && removed.length === 0 && changed.length === 0 && missing.length === 0;
+    return {
+        class: same ? 'same' : 'public-session-drift',
+        added,
+        removed,
+        changed,
+        missing,
+        reason: same ? 'checked-in sessions match cached hosted public sessions' : 'hosted public sessions differ from checked-in sessions',
+    };
+}
+
+function fetchLiveSessions(liveDir) {
+    const child = spawnSync(process.execPath, ['scripts/fetch-live-public-sessions.mjs', liveDir], {
+        cwd: PROJECT_ROOT,
+        encoding: 'utf8',
+        maxBuffer: 32 * 1024 * 1024,
+    });
+    if (child.error || child.status !== 0) {
+        return {
+            status: child.status ?? 1,
+            error: child.error?.message || child.stderr.trim() || child.stdout.trim() || 'live session fetch failed',
+        };
+    }
+    return { status: 0 };
+}
+
+function firstScreenHead(result) {
+    const first = result.firstScreenMismatch;
+    if (!first) return '-';
+    return `${first.index}:${first.mismatchClass}:${first.screen.surface}:${first.keyDisplay}`;
+}
+
+function firstRngHead(result) {
+    const first = result.firstRngMismatch;
+    if (!first) return '-';
+    return `${first.index}:${first.expected ?? 'null'}=>${first.actual ?? 'null'}`;
+}
+
+function sessionRecord(result) {
+    return {
+        session: result.session,
+        exact: isExactSession(result),
+        screen: {
+            matched: scoredScreenMatched(result),
+            total: result.metrics.screens.total,
+        },
+        cellsOnly: {
+            matched: result.metrics.screens.matched,
+            total: result.metrics.screens.total,
+        },
+        cursorOnly: result.metrics.cursorOnly.count,
+        rng: {
+            matched: result.metrics.rngCalls.matched,
+            total: result.metrics.rngCalls.total,
+        },
+        firstScreen: firstScreenHead(result),
+        firstRng: firstRngHead(result),
+        error: result.error,
+        warnings: result.warnings,
+    };
+}
+
+async function analyzeCorpus(dir, label) {
+    const loaded = loadManifest(dir);
+    if (!loaded.available) return { available: false, label, dir, error: loaded.error };
+
+    const results = [];
+    for (const name of loaded.manifest) {
+        results.push(await analyzeSession(path.join(dir, name), { sampleLimit: 1, cursorStepLimit: 3 }));
+    }
+    const summary = summarizeSessionResults(results);
+    return {
+        available: true,
+        label,
+        dir,
+        summary,
+        sessions: results.map(sessionRecord),
+    };
+}
+
+async function analyzeSentinels() {
+    const results = [];
+    for (const ref of DEFAULT_SENTINEL_SUITE) {
+        results.push(await analyzeSession(ref, { sampleLimit: 1, cursorStepLimit: 3 }));
+    }
+    return {
+        available: true,
+        label: 'sentinel',
+        suite: DEFAULT_SENTINEL_SUITE,
+        ok: results.every(isExactSession),
+        summary: summarizeSessionResults(results),
+        sessions: results.map(sessionRecord),
+    };
+}
+
+async function fetchJson(url) {
+    const res = await fetch(url, {
+        cache: 'no-store',
+        signal: AbortSignal.timeout(12000),
+    });
+    const text = await res.text();
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return JSON.parse(text);
+}
+
+async function fetchLeaderboard(baseUrl) {
+    const candidates = [
+        `${baseUrl}/leaderboard/data.json`,
+        `${baseUrl}/data.json`,
+        `${baseUrl}/leaderboard.json`,
+    ];
+    const errors = [];
+    for (const url of candidates) {
+        try {
+            return { available: true, url, data: await fetchJson(url) };
+        } catch (err) {
+            errors.push(`${url}: ${err.message}`);
+        }
+    }
+    return { available: false, errors };
+}
+
+function findLeaderboardTeam(data, teamName) {
+    const teams = Array.isArray(data?.teams) ? data.teams : [];
+    if (!teamName) return null;
+    const wanted = teamName.toLowerCase();
+    return teams.find((team) => String(team.name || '').toLowerCase() === wanted) ||
+        teams.find((team) => String(team.fork || '').split('/')[0].toLowerCase() === wanted) ||
+        null;
+}
+
+function summarizeLeaderboardSessions(team) {
+    if (Array.isArray(team?.sessions)) {
+        return team.sessions.reduce((acc, session) => {
+            acc.sessions++;
+            acc.exact += session.passed ? 1 : 0;
+            acc.screenMatched += Number(session.screen?.matched ?? 0);
+            acc.screenTotal += Number(session.screen?.total ?? 0);
+            acc.rngMatched += Number(session.rng?.matched ?? 0);
+            acc.rngTotal += Number(session.rng?.total ?? 0);
+            return acc;
+        }, {
+            sessions: 0,
+            exact: 0,
+            screenMatched: 0,
+            screenTotal: 0,
+            rngMatched: 0,
+            rngTotal: 0,
+        });
+    }
+    const pub = team?.public || {};
+    return {
+        sessions: Number(pub.total ?? 0),
+        exact: Number(pub.passing ?? 0),
+        screenMatched: Number(pub.points ?? 0),
+        screenTotal: Number(pub.maxPoints ?? 0),
+        rngMatched: null,
+        rngTotal: null,
+    };
+}
+
+function compactLeaderboardTeam(team) {
+    if (!team) return null;
+    return {
+        name: team.name,
+        fork: team.fork,
+        category: team.category,
+        lastScored: team.lastScored,
+        public: team.public,
+        heldOut: team.heldOut,
+    };
+}
+
+function scoresEqual(localSummary, leaderboardSummary) {
+    if (!localSummary || !leaderboardSummary) return false;
+    const screenEqual = localSummary.screenMatched === leaderboardSummary.screenMatched &&
+        localSummary.screenTotal === leaderboardSummary.screenTotal;
+    if (!screenEqual) return false;
+    if (leaderboardSummary.rngMatched == null || leaderboardSummary.rngTotal == null) return true;
+    return localSummary.rngMatched === leaderboardSummary.rngMatched &&
+        localSummary.rngTotal === leaderboardSummary.rngTotal;
+}
+
+function classifyLeaderboard({ leaderboard, teamName, scoreCorpus, corpusComparison, git }) {
+    if (!leaderboard?.available) {
+        return { class: 'unknown', reason: (leaderboard?.errors || ['leaderboard unavailable']).join(' | ') };
+    }
+    const team = findLeaderboardTeam(leaderboard.data, teamName);
+    if (!team) {
+        return { class: 'unknown', reason: `team ${teamName || '(none)'} not found`, url: leaderboard.url };
+    }
+    if (!scoreCorpus?.available) {
+        return { class: 'unknown', reason: 'no local/live corpus score available', url: leaderboard.url, team: compactLeaderboardTeam(team) };
+    }
+    if (corpusComparison?.class === 'public-session-drift') {
+        return { class: 'public-session-drift', reason: corpusComparison.reason, url: leaderboard.url, team: compactLeaderboardTeam(team) };
+    }
+    if (git.dirty) {
+        return { class: 'local-dirty-or-unpushed', reason: 'working tree has local changes not represented by leaderboard', url: leaderboard.url, team: compactLeaderboardTeam(team) };
+    }
+
+    const publicSummary = summarizeLeaderboardSessions(team);
+    const publicEqual = scoresEqual(scoreCorpus.summary, publicSummary);
+    if (publicEqual) {
+        const held = team.heldOut;
+        if (held && Number(held.points ?? 0) !== Number(held.maxPoints ?? 0)) {
+            return { class: 'heldout-only-gap', reason: 'public score matches; held-out sessions remain private cleanliness evidence', url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary };
+        }
+        return { class: 'same', reason: 'leaderboard public score matches local hosted-public score', url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary };
+    }
+
+    if (team.lastScored && git.commitTime && Date.parse(team.lastScored) < Date.parse(git.commitTime)) {
+        return { class: 'leaderboard-lag', reason: 'leaderboard lastScored is older than local HEAD commit time', url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary };
+    }
+    return { class: 'scorer-drift', reason: 'same public corpus but leaderboard public score differs from local scorer output', url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary };
+}
+
+function auditSummary() {
+    const hackFindings = auditHackDebt();
+    const memoryIssues = collectMemoryIssues();
+    return {
+        hackDebt: {
+            hard: hackFindings.filter((finding) => finding.level === 'hard').length,
+            suspicious: hackFindings.filter((finding) => finding.level === 'suspicious').length,
+        },
+        memory: {
+            issues: memoryIssues.length,
+        },
+    };
+}
+
+function fmtCount(matched, total) {
+    return `${matched}/${total}`;
+}
+
+function summarizeLine(summary) {
+    return `exact ${summary.exact}/${summary.sessions} S ${fmtCount(summary.screenMatched, summary.screenTotal)} R ${fmtCount(summary.rngMatched, summary.rngTotal)} C ${summary.cursorOnly ?? 0}`;
+}
+
+function printCorpus(title, corpus) {
+    console.log(`\n## ${title}`);
+    if (!corpus.available) {
+        console.log(`- unavailable: ${corpus.error}`);
+        return;
+    }
+    console.log(`- ${summarizeLine(corpus.summary)}`);
+}
+
+function printNonExact(title, corpus, limit) {
+    if (!corpus.available) return;
+    const rows = corpus.sessions.filter((session) => !session.exact).slice(0, limit);
+    if (!rows.length) return;
+    console.log(`\n## ${title}`);
+    for (const row of rows) {
+        console.log(`- ${row.session}: S ${fmtCount(row.screen.matched, row.screen.total)} R ${fmtCount(row.rng.matched, row.rng.total)} FS ${row.firstScreen} FR ${row.firstRng} C ${row.cursorOnly}`);
+    }
+}
+
+function printHuman(payload) {
+    console.log('# Parity State');
+    console.log(`- commit: ${payload.git.commit}${payload.git.dirty ? ' dirty' : ''}`);
+    console.log(`- generated: ${payload.generatedAt}`);
+    printCorpus('Checked-In Public Corpus', payload.localCorpus);
+    printCorpus('Cached Hosted Public Corpus', payload.liveCorpus);
+    console.log('\n## Public Corpus Comparison');
+    console.log(`- class: ${payload.corpusComparison.class}`);
+    console.log(`- reason: ${payload.corpusComparison.reason}`);
+    if (payload.liveFingerprint?.metadata?.fetchedAt) {
+        console.log(`- live cache fetched: ${payload.liveFingerprint.metadata.fetchedAt}`);
+    }
+    const drift = payload.corpusComparison;
+    if (drift.changed?.length || drift.added?.length || drift.removed?.length || drift.missing?.length) {
+        console.log(`- changed=${drift.changed.length} added=${drift.added.length} removed=${drift.removed.length} missing=${drift.missing.length}`);
+    }
+
+    console.log('\n## Sentinel');
+    console.log(`- strict: ${payload.sentinel.ok ? 'ok' : 'regression'} ${summarizeLine(payload.sentinel.summary)}`);
+
+    console.log('\n## Leaderboard');
+    if (payload.leaderboard?.skipped) {
+        console.log(`- skipped: ${payload.leaderboard.reason}`);
+    } else {
+        console.log(`- class: ${payload.leaderboard.class}`);
+        console.log(`- reason: ${payload.leaderboard.reason}`);
+        if (payload.leaderboard.url) console.log(`- source: ${payload.leaderboard.url}`);
+        if (payload.leaderboard.team) {
+            const team = payload.leaderboard.team;
+            console.log(`- team: ${team.name} (${team.fork || 'unknown fork'}), last scored ${team.lastScored || 'unknown'}`);
+            if (payload.leaderboard.publicSummary) {
+                const pub = payload.leaderboard.publicSummary;
+                const rng = pub.rngMatched == null ? 'unknown' : fmtCount(pub.rngMatched, pub.rngTotal);
+                console.log(`- public: exact ${pub.exact}/${pub.sessions} S ${fmtCount(pub.screenMatched, pub.screenTotal)} R ${rng}`);
+            }
+            if (team.heldOut) {
+                console.log(`- held-out: points ${fmtCount(team.heldOut.points, team.heldOut.maxPoints)} passing ${fmtCount(team.heldOut.passing, team.heldOut.total)}; private sessions are the cleanliness benchmark`);
+            }
+        }
+    }
+
+    console.log('\n## Maintenance Signals');
+    console.log(`- hack debt: hard=${payload.audits.hackDebt.hard} suspicious=${payload.audits.hackDebt.suspicious}`);
+    console.log(`- memory lint: issues=${payload.audits.memory.issues}`);
+
+    if (payload.options.full) {
+        printNonExact('Checked-In Non-Exact Sessions', payload.localCorpus, 20);
+        printNonExact('Hosted Public Non-Exact Sessions', payload.liveCorpus, 20);
+        printNonExact('Sentinel Non-Exact Sessions', payload.sentinel, 20);
+    }
+}
+
+async function main() {
+    const options = parseArgs(process.argv.slice(2));
+    const git = gitState();
+    let liveFetch = null;
+    if (options.refreshLive) liveFetch = fetchLiveSessions(options.liveDir);
+
+    const localFingerprint = corpusFingerprint(options.localDir);
+    const liveFingerprint = corpusFingerprint(options.liveDir);
+    const corpusComparison = compareCorpora(localFingerprint, liveFingerprint);
+    const localCorpus = await analyzeCorpus(options.localDir, 'checked-in public');
+    const liveCorpus = liveFingerprint.available
+        ? await analyzeCorpus(options.liveDir, 'hosted public')
+        : { available: false, label: 'hosted public', dir: options.liveDir, error: liveFingerprint.error };
+    const sentinel = await analyzeSentinels();
+    const audits = auditSummary();
+
+    const wantLeaderboard = options.leaderboard;
+    const leaderboardData = wantLeaderboard ? await fetchLeaderboard(options.baseUrl) : null;
+    const scoreCorpus = liveCorpus.available ? liveCorpus : localCorpus;
+    const leaderboard = wantLeaderboard
+        ? classifyLeaderboard({
+            leaderboard: leaderboardData,
+            teamName: options.team,
+            scoreCorpus,
+            corpusComparison,
+            git,
+        })
+        : { skipped: true, reason: 'use --leaderboard, --team, or --refresh-live to compare online leaderboard data' };
+
+    const payload = {
+        generatedAt: new Date().toISOString(),
+        options: {
+            refreshLive: options.refreshLive,
+            full: options.full,
+            team: options.team,
+            explicitTeam: options.explicitTeam,
+            baseUrl: options.baseUrl,
+            localDir: options.localDir,
+            liveDir: options.liveDir,
+        },
+        git,
+        liveFetch,
+        localFingerprint,
+        liveFingerprint,
+        corpusComparison,
+        localCorpus,
+        liveCorpus,
+        sentinel,
+        leaderboard,
+        audits,
+    };
+
+    if (options.json) console.log(JSON.stringify(payload, null, 2));
+    else printHuman(payload);
+}
+
+main().catch((err) => {
+    console.error(err.message);
+    process.exit(1);
+});

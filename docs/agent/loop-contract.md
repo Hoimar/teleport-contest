@@ -7,9 +7,10 @@ the optimization target.
 
 1. Run `npm run agent:brief -- --target <target>`.
 2. Confirm branch, commit, and dirty files from the brief.
-3. Run baseline verification unless a fresh baseline exists in the current turn:
+3. Run state and baseline verification unless fresh evidence exists:
+   - `npm run parity:state -- --refresh-live`
    - `npm run verify -- --target <session>`
-   - add `--full` after broad shared changes.
+   - add `npm run parity:state -- --refresh-live --full` after broad shared changes.
 4. Update `scratch/agent-loop.md` with only current state and queue.
 
 ## Work Cycle
@@ -19,10 +20,12 @@ the optimization target.
 3. Check relevant local C refs, JS files, feature-map rows, lessons, and git history.
 4. Implement general subsystem behavior or remove hack debt.
 5. Run `npm run verify -- --target <session>`.
-6. Classify regressions.
+6. Run `npm run sentinel:strict` before commit and classify regressions.
 7. Update `feature_map.md`, `lessons.md`, and checkpoint only if truth changed.
-8. Commit the coherent truth or harness change after verification.
-9. Continue to the next queue item unless a valid stop condition applies.
+8. Prefer deleting or merging stale harness/replay/debug debt over adding
+   compensating layers.
+9. Commit the coherent truth or harness change after verification.
+10. Continue to the next queue item unless a valid stop condition applies.
 
 If a behavior claim came from outside `nethack-c/upstream`, re-derive it from
 the local submodule before editing code or durable memory.
@@ -34,6 +37,7 @@ the local submodule before editing code or durable memory.
 3. Highest-ROI structural blocker from `feature_map.md`.
 4. Hack-debt cleanup that unlocks real subsystem work.
 5. Corpus bucket from `scratch/divergence-inventory.md`.
+6. Simplifier pass when several forward-only parity changes have accumulated.
 
 ## Stop Conditions
 
@@ -53,5 +57,6 @@ unrelated dirty worktree changes.
 ## Final Handoff
 
 Report active loop time, iteration count, implementation delta, score delta,
-sentinel stability, classified regressions, current queue, exact stop condition,
-the global-next-step check, and the commit hash when a commit was made.
+strict sentinel stability, local/public/leaderboard classification when checked,
+classified regressions, current queue, exact stop condition, the
+global-next-step check, and the commit hash when a commit was made.

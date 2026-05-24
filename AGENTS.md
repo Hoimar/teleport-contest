@@ -63,8 +63,9 @@ More: `docs/agent/memory-model.md`.
 npm run agent:brief -- --target <target>
 npm run triage -- <session>
 npm run screen:diff -- <session> --first
+npm run parity:state -- --refresh-live
 npm run verify -- --target <session>
-npm run verify -- --target <session> --full
+npm run sentinel:strict
 npm run hack:audit
 npm run memory:lint
 ```
@@ -80,11 +81,12 @@ For sustained work, follow `docs/agent/loop-contract.md`. Required cycle:
 2. State a subsystem hypothesis.
 3. Check relevant local C source, JS files, feature-map rows, lessons, and git history.
 4. Implement or dehack a general subsystem behavior.
-5. Run `npm run verify -- --target <session>`.
+5. Run `npm run verify -- --target <session>` and `npm run sentinel:strict`.
 6. Classify regressions.
-7. Update memory only when subsystem truth changed.
-8. Commit coherent truth or harness changes after verification.
-9. Continue unless a valid stop condition applies.
+7. Prefer dehacking stale replay/debug/duplicated harness code over new layers.
+8. Update memory only when subsystem truth changed.
+9. Commit coherent truth or harness changes after verification.
+10. Continue unless a valid stop condition applies.
 
 Use sessions as evidence. The unit of progress is subsystem truth. Progress
 rules: `docs/agent/progress-model.md`.
@@ -94,7 +96,8 @@ rules: `docs/agent/progress-model.md`.
 Every meaningful change report needs:
 
 - target/evidence score delta
-- sentinel stability
+- strict sentinel stability
+- local/public/leaderboard classification when relevant
 - implementation delta by subsystem
 - hacks/stubs removed, reduced, or introduced
 - regression classification
@@ -102,6 +105,9 @@ Every meaningful change report needs:
 Run the full suite at startup for marathon loops, after broad shared changes,
 after every 3-5 meaningful implementation iterations, and before valid final
 handoff when the loop budget is met.
+
+Use `npm run parity:state -- --refresh-live` for local-vs-hosted-public and
+leaderboard sanity. Hidden held-out sessions are the later cleanliness benchmark.
 
 ## Stop Conditions
 
@@ -140,5 +146,5 @@ the handoff artifact.
 
 Use compact C breadcrumbs: `C ref: path:function()`. Avoid long upstream
 excerpts. Final loop reports need active time, iteration count, implementation
-delta, score delta, sentinel stability, regressions, queue, stop condition, and
-global-next-step check.
+delta, score delta, strict sentinel stability, regressions, queue, stop
+condition, and global-next-step check.

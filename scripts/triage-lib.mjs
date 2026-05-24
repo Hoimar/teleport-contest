@@ -30,6 +30,48 @@ export const DEFAULT_SENTINEL_SUITE = [
     'seed0383-wizard-hallucinate.session.json',
 ];
 
+export function scoredScreenMatched(result) {
+    const cells = result?.metrics?.screens?.matched ?? 0;
+    const cursorOnly = result?.metrics?.cursorOnly?.count ?? 0;
+    return Math.max(0, cells - cursorOnly);
+}
+
+export function isExactSession(result) {
+    if (!result || result.error) return false;
+    const rng = result.metrics.rngCalls;
+    const screens = result.metrics.scoredScreens ?? result.metrics.screens;
+    const cursorOnly = result.metrics.cursorOnly?.count ?? 0;
+    return rng.matched === rng.total &&
+        screens.matched === screens.total &&
+        cursorOnly === 0;
+}
+
+export function summarizeSessionResults(results) {
+    return results.reduce((acc, result) => {
+        const screenMatched = result.metrics.scoredScreens?.matched ?? scoredScreenMatched(result);
+        acc.sessions++;
+        acc.exact += isExactSession(result) ? 1 : 0;
+        acc.errors += result.error ? 1 : 0;
+        acc.screenMatched += screenMatched;
+        acc.screenTotal += result.metrics.screens.total;
+        acc.cellMatched += result.metrics.screens.matched;
+        acc.cursorOnly += result.metrics.cursorOnly.count;
+        acc.rngMatched += result.metrics.rngCalls.matched;
+        acc.rngTotal += result.metrics.rngCalls.total;
+        return acc;
+    }, {
+        sessions: 0,
+        exact: 0,
+        errors: 0,
+        screenMatched: 0,
+        screenTotal: 0,
+        cellMatched: 0,
+        cursorOnly: 0,
+        rngMatched: 0,
+        rngTotal: 0,
+    });
+}
+
 function loadManifestSessions() {
     return JSON.parse(readFileSync(MANIFEST_PATH, 'utf8'));
 }
@@ -323,6 +365,11 @@ export async function analyzeSession(sessionRef, options = {}) {
             },
             screens: {
                 matched: screenMatched,
+                total: canonicalSteps.length,
+                actualTotal: jsScreens.length,
+            },
+            scoredScreens: {
+                matched: Math.max(0, screenMatched - cursorOnlyCount),
                 total: canonicalSteps.length,
                 actualTotal: jsScreens.length,
             },
