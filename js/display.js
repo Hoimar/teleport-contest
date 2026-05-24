@@ -311,7 +311,12 @@ function terrain_glyph(loc, x, y) {
         case CORR:
             return { ch: '#', color: (loc.waslit || game.flags?.lit_corridor) ? CLR_WHITE : NO_COLOR, dec: false };
         case DOOR:
-            if (loc.doormask & D_ISOPEN) return { ch: loc.horizontal ? '-' : '|', color: CLR_BROWN, dec: false };
+            if (loc.doormask & D_ISOPEN) {
+                // C refs: src/display.c:back_to_glyph(), include/defsym.h.
+                // NetHack's legacy names describe the doorway orientation:
+                // vertical open doors draw '-' and horizontal open doors draw '|'.
+                return { ch: loc.horizontal ? '|' : '-', color: CLR_BROWN, dec: false };
+            }
             if (loc.doormask & (D_CLOSED | D_LOCKED)) return { ch: '+', color: CLR_BROWN, dec: false };
             return { ch: '.', color: NO_COLOR, dec: false };
         case SDOOR:

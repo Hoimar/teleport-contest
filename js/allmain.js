@@ -164,6 +164,13 @@ function startupPrimaryDecgraphics() {
     return String(game._nhopts?.symset || '').toLowerCase() === 'decgraphics';
 }
 
+function legacyPagerLeftColumn(textLines, cols) {
+    // C refs: win/tty/wintty.c:tty_putstr(), tty_display_nhwindow().
+    const maxcol = Math.max(...textLines.map(line => line.length + 1));
+    const offx = Math.min(Math.min(82, Math.trunc(cols / 2)), cols - maxcol - 1);
+    return Math.max(0, offx) + 1;
+}
+
 function restoreLegacyPagerLowerMapRows(display) {
     for (let screenRow = 18; screenRow <= 21; screenRow++) {
         const y = screenRow - 1;
@@ -192,7 +199,27 @@ function drawQuestIntroOverlay(alignName) {
         ? (g.urole?.rank?.f || g.urole?.rank?.m || g.urole?.name?.f || g.urole?.name?.m)
         : (g.urole?.rank?.m || g.urole?.name?.m);
     const isTourist = g.urole?.name?.m === 'Tourist';
-    const left = isTourist ? 17 : 23;
+    const textLines = [
+        `It is written in the Book of ${god}:`,
+        '',
+        '    After the Creation, the cruel god Moloch rebelled',
+        '    against the authority of Marduk the Creator.',
+        '    Moloch stole from Marduk the most powerful of all',
+        '    the artifacts of the gods, the Amulet of Yendor,',
+        '    and he hid it in the dark cavities of Gehennom, the',
+        '    Under World, where he now lurks, and bides his time.',
+        '',
+        `Your ${godTitle} ${god} seeks to possess the Amulet, and with it`,
+        'to gain deserved ascendance over the other gods.',
+        '',
+        `You, a newly trained ${rank}, have been heralded`,
+        `from birth as the instrument of ${god}.  You are destined`,
+        'to recover the Amulet for your deity, or die in the',
+        'attempt.  Your hour of destiny has come.  For the sake',
+        `of us all:  Go bravely with ${god}!`,
+        '--More--',
+    ];
+    const left = isTourist ? 17 : legacyPagerLeftColumn(textLines, display.cols || COLNO);
     const bodyLeft = left + 4;
     const lines = [
         [left, 0, `It is written in the Book of ${god}:`],
@@ -421,6 +448,8 @@ export async function newgame() {
         g._deferred_startup_uac = 7;
     } else if (!ff && g.flags?.legacy !== false && g.urole?.name?.m === 'Valkyrie') {
         g._deferred_startup_uac = 6;
+    } else if (!ff && g.flags?.legacy !== false && g.urole?.name?.m === 'Samurai') {
+        g._deferred_startup_uac = 4;
     }
 
     // Welcome message
@@ -484,7 +513,15 @@ export async function advanceTurn() {
     }
 
     await maybe_generate_rnd_mon();
-    if (g.u?.uprops?.fast) g._fast_extra_action_pending = rn2(3) !== 0;
+    if (g.u?.uprops?.fast) {
+        // C ref: src/allmain.c:u_calc_moveamt(); speed boots/potion/spell
+        // Very_fast grants an extra action on 2/3 of turns.
+        g._fast_extra_action_pending = rn2(3) !== 0;
+    } else if (g.u?.uprops?.intrinsic_fast) {
+        // C ref: src/allmain.c:u_calc_moveamt(); intrinsic Fast grants an
+        // extra action on 1/3 of turns.
+        g._fast_extra_action_pending = rn2(3) === 0;
+    }
     settrack();
 
     await nhTimeoutBasic();

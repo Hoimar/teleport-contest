@@ -1324,6 +1324,11 @@ function mksobj_init(otmp, otyp, artif) {
             blessorcurse(otmp, 10);
         }
         if (artif) maybe_artifact(otmp, 40);
+        if (samuraiLacqueredSplintApplies(otyp)) {
+            // C ref: src/mkobj.c:mksobj_init().
+            otmp.oerodeproof = true;
+            otmp.rknown = true;
+        }
         break;
     case AMULET_CLASS:
         if (rn2(10) && (otyp === AMULET_OF_STRANGULATION
@@ -1351,6 +1356,13 @@ function mksobj_init(otmp, otyp, artif) {
             if (monsterName(otmp.corpsenm) !== 'LICHEN') rnz(25);
         }
     }
+}
+
+function samuraiLacqueredSplintApplies(otyp) {
+    if (otyp !== SPLINT_MAIL) return false;
+    const roleName = game.urole?.name?.m || game._nhopts?.role;
+    if (roleName !== 'Samurai') return false;
+    return (game.moves ?? 1) <= 1 || game.u?.uz?.dnum === game.quest_dnum;
 }
 
 function is_poisonable_weapon(otyp) {
@@ -4880,7 +4892,8 @@ function premapGlyphForLoc(loc, x, y) {
         if (loc.doormask & D_ISOPEN)
             return decgraphics
                 ? { ch: 'a', color: 3, decgfx: true }
-                : { ch: loc.horizontal ? '-' : '|', color: 8, decgfx: false };
+                // C refs: src/display.c:back_to_glyph(), include/defsym.h.
+                : { ch: loc.horizontal ? '|' : '-', color: 8, decgfx: false };
         if (loc.doormask & (D_CLOSED | D_LOCKED))
             return { ch: '+', color: 3, decgfx: false };
         return decgraphics

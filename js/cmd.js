@@ -127,6 +127,7 @@ const YA = 22;
 const SHURIKEN = 25;
 const SPEAR = 27;
 const SCALPEL = 39;
+const KNIFE = 40;
 const DART = 24;
 const DAGGER = 34;
 const ELVEN_DAGGER = 35;
@@ -140,6 +141,7 @@ const ELVEN_SHORT_SWORD = 47;
 const ORCISH_SHORT_SWORD = 48;
 const DWARVISH_SHORT_SWORD = 49;
 const SCIMITAR = 50;
+const BROADSWORD = 52;
 const ELVEN_BROADSWORD = 53;
 const KATANA = 56;
 const TSURUGI = 57;
@@ -150,6 +152,7 @@ const ELVEN_BOW = 84;
 const ORCISH_BOW = 85;
 const YUMI = 86;
 const ORCISH_DAGGER = 36;
+const BOW_AMMO = new Set([ARROW, ELVEN_ARROW, ORCISH_ARROW, YA]);
 const TRIPE_RATION = 264;
 const CORPSE = 265;
 const EGG = 266;
@@ -204,6 +207,8 @@ const FOOD_RATION = 293;
 const K_RATION = 294;
 const C_RATION = 295;
 const TIN = 296;
+const PLATE_MAIL = 121;
+const SPLINT_MAIL = 124;
 const CHAIN_MAIL = 128;
 const LEATHER_GLOVES = 159;
 const GAUNTLETS_OF_POWER = 161;
@@ -347,12 +352,14 @@ const OBJECT_BASE_NAMES = new Map([
     [DWARVISH_SPEAR, 'dwarvish spear'],
     [JAVELIN, 'javelin'],
     [SCALPEL, 'scalpel'],
+    [KNIFE, 'knife'],
     [ORCISH_DAGGER, 'crude dagger'],
     [BATTLE_AXE, 'battle-axe'],
     [ELVEN_SHORT_SWORD, 'elven short sword'],
     [ORCISH_SHORT_SWORD, 'orcish short sword'],
     [DWARVISH_SHORT_SWORD, 'dwarvish short sword'],
     [SCIMITAR, 'scimitar'],
+    [BROADSWORD, 'broadsword'],
     [ELVEN_BROADSWORD, 'elven broadsword'],
     [KATANA, 'katana'],
     [TSURUGI, 'tsurugi'],
@@ -488,6 +495,17 @@ const OBJECT_BASE_NAMES = new Map([
     [TIN, 'tin'],
     [BOULDER, 'boulder'],
     [461, 'white gem'],
+]);
+
+const JAPANESE_ITEM_NAMES = new Map([
+    // C ref: src/objnam.c:Japanese_item_name().
+    [SHORT_SWORD, 'wakizashi'],
+    [BROADSWORD, 'ninja-to'],
+    [KNIFE, 'shito'],
+    [PLATE_MAIL, 'tanko'],
+    [LEATHER_GLOVES, 'yugake'],
+    [FOOD_RATION, 'gunyoki'],
+    [POT_BOOZE, 'sake'],
 ]);
 
 const ARMOR_XNAMES = new Map([
@@ -1643,6 +1661,7 @@ async function showDeathPrompt() {
 }
 
 function pluralizeObjectName(name) {
+    if (name === 'ya') return name;
     if (name.startsWith('scroll of ')) return name.replace(/^scroll of /, 'scrolls of ');
     if (name.startsWith('scroll labeled ')) return name.replace(/^scroll labeled /, 'scrolls labeled ');
     if (name.startsWith('spellbook of ')) return name.replace(/^spellbook of /, 'spellbooks of ');
@@ -1689,6 +1708,15 @@ function knownObjectType(otyp) {
         && game.discoveredObjects.has(otyp);
 }
 
+function isSamuraiRole() {
+    return game.urole?.name?.m === 'Samurai' || game._nhopts?.role === 'Samurai';
+}
+
+function japaneseItemName(otyp) {
+    if (!isSamuraiRole()) return '';
+    return JAPANESE_ITEM_NAMES.get(otyp) || '';
+}
+
 function objectTypeNameKnown(obj) {
     if (!obj) return false;
     if (obj.oclass === ARMOR_CLASS) {
@@ -1728,9 +1756,13 @@ function baseObjectName(obj) {
         return 'oil lamp';
     }
     if (obj?.oclass === ARMOR_CLASS) {
+        const japaneseName = japaneseItemName(obj.otyp);
+        if (japaneseName && (obj.knownName || knownObjectType(obj.otyp))) return japaneseName;
         const armorName = armorObjectName(obj);
         if (armorName) return armorName;
     }
+    const japaneseName = japaneseItemName(obj?.otyp);
+    if (japaneseName && (obj?.knownName || knownObjectType(obj?.otyp))) return japaneseName;
     if ((obj?.knownName || knownObjectType(obj?.otyp)) && OBJECT_BASE_NAMES.has(obj.otyp)) return OBJECT_BASE_NAMES.get(obj.otyp);
     const appearanceName = unknownAppearanceName(obj);
     if (appearanceName) return appearanceName;
@@ -1832,6 +1864,13 @@ function enchantmentPrefix(obj) {
         return `${obj.spe >= 0 ? '+' : ''}${obj.spe}`;
     }
     return '';
+}
+
+function erosionProofPrefix(obj) {
+    if (!obj?.oerodeproof || !obj?.rknown) return '';
+    // C ref: src/objnam.c:doname_base(); Samurai lacquered splint mail is
+    // reported with the same erosion-proof prefix as rustproof metal armor.
+    return 'rustproof';
 }
 
 function chargeSuffix(obj, opts = {}) {
@@ -1966,12 +2005,18 @@ function unpaidSuffix(obj) {
 
 function wornSuffix(obj) {
     if (obj?.wornSide) return ` (on ${obj.wornSide} hand)`;
-    if (obj?.quivered) return ' (at the ready)';
+    if (obj?.quivered) return BOW_AMMO.has(obj.otyp) ? ' (in quiver)' : ' (at the ready)';
     if (obj?.wielded || ((obj?.owornmask || 0) & C.W_WEP)) {
+        if (game.u?.twoweap) return ` (wielded in ${game.u?.uhandedness || 'right'} hand)`;
         if (obj?.otyp === QUARTERSTAFF) return ' (weapon in hands)';
         return ` (weapon in ${game.u?.uhandedness || 'right'} hand)`;
     }
     if (obj?.alternate) {
+        if (game.u?.twoweap) {
+            const primaryHand = game.u?.uhandedness || 'right';
+            const secondaryHand = primaryHand === 'left' ? 'right' : 'left';
+            return ` (wielded in ${secondaryHand} hand)`;
+        }
         const noun = (obj?.quan || 1) > 1 ? 'weapons' : 'weapon';
         return ` (alternate ${noun}; not wielded)`;
     }
@@ -2025,7 +2070,14 @@ function inventoryObjectName(obj, opts = {}) {
         : (pairObject ? `pair of ${rawBase}` : rawBase);
     const oname = C.ONAME(obj);
     const namedBase = oname ? `${base} named ${oname}` : base;
-    const parts = [emptyContentsPrefix(obj), bucPrefix(obj), enchantmentPrefix(obj), boxStatePrefix(obj), namedBase].filter(Boolean);
+    const parts = [
+        emptyContentsPrefix(obj),
+        bucPrefix(obj),
+        erosionProofPrefix(obj),
+        enchantmentPrefix(obj),
+        boxStatePrefix(obj),
+        namedBase,
+    ].filter(Boolean);
     const body = parts.join(' ') + chargeSuffix(obj, opts) + unpaidSuffix(obj) + shopPriceSuffix(obj, opts);
     const worn = opts.includeWorn ? wornSuffix(obj) : '';
     if (quan > 1) return `${quan} ${body}${worn}`;
@@ -2284,6 +2336,8 @@ function armor_base_bonus(obj) {
     switch (obj?.otyp) {
     case GRAY_DRAGON_SCALE_MAIL:
         return 9;
+    case SPLINT_MAIL:
+        return 6;
     case CHAIN_MAIL:
         return 5;
     case CLOAK_OF_PROTECTION:
@@ -3846,6 +3900,7 @@ function woundedLegsKickMessage() {
 const EXTENDED_COMMANDS = [
     { name: 'annotate', min: 2, autocomplete: true },
     { name: 'chat', min: 3, autocomplete: true },
+    { name: 'enhance', min: 1, autocomplete: true },
     { name: 'force', min: 1, autocomplete: true },
     { name: 'herecmdmenu', min: 2, autocomplete: true },
     { name: 'invoke', min: 1, autocomplete: true },
@@ -3858,7 +3913,9 @@ const EXTENDED_COMMANDS = [
     { name: 'pray', min: 2, autocomplete: true },
     { name: 'quit', min: 1, autocomplete: true },
     { name: 'rub', min: 2, autocomplete: true },
+    { name: 'sit', min: 1, autocomplete: true },
     { name: 'tip', min: 3, autocomplete: true },
+    { name: 'twoweapon', min: 9, autocomplete: false },
     { name: 'untrap', min: 1, autocomplete: true },
     { name: 'wipe', min: 3, autocomplete: true },
     { name: 'wizgenesis', min: 10, autocomplete: false, wizard: true },
@@ -3866,6 +3923,123 @@ const EXTENDED_COMMANDS = [
     { name: 'wizwhere', min: 4, autocomplete: true, wizard: true },
     { name: 'wizwish', min: 7, autocomplete: false, wizard: true },
 ];
+
+function heroPrimaryWeapon() {
+    return (game.inventory || []).find((obj) => obj?.wielded || ((obj?.owornmask || 0) & C.W_WEP)) || null;
+}
+
+function samuraiEnhanceSkillsScreen() {
+    // C refs: src/cmd.c extcmdlist[] AUTOCOMPLETE, src/weapon.c:show_skills(),
+    // src/u_init.c:Skill_S[].
+    const lines = [
+        ' \x1b[7mCurrent skills:\x1b[0m',
+        '',
+        ' \x1b[7mFighting Skills\x1b[0m',
+        '   martial arts      [Basic]',
+        '   two weapon combat [Unskilled]',
+        '   riding            [Unskilled]',
+        ' \x1b[7mWeapon Skills\x1b[0m',
+        '   dagger            [Unskilled]',
+        '   knife             [Unskilled]',
+        '   short sword       [Basic]',
+        '   broadsword        [Unskilled]',
+        '   long sword        [Basic]',
+        '   two-handed sword  [Unskilled]',
+        '   saber             [Unskilled]',
+        '   flail             [Unskilled]',
+        '   quarterstaff      [Unskilled]',
+        '   polearms          [Unskilled]',
+        '   spear             [Unskilled]',
+        '   lance             [Unskilled]',
+        '   bow               [Basic]',
+        '   shuriken          [Unskilled]',
+        ' \x1b[7mSpellcasting Skills\x1b[0m',
+        '   attack spells     [Unskilled]',
+        ' (1 of 2)',
+    ];
+    return lines.join('\n');
+}
+
+function showEnhanceSkillsMenu() {
+    const screen = game.urole?.name?.m === 'Samurai'
+        ? samuraiEnhanceSkillsScreen()
+        : ' \x1b[7mCurrent skills:\x1b[0m\n';
+    game._enhance_skills_screen = screen;
+    showOverride(screen, [9, 23]);
+}
+
+async function doSitCommand() {
+    // C ref: src/sit.c:dosit().
+    refreshHeroPreviousPositionForStationaryCommand();
+    const corpse = floorCorpseAtHero();
+    if (corpse) {
+        await pline('You sit on the corpse.');
+        await append_pline("It's not very comfortable...");
+    } else {
+        await pline(`You sit down.`);
+    }
+    game.context.move = 1;
+}
+
+function heroSecondaryWeapon() {
+    return (game.inventory || []).find((obj) => obj?.alternate || ((obj?.owornmask || 0) & C.W_SWAPWEP)) || null;
+}
+
+function twoweapOk(obj) {
+    // C ref: src/wield.c:TWOWEAPOK().
+    if (!obj) return false;
+    if (obj.oclass !== WEAPON_CLASS) return false;
+    return ![ARROW, YA, DART, SHURIKEN, BOW, ELVEN_BOW, ORCISH_BOW, YUMI].includes(obj.otyp);
+}
+
+function bimanualWeapon(obj) {
+    return [BATTLE_AXE].includes(obj?.otyp);
+}
+
+function wornShield() {
+    return (game.inventory || []).find((obj) =>
+        obj?.oclass === ARMOR_CLASS && (obj.worn || (obj.owornmask || 0))
+        && obj.otyp >= SMALL_SHIELD && obj.otyp <= SHIELD_OF_REFLECTION) || null;
+}
+
+function heroCanTwoWeapon() {
+    const primary = heroPrimaryWeapon();
+    const secondary = heroSecondaryWeapon();
+    if (!primary || !secondary) {
+        const hand = !primary && !secondary ? 'hands are' : `${primary ? 'left' : 'right'} hand is`;
+        return { ok: false, message: `Your ${hand} empty.` };
+    }
+    if (!twoweapOk(primary) || !twoweapOk(secondary)) {
+        const obj = !twoweapOk(primary) ? primary : secondary;
+        return { ok: false, message: `${sentenceStart(inventoryObjectName(obj))} isn't a suitable ${obj === primary ? 'primary' : 'secondary'} weapon.` };
+    }
+    if (bimanualWeapon(primary) || bimanualWeapon(secondary)) {
+        const obj = bimanualWeapon(primary) ? primary : secondary;
+        return { ok: false, message: `${sentenceStart(inventoryObjectName(obj))} isn't one-handed.` };
+    }
+    if (wornShield()) return { ok: false, message: "You can't use two weapons while wearing a shield." };
+    return { ok: true };
+}
+
+async function doTwoWeaponCommand() {
+    // C ref: src/wield.c:dotwoweapon().
+    game.u = game.u || {};
+    if (game.u.twoweap) {
+        game.u.twoweap = false;
+        await pline('You switch to your primary weapon.');
+        game.context.move = 0;
+        return;
+    }
+    const check = heroCanTwoWeapon();
+    if (!check.ok) {
+        await pline(check.message);
+        game.context.move = 0;
+        return;
+    }
+    await pline('You begin two-weapon combat.');
+    game.u.twoweap = true;
+    game.context.move = rnd(20) > heroAttr(C.A_DEX) ? 1 : 0;
+}
 
 function availableExtendedCommands() {
     const wizard = !!(game.wizard || game.flags?.debug);
@@ -4442,7 +4616,52 @@ function monsterArmorClass(mon) {
     return mon?.mac ?? mon?.ac ?? mon?.data?.ac ?? MONSTER_AC.get(name) ?? 10;
 }
 
-function heroMeleeToHit(mon) {
+function heroAttackAttributeBonus() {
+    // C ref: src/weapon.c:abon().
+    const str = currentAttr(A_STR);
+    const dex = currentAttr(A_DEX);
+    let sbon;
+    if (str < 6) sbon = -2;
+    else if (str < 8) sbon = -1;
+    else if (str < 17) sbon = 0;
+    else if (str < 19) sbon = 1;
+    else sbon = 2;
+    if ((game.u?.ulevel ?? 1) < 3) sbon++;
+    if (dex < 4) return sbon - 3;
+    if (dex < 6) return sbon - 2;
+    if (dex < 8) return sbon - 1;
+    if (dex < 14) return sbon;
+    return sbon + dex - 14;
+}
+
+function heroLuckHitBonus() {
+    const luck = game.u?.uluck || 0;
+    if (!luck) return 0;
+    return Math.sign(luck) * Math.trunc((Math.abs(luck) + 2) / 3);
+}
+
+function weaponHitBonusForMelee(weapon) {
+    // C ref: src/weapon.c:weapon_hit_bonus().  The current JS skill model is
+    // shallow; represent the unskilled two-weapon penalty that owns this path.
+    if (game.u?.twoweap && (weapon === heroPrimaryWeapon() || weapon === heroSecondaryWeapon()))
+        return -9;
+    return 0;
+}
+
+function heroMeleeToHit(mon, weapon = heroWieldedWeapon()) {
+    if (game.u?.twoweap) {
+        // C ref: src/uhitm.c:find_roll_to_hit().
+        let tmp = 1 + heroAttackAttributeBonus() + monsterArmorClass(mon)
+            + (game.u?.uhitinc || 0) + heroLuckHitBonus()
+            + (game.u?.ulevel ?? 1);
+        if (mon?.mstun) tmp += 2;
+        if (mon?.mflee) tmp += 2;
+        if (mon?.msleeping) tmp += 2;
+        if (mon?.mcanmove === 0) tmp += 4;
+        if (weapon) tmp += weapon.spe || 0;
+        tmp += weaponHitBonusForMelee(weapon);
+        return tmp;
+    }
     const level = game.u?.ulevel ?? 1;
     return 10 + level + (10 - monsterArmorClass(mon));
 }
@@ -4860,15 +5079,53 @@ async function swapWithSafeMonster(mon, x, y) {
 async function heroMeleeAttack(mon) {
     gethungry();
     exercise(A_DEX, true);
+    const primary = heroWieldedWeapon();
     const dieroll = rnd(20);
-    const hit = heroMeleeToHit(mon) > dieroll;
+    const hit = heroMeleeToHit(mon, primary) > dieroll;
     if (!hit) {
         await pline(`You miss ${monsterHitName(mon)}.`);
+        rn2(3);
+        if (!game.u?.twoweap || !heroSecondaryWeapon()) {
+            game.context.run = null;
+            return;
+        }
+    } else {
+        exercise(A_DEX, true);
+        const damage = Math.max(1, rnd(heroMeleeSmallDamageDie()) + heroMeleeDamageBonus());
+        if (typeof mon.mhp === 'number') {
+            mon.mhp -= damage;
+            if (mon.mhp <= 0) {
+                const petSoundPrinted = mon.mtame ? await abuseDog(mon) : false;
+                const killLine = `You kill ${monsterKillName(mon)}!`;
+                if (game._pending_message) await append_pline(killLine);
+                else await pline(killLine);
+                if (petSoundPrinted) queue_more_prompt();
+                heroKilledMonster(mon);
+                if (game._more) {
+                    game._pre_turn_more_waiting = true;
+                    game._monster_turn_paused_for_more = true;
+                }
+                game.context.run = null;
+                return;
+            }
+        }
+        await pline(`You hit ${monsterHitName(mon)}.`);
+        rn2(3);
+        rn2(6);
+        rn2(25);
         rn2(3);
         game.context.run = null;
         return;
     }
-    exercise(A_DEX, true);
+
+    const second = heroSecondaryWeapon();
+    const secondRoll = rnd(20);
+    const secondHit = heroMeleeToHit(mon, second) > secondRoll;
+    if (!secondHit) {
+        await append_pline(`You miss ${monsterHitName(mon)}.`);
+        game.context.run = null;
+        return;
+    }
     const damage = Math.max(1, rnd(heroMeleeSmallDamageDie()) + heroMeleeDamageBonus());
     if (typeof mon.mhp === 'number') {
         mon.mhp -= damage;
@@ -7568,6 +7825,7 @@ function discoveryLineForObjectType(otyp, encounteredTypes) {
     const calledName = game.calledObjects instanceof Map ? game.calledObjects.get(otyp) : '';
     const typeKnown = knownObjectType(otyp);
     const priceQuote = discoveryPriceQuoteSuffix(otyp);
+    const japaneseName = typeKnown ? japaneseItemName(otyp) : '';
 
     if (calledName && oclass === SCROLL_CLASS && !typeKnown) {
         return `${prefix}scroll called ${calledName}${desc ? ` (${desc})` : ''}${priceQuote}`;
@@ -7576,6 +7834,10 @@ function discoveryLineForObjectType(otyp, encounteredTypes) {
         base = ARMOR_XNAMES.get(otyp).name;
     }
     if (typeKnown && otyp === ORCISH_DAGGER) base = 'orcish dagger';
+    if (japaneseName && base && japaneseName !== base) {
+        // C ref: src/objnam.c:Japanese_item_name().
+        return `${prefix}${japaneseName} [${base}]${priceQuote}`;
+    }
     if (!base && !desc) return null;
     if (!base) base = desc;
     if (typeKnown && !desc && (oclass === WEAPON_CLASS || oclass === TOOL_CLASS
@@ -7879,7 +8141,11 @@ function roleAttributesPage2() {
     if (game.u?.uprops?.deaf) lines.push('  You are deaf.');
     lines.push('  You aren\'t hungry.');
     lines.push(encumbranceInsightLine());
-    if (wielded) {
+    if (game.u?.twoweap) {
+        lines.push('  You are wielding two weapons at once.');
+        lines.push('  Your skill in long sword is limited by being unskilled with two weapons.');
+        lines.push('  Your skill in short sword is also limited by being unskilled with two weapons');
+    } else if (wielded) {
         const skill = weaponSkillName(wielded);
         lines.push(`  You are wielding ${articleForWord(skill)} ${skill}.`);
         lines.push(`  You have ${weaponSkillLevelName(wielded)} skill with ${skill}.`);
@@ -9316,13 +9582,20 @@ export async function rhack(key) {
             } else if (cmd === 'name') {
                 showNameCommandMenu();
                 game.context.move = 0;
+            } else if (cmd === 'enhance') {
+                showEnhanceSkillsMenu();
+                game.context.move = 0;
+            } else if (cmd === 'sit') {
+                await doSitCommand();
+            } else if (cmd === 'twoweapon') {
+                await doTwoWeaponCommand();
             } else {
                 // C ref: win/tty/getline.c:tty_get_ext_cmd().
                 if (typedExtCommand) {
                     await pline(`#${typedExtCommand.slice(0, 60)}: unknown extended command.`);
                 }
             }
-            if (cmd !== 'force' && cmd !== 'wipe') game.context.move = 0;
+            if (cmd !== 'force' && cmd !== 'wipe' && cmd !== 'twoweapon' && cmd !== 'sit') game.context.move = 0;
             return;
         }
         if (ch === '\x1b') {
@@ -10761,6 +11034,7 @@ export async function rhack(key) {
             || prev === game._look_data_screen
             || prev === game._look_list_screen
             || prev === game._name_menu_screen
+            || prev === game._enhance_skills_screen
             || (prev === game._attributes_page1_screen && key !== 32 && key !== 13)
             || prev === game._attributes_page2_screen) {
             game._spell_menu_screen = null;
@@ -10768,6 +11042,7 @@ export async function rhack(key) {
             game._look_data_screen = null;
             game._look_list_screen = null;
             game._name_menu_screen = null;
+            game._enhance_skills_screen = null;
             game._attributes_page1_screen = null;
             game._attributes_page2_screen = null;
             await redrawAfterFullScreenMenuDismiss();
@@ -10997,6 +11272,8 @@ export async function rhack(key) {
         const letters = wieldLetters();
         game._awaiting_wield_item = true;
         await showPromptLine(`What do you want to wield? [-${letters ? ` ${letters}` : ''} or ?*] `);
+    } else if (ch === 'X') {
+        await doTwoWeaponCommand();
     } else if (ch === 'Q') {
         game.context.move = 0;
         const letters = readyLetters();

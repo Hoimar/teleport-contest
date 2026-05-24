@@ -26,6 +26,12 @@ const ROLE_INIT = new Map([
         attrdist: [30, 10, 10, 20, 20, 10],
         hp: 15, pwBase: 2, pwRnd: 0, ac: 0, gold: 0,
     }],
+    ['Samurai', {
+        attrbase: [10, 8, 7, 10, 17, 6],
+        attrmax: [30, 10, 8, 30, 14, 8],
+        attrdist: [30, 10, 8, 30, 14, 8],
+        hp: 15, pwBase: 2, pwRnd: 0, ac: 0, gold: 0,
+    }],
     ['Tourist', {
         attrbase: [7, 10, 6, 7, 7, 10],
         attrmax: [15, 10, 10, 15, 30, 20],
@@ -97,6 +103,7 @@ const SPEAR = 27;
 const DAGGER = 34;
 const ELVEN_DAGGER = 35;
 const ORCISH_DAGGER = 36;
+const KNIFE = 40;
 const ELVEN_SPEAR = 28;
 const ORCISH_SPEAR = 29;
 const DWARVISH_SPEAR = 30;
@@ -107,6 +114,7 @@ const ELVEN_SHORT_SWORD = 47;
 const ORCISH_SHORT_SWORD = 48;
 const DWARVISH_SHORT_SWORD = 49;
 const SCIMITAR = 50;
+const BROADSWORD = 52;
 const ELVEN_BROADSWORD = 53;
 const KATANA = 56;
 const TSURUGI = 57;
@@ -117,6 +125,8 @@ const BOW = 83;
 const ELVEN_BOW = 84;
 const ORCISH_BOW = 85;
 const YUMI = 86;
+const PLATE_MAIL = 121;
+const SPLINT_MAIL = 124;
 const HAWAIIAN_SHIRT = 136;
 const LEATHER_ARMOR = 134;
 const CLOAK_OF_MAGIC_RESISTANCE = 148;
@@ -268,6 +278,15 @@ const ROGUE_INVENTORY = [
     { typ: SACK, spe: 0, cls: TOOL_CLASS, min: 1, max: 1, bless: 0 },
 ];
 
+const SAMURAI_INVENTORY = [
+    // C ref: src/u_init.c:Samurai[].
+    { typ: KATANA, spe: 0, cls: WEAPON_CLASS, min: 1, max: 1, bless: UNDEF_BLESS, wielded: true },
+    { typ: SHORT_SWORD, spe: 0, cls: WEAPON_CLASS, min: 1, max: 1, bless: UNDEF_BLESS, alternate: true },
+    { typ: YUMI, spe: 0, cls: WEAPON_CLASS, min: 1, max: 1, bless: UNDEF_BLESS },
+    { typ: YA, spe: 0, cls: WEAPON_CLASS, min: 26, max: 45, bless: UNDEF_BLESS, quivered: true },
+    { typ: SPLINT_MAIL, spe: 0, cls: ARMOR_CLASS, min: 1, max: 1, bless: UNDEF_BLESS, worn: true },
+];
+
 const RANGER_KNOWN_WEAPONS = [
     ELVEN_ARROW, ORCISH_ARROW, YA,
     ELVEN_SPEAR, ORCISH_SPEAR, DWARVISH_SPEAR,
@@ -288,6 +307,21 @@ const VALKYRIE_KNOWN_WEAPONS = [
     ELVEN_SHORT_SWORD, ORCISH_SHORT_SWORD, DWARVISH_SHORT_SWORD,
     SCIMITAR, ELVEN_BROADSWORD, KATANA, TSURUGI,
     RUNESWORD, DWARVISH_MATTOCK,
+];
+
+const SAMURAI_KNOWN_WEAPONS = [
+    // C ref: src/u_init.c:u_init_role() -> knows_class(WEAPON_CLASS).
+    ELVEN_ARROW, ORCISH_ARROW, YA, SHURIKEN,
+    ELVEN_SPEAR, ORCISH_SPEAR, DWARVISH_SPEAR, JAVELIN,
+    ELVEN_DAGGER, ORCISH_DAGGER, KNIFE, BATTLE_AXE,
+    SHORT_SWORD, ELVEN_SHORT_SWORD, ORCISH_SHORT_SWORD, DWARVISH_SHORT_SWORD,
+    SCIMITAR, BROADSWORD, ELVEN_BROADSWORD, KATANA, TSURUGI,
+    RUNESWORD, DWARVISH_MATTOCK,
+];
+
+const SAMURAI_KNOWN_ARMOR = [
+    // C ref: src/u_init.c:u_init_role() -> knows_class(ARMOR_CLASS).
+    PLATE_MAIL, SPLINT_MAIL, LEATHER_GLOVES,
 ];
 
 function trquan(trop) {
@@ -398,6 +432,16 @@ function discover_role_known_object(otyp) {
     if (!order.includes(otyp)) order.push(otyp);
     game.discoveredObjects = game.discoveredObjects || new Set();
     if (typeof game.discoveredObjects.add === 'function') game.discoveredObjects.add(otyp);
+}
+
+function reorder_samurai_known_discoveries() {
+    // C ref: src/u_init.c:u_init_role() -> knows_class(); discovery output
+    // follows object-table order for the pre-known classes, not ini_inv order.
+    const known = [...SAMURAI_KNOWN_WEAPONS, ...SAMURAI_KNOWN_ARMOR, FOOD_RATION];
+    const knownSet = new Set(known);
+    const order = Array.isArray(game.discoveryOrder) ? game.discoveryOrder : [];
+    const rest = order.filter((otyp) => !knownSet.has(otyp));
+    game.discoveryOrder = [...known, ...rest];
 }
 
 function is_container_type(otyp) {
@@ -558,6 +602,15 @@ export function u_init_role_inventory() {
         if (!rn2(5)) {
             ini_inv(BLINDFOLD_INVENTORY, noCreate, role.name.m);
         }
+    } else if (role?.name?.m === 'Samurai') {
+        ini_inv(SAMURAI_INVENTORY, noCreate, role.name.m);
+        if (!rn2(5)) {
+            ini_inv(BLINDFOLD_INVENTORY, noCreate, role.name.m);
+        }
+        for (const otyp of SAMURAI_KNOWN_WEAPONS) discover_role_known_object(otyp);
+        for (const otyp of SAMURAI_KNOWN_ARMOR) discover_role_known_object(otyp);
+        discover_role_known_object(FOOD_RATION);
+        reorder_samurai_known_discoveries();
     }
     if (roleStartingGold > 0) {
         ini_inv(MONEY_INVENTORY, noCreate, role?.name?.m);
@@ -643,6 +696,11 @@ export function apply_startup_role_state() {
     game.u.uencumber = 0;
     game.u.acurr = { a: attrs };
     game.u.amax = { a: maxes };
+    if (role?.name?.m === 'Samurai') {
+        // C ref: src/attrib.c:sam_abil[] grants level-1 intrinsic HFast.
+        game.u.uprops = game.u.uprops || {};
+        game.u.uprops.intrinsic_fast = true;
+    }
 }
 
 function roleLevelAdv() {

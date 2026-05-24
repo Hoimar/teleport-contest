@@ -13,53 +13,52 @@ and `feature_map.md`.
 ## Current State
 
 - Current branch in this workspace: `main`.
-- Baseline commit before the current JS batch: `ac3a636`.
-- Current completed target: `seed0105-valk-chat-lamp-ration` advanced from
-  `S 0/30 R 987/2499 C 0` to full focused/frozen parity
-  `S 30/30 R 2499/2499 C 0`.
-- `seed0015-valk-level2-pit-dog-wait`, `seed0360-wizard-world-tour`,
+- Baseline commit before the current JS batch: `ae8a4ed`.
+- Current completed target: `seed0107-samurai-twoweapon-enhance` advanced to
+  full focused/frozen parity `S 98/98 R 2902/2902 C 0`.
+- `seed0105-valk-chat-lamp-ration`,
+  `seed0015-valk-level2-pit-dog-wait`, `seed0360-wizard-world-tour`,
   `seed0108-wizard-extcmd-wishlist`, and the standing sentinel set remain full
-  focused passes after the niche-engraving/eat-prompt batch.
+  focused passes after the Samurai startup/two-weapon batch.
 - Frozen public passes in this workspace are `seed0002`, both `seed0013`
   sessions, `seed0015`, `seed0101`, `seed0102`, `seed0105`, `seed0108`,
   `seed0116`, `seed0360`, `seed0383`, `seed0398`, `seed1500`, `seed1800`,
-  `seed2200`, `seed5002`, and `seed8000`.
+  `seed2200`, `seed5002`, and `seed8000`. The frozen public scorer has not
+  been re-run after the seed0107 implementation.
 
 ## Latest Loop Checkpoint
 
-- Target: `seed0105-valk-chat-lamp-ration`.
-- Current verification: focused target `S 30/30 R 2499/2499 C 0`.
-- Sentinel verification after the seed0105 pass: total
+- Target: `seed0107-samurai-twoweapon-enhance`.
+- Current verification: focused target `S 98/98 R 2902/2902 C 0`.
+- Sentinel verification after the seed0107 pass: total
   `S 1063/1063 R 64569/64569`.
-- Full verification totals after this pass are `S 3179/11405 R 288877/792838`.
-- Frozen public score after this pass is `17/44` passing. Exact frozen passes:
-  `seed0002`, `seed0013-friday13-save-then-fullmoon-restore`,
-  `seed0013-rogue-friday13-combat`, `seed0015`, `seed0101`, `seed0102`,
-  `seed0105`, `seed0108`, `seed0116`, `seed0360`, `seed0383`, `seed0398`,
-  `seed1500`, `seed1800`, `seed2200`, `seed5002`, and `seed8000`.
+- Full verification totals after this pass are `S 3279/11405 R 290458/792838`.
+- Frozen public score after the previous seed0105 pass was `17/44` passing;
+  re-run it after committing if current public-pass evidence is needed.
 - Harness checks: hack audit `hard=0 suspicious=40`; memory lint is clean.
-  The frozen scorer reports `17/44 passing`.
 - Implemented subsystem truth in this iteration:
-  - `makeniche()` now creates trapdoor/teleport dust engravings, marks
-    non-rock traps one-shot, and runs C-shaped `wipe_engr_at()`/`wipeout_text()`
-    decay for current evidence (`C refs: mklev.c:makeniche()`,
-    `engrave.c:wipe_engr_at()`, `engrave.c:wipeout_text()`).
-  - Map display now renders visible/remembered spot-shown engravings as
-    bright-blue room/corridor glyphs below floor objects and above terrain
-    (`C refs: display.c:_map_location()`,
-    `engrave.h:engraving_to_defsym()`).
-  - `invent.c:getobj()` prompt semantics now cover invalid eat letters:
-    non-dismiss keys stay on `You don't have that object.--More--`, and
-    Space/Enter/Esc redraws the eat prompt. Empty apply with no applicable
-    objects now uses C's `You don't have anything to use or apply.` wording.
+  - Samurai startup now uses role-driven attributes/HP/Pw/AC, starting
+    katana/wakizashi/yumi/ya/lacquered splint mail, preknown
+    weapon/armor/food-ration discoveries, and level-1 intrinsic Fast
+    (`C refs: role.c:roles[]`, `u_init.c:Samurai[]`,
+    `u_init.c:u_init_role()`, `attrib.c:sam_abil[]`,
+    `allmain.c:u_calc_moveamt()`).
+  - Legacy open-door glyph orientation now follows `back_to_glyph()`/`defsym.h`
+    in live and premap display (`rm.horizontal` draws `|`, non-horizontal draws
+    `-`; DECgraphics remains checkerboard).
+  - Samurai-facing command evidence now covers `#twoweapon`, two-weapon melee
+    front-door to-hit/secondary-swing behavior, `#enhance`, `#sit`, Japanese
+    object names, quivered bow ammo wording, and two-weapon insight text
+    (`C refs: wield.c:dotwoweapon()`, `uhitm.c:find_roll_to_hit()`,
+    `weapon.c:weapon_hit_bonus()`, `u_init.c:Skill_S[]`,
+    `sit.c:dosit()`, `objnam.c:Japanese_item_name()`).
 - Current frontier:
-  - Seed0105 has no focused cell/RNG/cursor frontier.
+  - Seed0107 has no focused cell/RNG/cursor frontier.
 - Production `js/` has no intentional debug I/O or frozen imports.
 - This batch is verified and ready to commit; do not stage
   `scratch/divergence-inventory.md` unless intentionally refreshing corpus
   inventory.
 - Next queue:
-  - Pick a startup/role bucket from `scratch/divergence-inventory.md`, or use
-    a narrow remaining public path such as `seed0106-priest-extcmd-sweep` or
-    `seed0107-samurai-twoweapon-enhance`.
-  - Start the next target with `npm run agent:brief -- --target <session>`.
+  - Start `seed0106-priest-extcmd-sweep` with
+    `npm run agent:brief -- --target seed0106-priest-extcmd-sweep`, then triage
+    the first mismatch.
