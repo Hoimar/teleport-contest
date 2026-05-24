@@ -6,6 +6,10 @@ import { rnd, rn2, rn1, rne } from './rng.js';
 import { findRole } from './roles.js';
 import { mkobj, mksobj } from './mklev.js';
 import { OBJECT_CHARGED } from './object_data.js';
+import {
+    P_ATTACK_SPELL, P_HEALING_SPELL, P_DIVINATION_SPELL, P_ENCHANTMENT_SPELL,
+    P_CLERIC_SPELL, P_ESCAPE_SPELL, P_MATTER_SPELL,
+} from './const.js';
 
 const ROLE_INIT = new Map([
     ['Healer', {
@@ -201,6 +205,28 @@ const SPELLBOOK_LEVEL = new Map([
     [402, 7], [403, 1], [404, 1], [405, 3], [406, 2], [407, 0],
 ]);
 
+const SPELLBOOK_SKILL = new Map([
+    [366, P_MATTER_SPELL], [367, P_ATTACK_SPELL], [368, P_ATTACK_SPELL],
+    [369, P_ATTACK_SPELL], [370, P_ENCHANTMENT_SPELL], [371, P_ATTACK_SPELL],
+    [372, P_DIVINATION_SPELL], [373, P_DIVINATION_SPELL], [374, P_HEALING_SPELL],
+    [375, P_MATTER_SPELL], [376, P_ATTACK_SPELL], [377, P_ENCHANTMENT_SPELL],
+    [378, P_HEALING_SPELL], [379, P_ATTACK_SPELL], [380, P_ENCHANTMENT_SPELL],
+    [381, P_MATTER_SPELL], [382, P_CLERIC_SPELL], [383, P_DIVINATION_SPELL],
+    [384, P_ENCHANTMENT_SPELL], [385, P_DIVINATION_SPELL], [386, P_HEALING_SPELL],
+    [387, P_ENCHANTMENT_SPELL], [388, P_ESCAPE_SPELL], [389, P_DIVINATION_SPELL],
+    [390, P_ESCAPE_SPELL], [391, P_HEALING_SPELL], [392, P_HEALING_SPELL],
+    [393, P_ESCAPE_SPELL], [394, P_DIVINATION_SPELL], [395, P_CLERIC_SPELL],
+    [396, P_DIVINATION_SPELL], [397, P_DIVINATION_SPELL], [398, P_CLERIC_SPELL],
+    [399, P_MATTER_SPELL], [400, P_ESCAPE_SPELL], [401, P_CLERIC_SPELL],
+    [402, P_MATTER_SPELL], [403, P_CLERIC_SPELL], [404, P_ESCAPE_SPELL],
+    [405, P_HEALING_SPELL], [406, P_ATTACK_SPELL],
+]);
+
+const ROLE_ALLOWED_STARTING_SPELL_SKILLS = new Map([
+    // C ref: src/u_init.c:restricted_spell_discipline(), Skill_P[].
+    ['Priest', new Set([P_HEALING_SPELL, P_DIVINATION_SPELL, P_CLERIC_SPELL])],
+]);
+
 const WIZARD_INVENTORY = [
     { typ: QUARTERSTAFF, spe: 1, cls: WEAPON_CLASS, min: 1, max: 1, bless: 1, wielded: true },
     { typ: CLOAK_OF_MAGIC_RESISTANCE, spe: 0, cls: ARMOR_CLASS, min: 1, max: 1, bless: UNDEF_BLESS, worn: true },
@@ -356,6 +382,13 @@ function starting_spell_level(otyp) {
     return SPELLBOOK_LEVEL.get(otyp) ?? 0;
 }
 
+function restricted_starting_spell_discipline(otyp, roleName) {
+    const allowed = ROLE_ALLOWED_STARTING_SPELL_SKILLS.get(roleName);
+    if (!allowed) return false;
+    const skill = SPELLBOOK_SKILL.get(otyp);
+    return skill != null && !allowed.has(skill);
+}
+
 function rejected_starting_object(obj, noCreate, gotLevel1Spellbook, roleName) {
     const otyp = obj?.otyp;
     if (otyp == null) return false;
@@ -372,7 +405,8 @@ function rejected_starting_object(obj, noCreate, gotLevel1Spellbook, roleName) {
     if (roleName === 'Wizard' && otyp === SPE_FORCE_BOLT) return true;
     if (obj.oclass === SPBOOK_CLASS) {
         const maxLevel = gotLevel1Spellbook ? 3 : 1;
-        return starting_spell_level(otyp) > maxLevel;
+        return starting_spell_level(otyp) > maxLevel
+            || restricted_starting_spell_discipline(otyp, roleName);
     }
     return false;
 }

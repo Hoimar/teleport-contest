@@ -19,7 +19,7 @@ import {
     makemon, mklev, mkobj, mkcorpstat, mksobj, monster_by_user_name, monsterPtr,
     next_ident, place_lregion, place_object, shopTypeName, u_on_dnstairs, u_on_upstairs,
 } from './mklev.js';
-import { OBJECT_CHARGED, OBJECT_CLASS, OBJECT_DELAY, OBJECT_MATERIAL, OBJECT_PROB } from './object_data.js';
+import { OBJECT_CHARGED, OBJECT_CLASS, OBJECT_DELAY, OBJECT_DIR, OBJECT_MATERIAL, OBJECT_PROB } from './object_data.js';
 import { finish_deferred_monster_pet_hit, finish_pet_kill, obj_resists, pet_arrive_with_you } from './dog.js';
 import { merge_inventory_object, newuexp, pluslvl } from './u_init.js';
 import { adjalign, exercise, gethungry } from './allmain_turns.js';
@@ -7745,6 +7745,13 @@ async function handleQueuedMore(ch) {
             game.context.move = 0;
             return true;
         }
+        if (game._spellbook_refresh_prompt_after_more) {
+            game._spellbook_refresh_prompt_after_more = null;
+            game._awaiting_spellbook_refresh_confirm = true;
+            await showPromptLine('Refresh your memory anyway? [yn] (n)', { trailingInputSpace: true });
+            game.context.move = 0;
+            return true;
+        }
         if (game._resume_engrave_prompt_after_more) {
             game._resume_engrave_prompt_after_more = false;
             game._awaiting_engrave_item = true;
@@ -8154,10 +8161,17 @@ function spellMenuPlainLine(entry, turnsLeft, showTurns = false) {
 }
 
 async function showSpellMenu() {
+    const menu = await buildSpellMenuWindow('Currently known spells', true);
+    if (!menu) return;
+    game._spell_menu_screen = menu.screen;
+    showSerializedOverride(menu.screen, menu.cursor);
+}
+
+async function buildSpellMenuWindow(title, includeSort) {
     const spells = knownSpellEntries();
     if (!spells.length) {
         await pline("You don't know any spells right now.");
-        return;
+        return null;
     }
 
     await flush_screen(1);
@@ -8168,13 +8182,13 @@ async function showSpellMenu() {
     const showTurns = !!(game.wizard || game.flags?.debug);
     const headerLine = `    ${'Name'.padEnd(20)} Level ${'Category'.padEnd(12)} Fail Retention${showTurns ? '  turns' : ''}`;
     const lines = [
-        { text: 'Currently known spells', attr: ATR_INVERSE },
+        { text: title, attr: ATR_INVERSE },
         { text: '' },
         { text: '', headerSegments: true },
         ...spells.map((entry) => ({ text: spellMenuPlainLine(entry, turnsLeft, showTurns) })),
-        { text: '+ - [sort spells]' },
-        { text: '(end)' },
     ];
+    if (includeSort) lines.push({ text: '+ - [sort spells]' });
+    lines.push({ text: '(end)' });
     const maxLen = Math.max(headerLine.length, ...lines.map((line) => (line.text || '').length));
     const menuCol = Math.max(1, Math.min(COLNO - 1, COLNO - maxLen - 2));
     for (let row = 0; row < Math.min(5, lines.length); row++)
@@ -8206,8 +8220,82 @@ async function showSpellMenu() {
     }
     const lastRow = lines.length - 1;
     const cursorCol = menuCol + 6;
-    game._spell_menu_screen = screen;
-    showSerializedOverride(screen, [Math.min(cursorCol, COLNO - 1), lastRow]);
+    return {
+        screen,
+        cursor: [Math.min(cursorCol, COLNO - 1), lastRow],
+        spells,
+    };
+}
+
+async function showCastSpellMenu() {
+    const menu = await buildSpellMenuWindow('Choose which spell to cast', false);
+    if (!menu) return;
+    game._spell_cast_menu_screen = menu.screen;
+    game._spell_cast_menu_choices = new Map(menu.spells.map((entry) => [entry.letter, entry]));
+    showSerializedOverride(menu.screen, menu.cursor);
+}
+
+function spendSpellHunger(entry, energy) {
+    if (entry?.name === 'detect food') return;
+    if (!game.u) return;
+    let hunger = energy * 2;
+    if (game.urole?.name?.m === 'Wizard') {
+        const intell = game.u?.acurr?.a?.[C.A_INT] ?? 10;
+        if (intell >= 17) hunger = 0;
+        else if (intell === 16) hunger = Math.trunc(hunger / 4);
+        else if (intell === 15) hunger = Math.trunc(hunger / 2);
+    }
+    if (hunger > (game.u.uhunger || 0) - 3) hunger = (game.u.uhunger || 0) - 3;
+    if (hunger > 0) game.u.uhunger = Math.max(0, (game.u.uhunger || 0) - hunger);
+}
+
+async function beginCastSpell(entry) {
+    // C ref: src/spell.c:docast(), spelleffects_check(), spelleffects().
+    if (!entry) {
+        game.context.move = 0;
+        return;
+    }
+    const energy = Math.max(1, entry.level || 1) * 5;
+    if ((game.u?.uen || 0) < energy) {
+        game.context.move = 0;
+        await pline(`You don't have enough energy to cast that spell${(game.u?.uen || 0) < (game.u?.uenmax || 0) ? '' : ' yet'}.`);
+        return;
+    }
+    spendSpellHunger(entry, energy);
+    const chance = percentSpellSuccessBasic(entry);
+    if (rnd(100) > chance) {
+        if (game.u) game.u.uen = Math.max(0, (game.u.uen || 0) - Math.trunc(energy / 2));
+        game.context.move = 1;
+        await pline('You fail to cast the spell correctly.');
+        return;
+    }
+    if (game.u) game.u.uen = Math.max(0, (game.u.uen || 0) - energy);
+    exercise(A_WIS, true);
+    const pseudo = mksobj(entry.otyp, false, false);
+    pseudo.blessed = false;
+    pseudo.cursed = false;
+    pseudo.quan = 20;
+    if ((OBJECT_DIR[entry.otyp] || 0) !== 0) {
+        game._awaiting_spell_direction = { entry, pseudo };
+        game.context.move = 0;
+        await showPromptLine('In what direction? ');
+        return;
+    }
+    await finishCastSpell(entry, pseudo, '.');
+}
+
+async function finishCastSpell(entry, pseudo, dir) {
+    if (entry?.otyp === SPE_HEALING) {
+        // C ref: src/zap.c:zapyourself(), SPE_HEALING.
+        if (dir === '.') {
+            healup(d(6, 4), 0);
+            await pline('You feel better.');
+        }
+        game.context.move = 1;
+        return;
+    }
+    void pseudo;
+    game.context.move = 1;
 }
 
 function shouldShowWizardSkillDiscoveries() {
@@ -10224,6 +10312,24 @@ export async function rhack(key) {
         return;
     }
 
+    if (game._awaiting_spell_direction) {
+        clear_pending_message();
+        const state = game._awaiting_spell_direction;
+        game._awaiting_spell_direction = null;
+        if (!'hykulnjb<>.'.includes(ch)) {
+            game.context.move = 0;
+            await pline('What a strange direction!');
+            return;
+        }
+        if (ch === '<' || ch === '>') {
+            game.context.move = 0;
+            await pline(`The magical energy is released!`);
+            return;
+        }
+        await finishCastSpell(state.entry, state.pseudo, ch);
+        return;
+    }
+
     if (game._awaiting_travel_prompt) {
         if (ch === '>' || ch === '<') {
             const st = travelFeatureStair(ch === '<');
@@ -10868,6 +10974,24 @@ export async function rhack(key) {
         return;
     }
 
+    if (game._awaiting_spellbook_refresh_confirm) {
+        if (ch === 'y' || ch === 'Y') {
+            clear_pending_message();
+            game._awaiting_spellbook_refresh_confirm = false;
+            game.context.move = 0;
+            return;
+        }
+        if (ch === 'n' || ch === 'N' || ch === '\x1b' || ch === ' ' || ch === '\r' || ch === '\n') {
+            game._awaiting_spellbook_refresh_confirm = false;
+            game._prompt_cursor = null;
+            game.context.move = 0;
+            return;
+        }
+        await showPromptLine('Refresh your memory anyway? [yn] (n)', { trailingInputSpace: true });
+        game.context.move = 0;
+        return;
+    }
+
     if (game._awaiting_quiver_confirm) {
         clear_pending_message();
         const obj = game._awaiting_quiver_confirm;
@@ -10981,6 +11105,18 @@ export async function rhack(key) {
         if (obj.oclass !== SCROLL_CLASS && obj.oclass !== SPBOOK_CLASS) {
             game.context.move = 0;
             await pline('That is a silly thing to read.');
+            return;
+        }
+        if (obj.oclass === SPBOOK_CLASS) {
+            const info = SPELLBOOK_SPELL_INFO.get(obj.otyp);
+            const alreadyKnown = info && knownSpellEntries().some((entry) => entry.otyp === obj.otyp);
+            if (alreadyKnown) {
+                // C ref: src/spell.c:study_book().
+                await pline(`You know "${info.name}" quite well already.`);
+                game._spellbook_refresh_prompt_after_more = { otyp: obj.otyp };
+                queue_more_prompt();
+            }
+            game.context.move = 0;
             return;
         }
         if (obj.otyp === SCR_REMOVE_CURSE) {
@@ -11440,6 +11576,15 @@ export async function rhack(key) {
             game.context.move = 0;
             return;
         }
+        if (prev === game._spell_cast_menu_screen) {
+            const entry = game._spell_cast_menu_choices?.get(ch);
+            game._spell_cast_menu_screen = null;
+            game._spell_cast_menu_choices = null;
+            await redrawAfterFullScreenMenuDismiss();
+            if (entry) await beginCastSpell(entry);
+            else game.context.move = 0;
+            return;
+        }
         if (prev === game._help_menu_screen) {
             clearOverrideScreen();
             await handleHelpMenuSelection(ch);
@@ -11607,9 +11752,12 @@ export async function rhack(key) {
             || prev === game._overview_screen
             || prev === game._conduct_screen
             || prev === game._vanquished_screen
+            || prev === game._spell_cast_menu_screen
             || (prev === game._attributes_page1_screen && key !== 32 && key !== 13)
             || prev === game._attributes_page2_screen) {
             game._spell_menu_screen = null;
+            game._spell_cast_menu_screen = null;
+            game._spell_cast_menu_choices = null;
             game._discovery_screen = null;
             game._look_data_screen = null;
             game._look_list_screen = null;
@@ -11859,6 +12007,9 @@ export async function rhack(key) {
     } else if (ch === '+') {
         game.context.move = 0;
         await showSpellMenu();
+    } else if (ch === 'Z') {
+        game.context.move = 0;
+        await showCastSpellMenu();
     } else if (key === 20) { // ^T teleport
         game.context.move = 0;
         await showPromptLine("Where do you want to be teleported?  (For instructions type a '?')");
