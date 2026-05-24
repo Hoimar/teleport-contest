@@ -7467,6 +7467,10 @@ async function handleQueuedMore(ch) {
     const swallowedDamageResume = pausedMonsterTurn && !!game._swallowed_damage_more_waiting;
     const preTurnResume = pausedMonsterTurn && !!game._pre_turn_more_waiting;
     const monsterAttackResume = pausedMonsterTurn && !!game._monster_attack_more_waiting;
+    const deferredPetDeathNeedsPrompt = !!game._after_more_message
+        && !!game._pet_defender_death_pending
+        && !!game._pet_combat_more_latched
+        && !(game.u?.uhallucination || game.u?.uprops?.hallucination);
     const pausedFloorListTurn = !!game._resume_floor_list_turn;
     const pausedRunTail = !!game._run_paused_for_more;
     const preserveMonsterMoreBase = pausedMonsterTurn
@@ -7812,7 +7816,10 @@ async function handleQueuedMore(ch) {
         }
         if (game._after_more_message) {
             const msg = game._after_more_message;
-            const needsPrompt = !!game._after_more_needs_prompt;
+            // C refs: src/mhitm.c:mattackm(), src/mon.c:monkilled().
+            // A deferred monster-vs-monster hit line blocks before visible
+            // death side effects such as "The kitten is killed!" are applied.
+            const needsPrompt = !!game._after_more_needs_prompt || deferredPetDeathNeedsPrompt;
             game._after_more_message = '';
             game._after_more_needs_prompt = false;
             if (game._clear_latched_status_before_after_more) {
