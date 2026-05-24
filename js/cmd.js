@@ -5416,6 +5416,7 @@ export function shouldStopRunForNearbyMonster() {
 }
 
 function monsterSwapName(mon) {
+    if (C.has_mgivenname(mon)) return C.MGIVENNAME(mon);
     const name = monsterName(mon);
     if (mon?.mtame) return `your ${name}`;
     if (mon?.mpeaceful) return `the peaceful ${name}`;
@@ -8437,6 +8438,24 @@ function heroBaseAttr(index) {
     return game.u?.amax?.a?.[index] ?? heroAttr(index);
 }
 
+function wearingPowerGauntlets() {
+    return (game.inventory || []).some((obj) => obj?.otyp === GAUNTLETS_OF_POWER
+        && (obj.worn || obj.owornmask));
+}
+
+function insightAttrValueText(index, value) {
+    let attrvalue = Number(value);
+    if (!Number.isFinite(attrvalue)) return String(value ?? 0);
+    if (index === C.A_STR && attrvalue === 25 && wearingPowerGauntlets()) {
+        attrvalue = C.STR19(25);
+    }
+    // C ref: src/insight.c:attrval().  Insight prints exceptional strength as
+    // 18/xx and uses 18/100 rather than the status line's 18/** spelling.
+    if (index !== C.A_STR || attrvalue <= 18) return String(attrvalue);
+    if (attrvalue > C.STR18(100)) return String(attrvalue - 100);
+    return `18/${String(attrvalue - 18).padStart(2, '0')}`;
+}
+
 function wizardRankTitle(level) {
     if (level >= 26) return 'Mage';
     if (level >= 22) return 'Necromancer';
@@ -8451,15 +8470,16 @@ function wizardRankTitle(level) {
 function insightAttrLine(label, index) {
     const current = heroAttr(index);
     const base = heroBaseAttr(index);
+    const currentText = insightAttrValueText(index, current);
     if (current !== base) {
         // C ref: src/insight.c:one_characteristic().  JS does not yet keep
         // separate ABASE/AMAX slots, so downward non-temporary loss is the
         // previous peak; explicit JS temporary penalties still report base.
         const temporaryPenalty = index === C.A_DEX && game.u?.wounded_legs_dex_penalty;
         const tag = current < base && !temporaryPenalty ? 'peak' : 'base';
-        return `  Your ${label} is ${current} (current; ${tag}:${base}).`;
+        return `  Your ${label} is ${currentText} (current; ${tag}:${insightAttrValueText(index, base)}).`;
     }
-    return `  Your ${label} is ${current}.`;
+    return `  Your ${label} is ${currentText}.`;
 }
 
 function articleForWord(word) {
@@ -8603,6 +8623,9 @@ function roleOppositionLine(role, alignName) {
 }
 
 function weaponSkillName(obj) {
+    // C ref: src/insight.c:attributes_enlightenment().  Most wielded weapons
+    // are described by skill class rather than exact object name.
+    if (obj?.otyp === KATANA) return 'long sword';
     if (obj?.otyp === SCALPEL) return 'knife';
     if (obj?.otyp === WAR_HAMMER) return 'hammer';
     return baseObjectName(obj);
@@ -8613,6 +8636,7 @@ function weaponSkillLevelName(obj) {
     if (game.urole?.name?.m === 'Ranger' && (obj?.otyp === DAGGER || obj?.otyp === BOW)) return 'basic';
     if (game.urole?.name?.m === 'Rogue' && obj?.otyp === SHORT_SWORD) return 'basic';
     if (game.urole?.name?.m === 'Priest' && obj?.otyp === MACE) return 'basic';
+    if (game.urole?.name?.m === 'Samurai' && (obj?.otyp === KATANA || obj?.otyp === SHORT_SWORD)) return 'basic';
     if (game.urole?.name?.m === 'Valkyrie' && obj?.otyp === SPEAR) return 'basic';
     return 'no';
 }

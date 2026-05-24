@@ -7,13 +7,13 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 
 | Sessions | Buckets | Screens | RNG calls | Errors |
 | --- | --- | --- | --- | --- |
-| 44 | 24 | 3576/11405 | 296698/792838 | 0 |
+| 44 | 23 | 3626/11405 | 296698/792838 | 0 |
 
 ## Bucket Summary
 
 | Count | Phase | Canonical evidence | Subsystem hypothesis | Owner | Needs deeper debug |
 | --- | --- | --- | --- | --- | --- |
-| 20 | passing | seed0116-wizard-wear-shop | Pet behavior: dog_goal() object scan, reachability, carry checks, and object resistance in dogmove.c. | Monsters / pets | yes |
+| 21 | passing | seed0116-wizard-wear-shop | Pet behavior: dog_goal() object scan, reachability, carry checks, and object resistance in dogmove.c. | Monsters / pets | yes |
 | 2 | late-startup | seed0016-healer-newmoon-eat-zap | Late startup side effects, special levels, monster/object initialization, or display setup. | Mklev / objects / monsters / display | yes |
 | 1 | early-startup | seed0006-wizard-water-demon | Chargen, role/race/gender/align selection, options parsing, or early startup RNG ordering. | Player initialization / options | yes |
 | 1 | early-startup | seed0014-dequa-fountain-explore | Chargen, role/race/gender/align selection, options parsing, or early startup RNG ordering. | Player initialization / options | yes |
@@ -22,7 +22,6 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 | 1 | early-startup | seed0007-rogue-snake-swamp | Chargen, role/race/gender/align selection, options parsing, or early startup RNG ordering. | Player initialization / options | yes |
 | 1 | early-startup | seed0009-swimmer-mforce | Chargen, role/race/gender/align selection, options parsing, or early startup RNG ordering. | Player initialization / options | yes |
 | 1 | early-startup | seed0004-feeding-pony | Chargen, role/race/gender/align selection, options parsing, or early startup RNG ordering. | Player initialization / options | yes |
-| 1 | early-startup | seed0700-samurai-explore-descend | Chargen, role/race/gender/align selection, options parsing, or early startup RNG ordering. | Player initialization / options | no |
 | 1 | late-startup | seed5006-tourist-stress-disaster | Late startup side effects, special levels, monster/object initialization, or display setup. | Mklev / objects / monsters / display | yes |
 | 1 | late-startup | seed0017-samurai-altar-pray | Late startup side effects, special levels, monster/object initialization, or display setup. | Mklev / objects / monsters / display | yes |
 | 1 | late-startup | seed0060-orc-rogue-kick-search | Late startup side effects, special levels, monster/object initialization, or display setup. | Mklev / objects / monsters / display | yes |
@@ -42,7 +41,7 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 
 ### passing: seed0116-wizard-wear-shop
 
-- Count: 20
+- Count: 21
 - Bucket key: `passing | FS=pass | FR=none | none/none | - | rows=-`
 - Canonical screens: 127/127
 - Canonical RNG: 12562/12562
@@ -52,7 +51,7 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 - Hypothesis: Pet behavior: dog_goal() object scan, reachability, carry checks, and object resistance in dogmove.c.
 - Next owner: Monsters / pets
 - Needs deeper debug: yes
-- Sessions: seed0002-healer-reflection-drummer, seed0013-friday13-save-then-fullmoon-restore, seed0013-rogue-friday13-combat, seed0015-valk-level2-pit-dog-wait, seed0101-ranger-quiver-throw-travel-engrave, seed0102-ranger-name-cancel, seed0105-valk-chat-lamp-ration, seed0106-priest-extcmd-sweep, seed0107-samurai-twoweapon-enhance, seed0108-wizard-extcmd-wishlist, seed0116-wizard-wear-shop, seed0360-wizard-world-tour, seed0383-wizard-hallucinate, seed0398-wizard-wandpoly-pile, seed0501-priest-cast-read-turn, seed1500-rogue-explore-move, seed1800-tourist-eat-throw, seed2200-wizard-quaff-zap-read, seed5002-wizard-coverage-pair, seed8000-tourist-starter
+- Sessions: seed0002-healer-reflection-drummer, seed0013-friday13-save-then-fullmoon-restore, seed0013-rogue-friday13-combat, seed0015-valk-level2-pit-dog-wait, seed0101-ranger-quiver-throw-travel-engrave, seed0102-ranger-name-cancel, seed0105-valk-chat-lamp-ration, seed0106-priest-extcmd-sweep, seed0107-samurai-twoweapon-enhance, seed0108-wizard-extcmd-wishlist, seed0116-wizard-wear-shop, seed0360-wizard-world-tour, seed0383-wizard-hallucinate, seed0398-wizard-wandpoly-pile, seed0501-priest-cast-read-turn, seed0700-samurai-explore-descend, seed1500-rogue-explore-move, seed1800-tourist-eat-throw, seed2200-wizard-quaff-zap-read, seed5002-wizard-coverage-pair, seed8000-tourist-starter
 
 ### late-startup: seed0016-healer-newmoon-eat-zap
 
@@ -165,20 +164,6 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 - Next owner: Player initialization / options
 - Needs deeper debug: yes
 - Sessions: seed0004-feeding-pony
-
-### early-startup: seed0700-samurai-explore-descend
-
-- Count: 1
-- Bucket key: `early-startup | FS=0 | FR=none | char/status | - | rows=22`
-- Canonical screens: 1/51
-- Canonical RNG: 3230/3230
-- First screen mismatch: 0 (char/status, rows 22)
-- First RNG mismatch: - (-)
-- Sample cells: [22,35] ch 8/8 -> 9/8; [22,36] ch //8 ->  /8; [22,37] ch 0/8 -> D/8; [22,38] ch 1/8 -> x/8; [22,39] ch  /8 -> :/8
-- Hypothesis: Chargen, role/race/gender/align selection, options parsing, or early startup RNG ordering.
-- Next owner: Player initialization / options
-- Needs deeper debug: no
-- Sessions: seed0700-samurai-explore-descend
 
 ### late-startup: seed5006-tourist-stress-disaster
 
@@ -421,7 +406,7 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 | seed0398-wizard-wandpoly-pile | 87/87 | 3026/3026 | passing | -:none:none:- | -:- | - | - |
 | seed0399-wizard-hallu-actions | 1/532 | 1679/11409 | mklev-or-uinit | 0:char:mixed:init | 599:rn2(68)=>rn2(100) | 6,7,8,9,10,11+2 | [6,11] ch ┌/8 ->  /8; [6,12] ch ─/8 ->  /8; [6,13] ch ─/8 ->  /8; [6,14] ch ─/8 ->  /8; [6,15] ch ─/8 ->  /8 |
 | seed0501-priest-cast-read-turn | 28/28 | 2238/2238 | passing | -:none:none:- | -:- | - | - |
-| seed0700-samurai-explore-descend | 1/51 | 3230/3230 | early-startup | 0:char:status:init | -:- | 22 | [22,35] ch 8/8 -> 9/8; [22,36] ch //8 ->  /8; [22,37] ch 0/8 -> D/8; [22,38] ch 1/8 -> x/8; [22,39] ch  /8 -> :/8 |
+| seed0700-samurai-explore-descend | 51/51 | 3230/3230 | passing | -:none:none:- | -:- | - | - |
 | seed0900-tourist-explore-actions | 0/84 | 356/2983 | mklev-or-uinit | 0:char:status:init | 302:rn2(5)=>rn2(3) | 22,23 | [22,35] ch 3/8 -> 5/8; [22,47] ch 2/8 -> 7/8; [22,53] ch 2/8 -> 4/8; [22,58] ch 1/8 -> 8/8; [22,59] ch 1/8 ->  /8 |
 | seed1150-caveman-explore-move | 0/51 | 361/3137 | mklev-or-uinit | 0:char:mixed:init | 302:rn2(5)=>rn2(3) | 18,19,20,22,23 | [18,46] ch │/8 ->  /8; [18,47] ch @/15 ->  /8; [18,48] ch %/3 ->  /8; [18,49] ch ·/8 ->  /8; [18,50] ch ·/8 ->  /8 |
 | seed1500-rogue-explore-move | 40/40 | 2768/2768 | passing | -:none:none:- | -:- | - | - |

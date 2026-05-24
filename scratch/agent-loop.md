@@ -14,41 +14,48 @@ and `feature_map.md`.
 
 - Current branch in this workspace: `main`.
 - Baseline commit before the current Priest JS batch: `c00d1cd`.
-- Current completed target: `seed5002-wizard-coverage-pair` is restored to
-  full focused parity `S 410/410 R 12167/12167 C 0`.
+- Current completed target: `seed0700-samurai-explore-descend` has full
+  focused parity `S 51/51 R 3230/3230 C 0`.
 - `seed0105-valk-chat-lamp-ration`,
   `seed0015-valk-level2-pit-dog-wait`, `seed0360-wizard-world-tour`,
   `seed0107-samurai-twoweapon-enhance`, `seed0108-wizard-extcmd-wishlist`,
-  `seed0501-priest-cast-read-turn`, `seed5002-wizard-coverage-pair`,
-  and the standing sentinel set remain full focused passes after the Priest
-  startup/extcmd/combat batch and the seed5002 More-boundary restoration.
+  `seed0501-priest-cast-read-turn`, `seed0700-samurai-explore-descend`,
+  `seed5002-wizard-coverage-pair`, and the standing sentinel set remain full
+  focused passes after the Priest startup/extcmd/combat batch, the seed5002
+  More-boundary restoration, and the seed0700 Samurai display/pet/insight pass.
 - Frozen public passes in this workspace are `seed0002`, both `seed0013`
   sessions, `seed0015`, `seed0101`, `seed0102`, `seed0105`, `seed0106`,
   `seed0107`, `seed0108`, `seed0116`, `seed0360`, `seed0383`, `seed0398`,
-  `seed0501`, `seed1500`, `seed1800`, `seed2200`, `seed5002`, and
-  `seed8000`. Local full verification/corpus state has 20 passing sessions.
+  `seed0501`, `seed0700`, `seed1500`, `seed1800`, `seed2200`, `seed5002`,
+  and `seed8000`. Local full verification/corpus state has 21 passing sessions.
 
 ## Latest Loop Checkpoint
 
-- Target: `seed5002-wizard-coverage-pair`.
-- Current verification: focused target `S 410/410 R 12167/12167 C 0`.
-- Sentinel verification after the seed5002 restoration: total
+- Target: `seed0700-samurai-explore-descend`.
+- Current verification: focused target `S 51/51 R 3230/3230 C 0`.
+- Sentinel verification after the seed0700 pass: total
   `S 1063/1063 R 64569/64569`.
-- Full verification totals after this pass are `S 3576/11405 R 296698/792838`.
-- Local corpus inventory now reports 20 passing sessions out of 44.
+- Full verification totals after this pass are `S 3626/11405 R 296698/792838`.
+- Local corpus inventory now reports 21 passing sessions out of 44.
 - Harness checks: hack audit `hard=0 suspicious=40`; memory lint is clean.
 - Implemented subsystem truth in this iteration:
-  - Deferred pet-combat return-hit text with pending defender death snapshots
-    the pre-clear More latch, queues its own `--More--`, and applies
-    `monkilled()`/`corpse_chance()`/`grow_up()` only after that More is
-    dismissed (`C refs: mhitm.c:mattackm()`, `mon.c:monkilled()`,
-    `win/tty/topl.c:more()`).
+  - Status and `^X` attributes format C exceptional Strength values instead
+    of raw JS numbers (`C refs: botl.c:get_strength_str()`,
+    `insight.c:attrval()`, `attrib.c:acurr()`).
+  - `makedog()` honors configured pet names and role-default little-dog names,
+    so Samurai's default pet is `Hachi`; named pet swap/pet messages suppress
+    `your`/`the` like `x_monnam()` (`C refs: dog.c:makedog()`,
+    `do_name.c:x_monnam()`).
+  - Samurai `^X` reports wielded katana by the long-sword skill class and
+    basic startup skill (`C refs: insight.c:attributes_enlightenment()`,
+    `weapon.c:skill_init()`).
 - Current frontier:
-  - Seed5002 has no focused cell/RNG/cursor frontier.
+  - Seed0700 has no focused cell/RNG/cursor frontier.
 - Production `js/` has no intentional debug I/O or frozen imports.
 - This batch is verified and ready to commit; `scratch/divergence-inventory.md`
-  was intentionally refreshed after the seed5002 restoration.
+  was intentionally refreshed after the seed0700 pass.
 - Next queue:
-  - After committing the seed5002 batch, consider
-    `seed0700-samurai-explore-descend` as a narrow screen-only frontier
-    (`S 1/51 R 3230/3230`), then re-check the generated divergence inventory.
+  - After committing the seed0700 batch, consider
+    `seed0017-samurai-altar-pray` (`S 1/67 R 3309/3465`) as a nearby
+    Samurai late-startup frontier, or status/RNG late-startup candidates
+    `seed0016-healer-newmoon-eat-zap` and `seed0060-orc-rogue-kick-search`.

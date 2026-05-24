@@ -34,12 +34,16 @@ export function parseNethackrc(rc) {
                 else if (key === 'race') result.race = val;
                 else if (key === 'gender') result.gender = val;
                 else if (key === 'align') result.align = val;
+                else if (key === 'catname') result.catname = val;
+                else if (key === 'dogname') result.dogname = val;
+                else if (key === 'horsename') result.horsename = val;
                 else if (key === 'playmode' && val === 'debug') result.flags.debug = true;
                 else if (key === 'pettype' || key === 'pet') {
                     result.flags.pettype = val;
                     if (val === 'none' || val === 'n') result.preferred_pet = 'n';
                     else if (val === 'dog' || val === 'd') result.preferred_pet = 'd';
                     else if (val === 'cat' || val === 'c') result.preferred_pet = 'c';
+                    else if (val === 'horse' || val === 'pony' || val === 'h') result.preferred_pet = 'h';
                 }
                 else if (key === 'symset') result.symset = val;
                 else if (key === 'suppress_alert') result.flags.suppress_alert = val;
