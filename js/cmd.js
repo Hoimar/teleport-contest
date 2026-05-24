@@ -4785,6 +4785,13 @@ function rememberPrayerStart() {
     game._prayer_ptype = currentPrayerType();
 }
 
+function prayerTurnBudget() {
+    // C refs: src/pray.c:dopray(), src/allmain.c:u_calc_moveamt().
+    // Current movement accounting needs the longer budget for intrinsically
+    // fast prayers so their extra movement allocation reaches prayer_done().
+    return (game.u?.uprops?.fast || game.u?.uprops?.intrinsic_fast) ? 4 : 2;
+}
+
 function changeLuck(delta) {
     game.u = game.u || {};
     const next = (game.u.uluck || 0) + delta;
@@ -8660,6 +8667,15 @@ function encumbranceInsightLine() {
     return '  You are overloaded; you cannot move.';
 }
 
+function autopickupInsightLine() {
+    // C ref: src/insight.c:attributes_enlightenment().
+    if (!game.flags?.pickup) return '  Autopickup is off.';
+    const pickupTypes = String(game.flags?.pickup_types || '');
+    let text = pickupTypes ? `on for '${pickupTypes}'` : 'on for all types';
+    if (pickupTypes && game.flags?.pickup_thrown !== false) text += ' plus thrown';
+    return `  Autopickup is ${text}.`;
+}
+
 function roleAttributesPageParts() {
     // C ref: insight.c:attributes_enlightenment().
     const role = game.urole || {};
@@ -8688,7 +8704,7 @@ function roleAttributesPageParts() {
         energyLine(),
         `  Your armor class is ${game.u?.uac ?? 10}.`,
         gold > 0 ? `  Your wallet contains ${gold} zorkmids.` : '  Your wallet is empty.',
-        '  Autopickup is off.',
+        autopickupInsightLine(),
         '',
         ' Characteristics:',
     ];
@@ -8767,7 +8783,7 @@ function wizardAttributesPage1() {
         + `  You have all ${game.u?.uenmax || 0} energy points (spell power).\n`
         + `  Your armor class is ${game.u?.uac ?? 10}.\n`
         + '  Your wallet is empty.\n'
-        + '  Autopickup is off.\n'
+        + `${autopickupInsightLine()}\n`
         + '\n Characteristics:\n'
         + `${insightAttrLine('strength', C.A_STR)}\n`
         + `${insightAttrLine('dexterity', C.A_DEX)}\n`
@@ -9968,7 +9984,9 @@ export async function rhack(key) {
                 game._awaiting_pray_force_more = true;
                 game.context.move = 0;
             } else {
-                game._prayer_turns_remaining = 2;
+                // C ref: src/pray.c:dopray() uses nomul(-3) before
+                // gn.nomovemsg/ga.afternmv run at prayer completion.
+                game._prayer_turns_remaining = prayerTurnBudget();
                 game._pending_prayer_finish_message = true;
                 game.context.move = 1;
             }
@@ -9991,6 +10009,9 @@ export async function rhack(key) {
             game.u.uinvulnerable = true;
             await pline('You are surrounded by a shimmering light.');
             game._more = true;
+            // C ref: src/pray.c:dopray() uses nomul(-3).  The wizard
+            // force prompt has already split the prayer start across a
+            // blocking --More-- boundary in this JS path.
             game._prayer_turns_remaining = 2;
             game._pending_prayer_finish_message = true;
             game.context.move = 1;
