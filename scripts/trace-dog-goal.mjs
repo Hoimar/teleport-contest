@@ -26,17 +26,18 @@ const PROJECT_ROOT = path.resolve(SCRIPT_DIR, '..');
 
 function usage() {
     return [
-        'Usage: node scripts/trace-dog-goal.mjs <session-ref> [--moves <count>] [--rng <start>:<end>] [--scan] [--monsters]',
+        'Usage: node scripts/trace-dog-goal.mjs <session-ref> [--segment <index>] [--moves <count>] [--rng <start>:<end>] [--scan] [--monsters]',
         '',
         'Examples:',
         '  node scripts/trace-dog-goal.mjs seed0116 --moves 16 --rng 5510:5545',
+        '  node scripts/trace-dog-goal.mjs seed0030-ten-diverse-deaths --segment 7 --moves 2 --scan',
         '  node scripts/trace-dog-goal.mjs seed0383 --moves 140 --rng 9700:9725 --scan',
         '  node scripts/trace-dog-goal.mjs seed0116 --moves 17 --monsters',
     ].join('\n');
 }
 
 function parseArgs(argv) {
-    const out = { ref: null, moves: null, rng: null, scan: false, monsters: false };
+    const out = { ref: null, segment: null, moves: null, rng: null, scan: false, monsters: false };
     for (let i = 0; i < argv.length; i++) {
         const arg = argv[i];
         if (arg === '--help' || arg === '-h') {
@@ -49,6 +50,14 @@ function parseArgs(argv) {
         }
         if (arg.startsWith('--moves=')) {
             out.moves = Number(arg.slice('--moves='.length));
+            continue;
+        }
+        if (arg === '--segment') {
+            out.segment = Number(argv[++i]);
+            continue;
+        }
+        if (arg.startsWith('--segment=')) {
+            out.segment = Number(arg.slice('--segment='.length));
             continue;
         }
         if (arg === '--rng') {
@@ -72,6 +81,9 @@ function parseArgs(argv) {
         else throw new Error(`unexpected argument ${arg}`);
     }
     if (!out.ref) throw new Error(usage());
+    if (out.segment != null && (!Number.isInteger(out.segment) || out.segment < 0)) {
+        throw new Error('--segment must be a non-negative integer');
+    }
     if (out.moves != null && (!Number.isInteger(out.moves) || out.moves < 0)) {
         throw new Error('--moves must be a non-negative integer');
     }
@@ -118,6 +130,7 @@ function objectSummary(obj) {
         cursed: !!obj.cursed,
         blessed: !!obj.blessed,
         quan: obj.quan ?? 1,
+        owornmask: obj.owornmask || 0,
     };
 }
 
@@ -150,6 +163,7 @@ const MEATBALL = 267;
 const MEAT_STICK = 268;
 const ENORMOUS_MEATBALL = 269;
 const GLOB_OF_GREEN_SLIME = 273;
+const APPLE = 277;
 const BANANA = 281;
 const CARROT = 282;
 const CLOVE_OF_GARLIC = 284;
@@ -214,6 +228,8 @@ function dogfoodShape(mtmp, obj) {
             return { foodType: herbi ? 2 : MANFOOD, resist };
         case TIN:
             return { foodType: MANFOOD, resist };
+        case APPLE:
+            return { foodType: herbi ? DOGFOOD : MANFOOD, resist };
         case BANANA:
             return { foodType: herbi ? 2 : MANFOOD, resist };
         case CARROT:
@@ -290,7 +306,7 @@ function traceDogGoalScan(pet, floorObjects, inventory) {
     const maxY = Math.min(20, pet.my + 5);
     const heroLoc = game.level?.at(hero?.ux, hero?.uy);
     const petLoc = game.level?.at(pet.mx, pet.my);
-    const dogHasMinvent = !!(pet.inventory?.length);
+    const dogHasMinvent = (pet.inventory || []).some((obj) => obj && !obj.owornmask);
 
     let goalType = UNDEF;
     let goalX = 0;
@@ -399,19 +415,27 @@ async function main() {
     const opts = parseArgs(process.argv.slice(2));
     const sessionPath = resolveSessionRef(opts.ref);
     const session = normalizeSession(JSON.parse(readFileSync(sessionPath, 'utf8')));
-    const seg = session.segments[0];
-    const moves = opts.moves == null ? seg.moves : seg.moves.slice(0, opts.moves);
+    const targetSegment = opts.segment ?? 0;
+    if (!session.segments[targetSegment]) throw new Error(`segment ${targetSegment} not found`);
 
-    const nhGame = await runSegment({
-        seed: seg.seed,
-        datetime: seg.datetime,
-        nethackrc: seg.nethackrc,
-        moves,
-    }, null);
+    let nhGame = null;
+    let moves = [];
+    for (let i = 0; i <= targetSegment; i++) {
+        const seg = session.segments[i];
+        moves = i === targetSegment && opts.moves != null
+            ? seg.moves.slice(0, opts.moves)
+            : seg.moves;
+        nhGame = await runSegment({
+            seed: seg.seed,
+            datetime: seg.datetime,
+            nethackrc: seg.nethackrc,
+            moves,
+        }, nhGame);
+    }
 
     const pet = game.level?.monsters?.find((mon) => mon.mtame);
     const hero = game.u;
-    console.log(`session ${path.relative(PROJECT_ROOT, sessionPath)} moves ${moves.length}/${seg.moves.length}`);
+    console.log(`session ${path.relative(PROJECT_ROOT, sessionPath)} segment ${targetSegment} moves ${moves.length}/${session.segments[targetSegment].moves.length}`);
     console.log(`screens ${nhGame.getScreens?.().length ?? 0} rng ${rngCalls(nhGame).length}`);
 
     if (!pet) {

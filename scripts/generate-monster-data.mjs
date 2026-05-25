@@ -206,7 +206,17 @@ const MZ = {
     MZ_GIGANTIC: 7,
 };
 
-const CONSTS = { ...GEN, ...M1, ...M2, ...M3, ...MR, ...MS, ...CLR, ...MZ };
+const WT = {
+    WT_ETHEREAL: 0,
+    WT_JELLY: 50,
+    WT_NYMPH: 600,
+    WT_ELF: 800,
+    WT_HUMAN: 1450,
+    WT_BABY_DRAGON: 1500,
+    WT_DRAGON: 4500,
+};
+
+const CONSTS = { ...GEN, ...M1, ...M2, ...M3, ...MR, ...MS, ...CLR, ...MZ, ...WT };
 CONSTS.A_NONE = 0;
 
 const ATTACK_MACROS = {
@@ -307,10 +317,13 @@ function collectMonsters(text) {
         const mlet = args[1].trim();
         const mlevel = Number(lvl[0]);
         const mmove = Number(lvl[1]);
+        const ac = Number(lvl[2]);
         const maligntyp = CONSTS[lvl[4]?.trim()] ?? Number(lvl[4]);
         const geno = evalMask(args[3]);
         const msound = evalMask(siz[2]);
         const msize = evalMask(siz[3]);
+        const cwt = evalMask(siz[0]);
+        const cnutrit = evalMask(siz[1]);
         const mresists = evalMask(args[6]);
         const mconveys = evalMask(args[7]);
         const mflags1 = evalMask(args[8]);
@@ -324,6 +337,7 @@ function collectMonsters(text) {
         rows.push([
             name, mlet, mlevel, mmove, maligntyp, geno, difficulty, color,
             neuter, male, female, msound, mresists, mconveys, mflags1, mflags2, mflags3, mattk, msize,
+            ac, cwt, cnutrit,
         ]);
     }
     return rows;
@@ -336,7 +350,7 @@ const rows = collectMonsters(source);
 const lines = [
     '// Generated from nethack-c/upstream/include/monsters.h (NetHack 5.0).',
     '// C refs: include/monsters.h MON() rows, include/monflag.h G_* flags, makemon.c:rndmonst_adj().',
-    '// Fields: name, mlet, mlevel, mmove, maligntyp, geno, difficulty, color, neuter, male, female, msound, mresists, mconveys, mflags1, mflags2, mflags3, mattk, msize.',
+    '// Fields: name, mlet, mlevel, mmove, maligntyp, geno, difficulty, color, neuter, male, female, msound, mresists, mconveys, mflags1, mflags2, mflags3, mattk, msize, ac, cwt, cnutrit.',
     'export const MONSTER_DATA = [',
     ...rows.map((row) => `    ${JSON.stringify(row)},`),
     '];',
