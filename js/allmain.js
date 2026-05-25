@@ -10,7 +10,7 @@ import {
     maybe_generate_rnd_mon, regen_hp, gethungry, exerchk,
     maybe_wipe_engraving, maybe_update_seer_turn, dosounds, exercise,
 } from './allmain_turns.js';
-import { flush_deferred_warning_redraws, mcalcdistress, mcalcmove, movemon } from './monmove.js';
+import { distfleeck, flush_deferred_warning_redraws, mcalcdistress, mcalcmove, movemon } from './monmove.js';
 import { initrack, settrack } from './track.js';
 import { mklev, l_nhcore_init, u_on_upstairs } from './mklev.js';
 import { init_objects } from './o_init.js';
@@ -549,6 +549,15 @@ export async function advanceTurn() {
     const g = game;
     const resumeTurnTailOnly = !!g._resume_turn_tail_after_more;
     g._resume_turn_tail_after_more = false;
+    if (resumeTurnTailOnly && g._resume_tame_post_distfleeck) {
+        // C refs: src/dogmove.c:dog_move(), src/monmove.c:dochug().
+        // A pet-combat death line can be deferred behind tty More after
+        // dog_move() returned but before the post-pet distfleeck() recalc.
+        distfleeck(g._resume_tame_post_distfleeck);
+        if (g._resume_movemon_after_mon === g._resume_tame_post_distfleeck)
+            g._resume_movemon_after_mon = null;
+        g._resume_tame_post_distfleeck = null;
+    }
 
     // C ref: hack.c:domove_core() and monmove.c keep a swallowed hero's
     // coordinates pinned to the engulfing monster.  Command paths in this

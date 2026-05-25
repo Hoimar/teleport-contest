@@ -929,7 +929,7 @@ function pet_inventory_pline(line) {
     }
     if (game._pending_message) {
         const packed = `${game._pending_message}  ${line}`;
-        if (packed.length >= (game.nhDisplay?.cols || COLNO)) {
+        if (!topline_can_pack_message(game._pending_message, line)) {
             queue_more_prompt();
             game._pet_inventory_more_latched = true;
             game._after_more_message = line;
@@ -1131,7 +1131,9 @@ function apply_pet_kill_side_effects(mtmp, target, oldx, oldy, targetX, targetY,
     // C ref: src/dogmove.c:dog_move().  A pet which kills an adjacent monster
     // returns after mattackm(); it does not step into the defender square as
     // part of the death side effects.
-    newsym(oldx, oldy);
+    // C ref: src/mon.c:monkilled()->mondied().  The defender square is
+    // redrawn for removal/corpse placement; the attacker square is not
+    // refreshed just because damage resolved.
     newsym(targetX, targetY);
 }
 
@@ -1139,6 +1141,7 @@ export function finish_deferred_pet_kill_side_effect() {
     const pending = game._pet_kill_side_effect_pending;
     if (!pending) return false;
     game._pet_kill_side_effect_pending = null;
+    game._pet_kill_suppress_resume_after_death_line = !!pending.suppressResumeAfterDeathLine;
     apply_pet_kill_side_effects(
         pending.killer,
         pending.target,
@@ -1165,7 +1168,15 @@ export async function finish_pet_kill(mtmp, target) {
             && !topline_can_pack_message(pending, line);
         await append_topline_message(line);
         if (deathLineWillDefer) {
-            game._pet_kill_side_effect_pending = { killer: mtmp, target, oldx, oldy, targetX, targetY };
+            game._pet_kill_side_effect_pending = {
+                killer: mtmp,
+                target,
+                oldx,
+                oldy,
+                targetX,
+                targetY,
+                suppressResumeAfterDeathLine: pet_inventory_combat_line(pending),
+            };
             return;
         }
     }
@@ -1511,6 +1522,18 @@ function visible_pet_miss_line(mtmp, target) {
     return `${monster_combat_subject(mtmp)} misses ${monster_combat_object(target)}.`;
 }
 
+function pet_miss_line(line) {
+    return /^The (?:kitten|little dog|(?:saddled )?pony) misses /.test(line || '');
+}
+
+function pet_inventory_miss_line(line) {
+    return /^The (?:kitten|little dog|(?:saddled )?pony) (?:drops|picks up) .+\.  The (?:kitten|little dog|(?:saddled )?pony) misses .+\.$/.test(line || '');
+}
+
+function pet_inventory_combat_line(line) {
+    return /^The (?:kitten|little dog|(?:saddled )?pony) (?:drops|picks up) .+\.  The (?:kitten|little dog|(?:saddled )?pony) (?:misses|bites|hits|kicks|stings|butts|touches) .+\.$/.test(line || '');
+}
+
 async function pet_melee_miss(mtmp, target, attack, hasLaterAttack) {
     const duplicateMiss = visible_pet_miss_line(mtmp, target);
     if (duplicateMiss && game._pending_message === duplicateMiss
@@ -1530,14 +1553,22 @@ async function pet_melee_miss(mtmp, target, attack, hasLaterAttack) {
         );
         const missedLine = game._after_more_message || game._pending_message || '';
         if (!hasLaterAttack && visibleMiss && game._resuming_monster_turn_after_more && !game._more
-            && /^The (?:kitten|little dog|(?:saddled )?pony) misses /.test(missedLine)
             && !hallucinating()) {
-            game._pet_miss_prompt_after_resume = true;
+            if (pet_miss_line(missedLine)) {
+                game._pet_miss_prompt_after_resume = true;
+            } else if (pet_inventory_miss_line(missedLine)) {
+                // C refs: win/tty/topl.c:update_topl(), src/mhitm.c:missmm().
+                // A resumed pet inventory pline leaves toplin in NEED_MORE;
+                // a packed pet miss behind it still owns the interrupted
+                // monster-turn More.
+                queue_more_prompt();
+                game._pet_combat_more_latched = true;
+            }
         }
     }
     const missedLine = game._after_more_message || game._pending_message || '';
     if (!hasLaterAttack && game._more
-        && /^The (?:kitten|little dog|(?:saddled )?pony) misses /.test(missedLine)) {
+        && (pet_miss_line(missedLine) || pet_inventory_miss_line(missedLine))) {
         // C ref: src/mhitm.c:missmm()/passivemm().  When a pet miss is queued
         // behind a tty More, the passive miss side-effect roll belongs to the
         // resumed path.

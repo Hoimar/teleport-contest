@@ -1675,9 +1675,10 @@ async function thrwmu_basic(mtmp) {
         mtmp.weapon_check = NEED_RANGED_WEAPON;
         if (await mon_wield_item_basic(mtmp)) return true;
     }
-    const linedUp = lined_up_basic(mtmp);
     const obj = ranged_weapon_candidate(mtmp);
-    if (!obj || !linedUp) return false;
+    if (!obj) return false;
+    const linedUp = lined_up_basic(mtmp);
+    if (!linedUp) return false;
 
     const dist = distmin(game.u?.ux ?? mtmp.mux ?? mtmp.mx, game.u?.uy ?? mtmp.muy ?? mtmp.my, mtmp.mx, mtmp.my);
     const oldDist = distmin(game.u?.ux0 ?? game.u?.ux ?? mtmp.mx, game.u?.uy0 ?? game.u?.uy ?? mtmp.my, mtmp.mx, mtmp.my);
@@ -3790,6 +3791,14 @@ async function mattacku_basic(mtmp, state) {
     if (game.u?.uswallow && game.u?.ustuck !== mtmp) return false;
     if (state.scared || mtmp.mpeaceful || mtmp.mtame) return false;
     if ((game.u?.uhp ?? 1) <= 0) return false;
+    const rangeWeapon = state?.inrange && !state.nearby && mon_has_attack_type(mtmp, 'AT_WEAP');
+
+    const cooldownAttack = cooldown_replacement_attack(mtmp);
+    const engulf = basic_engulf_attack(mtmp);
+    const physical = engulf ? null : basic_physical_attacks(mtmp, !rangeWeapon);
+    // C refs: src/mhitu.c:mattacku(), src/muse.c:find_offensive().
+    // mattacku() computes AC_VALUE() before checking offensive inventory.
+    const toHit = mattacku_to_hit(mtmp);
     const offensiveItem = offensive_item_candidate_basic(mtmp);
     if (offensiveItem?.kind === 'potion') return use_offensive_potion_basic(mtmp, offensiveItem.obj);
     if (offensiveItem?.kind === 'wand' && await use_offensive_wand_basic(mtmp, offensiveItem.obj)) {
@@ -3802,13 +3811,10 @@ async function mattacku_basic(mtmp, state) {
                 && (mtmp.movement || 0) < NORMAL_SPEED)
             || (game.u?.uhp ?? 1) <= 0) return true;
     }
-    const rangeWeapon = state?.inrange && !state.nearby && mon_has_attack_type(mtmp, 'AT_WEAP');
-
-    const cooldownAttack = cooldown_replacement_attack(mtmp);
     if (cooldownAttack) {
         if (game._hero_melee_message_pending && game._pending_message) queue_more_prompt();
         if (!game._monster_topline_deferred) await flush_pending_more_before_monster_message();
-        const messages = await physical_melee_attacks(mtmp, [cooldownAttack], mattacku_to_hit(mtmp));
+        const messages = await physical_melee_attacks(mtmp, [cooldownAttack], toHit);
         if (messages.length && game._monster_topline_deferred && game._after_more_message) {
             for (const message of messages)
                 await append_monster_effect_topline(message, { needsPrompt: true });
@@ -3816,8 +3822,6 @@ async function mattacku_basic(mtmp, state) {
         await flush_visible_monster_attack_side_effect();
         return true;
     }
-    const engulf = basic_engulf_attack(mtmp);
-    const physical = engulf ? null : basic_physical_attacks(mtmp, !rangeWeapon);
     if (rangeWeapon && !physical && (mtmp.weapon_check === NEED_WEAPON || !mtmp.mw)) {
         // C ref: mhitu.c:mattacku()/mthrowu.c:thrwmu().  A ranged weapon
         // switch consumes the monster's attack opportunity.
@@ -3832,7 +3836,6 @@ async function mattacku_basic(mtmp, state) {
         && (mtmp.mux !== game.u?.ux || mtmp.muy !== game.u?.uy);
     if (!engulf && !physical && !rangeWeapon) {
         if (state?.inrange && (mtmp.data?.mattk || []).some(Boolean)) {
-            mattacku_to_hit(mtmp);
             if (targetsDisplacedImage && wildmissMelee) {
                 await wildmiss_displaced_image_basic(mtmp);
                 return true;
@@ -3844,16 +3847,11 @@ async function mattacku_basic(mtmp, state) {
         // C ref: monmove.c:dochug() calls mhitu.c:mattacku() for in-range
         // displaced images; mattacku() computes AC_VALUE() before range2
         // suppresses ordinary physical attacks.
-        if (state?.inrange) mattacku_to_hit(mtmp);
         return false;
     }
-    const toHit = mattacku_to_hit(mtmp);
     if (targetsDisplacedImage && (physical || wildmissMelee)) {
         await wildmiss_displaced_image_basic(mtmp);
         return true;
-    }
-    if (!rangeWeapon && physical?.some((attack) => attack?.[0] === 'AT_WEAP')) {
-        lined_up_basic(mtmp);
     }
     if (game._hero_melee_message_pending && game._pending_message) queue_more_prompt();
     if (rangeWeapon && !physical) {

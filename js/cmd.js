@@ -8958,6 +8958,7 @@ function finishDeferredProjectileClearAfterMore() {
 async function handleQueuedMore(ch) {
     if (!game._more || (game._more_dismissals_remaining || 0) <= 0) return false;
     let resumeMonsterBehindNewMore = false;
+    let suppressPausedMonsterResume = false;
     const moreDismissKey = !!game._monster_more_accepts_any_key
         || ch === ' ' || ch === '\r' || ch === '\n' || ch === '\x1b';
     const pausedMonsterTurn = !!game._monster_turn_paused_for_more;
@@ -9510,7 +9511,21 @@ async function handleQueuedMore(ch) {
             await pline(msg);
             game._monster_topline_deferred = false;
             await finish_deferred_monster_physical_attack();
-            finish_deferred_pet_kill_side_effect();
+            const finishedDeferredPetKill = finish_deferred_pet_kill_side_effect();
+            const suppressPetKillResume = !!game._pet_kill_suppress_resume_after_death_line;
+            game._pet_kill_suppress_resume_after_death_line = false;
+            if (finishedDeferredPetKill && suppressPetKillResume && !needsPrompt) {
+                // C refs: src/mhitm.c:mdamagem(), src/mon.c:monkilled().
+                // The interrupted pet attack has already returned from
+                // dog_move(); dismissing the preceding More must finish the
+                // post-pet turn tail, not start another monster pass.
+                suppressPausedMonsterResume = true;
+                game._monster_turn_paused_for_more = false;
+                game._swallowed_damage_more_waiting = false;
+                game._pre_turn_more_waiting = false;
+                game._monster_attack_more_waiting = false;
+                game._skip_encumbered_debt_after_pet_death_more = true;
+            }
             if (game._after_more_potion_breathe) {
                 const pendingPotion = game._after_more_potion_breathe;
                 game._after_more_potion_breathe = null;
@@ -9634,6 +9649,9 @@ async function handleQueuedMore(ch) {
         game._resume_floor_list_turn = false;
         await triggerSpotEffectsAtHero();
         if (!game._more) finishPendingMoveSmudge();
+        game.context.move = 1;
+    } else if (suppressPausedMonsterResume && !game._more) {
+        game._resume_turn_tail_after_more = true;
         game.context.move = 1;
     } else if (pausedMonsterTurn && !game._more && !game._death_prompt_active) {
         game._monster_turn_paused_for_more = false;
