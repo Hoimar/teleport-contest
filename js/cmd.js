@@ -2201,6 +2201,12 @@ function deathTopTenScreen() {
     return game._death_topten_screen;
 }
 
+function deathTopTenCursor(screen) {
+    const rows = String(screen || '').split('\n');
+    while (rows.length > 0 && rows[rows.length - 1] === '') rows.pop();
+    return [0, Math.min(rows.length, C.TERMINAL_ROWS - 1)];
+}
+
 function pluralizeObjectName(name) {
     if (name === 'ya') return name;
     if (name.startsWith('scroll of ')) return name.replace(/^scroll of /, 'scrolls of ');
@@ -7784,6 +7790,7 @@ function extendedKeyLine(cmd, desc) {
 
 function showOverride(screen, cursor) {
     game._override_serialized_screen = null;
+    game._override_serialized_cursor = null;
     game._override_screen = screen;
     game._override_cursor = cursor ? [cursor[0], cursor[1], 1] : null;
     if (game.nhDisplay && cursor) {
@@ -7805,11 +7812,13 @@ function showSerializedOverride(screen, cursor) {
     }
     showOverride(screen, cursor);
     game._override_serialized_screen = screen;
+    game._override_serialized_cursor = cursor ? [cursor[0], cursor[1], 1] : null;
 }
 
 function clearOverrideScreen() {
     game._override_screen = null;
     game._override_serialized_screen = null;
+    game._override_serialized_cursor = null;
     game._override_serialized_persistent = false;
     game._override_cursor = null;
     game._override_prev = null;
@@ -9098,7 +9107,8 @@ async function handleQueuedMore(ch) {
         game._more = false;
         game._death_blank_more_active = false;
         game._override_serialized_persistent = false;
-        showSerializedOverride(deathTopTenScreen(), [0, 6]);
+        const screen = deathTopTenScreen();
+        showSerializedOverride(screen, deathTopTenCursor(screen));
         game.program_state = game.program_state || {};
         game.program_state.gameover = true;
         game.context.move = 0;

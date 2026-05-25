@@ -1383,7 +1383,9 @@ function renderOverrideScreen(display, screen) {
         state.col++;
     }
 
-    const cursor = game._override_cursor || game._latched_more_cursor;
+    const cursor = game._override_cursor
+        || game._latched_more_cursor
+        || (game._override_serialized_persistent ? game._override_serialized_cursor : null);
     if (cursor && display.setCursor) {
         display.setCursor(cursor[0], cursor[1]);
     }
