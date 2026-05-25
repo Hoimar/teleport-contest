@@ -3610,7 +3610,9 @@ async function physical_melee_attacks(mtmp, attacks, toHit) {
                 // are known but before knockback, AC reduction, HP loss, or the
                 // monster's later attacks run.
                 game._after_more_message = line;
-                game._after_more_needs_prompt = true;
+                const hasLaterAttack = attacks.slice(i + 1).some(Boolean);
+                game._after_more_needs_prompt = hasLaterAttack
+                    || (adtyp === 'AD_COLD' && damage > 0);
                 game._monster_attack_more_latched = true;
                 game._monster_attack_pause_after_more = true;
                 game._monster_attack_resume_behind_after_more = true;
