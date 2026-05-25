@@ -34,7 +34,11 @@ import { d, rn1, rn2, rnd, rnl, rnz } from './rng.js';
 import { dist2 } from './hacklib.js';
 import { getObjectDescription } from './o_init.js';
 import { getRumor, hallucinatedLiquidName, randomHallucinatedMonsterName, wipeoutText } from './random_text.js';
-import { finish_pending_swallowed_expulsion, monster_projectile_destroyed_by_hit } from './monmove.js';
+import {
+    finish_deferred_monster_physical_attack,
+    finish_pending_swallowed_expulsion,
+    monster_projectile_destroyed_by_hit,
+} from './monmove.js';
 import { writeSavedGame } from './save_restore.js';
 import { vfsReadFile, vfsWriteFile } from './storage.js';
 import { ATR_INVERSE, NO_COLOR } from './terminal.js';
@@ -3055,6 +3059,12 @@ async function start_wearing_object(obj) {
 
     const armorWearName = obj.oclass === ARMOR_CLASS ? baseObjectName(obj) : '';
     obj.worn = true;
+    if (obj.oclass === ARMOR_CLASS) {
+        // C refs: do_wear.c:armor_or_accessory_on(), allmain.c:moveloop_core().
+        // setworn() makes the bottom line eligible to show new AC before
+        // find_ac() updates u.uac for combat calculations.
+        game._status_uac_override = calculated_armor_class();
+    }
     if (obj.otyp === CLOAK_OF_DISPLACEMENT) {
         // C ref: do_wear.c:Cloak_on()/toggle_displacement().  The property
         // discovery message can block at --More-- before on_msg() reports
@@ -3080,6 +3090,7 @@ async function start_wearing_object(obj) {
         if (obj.oclass === ARMOR_CLASS) {
             obj.known = true;
             game.u.uac = calculated_armor_class();
+            game._status_uac_override = null;
             await pline(`You are now wearing ${wornArmorMessageName(armorWearName)}.`);
         } else {
             await pline(`${inventoryListing(obj)} (being worn).`);
@@ -4471,10 +4482,42 @@ function floorCorpseAtHero() {
 
 function corpseEatingReqtime(obj) {
     // C ref: eat.c:eatcorpse(); corpse delay is weight-dependent:
-    // victual.reqtime = 3 + (mons[mnum].cwt >> 6), then start_eating()
-    // records the first bite without consuming an input boundary.
+    // victual.reqtime = 3 + (mons[mnum].cwt >> 6).  C ref:
+    // eat.c:doeat() then scales that delay by the corpse's remaining
+    // nutrition after rotten first-bite accounting.
     const cwt = obj?.corpse_cwt || CORPSE_WEIGHT_BY_MONSTER.get(corpseMonsterPtr(obj)?.name) || 0;
-    return 3 + (cwt >> 6);
+    const reqtime = 3 + (cwt >> 6);
+    const fullNutrition = corpseNutrition(obj);
+    if (!fullNutrition) return reqtime;
+    const oeaten = currentCorpseOeaten(obj, fullNutrition);
+    return rounddiv(reqtime * oeaten, fullNutrition);
+}
+
+function corpseNutrition(obj) {
+    if (Number.isFinite(obj?.corpse_cnutrit)) return obj.corpse_cnutrit;
+    return corpseMonsterPtr(obj)?.cnutrit ?? 0;
+}
+
+function currentCorpseOeaten(obj, fullNutrition = corpseNutrition(obj)) {
+    if (!fullNutrition) return 0;
+    let oeaten = Number.isFinite(obj?.oeaten) && obj.oeaten > 0
+        ? Math.trunc(obj.oeaten)
+        : fullNutrition;
+    if (oeaten > fullNutrition) oeaten = fullNutrition;
+    if (obj && !Number.isFinite(obj.oeaten)) obj.oeaten = oeaten;
+    return oeaten;
+}
+
+function consumeCorpseOeaten(obj, amt) {
+    const fullNutrition = corpseNutrition(obj);
+    if (!obj || !fullNutrition) return 0;
+    let oeaten = currentCorpseOeaten(obj, fullNutrition);
+    if (amt > 0) oeaten >>= amt;
+    else if (oeaten > -amt) oeaten += amt;
+    else oeaten = 0;
+    if (oeaten === 0) oeaten = 1;
+    obj.oeaten = oeaten;
+    return oeaten;
 }
 
 function rottenFoodInterruptsEating() {
@@ -4698,6 +4741,7 @@ async function handleFloorCorpseEatKey(ch) {
     } else if (obj?._live_kill_corpse) {
         rn2(7);
         firstBiteStarted = !rottenFoodInterruptsEating();
+        if (firstBiteStarted) consumeCorpseOeaten(obj, 2);
     } else {
         rn2(5);
         const damage = rnd(8);
@@ -6142,6 +6186,15 @@ function monsterKillVerb(mon) {
     return 'kill';
 }
 
+function heroHitExclam(mon, damage) {
+    // C ref: src/uhitm.c:hmon_hitmon_msg_hit().  Hand-to-hand hits use
+    // exclam(dmg) only when canseemon(mon); swallowed or blind hits use ".".
+    const canSeeTarget = !(game.u?.uswallow && game.u?.ustuck === mon)
+        && !(game.u?.ublind || game.u?.uprops?.blind)
+        && cansee(mon.mx, mon.my);
+    return canSeeTarget ? (damage <= 4 ? '.' : '!') : '.';
+}
+
 function monsterHelpless(mon) {
     return !!mon?.msleeping || mon?.mcanmove === 0 || !!mon?.mfrozen;
 }
@@ -6777,7 +6830,7 @@ async function heroMeleeAttack(mon) {
             }
         }
         if (maybeKnockback) heroMeleeKnockbackFrontdoor();
-        await pline(`You hit ${monsterHitName(mon)}${damage <= 4 ? '.' : '!'}`);
+        await pline(`You hit ${monsterHitName(mon)}${heroHitExclam(mon, damage)}`);
         await wakeupMonsterByAttack(mon);
         // C refs: src/uhitm.c:known_hitum(), src/uhitm.c:passive().
         rn2(25);
@@ -6817,7 +6870,7 @@ async function heroMeleeAttack(mon) {
         }
     }
     if (maybeKnockback) heroMeleeKnockbackFrontdoor();
-    await pline(`You hit ${monsterHitName(mon)}${damage <= 4 ? '.' : '!'}`);
+    await pline(`You hit ${monsterHitName(mon)}${heroHitExclam(mon, damage)}`);
     await wakeupMonsterByAttack(mon);
     // C refs: src/uhitm.c:known_hitum(), src/uhitm.c:passive().
     rn2(25);
@@ -9434,6 +9487,7 @@ async function handleQueuedMore(ch) {
             }
             await pline(msg);
             game._monster_topline_deferred = false;
+            await finish_deferred_monster_physical_attack();
             finish_deferred_pet_kill_side_effect();
             if (game._after_more_potion_breathe) {
                 const pendingPotion = game._after_more_potion_breathe;
@@ -9486,7 +9540,13 @@ async function handleQueuedMore(ch) {
         } else if (game._pet_defender_death_pending) {
             const pending = game._pet_defender_death_pending;
             game._pet_defender_death_pending = null;
-            await finish_pet_kill(pending.killer, pending.target);
+            const oldPetDeathBlockingFrame = game._pet_deferred_death_blocking_frame;
+            game._pet_deferred_death_blocking_frame = true;
+            try {
+                await finish_pet_kill(pending.killer, pending.target);
+            } finally {
+                game._pet_deferred_death_blocking_frame = oldPetDeathBlockingFrame;
+            }
             game._skip_encumbered_debt_after_pet_death_more = true;
             if (game._resume_movemon_after_mon === pending.target)
                 game._resume_movemon_after_mon = null;

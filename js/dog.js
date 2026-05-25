@@ -2,7 +2,7 @@
 // C ref: dog.c:makedog(), makemon.c:makemon() near-hero placement.
 
 import { game } from './gstate.js';
-import { enexto_core, makemon, mkcorpstat, mksobj, monsterPtr, next_ident, place_object } from './mklev.js';
+import { enexto_core, makemon, mkcorpstat, mksobj, monsterPtr, next_ident, place_object, set_malign_basic } from './mklev.js';
 import { OBJECT_CLASS, OBJECT_DELAY } from './object_data.js';
 import { MONSTER_DATA } from './monster_data.js';
 import {
@@ -255,6 +255,9 @@ export async function makedog() {
         game.pet_type = pet;
         mon.mtame = Math.max(10, mon.mtame || 0);
         mon.mpeaceful = 1;
+        // C ref: src/dog.c:initedog().  Taming changes the later xkilled()
+        // alignment adjustment; keep it in sync with the peaceful state.
+        set_malign_basic(mon);
         const petname = configuredPetName(pet);
         if (petname && !game._petname_used) {
             mon.mgivenname = petname;
@@ -1108,21 +1111,11 @@ function apply_pet_kill_side_effects(mtmp, target, oldx, oldy, targetX, targetY,
     const monsters = game.level?.monsters || [];
     const idx = monsters.indexOf(target);
     if (idx >= 0) monsters.splice(idx, 1);
-    if (mtmp?.mtame && dist2(oldx, oldy, targetX, targetY) <= 2
-        && blockingFrame && game._more && game._pet_combat_more_latched) {
-        // C refs: mhitm.c:hitmm(), mhitm.c:mdamagem(), tty display.  The
-        // blocking kill frame shows the attacker glyph at the hit square, but
-        // dogmove.c still resumes with the pet at its original model square.
-        mtmp.mx = targetX;
-        mtmp.my = targetY;
-        newsym(oldx, oldy);
-        newsym(targetX, targetY);
-        mtmp.mx = oldx;
-        mtmp.my = oldy;
-    } else {
-        newsym(oldx, oldy);
-        newsym(targetX, targetY);
-    }
+    // C ref: src/dogmove.c:dog_move().  A pet which kills an adjacent monster
+    // returns after mattackm(); it does not step into the defender square as
+    // part of the death side effects.
+    newsym(oldx, oldy);
+    newsym(targetX, targetY);
 }
 
 export function finish_deferred_pet_kill_side_effect() {

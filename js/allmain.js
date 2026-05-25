@@ -944,6 +944,7 @@ async function continueOccupationTurns(g) {
             applyOccupationTakeoffObject(g);
             g.u.uac = g._occupation_finish_uac;
             g._occupation_finish_uac = null;
+            g._status_uac_override = null;
         }
         await runOccupationPreFinishTurn(g);
         applyOccupationFinishObjectEffects(g);
