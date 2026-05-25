@@ -1502,8 +1502,11 @@ async function pet_melee_miss(mtmp, target, attack, hasLaterAttack) {
     const duplicateMiss = visible_pet_miss_line(mtmp, target);
     if (duplicateMiss && game._pending_message === duplicateMiss
         && game._resuming_monster_turn_after_more && !game._more && !hallucinating()) {
-        // The deferred miss line has just been printed after the previous
-        // More; C continues through passivemm() without forcing another prompt.
+        // C refs: win/tty/topl.c:update_topl(), src/mhitm.c:missmm().
+        // A fresh resumed miss with identical text still goes through pline();
+        // tty packs it behind the deferred line and prompts at the boundary.
+        refresh_pet_attack_symbols(mtmp, target);
+        await append_topline_message(duplicateMiss);
         game._pet_miss_prompt_after_resume = true;
     } else {
         refresh_pet_attack_symbols(mtmp, target);
