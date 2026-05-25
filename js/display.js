@@ -348,7 +348,7 @@ function terrain_glyph(loc, x, y) {
         case FOUNTAIN:  return { ch: '{', color: CLR_BRIGHT_BLUE, dec: false };
         case SINK:      return { ch: '{', color: CLR_WHITE, dec: false };
         case ALTAR:     return { ch: '_', color: CLR_GRAY, dec: false };
-        case GRAVE:     return { ch: '|', color: CLR_GRAY, dec: false };
+        case GRAVE:     return { ch: '|', color: CLR_WHITE, dec: false };
         case THRONE:    return { ch: '\\', color: CLR_YELLOW, dec: false };
         case TREE:      return { ch: '#', color: CLR_GREEN, dec: false };
         case POOL:
@@ -411,7 +411,7 @@ function terrain_glyph(loc, x, y) {
         // C ref: dat/symbols DECGraphics S_altar uses the raw DEC payload
         // byte '{'; the harness cell decoder preserves that byte.
         return { ch: '{', color: CLR_GRAY, dec: false };
-    case GRAVE:     return { ch: '|', color: CLR_GRAY, dec: false };
+    case GRAVE:     return { ch: '|', color: CLR_WHITE, dec: false };
     case THRONE:    return { ch: '\\', color: CLR_YELLOW, dec: false };
     case TREE:      return { ch: 'g', color: CLR_GREEN, dec: false };
     case POOL:

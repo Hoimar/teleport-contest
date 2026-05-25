@@ -88,7 +88,15 @@ const WAN_DIGGING = 428;
 const WAN_MAGIC_MISSILE = 429;
 const QUARTERSTAFF = 79;
 const MACE = 73;
+const LANCE = 72;
+const SILVER_MACE = 74;
+const MORNING_STAR = 75;
 const WAR_HAMMER = 76;
+const CLUB = 77;
+const RUBBER_HOSE = 78;
+const AKLYS = 80;
+const FLAIL = 81;
+const BULLWHIP = 82;
 const ROBE = 143;
 const CLOAK_OF_MAGIC_RESISTANCE = 148;
 const CLOAK_OF_PROTECTION = 146;
@@ -147,15 +155,26 @@ const GOLD_PIECE = 438;
 const ARROW = 18;
 const ELVEN_ARROW = 19;
 const ORCISH_ARROW = 20;
+const SILVER_ARROW = 21;
 const YA = 22;
+const CROSSBOW_BOLT = 23;
 const SHURIKEN = 25;
+const BOOMERANG = 26;
 const SPEAR = 27;
+const SILVER_SPEAR = 31;
+const TRIDENT = 33;
 const SCALPEL = 39;
 const KNIFE = 40;
 const DART = 24;
 const DAGGER = 34;
 const ELVEN_DAGGER = 35;
+const SILVER_DAGGER = 37;
+const ATHAME = 38;
+const STILETTO = 41;
+const WORM_TOOTH = 42;
+const CRYSKNIFE = 43;
 const SHORT_SWORD = 46;
+const AXE = 44;
 const BATTLE_AXE = 45;
 const ELVEN_SPEAR = 28;
 const ORCISH_SPEAR = 29;
@@ -165,18 +184,33 @@ const ELVEN_SHORT_SWORD = 47;
 const ORCISH_SHORT_SWORD = 48;
 const DWARVISH_SHORT_SWORD = 49;
 const SCIMITAR = 50;
+const SILVER_SABER = 51;
 const BROADSWORD = 52;
 const ELVEN_BROADSWORD = 53;
 const LONG_SWORD = 54;
+const TWO_HANDED_SWORD = 55;
 const KATANA = 56;
 const TSURUGI = 57;
 const RUNESWORD = 58;
+const PARTISAN = 59;
+const RANSEUR = 60;
+const SPETUM = 61;
+const GLAIVE = 62;
+const HALBERD = 63;
+const BARDICHE = 64;
+const VOULGE = 65;
+const FAUCHARD = 66;
+const GUISARME = 67;
+const BILL_GUISARME = 68;
+const LUCERN_HAMMER = 69;
+const BEC_DE_CORBIN = 70;
 const DWARVISH_MATTOCK = 71;
 const BOW = 83;
 const ELVEN_BOW = 84;
 const ORCISH_BOW = 85;
 const YUMI = 86;
 const SLING = 87;
+const CROSSBOW = 88;
 const ORCISH_DAGGER = 36;
 const BOW_AMMO = new Set([ARROW, ELVEN_ARROW, ORCISH_ARROW, YA]);
 const TRIPE_RATION = 264;
@@ -381,12 +415,19 @@ const OBJECT_BASE_NAMES = new Map([
     [ARROW, 'arrow'],
     [ELVEN_ARROW, 'elven arrow'],
     [ORCISH_ARROW, 'orcish arrow'],
+    [SILVER_ARROW, 'silver arrow'],
     [YA, 'ya'],
+    [CROSSBOW_BOLT, 'crossbow bolt'],
     [DART, 'dart'],
     [SHURIKEN, 'shuriken'],
+    [BOOMERANG, 'boomerang'],
     [SPEAR, 'spear'],
+    [SILVER_SPEAR, 'silver spear'],
+    [TRIDENT, 'trident'],
     [DAGGER, 'dagger'],
     [ELVEN_DAGGER, 'elven dagger'],
+    [SILVER_DAGGER, 'silver dagger'],
+    [ATHAME, 'athame'],
     [SHORT_SWORD, 'short sword'],
     [ELVEN_SPEAR, 'elven spear'],
     [ORCISH_SPEAR, 'orcish spear'],
@@ -394,26 +435,54 @@ const OBJECT_BASE_NAMES = new Map([
     [JAVELIN, 'javelin'],
     [SCALPEL, 'scalpel'],
     [KNIFE, 'knife'],
+    [STILETTO, 'stiletto'],
+    [WORM_TOOTH, 'worm tooth'],
+    [CRYSKNIFE, 'crysknife'],
     [ORCISH_DAGGER, 'orcish dagger'],
+    [AXE, 'axe'],
     [BATTLE_AXE, 'battle-axe'],
     [ELVEN_SHORT_SWORD, 'elven short sword'],
     [ORCISH_SHORT_SWORD, 'orcish short sword'],
     [DWARVISH_SHORT_SWORD, 'dwarvish short sword'],
     [SCIMITAR, 'scimitar'],
+    [SILVER_SABER, 'silver saber'],
     [BROADSWORD, 'broadsword'],
     [ELVEN_BROADSWORD, 'elven broadsword'],
+    [LONG_SWORD, 'long sword'],
+    [TWO_HANDED_SWORD, 'two-handed sword'],
     [KATANA, 'katana'],
     [TSURUGI, 'tsurugi'],
     [RUNESWORD, 'runesword'],
+    [PARTISAN, 'partisan'],
+    [RANSEUR, 'ranseur'],
+    [SPETUM, 'spetum'],
+    [GLAIVE, 'glaive'],
+    [HALBERD, 'halberd'],
+    [BARDICHE, 'bardiche'],
+    [VOULGE, 'voulge'],
+    [FAUCHARD, 'fauchard'],
+    [GUISARME, 'guisarme'],
+    [BILL_GUISARME, 'bill-guisarme'],
+    [LUCERN_HAMMER, 'lucern hammer'],
+    [BEC_DE_CORBIN, 'bec de corbin'],
     [DWARVISH_MATTOCK, 'dwarvish mattock'],
+    [LANCE, 'lance'],
+    [SILVER_MACE, 'silver mace'],
     [WAR_HAMMER, 'war hammer'],
     [MACE, 'mace'],
+    [MORNING_STAR, 'morning star'],
+    [CLUB, 'club'],
+    [RUBBER_HOSE, 'rubber hose'],
     [QUARTERSTAFF, 'quarterstaff'],
+    [AKLYS, 'aklys'],
+    [FLAIL, 'flail'],
+    [BULLWHIP, 'bullwhip'],
     [BOW, 'bow'],
     [ELVEN_BOW, 'elven bow'],
     [ORCISH_BOW, 'orcish bow'],
     [YUMI, 'yumi'],
     [SLING, 'sling'],
+    [CROSSBOW, 'crossbow'],
     [GRAY_DRAGON_SCALE_MAIL, 'gray dragon scale mail'],
     [CLOAK_OF_MAGIC_RESISTANCE, 'cloak of magic resistance'],
     [CLOAK_OF_DISPLACEMENT, 'cloak of displacement'],
@@ -3526,6 +3595,23 @@ function floorObjectsAtHero() {
     return floorObjectsAt(u.ux, u.uy);
 }
 
+function showFloorObjectList(objects, featureLine = '') {
+    // C ref: src/invent.c:look_here().  Explicit ':' look uses obj_cnt=0,
+    // so it displays the full object list even when autopickup floor-look
+    // would summarize a pile via pile_limit.
+    const lines = objects.map(obj => inventoryObjectName(obj, { includePrice: true, observe: true }));
+    if (featureLine) {
+        game._pending_message = `${' '.repeat(41)}${featureLine}`;
+        game._floor_list_lines = ['', 'Things that are here:', ...lines];
+    } else {
+        game._pending_message = `${' '.repeat(41)}Things that are here:`;
+        game._floor_list_lines = lines;
+    }
+    game._floor_list_col = 41;
+    game._prompt_cursor = [49, Math.min(21, game._floor_list_lines.length + 1)];
+    queue_more_prompt();
+}
+
 function heroIsBlind() {
     return !!(game.u?.ublind || game.u?.blind
         || game.u?.uprops?.blind || game.u?.uprops?.blinded);
@@ -5821,6 +5907,30 @@ const LANDING_DIRS = [
     { dx: 1, dy: 0 }, { dx: 1, dy: 1 }, { dx: 0, dy: 1 }, { dx: -1, dy: 1 },
 ];
 
+function doorlessDoorBasic(loc) {
+    if (loc?.typ !== DOOR) return false;
+    const mask = loc.doormask || 0;
+    return mask === D_NODOOR || !!(mask & C.D_BROKEN);
+}
+
+function landingTestMoveBasic(dx, dy) {
+    // C ref: src/hack.c:test_move(TEST_MOVE).  Dismount landing uses the
+    // ordinary movement test, so diagonal moves into or out of intact doorways
+    // are rejected even if the destination itself is open/passable.
+    const ux = game.u?.ux || 0;
+    const uy = game.u?.uy || 0;
+    const x = ux + dx;
+    const y = uy + dy;
+    if (blocksMove(x, y)) return false;
+    if (!dx || !dy) return true;
+    const target = game.level?.at(x, y);
+    if (target?.typ === DOOR && !doorlessDoorBasic(target)) return false;
+    const origin = game.level?.at(ux, uy);
+    if (origin?.typ === DOOR && !doorlessDoorBasic(origin)) return false;
+    if (blocksMove(ux, y) && blocksMove(x, uy)) return false;
+    return true;
+}
+
 function landingSpotBasic() {
     // C ref: src/steed.c:landing_spot().  This covers the ordinary voluntary
     // dismount path: prefer accessible adjacent squares, favor orthogonal
@@ -5831,7 +5941,7 @@ function landingSpotBasic() {
     for (const dir of LANDING_DIRS) {
         const x = (game.u?.ux || 0) + dir.dx;
         const y = (game.u?.uy || 0) + dir.dy;
-        if (!C.isok(x, y) || blocksMove(x, y) || mon_at(x, y)) continue;
+        if (!C.isok(x, y) || mon_at(x, y) || !landingTestMoveBasic(dir.dx, dir.dy)) continue;
         viable++;
         const distance = dist2(game.u?.ux || 0, game.u?.uy || 0, x, y);
         if (minDistance < 0 || distance < minDistance
@@ -5867,7 +5977,22 @@ async function dismountSteedBasic() {
     placeSteedOnMap(steed, steedX, steedY);
     vision_recalc(1);
     newsym(spot.x, spot.y);
+    deferDismountLookHereIfNeeded();
     game.context.move = 1;
+}
+
+function deferDismountLookHereIfNeeded() {
+    // C refs: src/steed.c:dismount_steed(), src/hack.c:spoteffects(),
+    // src/pickup.c:pickup().  Voluntary dismount moves the hero via teleds();
+    // if pickup/look-here output is about to replace the dismount line, tty
+    // first blocks on the dismount topline.
+    const u = game.u || {};
+    const objects = floorObjectsAt(u.ux, u.uy);
+    if (!objects.length || !game._pending_message) return false;
+    queue_more_prompt();
+    game._look_here_pauses_turn = true;
+    game._resume_look_here_after_more = true;
+    return true;
 }
 
 async function doRideCommand() {
@@ -7781,7 +7906,20 @@ const DISCOVERY_DESCRIPTION_SLOT = new Map([
     [KATANA, 'samurai sword'],
     [TSURUGI, 'long samurai sword'],
     [RUNESWORD, 'runed broadsword'],
+    [PARTISAN, 'vulgar polearm'],
+    [RANSEUR, 'hilted polearm'],
+    [SPETUM, 'forked polearm'],
+    [GLAIVE, 'single-edged polearm'],
+    [HALBERD, 'angled poleaxe'],
+    [BARDICHE, 'long poleaxe'],
+    [VOULGE, 'pole cleaver'],
+    [FAUCHARD, 'pole sickle'],
+    [GUISARME, 'pruning hook'],
+    [BILL_GUISARME, 'hooked polearm'],
+    [LUCERN_HAMMER, 'pronged polearm'],
+    [BEC_DE_CORBIN, 'beaked polearm'],
     [DWARVISH_MATTOCK, 'broad pick'],
+    [AKLYS, 'thonged club'],
     [SACK, 'bag'],
     [QUARTERSTAFF, 'staff'],
     [CLOAK_OF_MAGIC_RESISTANCE, 148],
@@ -9823,6 +9961,20 @@ async function handleQueuedMore(ch) {
         }
         clear_pending_message();
         if (petMissLineAfterMore) await pline(petMissLineAfterMore);
+        if (game._resume_look_here_after_more) {
+            game._resume_look_here_after_more = false;
+            await lookHereAfterMove();
+            if (game._more && game._floor_list_pauses_turn) {
+                game._floor_list_pauses_turn = false;
+                game._resume_floor_list_turn = true;
+                game.context.move = 0;
+                return true;
+            }
+            await triggerSpotEffectsAtHero();
+            if (!game._more) finishPendingMoveSmudge();
+            game.context.move = 1;
+            return true;
+        }
         if (game._resume_spot_effects_after_more) {
             game._resume_spot_effects_after_more = false;
             game._resume_floor_list_turn = false;
@@ -11007,6 +11159,9 @@ function weaponSkillLevelName(obj) {
     if (game.urole?.name?.m === 'Samurai'
         && (obj?.otyp === KATANA
             || [SHORT_SWORD, ELVEN_SHORT_SWORD, ORCISH_SHORT_SWORD, DWARVISH_SHORT_SWORD].includes(obj?.otyp)))
+        return 'basic';
+    if (game.urole?.name?.m === 'Knight'
+        && (obj?.otyp === LONG_SWORD || obj?.otyp === LANCE))
         return 'basic';
     if (game.urole?.name?.m === 'Valkyrie' && obj?.otyp === SPEAR) return 'basic';
     return 'no';
@@ -15005,12 +15160,7 @@ export async function rhack(key) {
                 if (feature.line) await append_pline(line);
                 else await pline(line);
             } else if (objects.length > 1) {
-                const count = objects.length === 2 ? 'two'
-                    : objects.length < 5 ? 'a few'
-                        : objects.length < 10 ? 'several' : 'many';
-                const line = `There are ${count} objects here.`;
-                if (feature.line) await append_pline(line);
-                else await pline(line);
+                showFloorObjectList(objects, feature.line || '');
             } else if (!feature.line) {
                 await pline("You see no objects here.");
             }
@@ -15332,6 +15482,7 @@ export async function domove(dx, dy) {
     u.uy0 = oldy;
     u.ux = newx;
     u.uy = newy;
+    u.umoved = true;
     if (u.usteed) {
         u.usteed.mx = newx;
         u.usteed.my = newy;

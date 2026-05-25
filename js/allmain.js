@@ -598,15 +598,7 @@ export async function advanceTurn() {
     }
 
     await maybe_generate_rnd_mon();
-    if (g.u?.uprops?.fast) {
-        // C ref: src/allmain.c:u_calc_moveamt(); speed boots/potion/spell
-        // Very_fast grants an extra action on 2/3 of turns.
-        g._fast_extra_action_pending = rn2(3) !== 0;
-    } else if (g.u?.uprops?.intrinsic_fast) {
-        // C ref: src/allmain.c:u_calc_moveamt(); intrinsic Fast grants an
-        // extra action on 1/3 of turns.
-        g._fast_extra_action_pending = rn2(3) === 0;
-    }
+    applyHeroMovementRation(g);
     settrack();
 
     await nhTimeoutBasic();
@@ -631,7 +623,28 @@ function finishPostDosoundsTurnTail(g) {
 
     g._pet_combat_resume_active = false;
     g._savelife_resume_active = false;
+    if (g.u) g.u.umoved = false;
     g.moves = (g.moves || 1) + 1;
+}
+
+function applyHeroMovementRation(g) {
+    // C ref: src/allmain.c:u_calc_moveamt().  A mounted hero who actually
+    // changed map location uses the steed's movement rate; hero speed does
+    // not augment steed speed.
+    if (g.u?.usteed && g.u?.umoved) {
+        const moveamt = mcalcmove(g.u.usteed, true);
+        if (moveamt >= NORMAL_SPEED * 2) g._fast_extra_action_pending = true;
+        return;
+    }
+    if (g.u?.uprops?.fast) {
+        // C ref: src/allmain.c:u_calc_moveamt(); speed boots/potion/spell
+        // Very_fast grants an extra action on 2/3 of turns.
+        g._fast_extra_action_pending = rn2(3) !== 0;
+    } else if (g.u?.uprops?.intrinsic_fast) {
+        // C ref: src/allmain.c:u_calc_moveamt(); intrinsic Fast grants an
+        // extra action on 1/3 of turns.
+        g._fast_extra_action_pending = rn2(3) === 0;
+    }
 }
 
 function shouldDeferSeerTurnUpdate(g) {
@@ -1147,6 +1160,10 @@ export async function moveloop_core() {
             if (!await continueOccupationTurns(g)) return;
         } else {
             if (g._monster_turn_paused_for_more && g._more) return;
+            if (g._look_here_pauses_turn && g._more) {
+                g._look_here_pauses_turn = false;
+                return;
+            }
             if (g._floor_list_pauses_turn && g._more) {
                 g._floor_list_pauses_turn = false;
                 g._resume_floor_list_turn = true;

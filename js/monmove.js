@@ -44,6 +44,7 @@ const M1_AMORPHOUS = 0x00000004;
 const M2_WERE = 0x00000004;
 const M2_HUMAN = 0x00000008;
 const M2_DWARF = 0x00000020;
+const M2_ORC = 0x00000080;
 const M2_WANDER = 0x00800000;
 const M2_ROCKTHROW = 0x08000000;
 const M1_FLY = 0x00000001;
@@ -166,10 +167,10 @@ const CROSSBOW_BOLT = 23;
 const DART = 24;
 const SHURIKEN = 25;
 const BOOMERANG = 26;
-const PARTISAN = 56;
-const RANSEUR = 57;
-const SPETUM = 58;
-const BEC_DE_CORBIN = 67;
+const PARTISAN = 59;
+const RANSEUR = 60;
+const SPETUM = 61;
+const BEC_DE_CORBIN = 70;
 const AKLYS = 80;
 const BOW = 83;
 const ELVEN_BOW = 84;
@@ -3826,11 +3827,24 @@ function monster_weapon_damage(obj) {
     return Math.max(0, damage + (obj?.spe || 0) - projectile_erosion(obj));
 }
 
+function maybe_redirect_attack_to_steed_basic(mtmp) {
+    const steed = game.u?.usteed;
+    if (!steed || mtmp === steed) return false;
+    // C ref: src/mhitu.c:mattacku().  Mounted heroes give monsters a chance
+    // to attack the steed first; the random gate is evaluated before the
+    // adjacency check.
+    const chance = (mtmp.data?.mflags2 ?? 0) & M2_ORC ? 2 : 4;
+    if (rn2(chance) || dist2(mtmp.mx, mtmp.my, game.u?.ux ?? mtmp.mx, game.u?.uy ?? mtmp.my) > 2)
+        return false;
+    return true;
+}
+
 async function mattacku_basic(mtmp, state) {
     if (game.u?.uswallow && game.u?.ustuck !== mtmp) return false;
     if (state.scared || mtmp.mpeaceful || mtmp.mtame) return false;
     if ((game.u?.uhp ?? 1) <= 0) return false;
     const rangeWeapon = state?.inrange && !state.nearby && mon_has_attack_type(mtmp, 'AT_WEAP');
+    if (maybe_redirect_attack_to_steed_basic(mtmp)) return true;
 
     const cooldownAttack = cooldown_replacement_attack(mtmp);
     const engulf = basic_engulf_attack(mtmp);
