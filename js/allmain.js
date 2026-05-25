@@ -1230,6 +1230,19 @@ export async function moveloop_core() {
             g._slow_poly_extra_turn_pending_credit = false;
             creditSlowPolyExtraTurn(g);
         }
+        if (g._pet_miss_prompt_after_resume
+            && !g._more
+            && !g._monster_turn_paused_for_more
+            && /^The (?:kitten|little dog|(?:saddled )?pony) misses /.test(g._pending_message || '')) {
+            // C ref: win/tty/topl.c:more(), src/mhitm.c:missmm().
+            // A deferred pet miss does not force an immediate prompt after
+            // the old More; if no later monster-turn text packs behind it,
+            // tty prompts before the next command boundary.
+            g._pet_miss_prompt_after_resume = false;
+            g._pet_miss_prompt_preserve_on_dismiss = true;
+            queue_more_prompt();
+            g._pet_combat_more_latched = true;
+        }
         if (!skipPetDeathCatchupDebt
             && slowPolyDebtNeedsExtraTurn(g) && !g._monster_turn_paused_for_more) {
             // C ref: allmain.c:moveloop_core()/u_calc_moveamt().  Slow

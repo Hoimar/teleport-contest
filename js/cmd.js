@@ -9242,6 +9242,14 @@ async function handleQueuedMore(ch) {
             && /^The (?:kitten|little dog|(?:saddled )?pony) misses /.test(game._pending_message || '')
             ? game._pending_message
             : '';
+        if (game._pet_miss_prompt_preserve_on_dismiss && !game._after_more_message) {
+            game._pet_miss_prompt_preserve_on_dismiss = false;
+            game._pet_combat_more_latched = false;
+            game._more = false;
+            game._more_dismissals_remaining = 0;
+            game.context.move = 0;
+            return true;
+        }
         clear_pending_message();
         if (petMissLineAfterMore) await pline(petMissLineAfterMore);
         if (game._resume_spot_effects_after_more) {

@@ -1026,6 +1026,7 @@ async function append_topline_message(line) {
             if (topline_can_pack_message(game._pending_message, line)) {
                 game._pending_message = `${game._pending_message}  ${line}`;
                 game._last_topline_message = game._pending_message;
+                game._pet_miss_prompt_after_resume = false;
             } else {
                 const packed = game._after_more_message
                     ? `${game._after_more_message}  ${line}`
@@ -1063,9 +1064,11 @@ async function append_topline_message(line) {
         if (heroMeleePack) {
             game._pending_message = packed;
             game._pet_combat_pending_boundary = true;
+            game._pet_miss_prompt_after_resume = false;
         } else if (topline_can_pack_message(pending, line)) {
             game._pending_message = packed;
             game._pet_combat_pending_boundary = false;
+            game._pet_miss_prompt_after_resume = false;
         } else {
             queue_more_prompt();
             game._after_more_message = game._after_more_message
@@ -1073,6 +1076,7 @@ async function append_topline_message(line) {
                 : line;
             game._after_more_needs_prompt = false;
             game._pet_combat_more_latched = true;
+            game._pet_miss_prompt_after_resume = false;
         }
         if (occupation_message_boundary_active()) {
             // C ref: tty topline handling via pline()/--More--.  A second
@@ -1498,8 +1502,9 @@ async function pet_melee_miss(mtmp, target, attack, hasLaterAttack) {
     const duplicateMiss = visible_pet_miss_line(mtmp, target);
     if (duplicateMiss && game._pending_message === duplicateMiss
         && game._resuming_monster_turn_after_more && !game._more && !hallucinating()) {
-        queue_more_prompt();
-        game._pet_combat_more_latched = true;
+        // The deferred miss line has just been printed after the previous
+        // More; C continues through passivemm() without forcing another prompt.
+        game._pet_miss_prompt_after_resume = true;
     } else {
         refresh_pet_attack_symbols(mtmp, target);
         const visibleMiss = await monster_combat_message(
@@ -1511,8 +1516,7 @@ async function pet_melee_miss(mtmp, target, attack, hasLaterAttack) {
         if (!hasLaterAttack && visibleMiss && game._resuming_monster_turn_after_more && !game._more
             && /^The (?:kitten|little dog|(?:saddled )?pony) misses /.test(missedLine)
             && !hallucinating()) {
-            queue_more_prompt();
-            game._pet_combat_more_latched = true;
+            game._pet_miss_prompt_after_resume = true;
         }
     }
     const missedLine = game._after_more_message || game._pending_message || '';
@@ -1523,7 +1527,8 @@ async function pet_melee_miss(mtmp, target, attack, hasLaterAttack) {
         // resumed path.
         game._deferred_pet_miss_passive = true;
         game._pet_combat_passive_paused = true;
-        if (game._after_more_message) game._after_more_needs_prompt = true;
+        if (game._after_more_message && !game._after_more_needs_prompt)
+            game._pet_miss_prompt_after_resume = true;
         return true;
     }
     rn2(3);

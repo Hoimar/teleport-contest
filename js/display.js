@@ -1604,6 +1604,8 @@ export function clear_pending_message() {
     game._hero_melee_message_pending = false;
     game._pet_combat_more_latched = false;
     game._pet_combat_pending_boundary = false;
+    game._pet_miss_prompt_after_resume = false;
+    game._pet_miss_prompt_preserve_on_dismiss = false;
     game._prompt_cursor = null;
     game._packed_monster_more_candidate = false;
     game._monster_more_accepts_any_key = false;
