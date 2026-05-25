@@ -547,6 +547,7 @@ export async function newgame() {
 
 export async function advanceTurn() {
     const g = game;
+    g._advance_turn_completed_tail = false;
     const resumeTurnTailOnly = !!g._resume_turn_tail_after_more;
     g._resume_turn_tail_after_more = false;
     if (resumeTurnTailOnly && g._resume_tame_post_distfleeck) {
@@ -625,6 +626,7 @@ function finishPostDosoundsTurnTail(g) {
     g._savelife_resume_active = false;
     if (g.u) g.u.umoved = false;
     g.moves = (g.moves || 1) + 1;
+    g._advance_turn_completed_tail = true;
 }
 
 function applyHeroMovementRation(g) {
@@ -915,16 +917,18 @@ async function runOccupationPreFinishTurn(g) {
     }
 }
 
-async function continueNomulTurns(g) {
+async function continueNomulTurns(g, options = {}) {
     if ((g._nomul_turns_remaining || 0) <= 0) return true;
     // C ref: allmain.c:moveloop_core() increments negative `multi` after
     // each immobile turn, then `unmul()` prints `nomovemsg` on the final turn.
-    g._nomul_turns_remaining--;
+    if (options.countCurrentTurn && g._advance_turn_completed_tail)
+        g._nomul_turns_remaining--;
     while ((g._nomul_turns_remaining || 0) > 0) {
         await advanceTurn();
         if (g._monster_turn_paused_for_more) return false;
         if (g._more) return false;
-        g._nomul_turns_remaining--;
+        if (g._advance_turn_completed_tail)
+            g._nomul_turns_remaining--;
     }
     if (g._nomul_finish_message) {
         const msg = g._nomul_finish_message;
@@ -1205,7 +1209,7 @@ export async function moveloop_core() {
                     && !g._more
                     && !g._monster_turn_paused_for_more
                     && (g._nomul_turns_remaining || 0) > 0) {
-                    if (!await continueNomulTurns(g)) return;
+                    if (!await continueNomulTurns(g, { countCurrentTurn: true })) return;
                     if (!occupationPending(g)) finish_pending_eaten_corpse();
                     if (!await continueOccupationTurns(g)) return;
                 }
@@ -1216,7 +1220,7 @@ export async function moveloop_core() {
                 applyOccupationFinalTurnState(g);
                 await advanceTurn();
                 if (g._monster_turn_paused_for_more) return;
-                if (!await continueNomulTurns(g)) return;
+                if (!await continueNomulTurns(g, { countCurrentTurn: true })) return;
                 if (!occupationPending(g)) finish_pending_eaten_corpse();
                 if (g._more && occupationPending(g) && !g._occupation_continue_behind_more) {
                     if (g._force_lock) g._force_lock_resume_turn_first = true;
