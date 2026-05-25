@@ -1699,6 +1699,13 @@ function can_attack_after_move_basic(mtmp, state) {
     return mon_has_attack_type(mtmp, 'AT_WEAP') || !!offensive_potion_candidate_basic(mtmp);
 }
 
+function can_standard_attack_basic(state) {
+    // C ref: monmove.c:dochug() phase four.  mattacku() is not entered
+    // merely because m_move() failed to move; the recomputed range/scare
+    // state still gates the standard attack.
+    return !!state?.inrange && !state.scared;
+}
+
 async function maybe_wield_hth_before_move(mtmp, state) {
     // C ref: monmove.c:dochug() phase two lets close hostile weapon users
     // spend their move switching to a hand-to-hand weapon before m_move().
@@ -4386,7 +4393,7 @@ export async function movemon() {
             if (moveStatus === MMOVE_DIED) continue;
             if (g._monster_turn_paused_for_more) return false;
             const postMoveState = distfleeck(mtmp);
-            if ((moveStatus !== MMOVE_MOVED && moveStatus !== MMOVE_DONE)
+            if ((moveStatus !== MMOVE_MOVED && moveStatus !== MMOVE_DONE && can_standard_attack_basic(postMoveState))
                 || (moveStatus === MMOVE_MOVED && can_attack_after_move_basic(mtmp, postMoveState))) {
                 await mattacku_basic(mtmp, postMoveState);
                 if (g._monster_turn_paused_for_more) return false;
@@ -4509,7 +4516,7 @@ export async function movemon() {
                 // movement, even when the monster is off-screen.
                 postMoveState = distfleeck(mtmp);
             }
-            if ((moveStatus !== MMOVE_MOVED && moveStatus !== MMOVE_DONE)
+            if ((moveStatus !== MMOVE_MOVED && moveStatus !== MMOVE_DONE && can_standard_attack_basic(postMoveState))
                 || (moveStatus === MMOVE_MOVED && can_attack_after_move_basic(mtmp, postMoveState))) {
                 await mattacku_basic(mtmp, postMoveState);
                 if (g._swallowed_damage_more_latched && g._more) {

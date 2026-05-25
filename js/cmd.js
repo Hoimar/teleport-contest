@@ -3065,16 +3065,12 @@ async function start_wearing_object(obj) {
 
     const armorWearName = obj.oclass === ARMOR_CLASS ? baseObjectName(obj) : '';
     obj.worn = true;
-    if (obj.oclass === ARMOR_CLASS) {
-        // C refs: do_wear.c:armor_or_accessory_on(), allmain.c:moveloop_core().
-        // setworn() makes the bottom line eligible to show new AC before
-        // find_ac() updates u.uac for combat calculations.
-        game._status_uac_override = calculated_armor_class();
-    }
     if (obj.otyp === CLOAK_OF_DISPLACEMENT) {
         // C ref: do_wear.c:Cloak_on()/toggle_displacement().  The property
         // discovery message can block at --More-- before on_msg() reports
-        // that the cloak is now worn and before the wearing turn advances.
+        // that the cloak is now worn and before moveloop_core() reaches
+        // find_ac(), so the blocking frame still shows the previous AC.
+        game._status_uac_override = null;
         discoverObjectType(obj.otyp);
         obj.known = true;
         obj.knownName = true;
@@ -3085,6 +3081,12 @@ async function start_wearing_object(obj) {
         queue_more_prompt();
         game.context.move = 0;
         return;
+    }
+    if (obj.oclass === ARMOR_CLASS) {
+        // C refs: do_wear.c:armor_or_accessory_on(), allmain.c:moveloop_core().
+        // setworn() makes the bottom line eligible to show new AC before
+        // find_ac() updates u.uac for combat calculations.
+        game._status_uac_override = calculated_armor_class();
     }
     const delay = OBJECT_DELAY[obj.otyp] || 0;
     if (obj.oclass === ARMOR_CLASS && delay > 0) {
@@ -7849,6 +7851,22 @@ const TRAVEL_TIP_ROWS = [
     [8, '(end)'],
 ];
 
+function getposTipSeen() {
+    // C ref: hack.c:handle_tip(TIP_GETPOS).  Travel, terrain browsing, and
+    // farlook all consume the same context tip bit.
+    return !!(game._getpos_tip_seen
+        || game._travel_tip_seen
+        || game._farlook_tip_seen
+        || game._terrain_getpos_tip_seen);
+}
+
+function markGetposTipSeen() {
+    game._getpos_tip_seen = true;
+    game._travel_tip_seen = true;
+    game._farlook_tip_seen = true;
+    game._terrain_getpos_tip_seen = true;
+}
+
 function showTravelTipOverScreen(baseScreen) {
     const lines = String(baseScreen || '').split('\n');
     while (lines.length < C.TERMINAL_ROWS) lines.push('');
@@ -9370,8 +9388,8 @@ async function handleQueuedMore(ch) {
             game._farlook_intro_after_more = false;
             game._farlook_quick_mode = quick;
             clear_pending_message();
-            if (!game._farlook_tip_seen) {
-                game._farlook_tip_seen = true;
+            if (!getposTipSeen()) {
+                markGetposTipSeen();
                 game._farlook_after_tip_quick = quick;
                 game._travel_tip_active = 'farlook';
                 await showTravelTipScreen();
@@ -9387,7 +9405,7 @@ async function handleQueuedMore(ch) {
         if (game._travel_tip_pending) {
             game._travel_tip_pending = false;
             game._travel_tip_active = true;
-            game._travel_tip_seen = true;
+            markGetposTipSeen();
             clear_pending_message();
             await showTravelTipScreen();
             game.context.move = 0;
@@ -11548,8 +11566,8 @@ export async function rhack(key) {
             game._more = false;
             game._more_dismissals_remaining = 0;
             clear_pending_message();
-            if (!game._terrain_getpos_tip_seen) {
-                game._terrain_getpos_tip_seen = true;
+            if (!getposTipSeen()) {
+                markGetposTipSeen();
                 game._travel_tip_active = 'terrain';
                 await showTravelTipScreen(serialize_known_terrain_view_screen(''));
             } else {
@@ -13901,7 +13919,7 @@ export async function rhack(key) {
         await showTerrainMenu();
     } else if (ch === '_') {
         game.context.move = 0;
-        if (!game._travel_tip_seen) {
+        if (!getposTipSeen()) {
             await pline('Where do you want to travel to?');
             queue_more_prompt();
             game._travel_tip_pending = true;
@@ -13956,8 +13974,12 @@ export async function rhack(key) {
         game._awaiting_lookat_menu = true;
     } else if (ch === ';') {
         game.context.move = 0;
+        // C refs: src/pager.c:do_look(), src/getpos.c:getpos().
+        // The quick farlook getpos prompt starts as a fresh prompt line; an
+        // old command-result topline does not turn it into a blocking More.
+        clear_pending_message();
         await pline('Pick a monster, object or location.');
-        if (!game._farlook_tip_seen) {
+        if (!getposTipSeen()) {
             queue_more_prompt();
             game._farlook_intro_after_more = true;
             game._farlook_intro_quick = true;
