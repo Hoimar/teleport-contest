@@ -3785,6 +3785,9 @@ function restore_bones_snapshot(snapshot) {
     game.stairs = clone_for_bones(snapshot.stairs) || fallback_bones_stairs(game.level);
     game.updest = snapshot.updest ? clone_for_bones(snapshot.updest) : null;
     game.dndest = snapshot.dndest ? clone_for_bones(snapshot.dndest) : null;
+    // C refs: save.c:savelev(), restore.c:getlev().  Bones files include the
+    // hero scent track; off-screen monsters can follow it after restore.
+    game._utrack = Array.isArray(snapshot.utrack) ? clone_for_bones(snapshot.utrack) : [];
     game._made_special_level = false;
     game._last_special_protofile = '';
     game.u = game.u || {};
@@ -3793,10 +3796,10 @@ function restore_bones_snapshot(snapshot) {
     return true;
 }
 
-export function save_bones_snapshot(extra = {}) {
+export function save_bones_snapshot(extra = {}, options = {}) {
     const key = bones_file_key();
     if (!key || no_bones_level()) return false;
-    if (vfsReadFile(key) != null) return false;
+    if (vfsReadFile(key) != null && !options.replace) return false;
 
     const level = clone_for_bones(game.level);
     if (!level) return false;
@@ -3821,6 +3824,7 @@ export function save_bones_snapshot(extra = {}) {
         stairs: clone_for_bones(game.stairs || null),
         updest: clone_for_bones(game.updest || null),
         dndest: clone_for_bones(game.dndest || null),
+        utrack: clone_for_bones(game._utrack || []),
     }));
 }
 

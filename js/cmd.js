@@ -29,7 +29,6 @@ import {
 } from './dog.js';
 import { calculated_armor_class, merge_inventory_object, newuexp, pluslvl } from './u_init.js';
 import { adjalign, exercise, gethungry } from './allmain_turns.js';
-import { initrack } from './track.js';
 import { roleGod, roleGreeting, roleRankForLevel } from './roles.js';
 import { d, rn1, rn2, rnd, rnl, rnz } from './rng.js';
 import { dist2 } from './hacklib.js';
@@ -44,6 +43,7 @@ import { writeSavedGame } from './save_restore.js';
 import { vfsReadFile, vfsWriteFile } from './storage.js';
 import { ATR_INVERSE, NO_COLOR } from './terminal.js';
 import * as C from './const.js';
+import { initrack } from './track.js';
 import {
     COLNO, ROWNO, STONE, CORR, DOOR, D_NODOOR, D_CLOSED, D_LOCKED,
     SDOOR, SCORR, IS_WALL, IS_OBSTRUCTED, IS_POOL, LR_UPTELE, LR_DOWNTELE, A_STR, A_DEX, A_CON, A_WIS,
@@ -1915,11 +1915,11 @@ function prepareDeathBonesCorpseBasic() {
     game.in_mklev = oldInMklev;
 }
 
-function savePreparedBonesRngBasic() {
+function savePreparedBonesRngBasic(options = {}) {
     // C refs: src/bones.c:savebones(), src/bones.c:drop_upon_death().
     if (!game._death_bones_ok || game._death_bones_saved) return;
+    if (bones_file_exists() && !options.replace) return 'exists';
     game._death_bones_saved = true;
-    if (bones_file_exists()) return;
     const oldInMklev = game.in_mklev;
     const extra = deathDropInventoryForBonesBasic();
     game.in_mklev = true;
@@ -1933,7 +1933,7 @@ function savePreparedBonesRngBasic() {
     } finally {
         game.in_mklev = oldInMklev;
     }
-    save_bones_snapshot(extra);
+    save_bones_snapshot(extra, { replace: !!options.replace });
 }
 
 function saveBonesRngBasic() {
@@ -11116,6 +11116,7 @@ function saveCurrentLevelState() {
         specialLregions: game._special_lregions ? [...game._special_lregions] : [],
         lastSpecialProtofile: game._last_special_protofile || null,
         smeq: game.smeq ? [...game.smeq] : null,
+        utrack: Array.isArray(game._utrack) ? game._utrack.map((t) => ({ ...t })) : [],
         savedMoves: game.moves || 0,
     });
 }
@@ -11185,6 +11186,7 @@ function restoreCachedLevelState(uz) {
     game._special_lregions = saved.specialLregions ? [...saved.specialLregions] : [];
     game._last_special_protofile = saved.lastSpecialProtofile || null;
     game.smeq = saved.smeq ? [...saved.smeq] : game.smeq;
+    game._utrack = Array.isArray(saved.utrack) ? saved.utrack.map((t) => ({ ...t })) : [];
     const elapsed = (game.moves || 0) - (saved.savedMoves || 0);
     if (elapsed > 0) {
         // C ref: restore.c:getlev() gives each restored monster a hide
@@ -11690,7 +11692,8 @@ async function finishLevelTeleportArrival({
         }
     }
     pet_arrive_with_you();
-    initrack();
+    const restoredBonesTrack = !!game._pending_bones_familiar;
+    if (!restoredLevel && !restoredBonesTrack) initrack();
     let familiarBonesMessage = '';
     if (game._pending_bones_familiar) {
         game._pending_bones_familiar = false;
@@ -12259,11 +12262,42 @@ export async function rhack(key) {
         return;
     }
 
+    if (game._death_replace_bones_prompt_active) {
+        if (ch === 'y' || ch === 'Y') {
+            game._death_replace_bones_prompt_active = false;
+            clear_pending_message();
+            savePreparedBonesRngBasic({ replace: true });
+            await showDeathDisclosure();
+            game.context.move = 0;
+            return;
+        }
+        if (ch === 'n' || ch === 'N' || ch === ' ' || ch === '\r' || ch === '\n') {
+            game._death_replace_bones_prompt_active = false;
+            clear_pending_message();
+            await showDeathDisclosure();
+            game.context.move = 0;
+            return;
+        }
+        const msg = 'Bones file already exists.  Replace it? [yn] (n)';
+        await showPromptLine(msg);
+        game._prompt_cursor = [msg.length + 1, 0];
+        game.context.move = 0;
+        return;
+    }
+
     if (game._death_save_bones_prompt_active) {
         if (ch === 'y' || ch === 'Y') {
             game._death_save_bones_prompt_active = false;
             clear_pending_message();
-            savePreparedBonesRngBasic();
+            const saved = savePreparedBonesRngBasic();
+            if (saved === 'exists' && deathCanSaveWizardBones()) {
+                const msg = 'Bones file already exists.  Replace it? [yn] (n)';
+                await showPromptLine(msg);
+                game._prompt_cursor = [msg.length + 1, 0];
+                game._death_replace_bones_prompt_active = true;
+                game.context.move = 0;
+                return;
+            }
             await showDeathDisclosure();
             game.context.move = 0;
             return;
