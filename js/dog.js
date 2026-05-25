@@ -1061,9 +1061,22 @@ async function append_topline_message(line) {
         const packed = `${pending}  ${line}`;
         const cols = game.nhDisplay?.cols || COLNO;
         const heroMeleePack = /^You (?:miss|hit) /.test(pending) && packed.length < cols;
+        const savelifePack = pending === "OK, so you don't die."
+            && /^The (?:kitten|little dog|(?:saddled )?pony) /.test(line)
+            && topline_can_pack_message(pending, line);
         if (heroMeleePack) {
             game._pending_message = packed;
             game._pet_combat_pending_boundary = true;
+            game._pet_miss_prompt_after_resume = false;
+        } else if (savelifePack) {
+            // C refs: src/end.c:savelife(), src/mhitm.c:mattackm(),
+            // win/tty/topl.c:update_topl().  A resumed pet-combat line can
+            // pack behind "OK, so you don't die." but still blocks before
+            // gn.nomovemsg is printed.
+            game._pending_message = packed;
+            game._pet_combat_pending_boundary = false;
+            queue_more_prompt();
+            game._pet_combat_more_latched = true;
             game._pet_miss_prompt_after_resume = false;
         } else if (topline_can_pack_message(pending, line)) {
             game._pending_message = packed;

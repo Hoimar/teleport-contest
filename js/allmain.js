@@ -473,7 +473,9 @@ export async function newgame() {
     const startupRoleName = g.flags?.female ? (g.urole.name.f || g.urole.name.m) : g.urole.name.m;
     const configuredPlayerName = g.plname;
     g.plname = g._seed === 2 ? 'David'
-        : g.flags?.debug ? startupRoleName
+        // C refs: sys/libnh/libnhmain.c:nhmain(), src/options.c:set_playmode().
+        // Wizard/debug mode replaces the player name with lowercase "wizard".
+        : g.flags?.debug ? 'wizard'
         : startupPlayerName(g.plname);
     g._startupGreetingName = g.flags?.debug ? String(g.plname).toLowerCase()
         : configuredPlayerName || g.plname;

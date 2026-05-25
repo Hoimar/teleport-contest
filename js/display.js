@@ -1252,7 +1252,10 @@ function strength_status_text(value) {
 function _statusLine1() {
     const u = game.u;
     if (!u) return '';
-    const name = game.plname || 'Hero';
+    const rawName = game.plname || 'Hero';
+    // C ref: src/botl.c:do_statusline1().  The bottom line capitalizes the
+    // first player-name character, while ustatusline() prints svp.plname raw.
+    const name = rawName ? `${rawName[0].toUpperCase()}${rawName.slice(1)}` : rawName;
     const form = u._poly_form || null;
     const role = form?.title || roleRankForLevel(game.urole, u.ulevel || 1, !!game.flags?.female)
         || (game.flags?.female

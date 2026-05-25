@@ -9082,7 +9082,11 @@ async function handleQueuedMore(ch) {
         game._more_dismissals_remaining = 0;
         game._monster_death_pending = false;
         game._death_prompt_pending = true;
-        runPendingDeathBonesCheck();
+        // C refs: src/end.c:done(), src/end.c:really_done(),
+        // src/bones.c:can_make_bones().  Wizard/explore deaths ask whether to
+        // die before really_done(); declining the prompt must not run the bones
+        // feasibility RNG.
+        if (!deathUsesWizardPrompt()) runPendingDeathBonesCheck();
         if (!game._death_preserve_latched_status) game._latched_status_uhp = 0;
         await pline('You die...');
         if (game._death_shopkeeper_takes_name) {
@@ -10438,8 +10442,9 @@ function roleAttributesPageParts() {
     const alignName = alignNameForHero();
     const levelName = game.level?.flags?.sokoban_rules ? 'Sokoban' : 'the Dungeons of Doom';
     const gold = heroGoldAmount();
+    const playerName = sentenceStart(game.plname || 'Adventurer');
     const headerLines = [
-        ` ${game.plname || 'Adventurer'} the ${roleName}'s attributes:`,
+        ` ${playerName} the ${roleName}'s attributes:`,
         '',
         ' Background:',
         `  You are ${articleForWord(rank)} ${rank}, a level ${game.u?.ulevel || 1} ${roleInsightGenderPrefix(role, female)}${game.urace?.adj || game.urace?.name || 'human'} ${roleName}.`,
@@ -10523,7 +10528,8 @@ function wizardAttributesPage1() {
         ? `${xp} experience points, ${xpNeedText}`
         : `${xp} experience points`;
     const pages = wizardAttributePageCount();
-    return ` ${game.plname || 'Wizard'} the Wizard's attributes:\n\n`
+    const playerName = sentenceStart(game.plname || 'Wizard');
+    return ` ${playerName} the Wizard's attributes:\n\n`
         + ' Background:\n'
         + `  You are ${articleForWord(rank)} ${rank}, a level ${level} male human Wizard.\n`
         + '  You are neutral, on a mission for Thoth\n'

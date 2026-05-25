@@ -2400,7 +2400,12 @@ async function show_blocking_monster_message(line) {
         if (is_simple_monster_vs_monster_line(game._pending_message)
             && is_simple_monster_hit_you_line(line)
             && topline_can_pack_message(game._pending_message, line)) {
+            // C refs: src/mhitm.c:mattackm(), src/mhitu.c:hitmsg(),
+            // win/tty/topl.c:update_topl().  While resuming an interrupted
+            // pet-combat turn, a monster-to-hero hit can pack behind the
+            // restored monster-vs-monster line but still owns a tty More.
             game._pending_message = `${game._pending_message}  ${line}`;
+            if (game._pet_combat_resume_active) queue_more_prompt();
             return;
         }
         if (/^The .+ (?:misses|hits|bites|stings|kicks|butts) the .+\.$/.test(game._pending_message)) {
@@ -3397,7 +3402,9 @@ function apply_hero_damage(damage) {
 function handle_monster_fatal_damage(mtmp, preDamageHp) {
     if ((game.u?.uhp ?? 0) > 0) return false;
     begin_monster_fatal_damage_basic();
-    const preserveFatalHitStatusHp = !/^You /.test(game._pending_message || '');
+    const pendingTopline = game._pending_message || '';
+    const preserveFatalHitStatusHp = (!pendingTopline && preDamageHp <= 1)
+        || (!!pendingTopline && !/^You /.test(pendingTopline));
     let preserveDeathPromptStatusHp = preserveFatalHitStatusHp;
     if (mtmp.isshk && shopkeeper_name(mtmp)) {
         const honorific = mtmp.female ? 'Ms.' : 'Mr.';
