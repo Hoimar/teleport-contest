@@ -1595,8 +1595,11 @@ async function pet_melee_hit(mtmp, target, attack) {
     rn2(3); // mhitm_knockback chance
     rn2(6); // mhitm_knockback distance/side gate
     if (target.mhp < 1) {
-        if ((game._more || pending_pet_combat_boundary()) && !hallucinating()) {
-            if (!game._more && pending_pet_combat_boundary()) {
+        const killLine = `The ${monster_name(target)} is killed!`;
+        const killLineCanPack = !!game._pending_message && !game._more
+            && topline_can_pack_message(game._pending_message, killLine);
+        if ((game._more || (pending_pet_combat_boundary() && !killLineCanPack)) && !hallucinating()) {
+            if (!game._more && pending_pet_combat_boundary() && !killLineCanPack) {
                 game._pet_combat_pending_boundary = false;
                 queue_more_prompt();
                 game._pet_combat_more_latched = true;

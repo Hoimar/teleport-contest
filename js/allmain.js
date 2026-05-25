@@ -17,12 +17,12 @@ import { init_objects } from './o_init.js';
 import { init_dungeons } from './dungeon.js';
 import { apply_startup_role_state, calculated_armor_class, u_init_misc_rng, u_init_role_inventory } from './u_init.js';
 import { makedog } from './dog.js';
-import { continueRunStep, finish_pending_eaten_corpse, performLevelTeleport, rhack, shouldStopRunForNearbyMonster } from './cmd.js';
+import { continueRunStep, finish_pending_eaten_corpse, finishPrayerResult, performLevelTeleport, rhack, shouldStopRunForNearbyMonster } from './cmd.js';
 import { nhgetch } from './input.js';
 import {
     docrt, cls, bot, flush_screen, pline, append_pline, newsym, serialize_terminal_grid,
     refresh_warning_monsters, refresh_swallowed_overlay, clear_pending_message,
-    queue_more_prompt, see_monsters, see_objects, see_traps,
+    queue_more_prompt, see_monsters, see_objects, see_traps, topline_can_pack_message,
 } from './display.js';
 import { vision_recalc, vision_reset, init_vision_globals } from './vision.js';
 import { roles, findAlign, findRace, findRole, roleGod, roleGreeting, roleWithStartingRank } from './roles.js';
@@ -946,8 +946,9 @@ async function continueOccupationTurns(g) {
         }
     }
     if (g._occupation_finish_message) {
-        if (g._more && g._occupation_continue_behind_more) {
-            g._occupation_continue_behind_more = false;
+        if (g._more) {
+            if (g._occupation_continue_behind_more)
+                g._occupation_continue_behind_more = false;
             g._occupation_paused_for_more = true;
             return false;
         }
@@ -959,7 +960,9 @@ async function continueOccupationTurns(g) {
         }
         await runOccupationPreFinishTurn(g);
         applyOccupationFinishObjectEffects(g);
-        if (g._pending_message && g._occupation_pack_finish_message) {
+        if (g._pending_message
+            && g._occupation_pack_finish_message
+            && topline_can_pack_message(g._pending_message, g._occupation_finish_message)) {
             await append_pline(g._occupation_finish_message);
             g._occupation_pack_finish_message = false;
         } else {
@@ -1279,10 +1282,18 @@ export async function moveloop_core() {
         finishDeferredSeerTurnUpdate(g);
         if (g._pending_prayer_finish_message) {
             g._pending_prayer_finish_message = false;
-            if (g._pending_message) await append_pline('You finish your prayer.');
+            const hadPrayerTopline = !!g._pending_message;
+            if (hadPrayerTopline) await append_pline('You finish your prayer.');
             else await pline('You finish your prayer.');
-            g._more = true;
-            g._awaiting_prayer_done_more = true;
+            if (g._prayer_finish_result_inline && !hadPrayerTopline) {
+                g._prayer_finish_result_inline = false;
+                g._pack_next_prayer_result_line = true;
+                await finishPrayerResult();
+            } else {
+                g._prayer_finish_result_inline = false;
+                g._more = true;
+                g._awaiting_prayer_done_more = true;
+            }
             if (g.u?.uinvulnerable) g.u.uinvulnerable = false;
         }
         // C ref: topl.c:pline()/more() blocks the current command before a

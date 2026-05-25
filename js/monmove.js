@@ -1958,7 +1958,25 @@ function shopkeeper_name(mtmp) {
     return String(mtmp?.mextra?.eshk?.shknam || '').replace(/^[_+\-|]/, '');
 }
 
+function hero_can_spot_monster(mtmp) {
+    if (!mtmp || mtmp.mundetected) return false;
+    if (!cansee(mtmp.mx, mtmp.my)) return false;
+    if (mtmp.minvis && !(game.u?.usee_invisible || game.u?.uprops?.see_invisible)) return false;
+    return true;
+}
+
+function map_invisible_basic(x, y) {
+    // C ref: display.c:map_invisible().
+    if (x === game.u?.ux && y === game.u?.uy) return;
+    const loc = game.level?.at(x, y);
+    if (loc) loc.remembered_glyph = { ch: 'I', color: NO_COLOR, decgfx: false };
+    show_glyph_cell(x, y, 'I', NO_COLOR, false);
+}
+
 function monster_subject(mtmp) {
+    // C ref: mhitu.c:hitmsg() via do_name.c:Monnam().  Once the hero is
+    // blind, physical attack messages use the unseen generic subject.
+    if (!hero_can_spot_monster(mtmp)) return 'It';
     if (hallucinating()) return sentence_case(randomHallucinatedMonsterName('the'));
     if (mtmp?.isshk && shopkeeper_name(mtmp)) return shopkeeper_name(mtmp);
     const named = named_monster_name(mtmp);
@@ -2371,6 +2389,17 @@ async function show_blocking_monster_message(line) {
         return;
     }
     if (game._pending_message && !game._more && `${game._pending_message}  ${line}`.length < 80) {
+        if (is_simple_monster_hit_you_line(line)
+            && !is_simple_monster_vs_monster_line(game._pending_message)
+            && !/^You hear the (?:studio audience applaud|rumble of distant thunder\.\.\.)!$/.test(game._pending_message)
+            && game._pending_message !== "You're covered in frost!"
+            && topline_can_pack_message(game._pending_message, line)) {
+            // C refs: mhitu.c:hitmsg(), win/tty/topl.c:update_topl().
+            // A short command result can share the tty topline with the
+            // following monster hit rather than pausing the monster turn.
+            game._pending_message = `${game._pending_message}  ${line}`;
+            return;
+        }
         if (is_simple_monster_hit_you_chain(game._pending_message)
             && is_simple_monster_hit_you_line(line)
             && topline_can_pack_message(game._pending_message, line)) {
@@ -3603,6 +3632,7 @@ async function physical_melee_attacks(mtmp, attacks, toHit) {
             const verb = monster_attack_verb(attack, attackVerbCounts);
             const extra = adtyp === 'AD_ELEC' ? '  You get zapped!' : '';
             const target = verb === 'touches' ? ' you' : '';
+            if (!hero_can_spot_monster(mtmp)) map_invisible_basic(mtmp.mx, mtmp.my);
             const subject = monster_subject(mtmp);
             const line = verb === 'weapon'
                 ? (mtmp.mw
@@ -3684,6 +3714,7 @@ async function physical_melee_attacks(mtmp, attacks, toHit) {
             if (game._monster_topline_deferred) break;
         } else {
             const miss = toHit === roll ? 'just misses' : 'misses';
+            if (!hero_can_spot_monster(mtmp)) map_invisible_basic(mtmp.mx, mtmp.my);
             const subject = monster_subject(mtmp);
             const line = attack?.[0] === 'AT_WEAP'
                 ? (mtmp.mw
