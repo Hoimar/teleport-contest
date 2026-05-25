@@ -1826,6 +1826,37 @@ function deathUsesWizardPrompt() {
     return !!(game.wizard || game.flags?.debug || game.flags?.explore);
 }
 
+function deathDisclosureOptionDisables(category) {
+    const raw = String(game.flags?.disclose || '').trim().toLowerCase();
+    if (!raw) return false;
+    if (raw === 'none') return true;
+    return raw.split(/\s+/).includes(`-${category}`);
+}
+
+function deathInventoryDisclosurePromptWanted() {
+    // C ref: src/end.c:disclose().  The inventory prompt is skipped when
+    // end_disclose says "-i" or when there is no inventory to disclose.
+    if (deathDisclosureOptionDisables('i')) return false;
+    return (game.inventory || []).length > 0 || (game._goldCount || 0) > 0;
+}
+
+async function showDeathInventoryDisclosurePrompt() {
+    game._death_prompt_pending = false;
+    game._death_inventory_disclosure_prompt_active = true;
+    game._more = false;
+    game._more_dismissals_remaining = 0;
+    game._latched_status_uhp = 0;
+    if (game.u && typeof game.u.uhp === 'number') game.u.uhp = 0;
+    const msg = 'Do you want your possessions identified? [ynq] (n)';
+    await showPromptLine(msg);
+    game._prompt_cursor = [msg.length + 1, 0];
+}
+
+async function showDeathDisclosureOrPrompt() {
+    if (deathInventoryDisclosurePromptWanted()) await showDeathInventoryDisclosurePrompt();
+    else await showDeathDisclosure();
+}
+
 function deathCanSaveWizardBones() {
     return !!(game.wizard || game.flags?.debug);
 }
@@ -5211,6 +5242,7 @@ const EXTENDED_COMMANDS = [
     { name: 'polyself', min: 2, autocomplete: true, wizard: true },
     { name: 'pray', min: 1, autocomplete: true },
     { name: 'quit', min: 1, autocomplete: true },
+    { name: 'ride', min: 2, autocomplete: true },
     { name: 'rub', min: 2, autocomplete: true },
     { name: 'sit', min: 1, autocomplete: true },
     { name: 'terrain', min: 2, autocomplete: true },
@@ -5663,6 +5695,189 @@ async function showExtendedCommandInput(typed) {
     await showPromptLine(`# ${shown}`);
     game._pending_message_wrap_cols = 79;
     game._prompt_cursor = extendedCommandInputCursor(input);
+}
+
+function monsterHasSaddle(mon) {
+    return !!((mon?.misc_worn_check || 0) & C.W_SADDLE)
+        || (mon?.inventory || []).some((obj) => (obj?.owornmask || 0) & C.W_SADDLE);
+}
+
+function steedBaseName(mon) {
+    return String(mon?.data?.name || 'monster').toLowerCase().replaceAll('_', ' ');
+}
+
+function steedSaddledName(mon) {
+    const visibleSaddle = monsterHasSaddle(mon)
+        && !(game.u?.ublind || game.u?.uprops?.blind)
+        && !(game.u?.uhallucination || game.u?.uprops?.hallucination);
+    return `${visibleSaddle ? 'saddled ' : ''}${steedBaseName(mon)}`;
+}
+
+function steedMonNam(mon) {
+    return C.has_mgivenname(mon) ? C.MGIVENNAME(mon) : `the ${steedSaddledName(mon)}`;
+}
+
+function steedAnName(mon) {
+    const name = steedBaseName(mon);
+    const article = /^[aeiou]/i.test(name) ? 'an' : 'a';
+    return `${article} ${name}`;
+}
+
+function steedCanBeRidden(mon) {
+    const mlet = mon?.data?.mlet;
+    const size = mon?.data?.msize ?? mon?.data?.size ?? 0;
+    return mlet === 'S_QUADRUPED' || mlet === 'S_UNICORN' || mlet === 'S_ANGEL'
+        || steedBaseName(mon) === 'pony' || size >= 2;
+}
+
+function removeMountedSteedFromMap(mon) {
+    // C ref: src/steed.c:mount_steed() removes the steed from the map grid,
+    // but it remains in the fmon list for movement allocation and pet upkeep.
+    // JS uses level.monsters for that fmon-like list, so keep the object here;
+    // mon_at() ignores the active steed while mounted.
+    void mon;
+}
+
+function placeSteedOnMap(mon, x, y) {
+    if (!mon || !game.level) return;
+    mon.mx = x;
+    mon.my = y;
+    if (!game.level.monsters.includes(mon)) game.level.monsters.push(mon);
+    newsym(x, y);
+}
+
+async function mountSteedBasic(mon) {
+    // C ref: src/steed.c:mount_steed().
+    if (game.u?.usteed) {
+        await pline(`You are already riding ${steedMonNam(game.u.usteed)}.`);
+        game.context.move = 0;
+        return;
+    }
+    if (!mon) {
+        await pline('I see nobody there.');
+        game.context.move = 0;
+        return;
+    }
+    if (!monsterHasSaddle(mon)) {
+        await pline(`${C.has_mgivenname(mon) ? C.MGIVENNAME(mon) : `The ${steedBaseName(mon)}`} is not saddled.`);
+        game.context.move = 0;
+        return;
+    }
+    if (!mon.mtame || mon.isminion) {
+        await pline(`I think ${steedMonNam(mon)} would mind.`);
+        game.context.move = 0;
+        return;
+    }
+    if (!steedCanBeRidden(mon)) {
+        await pline("You can't ride such a creature.");
+        game.context.move = 0;
+        return;
+    }
+
+    const threshold = (game.u?.ulevel || 1) + (mon.mtame || 0);
+    if (threshold < rnd(20)) {
+        await pline(`You slip while trying to get on ${steedMonNam(mon)}.`);
+        const damage = rn1(5, 10);
+        if (game.u && typeof game.u.uhp === 'number') {
+            game.u.uhp = Math.max(0, game.u.uhp - damage);
+            if (game.u.uhp <= 0) {
+                game._death_killer_name = 'riding accident';
+                game._death_killer_article = 'a';
+                game._death_killer_format = 'by-an';
+                game._death_shopkeeper_killer = null;
+                game._death_preserve_latched_status = true;
+                if (!game._death_bones_checked) {
+                    game._death_bones_checked = true;
+                    game._death_bones_check_pending = true;
+                }
+                game._monster_death_pending = true;
+                game._latched_status_uhp = 0;
+                queue_more_prompt();
+            }
+        }
+        game.context.move = 0;
+        return;
+    }
+
+    await pline(`You mount ${steedMonNam(mon)}.`);
+    const oldx = game.u.ux;
+    const oldy = game.u.uy;
+    game.u.usteed = mon;
+    removeMountedSteedFromMap(mon);
+    game.u.ux0 = oldx;
+    game.u.uy0 = oldy;
+    game.u.ux = mon.mx;
+    game.u.uy = mon.my;
+    mon.mx = game.u.ux;
+    mon.my = game.u.uy;
+    newsym(oldx, oldy);
+    vision_recalc(1);
+    newsym(game.u.ux, game.u.uy);
+    game.context.move = 1;
+}
+
+const LANDING_DIRS = [
+    { dx: -1, dy: 0 }, { dx: -1, dy: -1 }, { dx: 0, dy: -1 }, { dx: 1, dy: -1 },
+    { dx: 1, dy: 0 }, { dx: 1, dy: 1 }, { dx: 0, dy: 1 }, { dx: -1, dy: 1 },
+];
+
+function landingSpotBasic() {
+    // C ref: src/steed.c:landing_spot().  This covers the ordinary voluntary
+    // dismount path: prefer accessible adjacent squares, favor orthogonal
+    // distance, and randomize among equal-distance candidates.
+    let viable = 0;
+    let best = null;
+    let minDistance = -1;
+    for (const dir of LANDING_DIRS) {
+        const x = (game.u?.ux || 0) + dir.dx;
+        const y = (game.u?.uy || 0) + dir.dy;
+        if (!C.isok(x, y) || blocksMove(x, y) || mon_at(x, y)) continue;
+        viable++;
+        const distance = dist2(game.u?.ux || 0, game.u?.uy || 0, x, y);
+        if (minDistance < 0 || distance < minDistance
+            || (distance === minDistance && !rn2(viable))) {
+            best = { x, y };
+            minDistance = distance;
+        }
+    }
+    return best;
+}
+
+async function dismountSteedBasic() {
+    // C ref: src/steed.c:dismount_steed(DISMOUNT_BYCHOICE).
+    const steed = game.u?.usteed;
+    if (!steed) return;
+    const spot = landingSpotBasic();
+    if (!spot) {
+        await pline("You can't.  There isn't anywhere for you to stand.");
+        game.context.move = 0;
+        return;
+    }
+
+    if (C.has_mgivenname(steed)) await pline(`You dismount ${steedMonNam(steed)}.`);
+    else await pline(`You've been through the dungeon on ${steedAnName(steed)} with no name.`);
+
+    const steedX = game.u.ux;
+    const steedY = game.u.uy;
+    game.u.usteed = null;
+    game.u.ux0 = steedX;
+    game.u.uy0 = steedY;
+    game.u.ux = spot.x;
+    game.u.uy = spot.y;
+    placeSteedOnMap(steed, steedX, steedY);
+    vision_recalc(1);
+    newsym(spot.x, spot.y);
+    game.context.move = 1;
+}
+
+async function doRideCommand() {
+    if (game.u?.usteed) {
+        await dismountSteedBasic();
+        return;
+    }
+    await showPromptLine('In what direction? ');
+    game._awaiting_ride_direction = true;
+    game.context.move = 0;
 }
 
 function showNameCommandMenu() {
@@ -6367,7 +6582,8 @@ async function tryPushBoulder(boulder, sx, sy, dx, dy) {
 }
 
 function mon_at(x, y) {
-    return (game.level?.monsters || []).find((mon) => mon.mx === x && mon.my === y);
+    return (game.level?.monsters || []).find((mon) =>
+        mon !== game.u?.usteed && mon.mx === x && mon.my === y);
 }
 
 function namedMonsterDisplayName(mon) {
@@ -9233,10 +9449,43 @@ function finishDeferredProjectileClearAfterMore() {
     if (clear && C.isok(clear.x, clear.y)) newsym(clear.x, clear.y);
 }
 
+function petCombatTopline(line) {
+    return /^The (?:kitten|little dog|(?:saddled )?pony) (?:misses|bites|hits|kicks|stings|butts|touches) .+[.!]$/.test(line || '');
+}
+
+function petCombatHitTopline(line) {
+    return /^The (?:kitten|little dog|(?:saddled )?pony) (?:bites|hits|kicks|stings|butts|touches) .+[.!]$/.test(line || '');
+}
+
+function splitDeferredPetCombatTopline(line) {
+    const msg = String(line || '');
+    const match = /^(The (?:kitten|little dog|(?:saddled )?pony) (?:misses|bites|hits|kicks|stings|butts|touches) .+?[.!])  (The (?:kitten|little dog|(?:saddled )?pony) .+)$/.exec(msg);
+    if (!match || !petCombatTopline(match[1]) || !petCombatTopline(match[2])) return null;
+    return { first: match[1], rest: match[2] };
+}
+
+function monsterDeathPastTense(mon) {
+    // C ref: src/mon.c:monkilled(). Nonliving monsters are destroyed.
+    const ptr = mon?.data;
+    if ((ptr?.mflags2 ?? 0) & M2_UNDEAD) return 'destroyed';
+    if (ptr?.name === 'MANES' || ptr?.mlet === 'S_GOLEM' || ptr?.mlet === 'S_VORTEX')
+        return 'destroyed';
+    return 'killed';
+}
+
+function monsterPetDeathLine(mon) {
+    return `The ${monsterName(mon)} is ${monsterDeathPastTense(mon)}!`;
+}
+
 async function handleQueuedMore(ch) {
     if (!game._more || (game._more_dismissals_remaining || 0) <= 0) return false;
     let resumeMonsterBehindNewMore = false;
     let suppressPausedMonsterResume = false;
+    const afterMoreSplit = splitDeferredPetCombatTopline(game._after_more_message || '');
+    const afterMoreTopline = afterMoreSplit?.first || game._after_more_message || '';
+    const splitHitDeathPrompt = !!game._pet_death_after_split_hit_more
+        && !!game._pet_defender_death_pending
+        && petCombatHitTopline(afterMoreTopline);
     const moreDismissKey = !!game._monster_more_accepts_any_key
         || ch === ' ' || ch === '\r' || ch === '\n' || ch === '\x1b';
     const pausedMonsterTurn = !!game._monster_turn_paused_for_more;
@@ -9244,16 +9493,18 @@ async function handleQueuedMore(ch) {
     const preTurnResume = pausedMonsterTurn && !!game._pre_turn_more_waiting;
     const monsterAttackResume = pausedMonsterTurn && !!game._monster_attack_more_waiting;
     const deferredPetDeathPending = game._pet_defender_death_pending || null;
-    const deferredPetDeathCanPack = !!game._after_more_message
+    const deferredPetDeathCanPack = !!afterMoreTopline
+        && !afterMoreSplit
+        && !splitHitDeathPrompt
         && !!deferredPetDeathPending
         && topline_can_pack_message(
-            game._after_more_message,
-            `The ${monsterName(deferredPetDeathPending.target)} is killed!`,
+            afterMoreTopline,
+            monsterPetDeathLine(deferredPetDeathPending.target),
         );
-    const deferredPetDeathNeedsPrompt = !!game._after_more_message
+    const deferredPetDeathNeedsPrompt = !!afterMoreTopline
         && !!game._pet_defender_death_pending
         && !!game._pet_combat_more_latched
-        && !deferredPetDeathCanPack
+        && (!deferredPetDeathCanPack || splitHitDeathPrompt)
         && !(game.u?.uhallucination || game.u?.uprops?.hallucination);
     const pausedFloorListTurn = !!game._resume_floor_list_turn;
     const pausedRunTail = !!game._run_paused_for_more;
@@ -9386,7 +9637,7 @@ async function handleQueuedMore(ch) {
         queue_more_prompt();
     } else if (game._death_prompt_pending) {
         if (deathUsesWizardPrompt()) await showDeathPrompt();
-        else await showDeathDisclosure();
+        else await showDeathDisclosureOrPrompt();
     } else if (game._quit_disclosure_active) {
         game._quit_disclosure_active = false;
         game._override_serialized_persistent = false;
@@ -9786,13 +10037,23 @@ async function handleQueuedMore(ch) {
             await finishEnchantWeaponAfterMore();
         }
         if (game._after_more_message) {
-            const msg = game._after_more_message;
+            const split = afterMoreSplit;
+            const msg = split?.first || game._after_more_message;
+            const rest = split?.rest || '';
             // C refs: src/mhitm.c:mattackm(), src/mon.c:monkilled().
             // A deferred monster-vs-monster hit line blocks before visible
             // death side effects such as "The kitten is killed!" are applied.
-            let needsPrompt = !!game._after_more_needs_prompt || deferredPetDeathNeedsPrompt;
-            game._after_more_message = '';
+            let needsPrompt = !!game._after_more_needs_prompt || deferredPetDeathNeedsPrompt || !!rest;
+            game._after_more_message = rest;
             game._after_more_needs_prompt = false;
+            if (rest) {
+                // C refs: win/tty/topl.c:update_topl()/more(),
+                // src/mhitm.c:mattackm().  Pet combat plines generated behind
+                // an existing --More-- are shown one tty boundary at a time.
+                game._pet_combat_more_latched = true;
+                if (game._pet_defender_death_pending && petCombatHitTopline(rest))
+                    game._pet_death_after_split_hit_more = true;
+            }
             if (game._clear_latched_status_before_after_more) {
                 game._clear_latched_status_before_after_more = false;
                 game._latched_status_uhp = null;
@@ -9824,6 +10085,7 @@ async function handleQueuedMore(ch) {
                     exercise(A_STR, false); // C ref: src/mthrowu.c:thitu().
             }
             await pline(msg);
+            if (splitHitDeathPrompt) game._pet_death_after_split_hit_more = false;
             game._monster_topline_deferred = false;
             await finish_deferred_monster_physical_attack();
             if (deferredPetDeathCanPack && game._pet_defender_death_pending) {
@@ -12202,6 +12464,22 @@ export async function rhack(key) {
         return;
     }
 
+    if (game._death_inventory_disclosure_prompt_active) {
+        if (ch === 'y' || ch === 'Y' || ch === 'n' || ch === 'N'
+            || ch === 'q' || ch === 'Q' || ch === ' ' || ch === '\r' || ch === '\n') {
+            game._death_inventory_disclosure_prompt_active = false;
+            clear_pending_message();
+            await showDeathDisclosure();
+            game.context.move = 0;
+            return;
+        }
+        const msg = 'Do you want your possessions identified? [ynq] (n)';
+        await showPromptLine(msg);
+        game._prompt_cursor = [msg.length + 1, 0];
+        game.context.move = 0;
+        return;
+    }
+
     if (game._death_prompt_active) {
         if (ch === 'y' || ch === 'Y') {
             game._death_prompt_active = false;
@@ -12217,7 +12495,7 @@ export async function rhack(key) {
             if (bonesOk && deathCanSaveWizardBones()) {
                 await showDeathSaveBonesPrompt();
             } else {
-                await showDeathDisclosure();
+                await showDeathDisclosureOrPrompt();
             }
             game.context.move = 0;
             return;
@@ -12267,14 +12545,14 @@ export async function rhack(key) {
             game._death_replace_bones_prompt_active = false;
             clear_pending_message();
             savePreparedBonesRngBasic({ replace: true });
-            await showDeathDisclosure();
+            await showDeathDisclosureOrPrompt();
             game.context.move = 0;
             return;
         }
         if (ch === 'n' || ch === 'N' || ch === ' ' || ch === '\r' || ch === '\n') {
             game._death_replace_bones_prompt_active = false;
             clear_pending_message();
-            await showDeathDisclosure();
+            await showDeathDisclosureOrPrompt();
             game.context.move = 0;
             return;
         }
@@ -12298,14 +12576,14 @@ export async function rhack(key) {
                 game.context.move = 0;
                 return;
             }
-            await showDeathDisclosure();
+            await showDeathDisclosureOrPrompt();
             game.context.move = 0;
             return;
         }
         if (ch === 'n' || ch === 'N' || ch === ' ' || ch === '\r' || ch === '\n') {
             game._death_save_bones_prompt_active = false;
             clear_pending_message();
-            await showDeathDisclosure();
+            await showDeathDisclosureOrPrompt();
             game.context.move = 0;
             return;
         }
@@ -12557,6 +12835,8 @@ export async function rhack(key) {
                 await showPromptLine('Are you sure you want to pray? [yn] (n) ');
                 game._awaiting_pray_confirm = true;
                 game.context.move = 0;
+            } else if (cmd === 'ride') {
+                await doRideCommand();
             } else if (cmd === 'quit') {
                 // C ref: src/end.c:done2().
                 const prompt = 'Really quit without saving? [yn] (n)';
@@ -12647,7 +12927,8 @@ export async function rhack(key) {
                     await pline(`#${typedExtCommand.slice(0, 60)}: unknown extended command.`);
                 }
             }
-            if (cmd !== 'force' && cmd !== 'wipe' && cmd !== 'twoweapon' && cmd !== 'sit' && cmd !== 'dip') game.context.move = 0;
+            if (cmd !== 'force' && cmd !== 'wipe' && cmd !== 'twoweapon'
+                && cmd !== 'sit' && cmd !== 'dip' && cmd !== 'ride') game.context.move = 0;
             return;
         }
         if (ch === '\x1b') {
@@ -12691,6 +12972,33 @@ export async function rhack(key) {
             return;
         }
         game.context.move = 0;
+        return;
+    }
+
+    if (game._awaiting_ride_direction) {
+        game._awaiting_ride_direction = false;
+        clear_pending_message();
+        if (!'hykulnjb<>.'.includes(ch)) {
+            game.context.move = 0;
+            if (game.iflags?.cmdassist !== false) {
+                game._direction_help_screen = INVALID_DIRECTION_HELP_SCREEN;
+                game._direction_help_after_more_message = '';
+                showSerializedOverride(INVALID_DIRECTION_HELP_SCREEN, [8, 23]);
+                queue_more_prompt();
+            } else {
+                await pline('What a strange direction!');
+            }
+            return;
+        }
+        if (ch === '<' || ch === '>' || ch === '.') {
+            await pline('I see nobody there.');
+            game.context.move = 0;
+            return;
+        }
+        game.u.dx = DIR_DX[ch] || 0;
+        game.u.dy = DIR_DY[ch] || 0;
+        const mon = mon_at((game.u?.ux || 0) + game.u.dx, (game.u?.uy || 0) + game.u.dy);
+        await mountSteedBasic(mon);
         return;
     }
 
@@ -14137,7 +14445,12 @@ export async function rhack(key) {
                 game.context.move = 0;
                 return;
             }
-            await showTutorialPrompt(true);
+            // C ref: options.c:ask_do_tutorial() + win/tty/wintty.c:tty_select_menu().
+            // The menu loop returns with no selection for space/enter, causing
+            // ask_do_tutorial() to rebuild the menu with the extra guidance
+            // line. Other invalid selector keys are swallowed by the tty menu
+            // and leave the original menu/cursor in place.
+            await showTutorialPrompt(ch === ' ' || ch === '\r' || ch === '\n');
             game.context.move = 0;
             return;
         }
@@ -15019,6 +15332,10 @@ export async function domove(dx, dy) {
     u.uy0 = oldy;
     u.ux = newx;
     u.uy = newy;
+    if (u.usteed) {
+        u.usteed.mx = newx;
+        u.usteed.my = newy;
+    }
     game._pending_move_smudge = { oldx, oldy };
     if (game.context?.run && runShouldStopAfterMove(source, target)) {
         if (target?.typ === DOOR && !(target.doormask & (D_CLOSED | D_LOCKED))) {

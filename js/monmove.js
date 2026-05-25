@@ -703,7 +703,8 @@ async function m_digweapon_check_basic(mtmp, x, y) {
 }
 
 function mon_at(x, y, self) {
-    return (game.level?.monsters || []).find((mon) => mon !== self && mon.mx === x && mon.my === y);
+    return (game.level?.monsters || []).find((mon) =>
+        mon !== self && mon !== game.u?.usteed && mon.mx === x && mon.my === y);
 }
 
 function closed_door_basic(x, y) {

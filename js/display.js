@@ -925,6 +925,9 @@ function swallowed_glyph_at(x, y) {
 }
 
 function hero_glyph() {
+    // C ref: src/display.c:newsym().  When mounted, the hero's map square is
+    // rendered with the steed's glyph/color rather than the ordinary @ glyph.
+    if (game.u?.usteed) return monster_glyph(game.u.usteed);
     const form = game.u?._poly_form || null;
     return {
         ch: form?.glyph || '@',
@@ -1290,6 +1293,7 @@ function _statusLine2() {
     if (u.uprops?.blinded || u.uprops?.blind || u.ublind) conditions.push('Blind');
     if (u.uprops?.deaf) conditions.push('Deaf');
     if (form?.fly) conditions.push('Fly');
+    if (u.usteed) conditions.push('Ride');
     const conditionText = conditions.length ? ` ${conditions.join(' ')}` : '';
     const hp = game._latched_status_uhp != null && (game._more || game._death_prompt_active)
         ? game._latched_status_uhp
