@@ -1172,7 +1172,7 @@ export async function moveloop_core() {
         }
         if (g._resume_nomul_after_more) {
             g._resume_nomul_after_more = false;
-            if (!await continueNomulTurns(g)) return;
+            if (!await continueNomulTurns(g, { countCurrentTurn: true })) return;
             if (!occupationPending(g)) finish_pending_eaten_corpse();
             if (!await continueOccupationTurns(g)) return;
         } else {
