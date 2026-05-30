@@ -126,6 +126,7 @@ const C_RATION = 295;
 const CORPSE = 265;
 const ROCK = 474;
 const BOULDER = 475;
+const STATUE = 476;
 const AXE = 44;
 const BATTLE_AXE = 45;
 const DWARVISH_MATTOCK = 71;
@@ -540,14 +541,18 @@ function hides_under_basic(mtmp) {
     return !!(mtmp.data?.mflags1 & M1_CONCEAL);
 }
 
+function hide_under_object_at_basic(x, y) {
+    return (game.level?.objects || []).find((item) => item.ox === x && item.oy === y) || null;
+}
+
 function can_hide_under_object_basic(x, y) {
-    const obj = (game.level?.objects || []).find((item) => item.ox === x && item.oy === y);
+    const obj = hide_under_object_at_basic(x, y);
     if (!obj) return false;
     const trap = (game.level?.traps || []).find((ttmp) => ttmp.tx === x && ttmp.ty === y);
     return !trap || is_pit(trap.ttyp);
 }
 
-function hideunder_basic(mtmp) {
+function hideunder_basic(mtmp, options = {}) {
     // C ref: mon.c:hideunder().  Keep the side effect conservative: eels hide
     // in pool squares; concealers hide under eligible floor objects.
     let undetected = false;
@@ -560,7 +565,7 @@ function hideunder_basic(mtmp) {
     }
     const old = !!mtmp.mundetected;
     mtmp.mundetected = undetected ? 1 : 0;
-    if (old !== !!mtmp.mundetected) newsym(mtmp.mx, mtmp.my);
+    if (old !== !!mtmp.mundetected && !options.deferNewsym) newsym(mtmp.mx, mtmp.my);
     return undetected;
 }
 
@@ -572,13 +577,58 @@ function maybe_unhide_at_basic(mtmp) {
     if (shouldRecheck) hideunder_basic(mtmp);
 }
 
-function postmove_hide_under_or_eel_basic(mtmp) {
+function monster_locomotion_basic(ptr, def) {
+    const capitalized = /^[A-Z]/.test(def || '');
+    const pick = (lower) => capitalized ? sentence_case(lower) : lower;
+    if ((ptr?.mflags1 ?? 0) & M1_FLY) return pick('fly');
+    if (ptr?.mlet === 'S_SNAKE') return pick('slither');
+    if ((ptr?.mflags1 ?? 0) & M1_AMORPHOUS) return pick('ooze');
+    if (!(ptr?.mmove ?? 0)) return pick('wiggle');
+    if ((ptr?.mflags1 ?? 0) & M1_NOHANDS) return pick('crawl');
+    return def;
+}
+
+function hide_under_seen_object_name(mtmp, obj) {
+    if (mtmp?.data?.mlet === 'S_EEL') return 'the water';
+    if (obj?.otyp === STATUE) return 'a statue';
+    return floor_object_name(obj);
+}
+
+function monster_seen_name(mtmp) {
+    const named = named_monster_name(mtmp);
+    if (named) return named;
+    return `the ${monster_name(mtmp)}`;
+}
+
+async function postmove_hide_under_or_eel_basic(mtmp) {
     if (!hides_under_basic(mtmp) && mtmp.data?.mlet !== 'S_EEL') return;
     // C ref: monmove.c:postmov() re-hide gate after moved/done monsters.
+    const wasUndetected = !!mtmp.mundetected;
+    const seeit = hero_can_spot_monster(mtmp);
+    const obj = hide_under_object_at_basic(mtmp.mx, mtmp.my);
+    let redrew = false;
     if (mtmp.mundetected || ((mtmp.mcanmove !== 0 && !mtmp.msleeping) && rn2(5))) {
-        hideunder_basic(mtmp);
+        const hid = hideunder_basic(mtmp, { deferNewsym: seeit && !wasUndetected });
+        // C ref: mon.c:hideunder().  The hide-under side effect happens
+        // before You_see(); tty may then block the previous topline and defer
+        // this visible monster message before the final newsym() redraw.
+        if (hid && !wasUndetected && seeit) {
+            const locomo = mtmp.data?.mlet === 'S_EEL'
+                ? 'dive'
+                : monster_locomotion_basic(mtmp.data, 'hide');
+            const line = `You see ${monster_seen_name(mtmp)} ${locomo} under ${hide_under_seen_object_name(mtmp, obj)}.`;
+            const packed = await append_monster_topline(line);
+            if (!packed && game._more) {
+                game._deferred_hideunder_newsym = { x: mtmp.mx, y: mtmp.my };
+                game._monster_turn_paused_for_more = true;
+                redrew = true;
+            } else {
+                newsym(mtmp.mx, mtmp.my);
+                redrew = true;
+            }
+        }
     }
-    newsym(mtmp.mx, mtmp.my);
+    if (!redrew) newsym(mtmp.mx, mtmp.my);
 }
 
 function wearing_ring_basic(otyp) {
@@ -4354,11 +4404,11 @@ async function m_move_basic(mtmp, resumeAfterTenguTeleRestrict = false) {
     if (doorStatus === MMOVE_DIED) return MMOVE_DIED;
     if (await mpickstuff_basic(mtmp)) {
         maybe_spin_web_basic(mtmp);
-        postmove_hide_under_or_eel_basic(mtmp);
+        await postmove_hide_under_or_eel_basic(mtmp);
         return MMOVE_DONE;
     }
     maybe_spin_web_basic(mtmp);
-    postmove_hide_under_or_eel_basic(mtmp);
+    await postmove_hide_under_or_eel_basic(mtmp);
     return doorStatus;
 }
 
@@ -4578,6 +4628,78 @@ export function mcalcdistress() {
     }
 }
 
+async function maybe_finish_post_move_attack(g, mtmp, moveStatus, postMoveState, somebody_can_move) {
+    if (!((moveStatus !== MMOVE_MOVED && moveStatus !== MMOVE_DONE && can_standard_attack_basic(postMoveState))
+        || (moveStatus === MMOVE_MOVED && can_attack_after_move_basic(mtmp, postMoveState)))) {
+        return true;
+    }
+    await mattacku_basic(mtmp, postMoveState);
+    if (g._swallowed_damage_more_latched && g._more) {
+        g._swallowed_damage_more_latched = false;
+        g._resume_movemon_after_mon = mtmp;
+        g._resume_somebody_can_move = somebody_can_move || mtmp.movement >= NORMAL_SPEED;
+        g._monster_turn_paused_for_more = true;
+        g._swallowed_damage_more_waiting = true;
+        return false;
+    }
+    if (g._pending_swallowed_display_clear && g._more) {
+        g._resume_movemon_after_mon = mtmp;
+        g._resume_somebody_can_move = somebody_can_move || mtmp.movement >= NORMAL_SPEED;
+        g._monster_turn_paused_for_more = true;
+        g._swallowed_expulsion_paused_for_more = true;
+        return false;
+    }
+    if (g._monster_attack_more_latched && g._more) {
+        // C ref: topl.c:more()/pline_mon(). A queued monster-hit More only
+        // interrupts immediately when dismissing it must expose a delayed
+        // side-effect pline. Otherwise it remains on the topline while later
+        // map updates in the same monster pass can happen; the next pline or
+        // input-boundary flush services the More.
+        g._monster_attack_more_latched = false;
+        if (g._after_more_message) {
+            if (g._pending_message
+                && topline_can_pack_message(g._pending_message, g._after_more_message)) {
+                g._pending_message = `${g._pending_message}  ${g._after_more_message}`;
+                g._after_more_message = '';
+                g._after_more_needs_prompt = false;
+                g._monster_attack_pause_after_more = false;
+                g._hallucination_warning_rng_active = true;
+                return true;
+            }
+            g._monster_attack_pause_after_more = false;
+            g._resume_movemon_after_mon = mtmp;
+            g._resume_somebody_can_move = somebody_can_move || mtmp.movement >= NORMAL_SPEED;
+            g._monster_turn_paused_for_more = true;
+            g._monster_attack_more_waiting = true;
+            return false;
+        }
+        g._monster_attack_pause_after_more = false;
+        g._hallucination_warning_rng_active = true;
+    }
+    if (g._fatal_monster_attack_paused && g._monster_turn_paused_for_more
+        && g._more && !hallucinating()) {
+        g._resume_turn_tail_after_more = true;
+        return false;
+    }
+    if (g._pet_combat_resume_active && g._more && !hallucinating()) {
+        if (g._packed_monster_more_candidate && !g._after_more_message
+            && !g._monster_attack_pause_after_more) {
+            // C refs: win/tty/topl.c:more(), mhitu.c:hitmsg().
+            // A non-side-effect packed monster hit can remain on the topline
+            // while later monster movement queues the next visible message
+            // behind that More.
+            g._pet_combat_resume_active = false;
+            return true;
+        }
+        g._pet_combat_resume_active = false;
+        g._resume_movemon_after_mon = mtmp;
+        g._resume_somebody_can_move = somebody_can_move || mtmp.movement >= NORMAL_SPEED;
+        g._monster_turn_paused_for_more = true;
+        return false;
+    }
+    return true;
+}
+
 export async function movemon() {
     const g = game;
     await prepare_monster_more_base_screen();
@@ -4621,26 +4743,38 @@ export async function movemon() {
     }
     const resumeAfter = g._resume_movemon_after_mon || null;
     const resumeTenguAfterTeleRestrict = g._resume_tengu_after_tele_restrict || null;
-    let skippingResumedPrefix = !!(resumeAfter || resumeTenguAfterTeleRestrict);
+    const resumePostMove = g._resume_movemon_post_move_mon || null;
+    let skippingResumedPrefix = !!(resumeAfter || resumeTenguAfterTeleRestrict || resumePostMove);
     g._resume_movemon_after_mon = null;
+    g._resume_movemon_post_move_mon = null;
 
     // C ref: mon.c:iter_mons_safe() snapshots fmon before the movement
     // pass so removals or insertions during combat do not shift ownership
     // of later monsters' turns.
     const monsters = [...(g.level.monsters || [])];
     for (const mtmp of monsters) {
+        let resumePostMoveForThis = false;
         if (skippingResumedPrefix) {
             if (mtmp === resumeAfter) {
                 skippingResumedPrefix = false;
                 continue;
+            } else if (mtmp === resumePostMove) {
+                skippingResumedPrefix = false;
+                resumePostMoveForThis = true;
             }
-            if (mtmp === resumeTenguAfterTeleRestrict) {
+            if (!resumePostMoveForThis && mtmp === resumeTenguAfterTeleRestrict) {
                 skippingResumedPrefix = false;
             } else {
-                continue;
+                if (!resumePostMoveForThis) continue;
             }
         }
         if (!g.level.monsters?.includes(mtmp)) continue;
+        if (resumePostMoveForThis) {
+            const postMoveState = distfleeck(mtmp);
+            if (!await maybe_finish_post_move_attack(g, mtmp, MMOVE_MOVED, postMoveState, somebody_can_move))
+                return false;
+            continue;
+        }
         if (mtmp === resumeTenguAfterTeleRestrict) {
             g._resume_tengu_after_tele_restrict = null;
             const moveStatus = await m_move_basic(mtmp, true);
@@ -4765,79 +4899,17 @@ export async function movemon() {
             if (non_tame_movement_opportunity(mtmp, fleeState)) {
                 moveStatus = maybe_cast_undirected_spell_before_move(mtmp) ? MMOVE_DONE : await m_move_basic(mtmp);
                 if (moveStatus === MMOVE_DIED) continue;
-                if (g._monster_turn_paused_for_more) return false;
+                if (g._monster_turn_paused_for_more) {
+                    g._resume_movemon_post_move_mon = mtmp;
+                    g._resume_somebody_can_move = somebody_can_move || mtmp.movement >= NORMAL_SPEED;
+                    return false;
+                }
                 // C calls distfleeck() again after m_move() returns for ordinary
                 // movement, even when the monster is off-screen.
                 postMoveState = distfleeck(mtmp);
             }
-            if ((moveStatus !== MMOVE_MOVED && moveStatus !== MMOVE_DONE && can_standard_attack_basic(postMoveState))
-                || (moveStatus === MMOVE_MOVED && can_attack_after_move_basic(mtmp, postMoveState))) {
-                await mattacku_basic(mtmp, postMoveState);
-                if (g._swallowed_damage_more_latched && g._more) {
-                    g._swallowed_damage_more_latched = false;
-                    g._resume_movemon_after_mon = mtmp;
-                    g._resume_somebody_can_move = somebody_can_move || mtmp.movement >= NORMAL_SPEED;
-                    g._monster_turn_paused_for_more = true;
-                    g._swallowed_damage_more_waiting = true;
-                    return false;
-                }
-                if (g._pending_swallowed_display_clear && g._more) {
-                    g._resume_movemon_after_mon = mtmp;
-                    g._resume_somebody_can_move = somebody_can_move || mtmp.movement >= NORMAL_SPEED;
-                    g._monster_turn_paused_for_more = true;
-                    g._swallowed_expulsion_paused_for_more = true;
-                    return false;
-                }
-                if (g._monster_attack_more_latched && g._more) {
-                    // C ref: topl.c:more()/pline_mon(). A queued monster-hit
-                    // More only interrupts immediately when dismissing it must
-                    // expose a delayed side-effect pline. Otherwise it remains
-                    // on the topline while later map updates in the same monster
-                    // pass can happen; the next pline or input-boundary flush
-                    // services the More.
-                    g._monster_attack_more_latched = false;
-                    if (g._after_more_message) {
-                        if (g._pending_message
-                            && topline_can_pack_message(g._pending_message, g._after_more_message)) {
-                            g._pending_message = `${g._pending_message}  ${g._after_more_message}`;
-                            g._after_more_message = '';
-                            g._after_more_needs_prompt = false;
-                            g._monster_attack_pause_after_more = false;
-                            g._hallucination_warning_rng_active = true;
-                            continue;
-                        }
-                        g._monster_attack_pause_after_more = false;
-                        g._resume_movemon_after_mon = mtmp;
-                        g._resume_somebody_can_move = somebody_can_move || mtmp.movement >= NORMAL_SPEED;
-                        g._monster_turn_paused_for_more = true;
-                        g._monster_attack_more_waiting = true;
-                        return false;
-                    }
-                    g._monster_attack_pause_after_more = false;
-                    g._hallucination_warning_rng_active = true;
-                }
-                if (g._fatal_monster_attack_paused && g._monster_turn_paused_for_more
-                    && g._more && !hallucinating()) {
-                    g._resume_turn_tail_after_more = true;
-                    return false;
-                }
-                if (g._pet_combat_resume_active && g._more && !hallucinating()) {
-                    if (g._packed_monster_more_candidate && !g._after_more_message
-                        && !g._monster_attack_pause_after_more) {
-                        // C refs: win/tty/topl.c:more(), mhitu.c:hitmsg().
-                        // A non-side-effect packed monster hit can remain on
-                        // the topline while later monster movement queues the
-                        // next visible message behind that More.
-                        g._pet_combat_resume_active = false;
-                        continue;
-                    }
-                    g._pet_combat_resume_active = false;
-                    g._resume_movemon_after_mon = mtmp;
-                    g._resume_somebody_can_move = somebody_can_move || mtmp.movement >= NORMAL_SPEED;
-                    g._monster_turn_paused_for_more = true;
-                    return false;
-                }
-            }
+            if (!await maybe_finish_post_move_attack(g, mtmp, moveStatus, postMoveState, somebody_can_move))
+                return false;
         }
     }
 

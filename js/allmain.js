@@ -943,6 +943,19 @@ async function continueNomulTurns(g, options = {}) {
     return true;
 }
 
+function restorePrayerBudgetForInterruptedFirstTurn(g) {
+    // C refs: src/pray.c:dopray(), src/allmain.c:moveloop_core().
+    // JS stores prayer's nomul(-3) as the command-owned turn plus queued
+    // follow-up turns.  If tty More interrupts that first turn before the
+    // once-per-turn tail, the command-owned turn has not been charged yet.
+    if (!g._pending_prayer_finish_message) return;
+    if ((g._prayer_turns_remaining || 0) <= 0) return;
+    if (g._advance_turn_completed_tail) return;
+    if (g._prayer_interrupted_first_turn_restored) return;
+    g._prayer_turns_remaining++;
+    g._prayer_interrupted_first_turn_restored = true;
+}
+
 async function continueOccupationTurns(g) {
     if (g._force_lock || (g._force_lock_post_success_turns || 0) > 0)
         return continueForceLockTurns(g);
@@ -1219,7 +1232,10 @@ export async function moveloop_core() {
             } else {
                 applyOccupationFinalTurnState(g);
                 await advanceTurn();
-                if (g._monster_turn_paused_for_more) return;
+                if (g._monster_turn_paused_for_more) {
+                    restorePrayerBudgetForInterruptedFirstTurn(g);
+                    return;
+                }
                 if (!await continueNomulTurns(g, { countCurrentTurn: true })) return;
                 if (!occupationPending(g)) finish_pending_eaten_corpse();
                 if (g._more && occupationPending(g) && !g._occupation_continue_behind_more) {
@@ -1303,6 +1319,7 @@ export async function moveloop_core() {
         finishDeferredSeerTurnUpdate(g);
         if (g._pending_prayer_finish_message) {
             g._pending_prayer_finish_message = false;
+            g._prayer_interrupted_first_turn_restored = false;
             const hadPrayerTopline = !!g._pending_message;
             if (hadPrayerTopline) await append_pline('You finish your prayer.');
             else await pline('You finish your prayer.');

@@ -6667,6 +6667,8 @@ function changeLuck(delta) {
 }
 
 const GOD_VOICES = ['booms out', 'thunders', 'rings out', 'booms'];
+const PRAYER_DEVOUT = 14;
+const PRAYER_STRIDENT = 4;
 
 async function prayerResultPline(line) {
     if (game._pack_next_prayer_result_line
@@ -6752,6 +6754,16 @@ async function godsUpset(respGod) {
     await angryGods(respGod);
 }
 
+function pleasedPrayerMood() {
+    // C ref: pray.c:pleased().  The initial feedback is based on current
+    // alignment record, before the later trouble/favor action roll.
+    const record = game.u?.ualign?.record ?? 0;
+    const hallucinating = !!(game.u?.uhallucination || game.u?.uprops?.hallucination);
+    if (record >= PRAYER_DEVOUT) return hallucinating ? 'pleased as punch' : 'well-pleased';
+    if (record >= PRAYER_STRIDENT) return hallucinating ? 'ticklish' : 'pleased';
+    return hallucinating ? 'full' : 'satisfied';
+}
+
 export async function finishPrayerResult() {
     // C ref: pray.c:prayer_done().
     const ptype = game._prayer_ptype ?? 3;
@@ -6767,7 +6779,7 @@ export async function finishPrayerResult() {
         await angryGods(game.u?.ualign?.type ?? alignment);
     } else {
         const god = prayerGodNameForAlign(alignment);
-        await prayerResultPline(`You feel that ${god} is satisfied.`);
+        await prayerResultPline(`You feel that ${god} is ${pleasedPrayerMood()}.`);
         if ((game.u?.ualign?.record ?? 0) < 2) adjalign(1);
         rn1(2, 1);
         game.u.ublesscnt = rnz(350);
@@ -10835,6 +10847,11 @@ async function handleQueuedMore(ch) {
                     exercise(A_STR, false); // C ref: src/mthrowu.c:thitu().
             }
             await pline(msg);
+            if (game._deferred_hideunder_newsym) {
+                const spot = game._deferred_hideunder_newsym;
+                game._deferred_hideunder_newsym = null;
+                newsym(spot.x, spot.y);
+            }
             if (splitHitDeathPrompt) game._pet_death_after_split_hit_more = false;
             game._monster_topline_deferred = false;
             await finish_deferred_monster_physical_attack();
