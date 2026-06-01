@@ -2110,6 +2110,10 @@ function restoreMappedForegroundAfterMonsterRefresh(options = {}) {
         if (!loc || mappingForegroundCovered(loc)) return;
         if (!glyph) return;
         loc.remembered_glyph = { ch: glyph.ch, color: glyph.color, decgfx: !!glyph.dec };
+        if (game.u?.ux === x && game.u?.uy === y) {
+            newsym(x, y);
+            return;
+        }
         show_glyph_cell(x, y, glyph.ch, glyph.color, !!glyph.dec);
     };
     const barsGlyph = mappedIronBarsGlyph();
@@ -19403,6 +19407,7 @@ export async function rhack(key) {
             game._attributes_page1_screen = null;
             game._attributes_page2_screen = null;
             game._attributes_page3_screen = null;
+            clearOverrideScreen();
             await redrawAfterFullScreenMenuDismiss();
             game.context.move = 0;
             return;
