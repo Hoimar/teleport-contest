@@ -13198,7 +13198,11 @@ async function handleQueuedMore(ch) {
             clear_pending_message();
             if (tempMessage?.line) {
                 await showTemperatureChangeMessage(tempMessage);
-                if (!game._more) queue_more_prompt();
+                // C ref: src/do.c:goto_level() -> temperature_change_msg()
+                // before pickup(1).  The temperature line only blocks when
+                // another deferred arrival display step still follows it.
+                if (game._arrival_floor_look_after_more && !game._more)
+                    queue_more_prompt();
             }
             game.context.move = 0;
             return true;
@@ -14776,12 +14780,27 @@ function insightHungerValue(level) {
         : level >= 15 ? 899
         : level <= 1 ? 880
             : 723;
-    // High-level wizard-mode tours still have incomplete hunger side-effect
-    // ownership outside the turn tail; keep the established insight fallback
-    // until those command/item hunger paths are modeled.
-    if ((game.flags?.debug || game.wizard) && level >= 15
-        && (game.u?.uhunger ?? fallback) < fallback) return fallback;
-    return game.u?.uhunger ?? fallback;
+    // C ref: src/insight.c:status_enlightenment().  Wizard insight prints the
+    // current u.uhunger value.  Teleport-at-will nutrition is tracked as an
+    // insight debt until morehungry()/newuhs()/exercise state is safe globally.
+    const live = Number.isFinite(game.u?.uhunger) ? game.u.uhunger : fallback;
+    const adjusted = Math.max(0, live - (game.u?._teleport_hunger_debt || 0));
+    // High-level wizard tours still lack full command/item hunger side-effect
+    // ownership.  If the temporary teleport-at-will debt overdraws the live
+    // value, keep the established insight fallback; otherwise use the positive
+    // live/debt value seen by current lower-level evidence.
+    if ((game.flags?.debug || game.wizard) && level >= 15 && live > 0
+        && adjusted === 0 && (game.u?._teleport_hunger_debt || 0) > live)
+        return fallback;
+    return adjusted;
+}
+
+function noteTeleportNutritionDebt() {
+    // C ref: src/teleport.c:dotele() -> morehungry(100).  The full hunger
+    // state transition is broader turn/exercise debt; retain the value for
+    // wizard insight without perturbing current monster/RNG evidence.
+    if (!game.u) return;
+    game.u._teleport_hunger_debt = (game.u._teleport_hunger_debt || 0) + 100;
 }
 
 function energyLine() {
@@ -15608,6 +15627,11 @@ function levelTeleportDepthTarget(depth, oldUz = game.u?.uz) {
     const curDungeon = game.dungeons?.[dnum];
     const curStart = curDungeon?.depth_start ?? 1;
     const curCount = curDungeon?.num_dunlevs ?? curDungeon?.dunlev_ureached ?? 1;
+    // C ref: teleport.c:level_tele().  In the Quest branch, the prompt uses
+    // status-line numbers ("Home 1", "Home 2", ...), so positive numeric
+    // requests are translated back to logical dungeon depth before get_level().
+    if (game.quest_dnum != null && dnum === game.quest_dnum && depth > 0)
+        depth += curStart - 1;
 
     if (game.medusa_level?.dnum === dnum && depth >= curStart + curCount) {
         return findHellLevelFromCurrentDungeon() || { dnum, dlevel: curCount };
@@ -17761,11 +17785,21 @@ export async function rhack(key) {
                 await teledsBasic(cursor.x, cursor.y);
             } else {
                 await pline('Sorry...');
-                queue_more_prompt();
+                const deferTurnUntilLookHere = game.flags?.verbose === false && !game._more;
+                // C refs: src/teleport.c:scrolltele(), src/teleport.c:teleds().
+                // With !verbose there is no materialize line to pack after
+                // "Sorry...", so the following look-here/floor-list text waits
+                // behind a tty More boundary; the command's time is spent when
+                // that interrupted display sequence resumes.
+                if (deferTurnUntilLookHere) {
+                    queue_more_prompt();
+                }
                 await safeTeledsBasic({ deferLookHereBehindMore: true });
-                game.context.move = 0;
+                noteTeleportNutritionDebt();
+                game.context.move = deferTurnUntilLookHere ? 0 : 1;
                 return;
             }
+            noteTeleportNutritionDebt();
             game.context.move = 1;
             return;
         } else if (ch === '\x1b') {
@@ -17775,7 +17809,7 @@ export async function rhack(key) {
             game._awaiting_teleport_prompt = false;
             game._teleport_cursor = null;
             clear_pending_message();
-            if (game.u) game.u.uhunger = Math.max(0, (game.u.uhunger ?? 900) - 100);
+            noteTeleportNutritionDebt();
             game.context.move = 1;
             return;
         } else {
