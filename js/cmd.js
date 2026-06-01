@@ -18553,11 +18553,12 @@ export async function rhack(key) {
     }
 
     if (game._awaiting_drop_item) {
-        clear_pending_message();
+        const dropPrompt = game._pending_message || '';
         game._awaiting_drop_item = false;
         const idx = inventoryIndexForLetter(ch);
         const obj = idx >= 0 ? game.inventory?.[idx] : null;
         if (!obj) {
+            clear_pending_message();
             game.context.move = 0;
             await pline('Never mind.');
             return;
@@ -18567,11 +18568,16 @@ export async function rhack(key) {
         if (game.flags?.verbose === false) {
             // C refs: src/do.c:drop(), src/invent.c:getobj().
             // Terse drop suppresses "You drop ..." without preserving the
-            // consumed getobj prompt into the following monster turn.
+            // consumed getobj prompt cursor; the prompt text remains visible
+            // for the turn snapshot when no drop pline replaces it.
+            game._pending_message = '';
+            game._pending_message_wrap_cols = 0;
+            if (dropPrompt) game._topline_residue = dropPrompt.trimEnd();
             game._prompt_cursor = null;
             game.context.move = 1;
             return;
         }
+        clear_pending_message();
         await pline(`You drop ${dropObjectName(obj)}.`);
         game.context.move = 1;
         return;
