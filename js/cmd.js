@@ -14775,7 +14775,8 @@ function insightHungerValue(level) {
     // High-level wizard-mode tours still have incomplete hunger side-effect
     // ownership outside the turn tail; keep the established insight fallback
     // until those command/item hunger paths are modeled.
-    if ((game.flags?.debug || game.wizard) && (game.u?.uhunger ?? fallback) < fallback) return fallback;
+    if ((game.flags?.debug || game.wizard) && level >= 15
+        && (game.u?.uhunger ?? fallback) < fallback) return fallback;
     return game.u?.uhunger ?? fallback;
 }
 
