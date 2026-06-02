@@ -4051,6 +4051,7 @@ async function start_takeoff_armor(obj) {
         obj.bknown = true;
         game.context.move = 0;
         await pline(`You can't.  ${plural ? 'They are' : 'It is'} cursed.`);
+        setTravelMapCursor();
         return;
     }
     const finishAc = armorClassAfterTakingOff(obj);
@@ -17160,7 +17161,7 @@ export async function rhack(key) {
             game._awaiting_pray_force = false;
             // C ref: pray.c:dopray().  Declining the wizard force-success
             // prompt still falls through to nomul(-3)/prayer_done().
-            game._prayer_turns_remaining = 4;
+            game._prayer_turns_remaining = prayerTurnBudget();
             game._pending_prayer_finish_message = true;
             game._prayer_finish_result_inline = true;
             game.context.move = 1;

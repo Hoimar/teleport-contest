@@ -14253,9 +14253,6 @@ function mk_knox_portal(x, y) {
     const eligibleKnoxDepth = same_dungeon(game.oracle_level)
         && !at_dgn_entrance('The Quest') && uDepth > 10 && uDepth < medusaDepth;
     const wizardMode = !!(game.wizard || game.flags?.debug);
-    if (wizardMode && !eligibleKnoxDepth) {
-        return;
-    }
 
     if ((source?.dnum ?? 0) < (game.dungeons?.length ?? 0) || (rn2(3) && !wizardMode)) {
         return;
