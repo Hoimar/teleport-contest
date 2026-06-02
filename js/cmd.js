@@ -14900,6 +14900,7 @@ function stageWishEncumbranceMessage(prevEncumbrance) {
     const newcap = heroNearCapacity();
     if (game.u) game.u.uencumber = newcap;
     if (newcap <= oldcap) return;
+    game._extra_encumbered_turn_pending = true;
     const msg = encumbranceIncreaseMessage(newcap);
     if (!msg) return;
     game._after_more_message = game._after_more_message
