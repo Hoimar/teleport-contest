@@ -5944,6 +5944,19 @@ async function physical_melee_attacks(mtmp, attacks, toHit) {
             if (damage > 0 && game._monster_topline_deferred && !damageSharesDeferredHitLine) {
                 game._after_more_hero_damage = (game._after_more_hero_damage || 0) + damage;
                 game._after_more_damage_after_prompt = true;
+                if (attacks.slice(i + 1).some(Boolean)) {
+                    // C ref: src/mhitu.c:mattacku().  A visible hit line can be
+                    // queued behind tty More, but the remaining attack rows
+                    // resume from the same monster after that boundary.
+                    game._deferred_monster_physical_attack = {
+                        mtmp,
+                        attacks,
+                        nextIndex: i + 1,
+                        toHit,
+                        attackVerbCounts: [...attackVerbCounts.entries()],
+                        current: null,
+                    };
+                }
                 if (damage >= preDamageHp) {
                     game._after_more_fatal_monster = {
                         isshk: !!mtmp.isshk,
