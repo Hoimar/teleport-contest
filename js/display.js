@@ -1301,7 +1301,10 @@ function _statusLine2() {
     const turn = game.flags?.time ? ` T:${game.moves || 1}` : '';
     const conditions = [];
     const encStatus = ['', 'Burdened', 'Stressed', 'Strained', 'Overtaxed', 'Overloaded'];
-    if ((u.uencumber || 0) > 0) conditions.push(encStatus[u.uencumber] || 'Overloaded');
+    const statusEncumbrance = game._more && game._status_uencumber_override != null
+        ? game._status_uencumber_override
+        : (u.uencumber || 0);
+    if (statusEncumbrance > 0) conditions.push(encStatus[statusEncumbrance] || 'Overloaded');
     if (u.uprops?.confusion || u.uconfusion) conditions.push('Conf');
     if (u.uprops?.hallucination || u.uhallucination) conditions.push('Hallu');
     if (u.uprops?.blinded || u.uprops?.blind || u.ublind) conditions.push('Blind');
