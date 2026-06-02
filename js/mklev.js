@@ -70,6 +70,7 @@ const POT_FRUIT_JUICE = 319;
 const POT_OIL = 321;
 const SCROLL_CLASS = 9;
 const SCR_LIGHT = 332;
+const SCR_MAIL = 364;
 const SPBOOK_CLASS = 10;
 const SPE_CONE_OF_COLD = 369;
 const SPE_LIGHT = 372;
@@ -271,6 +272,7 @@ const OILSKIN_SACK = 218;
 const BAG_OF_HOLDING = 219;
 const BAG_OF_TRICKS = 220;
 const HORN_OF_PLENTY = 252;
+const MAGIC_HARP = 254;
 const FOOD_RATION = 293;
 const CRAM_RATION = 292;
 const LEMBAS_WAFER = 291;
@@ -1384,6 +1386,9 @@ function mksobj_init(otmp, otyp, artif) {
         } else if (otyp === BAG_OF_TRICKS || otyp === HORN_OF_PLENTY) {
             // C ref: src/mkobj.c:mksobj_init().
             otmp.spe = rn1(18, 3);
+        } else if (otyp === MAGIC_HARP) {
+            // C ref: src/mkobj.c:mksobj_init(); charged instrument branch.
+            otmp.spe = rn1(5, 4);
         } else if (otyp === FIGURINE) {
             // C ref: mkobj.c:mksobj_init().  Random figurines use a
             // slightly harder monster pool, then reject human forms.
@@ -1398,7 +1403,7 @@ function mksobj_init(otmp, otyp, artif) {
         break;
     case POTION_CLASS:
     case SCROLL_CLASS:
-        blessorcurse(otmp, 4);
+        if (otyp !== SCR_MAIL) blessorcurse(otmp, 4);
         break;
     case SPBOOK_CLASS:
         blessorcurse(otmp, 17);

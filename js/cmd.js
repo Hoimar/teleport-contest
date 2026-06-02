@@ -175,11 +175,13 @@ const FIGURINE = 241;
 const MAGIC_MARKER = 242;
 const TIN_WHISTLE = 245;
 const MAGIC_WHISTLE = 246;
+const MAGIC_HARP = 254;
 const LEATHER_DRUM = 257;
 const DRUM_OF_EARTHQUAKE = 258;
 const PICK_AXE = 259;
 const GRAPPLING_HOOK = 260;
 const UNICORN_HORN = 261;
+const BELL_OF_OPENING = 263;
 const OIL_LAMP = 227;
 const MAGIC_LAMP = 228;
 const LARGE_BOX = 214;
@@ -289,6 +291,7 @@ const SCR_TELEPORTATION = 333;
 const SCR_IDENTIFY = 336;
 const SCR_MAGIC_MAPPING = 337;
 const SCR_PUNISHMENT = 341;
+const SCR_MAIL = 364;
 const BOULDER = 475;
 const APPLE = 277;
 const ORANGE = 278;
@@ -926,8 +929,8 @@ const RACE_INNATE_ABILITIES = new Map([
 function wishedObjectSpec(name) {
     const wish = String(name || '').toLowerCase();
     const spec = {};
-    const countMatch = wish.match(/^\s*(\d+)\s+/);
-    if (countMatch) spec.quan = Math.max(1, Number(countMatch[1]));
+    const count = wishedObjectCount(wish);
+    if (count) spec.quan = count;
     const chargeMatch = wish.match(/\((\d+)(?::(\d+))?\)/);
     if (chargeMatch) {
         spec.recharged = Number(chargeMatch[1]);
@@ -991,6 +994,15 @@ function wishedObjectSpec(name) {
         // war hammer, then oname() handles artifact naming after mksobj().
         return { ...spec, otyp: WAR_HAMMER, oname: 'Mjollnir', namedArtifact: true };
     }
+    if (/\bdaggers?\b/.test(wish)) {
+        // C ref: objnam.c:readobjnam() -> rnd_otyp_by_namedesc().
+        rn2(31);
+        return { ...spec, otyp: DAGGER };
+    }
+    if (/gold pieces?\b/.test(wish)) {
+        // C ref: objnam.c:readobjnam(); gold bypasses namedesc lookup.
+        return { ...spec, otyp: GOLD_PIECE };
+    }
     if (wish.includes('wand of fire')) {
         rn2(41);
         return { ...spec, otyp: WAN_FIRE };
@@ -1037,6 +1049,16 @@ function wishedObjectSpec(name) {
         // C ref: objnam.c:readobjnam() -> rnd_otyp_by_namedesc().
         rn2(181);
         return { ...spec, otyp: SCR_IDENTIFY };
+    }
+    if (/scrolls? of mail/.test(wish)) {
+        // C ref: objnam.c:readobjnam() -> rnd_otyp_by_namedesc().
+        rn2(1);
+        return { ...spec, otyp: SCR_MAIL };
+    }
+    if (/spellbooks? of magic missile/.test(wish)) {
+        // C ref: objnam.c:readobjnam() -> rnd_otyp_by_namedesc().
+        rn2(46);
+        return { ...spec, otyp: SPE_MAGIC_MISSILE };
     }
     if (/spellbooks? of detect food/.test(wish)) {
         // C ref: objnam.c:readobjnam() -> rnd_otyp_by_namedesc().
@@ -1094,6 +1116,18 @@ function wishedObjectSpec(name) {
         rn2(16);
         return { ...spec, otyp: MAGIC_LAMP };
     }
+    if (wish.includes('bell of opening')) {
+        rn2(1);
+        return { ...spec, otyp: BELL_OF_OPENING, appearanceName: 'silver bell' };
+    }
+    if (wish.includes('magic harp')) {
+        rn2(3);
+        return { ...spec, otyp: MAGIC_HARP, appearanceName: 'harp' };
+    }
+    if (wish.includes('leash')) {
+        rn2(66);
+        return { ...spec, otyp: LEASH };
+    }
     if (wish.includes('mirror')) {
         rn2(46);
         return { ...spec, otyp: MIRROR, appearanceName: 'looking glass' };
@@ -1110,6 +1144,14 @@ function wishedObjectSpec(name) {
         rn2(26);
         return { ...spec, otyp: CREAM_PIE, quan: 1 };
     }
+    if (wish.includes('fortune cookie')) {
+        rn2(56);
+        return { ...spec, otyp: FORTUNE_COOKIE };
+    }
+    if (wish.includes('apple')) {
+        rn2(16);
+        return { ...spec, otyp: APPLE };
+    }
     if (wish.includes('chest')) {
         // C ref: objnam.c:rnd_otyp_by_namedesc().  The name lookup for a
         // wished chest uses chest object probability plus the wish bonus.
@@ -1121,6 +1163,23 @@ function wishedObjectSpec(name) {
         return { ...spec, otyp: BAG_OF_HOLDING, appearanceName: 'bag' };
     }
     return null;
+}
+
+function wishedObjectCount(wish) {
+    // C ref: src/objnam.c:readobjnam_preparse().  BUC and enchantment
+    // prefixes can precede the requested quantity.
+    const cleaned = String(wish || '').replace(/\([^)]*\)/g, ' ');
+    const words = cleaned.trim().split(/\s+/).filter(Boolean);
+    for (let i = 0; i < words.length; i++) {
+        const word = words[i];
+        if (/^\d+$/.test(word)) return Math.max(1, Number(word));
+        if (/^[+-]\d+$/.test(word)
+            || ['blessed', 'uncursed', 'cursed', 'very', 'thoroughly',
+                'fixed', 'greased', 'rustproof', 'erodeproof', 'poisoned'].includes(word))
+            continue;
+        return 0;
+    }
+    return 0;
 }
 
 function validInvlet(ch) {
@@ -1183,6 +1242,7 @@ function assignInventoryLetter(obj) {
 function make_wish_object(name) {
     const spec = wishedObjectSpec(name);
     if (!spec?.otyp) return null;
+    const prevEncumbrance = heroNearCapacity();
     const otmp = mksobj(spec.otyp, true, false);
     otmp.wishedfor = true;
     if (typeof spec.spe === 'number') otmp.spe = spec.spe;
@@ -1207,11 +1267,13 @@ function make_wish_object(name) {
     if (game.u) game.u.ublesscnt = (game.u.ublesscnt ?? 300) + rn1(100, 50);
     const merged = merge_inventory_object(otmp);
     if (merged) {
+        stageWishEncumbranceMessage(prevEncumbrance);
         noteWishConduct(merged);
         return merged;
     }
     assignInventoryLetter(otmp);
     game.inventory.push(otmp);
+    stageWishEncumbranceMessage(prevEncumbrance);
     noteWishConduct(otmp);
     return otmp;
 }
@@ -14812,6 +14874,40 @@ function heroInventoryWeightDelta() {
     return delta;
 }
 
+function heroNearCapacity() {
+    // C ref: src/hack.c:near_capacity()/calc_capacity().
+    const wt = heroInventoryWeightDelta();
+    if (wt <= 0) return C.UNENCUMBERED;
+    const cap = heroWeightCap();
+    if (cap <= 1) return C.EXT_ENCUMBER + 1;
+    return Math.min(Math.trunc((wt * 2) / cap) + 1, C.EXT_ENCUMBER + 1);
+}
+
+function encumbranceIncreaseMessage(newcap) {
+    // C ref: src/pickup.c:encumber_msg().
+    if (newcap <= C.UNENCUMBERED) return '';
+    if (newcap === C.SLT_ENCUMBER)
+        return 'Your movements are slowed slightly because of your load.';
+    if (newcap === C.MOD_ENCUMBER)
+        return 'You rebalance your load.  Movement is difficult.';
+    if (newcap === C.HVY_ENCUMBER)
+        return 'You stagger under your heavy load.  Movement is very hard.';
+    return `You ${newcap === C.EXT_ENCUMBER ? 'can barely' : "can't even"} move a handspan with this load!`;
+}
+
+function stageWishEncumbranceMessage(prevEncumbrance) {
+    const oldcap = Math.max(prevEncumbrance || 0, game.u?.uencumber || 0);
+    const newcap = heroNearCapacity();
+    if (game.u) game.u.uencumber = newcap;
+    if (newcap <= oldcap) return;
+    const msg = encumbranceIncreaseMessage(newcap);
+    if (!msg) return;
+    game._after_more_message = game._after_more_message
+        ? `${msg}  ${game._after_more_message}`
+        : msg;
+    queue_more_prompt();
+}
+
 function insightHungerValue(level) {
     const fallback = game.u?.uhallucination || game.u?.uprops?.hallucination ? 874
         : level >= 15 ? 899
@@ -19216,6 +19312,13 @@ export async function rhack(key) {
             // line. Other invalid selector keys are swallowed by the tty menu
             // and leave the original menu/cursor in place.
             await showTutorialPrompt(ch === ' ' || ch === '\r' || ch === '\n');
+            game.context.move = 0;
+            return;
+        }
+        if (game._more && ch !== ' ' && ch !== '\r' && ch !== '\n' && ch !== '\x1b') {
+            // C ref: win/tty/topl.c:more(); a latched More override ignores
+            // non-dismissal keys instead of treating them as menu input.
+            showOverride(prev, game._latched_more_cursor || null);
             game.context.move = 0;
             return;
         }
