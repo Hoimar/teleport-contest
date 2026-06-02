@@ -14088,7 +14088,8 @@ async function showInventoryMenu() {
     const cursorCol = menuCol + lastText.length + (lastText === '(end)' ? 1 : 0);
     const screen = serialize_terminal_grid(display);
     game._inventory_menu_screen = screen;
-    showOverride(screen, [Math.min(cursorCol, COLNO - 1), lastRow]);
+    game._inventory_menu_cursor = [Math.min(cursorCol, COLNO - 1), lastRow];
+    showOverride(screen, game._inventory_menu_cursor);
 }
 
 function showInventoryMenuPage2() {
@@ -14109,7 +14110,8 @@ function showInventoryMenuPage2() {
     const cursorCol = menuCol + lastText.length;
     const screen = serialize_terminal_grid(display);
     game._inventory_menu_page2_screen = screen;
-    showOverride(screen, [Math.min(cursorCol, COLNO - 1), lastRow]);
+    game._inventory_menu_page2_cursor = [Math.min(cursorCol, COLNO - 1), lastRow];
+    showOverride(screen, game._inventory_menu_page2_cursor);
     return true;
 }
 
@@ -19296,6 +19298,7 @@ export async function rhack(key) {
             game._look_inventory_lookup_active = false;
             game._inventory_menu_screen = null;
             game._inventory_menu_page2_lines = null;
+            game._inventory_menu_cursor = null;
             if (ch === '\x1b' || ch === ' ' || ch === '\r' || ch === '\n') {
                 await redrawAfterFullScreenMenuDismiss();
                 game.context.move = 0;
@@ -19324,12 +19327,13 @@ export async function rhack(key) {
             else if (ch === '\x1b' || ch === ' ' || ch === '\r' || ch === '\n') {
                 game._inventory_menu_screen = null;
                 game._inventory_menu_page2_lines = null;
+                game._inventory_menu_cursor = null;
                 await redrawAfterFullScreenMenuDismiss();
             } else {
-                const cursor = game._override_serialized_cursor
-                    ? [game._override_serialized_cursor[0], game._override_serialized_cursor[1]]
+                const cursor = game._inventory_menu_cursor
+                    ? [game._inventory_menu_cursor[0], game._inventory_menu_cursor[1]]
                     : null;
-                showSerializedOverride(prev, cursor);
+                showOverride(prev, cursor);
             }
             game.context.move = 0;
             return;
@@ -19338,6 +19342,8 @@ export async function rhack(key) {
             game._inventory_menu_screen = null;
             game._inventory_menu_page2_screen = null;
             game._inventory_menu_page2_lines = null;
+            game._inventory_menu_cursor = null;
+            game._inventory_menu_page2_cursor = null;
             await redrawAfterFullScreenMenuDismiss();
             game.context.move = 0;
             return;
