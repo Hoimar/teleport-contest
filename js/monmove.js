@@ -114,6 +114,7 @@ const WEAPON_CLASS = 2;
 const ARMOR_CLASS = 3;
 const RING_CLASS = 4;
 const AMULET_CLASS = 5;
+const TOOL_CLASS = 6;
 const FOOD_CLASS = 7;
 const POTION_CLASS = 8;
 const SCROLL_CLASS = 9;
@@ -155,10 +156,30 @@ const CORPSE = 265;
 const ROCK = 474;
 const BOULDER = 475;
 const STATUE = 476;
+const LARGE_BOX = 214;
+const CHEST = 215;
+const ICE_BOX = 216;
+const SACK = 217;
+const OILSKIN_SACK = 218;
+const BAG_OF_HOLDING = 219;
+const BAG_OF_TRICKS = 220;
 const BIG_KILL_DROP_OBJECTS = new Set([
     EXPENSIVE_CAMERA,
     STETHOSCOPE,
     BOULDER,
+]);
+const CONTAINER_TOOLS = new Set([
+    LARGE_BOX,
+    CHEST,
+    ICE_BOX,
+    SACK,
+    OILSKIN_SACK,
+    BAG_OF_HOLDING,
+    BAG_OF_TRICKS,
+]);
+const MAGIC_BAGS = new Set([
+    BAG_OF_HOLDING,
+    BAG_OF_TRICKS,
 ]);
 const AXE = 44;
 const BATTLE_AXE = 45;
@@ -2878,6 +2899,10 @@ function searches_for_item_basic(mtmp, obj) {
     if (cls === AMULET_CLASS) {
         if (typ === AMULET_OF_LIFE_SAVING) return true;
         return typ === AMULET_OF_REFLECTION || typ === AMULET_OF_GUARDING;
+    }
+    if (cls === TOOL_CLASS && CONTAINER_TOOLS.has(typ)) {
+        // C ref: muse.c:searches_for_item(); Is_container() branch.
+        return !(MAGIC_BAGS.has(typ) && obj.cursed) && !obj.olocked;
     }
     return false;
 }
