@@ -9,16 +9,41 @@ function formatSample(sample) {
 }
 
 async function main() {
+    const options = {
+        jsonOnly: false,
+        sampleLimit: undefined,
+        cursorStepLimit: undefined,
+        refs: [],
+    };
     const args = process.argv.slice(2);
-    const jsonOnly = args.includes('--json');
-    const refs = args.filter((arg) => !arg.startsWith('--'));
-    if (refs.length !== 1) {
-        console.error('Usage: node scripts/triage-session.mjs [--json] <session-ref>');
+    for (let i = 0; i < args.length; i++) {
+        const arg = args[i];
+        if (arg === '--json') {
+            options.jsonOnly = true;
+        } else if (arg === '--sample-limit') {
+            options.sampleLimit = Number(args[++i]);
+        } else if (arg.startsWith('--sample-limit=')) {
+            options.sampleLimit = Number(arg.slice('--sample-limit='.length));
+        } else if (arg === '--cursor-step-limit') {
+            options.cursorStepLimit = Number(args[++i]);
+        } else if (arg.startsWith('--cursor-step-limit=')) {
+            options.cursorStepLimit = Number(arg.slice('--cursor-step-limit='.length));
+        } else if (arg.startsWith('--')) {
+            throw new Error(`unknown option ${arg}`);
+        } else {
+            options.refs.push(arg);
+        }
+    }
+    if (options.refs.length !== 1) {
+        console.error('Usage: node scripts/triage-session.mjs [--json] [--sample-limit <n>] [--cursor-step-limit <n>] <session-ref>');
         process.exit(2);
     }
 
-    const result = await analyzeSession(refs[0]);
-    if (jsonOnly) {
+    const result = await analyzeSession(options.refs[0], {
+        sampleLimit: Number.isFinite(options.sampleLimit) ? options.sampleLimit : undefined,
+        cursorStepLimit: Number.isFinite(options.cursorStepLimit) ? options.cursorStepLimit : undefined,
+    });
+    if (options.jsonOnly) {
         console.log(JSON.stringify(result, null, 2));
         return;
     }

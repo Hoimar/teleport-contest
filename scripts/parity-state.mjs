@@ -7,7 +7,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 import {
-    analyzeSession,
+    analyzeSessionIsolated,
     DEFAULT_SENTINEL_SUITE,
     isExactSession,
     scoredScreenMatched,
@@ -355,7 +355,7 @@ async function analyzeCorpus(dir, label) {
 
     const results = [];
     for (const name of loaded.manifest) {
-        results.push(await analyzeSession(path.join(dir, name), { sampleLimit: 1, cursorStepLimit: 3 }));
+        results.push(await analyzeSessionIsolated(path.join(dir, name), { sampleLimit: 1, cursorStepLimit: 3 }));
     }
     const summary = summarizeSessionResults(results);
     return {
@@ -370,7 +370,7 @@ async function analyzeCorpus(dir, label) {
 async function analyzeSentinels() {
     const results = [];
     for (const ref of DEFAULT_SENTINEL_SUITE) {
-        results.push(await analyzeSession(ref, { sampleLimit: 1, cursorStepLimit: 3 }));
+        results.push(await analyzeSessionIsolated(ref, { sampleLimit: 1, cursorStepLimit: 3 }));
     }
     return {
         available: true,

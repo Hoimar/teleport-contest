@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
+import { Worker } from 'node:worker_threads';
 import { fileURLToPath } from 'node:url';
 
 import { normalizeSession } from '../frozen/session_loader.mjs';
@@ -233,6 +234,39 @@ function frozenConsistencyWarnings() {
 async function loadRunSegment() {
     const mod = await import(path.join(PROJECT_ROOT, 'js', 'jsmain.js'));
     return mod.runSegment;
+}
+
+export async function analyzeSessionIsolated(sessionRef, options = {}) {
+    return await new Promise((resolve, reject) => {
+        let settled = false;
+        const worker = new Worker(new URL('./triage-worker.mjs', import.meta.url), {
+            workerData: {
+                sessionRef: String(sessionRef),
+                options: {
+                    sampleLimit: options.sampleLimit,
+                    cursorStepLimit: options.cursorStepLimit,
+                },
+            },
+        });
+
+        worker.on('message', (message) => {
+            settled = true;
+            if (message?.error) {
+                reject(new Error(`isolated triage failed for ${sessionRef}: ${message.error.message}`));
+                return;
+            }
+            resolve(message.result);
+        });
+        worker.on('error', (err) => {
+            settled = true;
+            reject(new Error(`isolated triage failed for ${sessionRef}: ${err.message}`));
+        });
+        worker.on('exit', (code) => {
+            if (!settled && code !== 0) {
+                reject(new Error(`isolated triage failed for ${sessionRef}: worker exited with ${code}`));
+            }
+        });
+    });
 }
 
 export async function analyzeSession(sessionRef, options = {}) {

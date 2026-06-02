@@ -15311,8 +15311,10 @@ function strengthRawFromStatusText(value) {
 
 function strengthForCapacityFormula() {
     // C refs: src/hack.c:weight_cap(), src/attrib.c:acurrstr().
-    const raw = strengthRawFromStatusText(game.u?._poly_form?.strength ?? heroAttr(C.A_STR));
+    let raw = strengthRawFromStatusText(game.u?._poly_form?.strength ?? heroAttr(C.A_STR));
     if (!Number.isFinite(raw)) return 3;
+    if (!game.u?._poly_form && raw === 25 && wearingPowerGauntlets())
+        raw = C.STR19(25);
     if (raw <= C.STR18(0)) return Math.max(raw, 3);
     if (raw <= C.STR19(21)) return 19 + Math.trunc(raw / 50);
     return Math.min(raw, C.STR19(25)) - 100;

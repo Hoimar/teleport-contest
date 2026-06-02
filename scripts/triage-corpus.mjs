@@ -4,7 +4,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { analyzeSession } from './triage-lib.mjs';
+import { analyzeSessionIsolated } from './triage-lib.mjs';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(SCRIPT_DIR, '..');
@@ -504,7 +504,7 @@ async function main() {
     const results = [];
 
     for (const ref of refs) {
-        results.push(await analyzeSession(ref, { sampleLimit: 5, cursorStepLimit: 6 }));
+        results.push(await analyzeSessionIsolated(ref, { sampleLimit: 5, cursorStepLimit: 6 }));
     }
 
     const records = results.map(makeRecord);

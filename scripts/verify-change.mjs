@@ -3,7 +3,7 @@
 import { readFileSync } from 'node:fs';
 
 import {
-    analyzeSession,
+    analyzeSessionIsolated,
     DEFAULT_SENTINEL_SUITE,
     isExactSession,
     scoredScreenMatched,
@@ -61,10 +61,10 @@ function formatSession(row) {
 
 async function main() {
     const options = parseArgs(process.argv.slice(2));
-    const target = options.target ? short(await analyzeSession(options.target)) : null;
+    const target = options.target ? short(await analyzeSessionIsolated(options.target)) : null;
     const sentinels = [];
     for (const ref of DEFAULT_SENTINEL_SUITE) {
-        sentinels.push(await analyzeSession(ref, { sampleLimit: 3, cursorStepLimit: 6 }));
+        sentinels.push(await analyzeSessionIsolated(ref, { sampleLimit: 3, cursorStepLimit: 6 }));
     }
     const sentinelShort = sentinels.map(short);
     const total = summarizeSessionResults(sentinels);
@@ -84,7 +84,7 @@ async function main() {
     if (options.full) {
         const refs = JSON.parse(readFileSync('sessions/manifest.json', 'utf8'));
         const fullResults = [];
-        for (const ref of refs) fullResults.push(await analyzeSession(ref, { sampleLimit: 1, cursorStepLimit: 3 }));
+        for (const ref of refs) fullResults.push(await analyzeSessionIsolated(ref, { sampleLimit: 1, cursorStepLimit: 3 }));
         const fullTotals = summarizeSessionResults(fullResults);
         full = {
             status: 0,

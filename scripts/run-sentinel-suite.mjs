@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import {
-    analyzeSession,
+    analyzeSessionIsolated,
     DEFAULT_SENTINEL_SUITE,
     isExactSession,
     summarizeSessionResults,
@@ -32,7 +32,7 @@ async function main() {
 
     const results = [];
     for (const ref of suite) {
-        results.push(await analyzeSession(ref, { sampleLimit: 3, cursorStepLimit: 6 }));
+        results.push(await analyzeSessionIsolated(ref, { sampleLimit: 3, cursorStepLimit: 6 }));
     }
     const summary = summarizeSessionResults(results);
     const ok = results.every(isExactSession);
