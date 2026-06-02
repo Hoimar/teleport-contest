@@ -1278,7 +1278,9 @@ function _statusLine1() {
             ? (game.urole?.rank?.f || game.urole?.name?.f || game.urole?.rank?.m || game.urole?.name?.m || 'Adventurer')
             : (game.urole?.rank?.m || game.urole?.name?.m || 'Adventurer'));
     const title = `${name} the ${role}`;
-    const attrs = u.acurr?.a || [];
+    const attrs = game._latched_status_attrs && game._more
+        ? game._latched_status_attrs
+        : (u.acurr?.a || []);
     const strength = strength_status_text(form?.strength ?? attrs[0]);
     const stats = `St:${strength} Dx:${attrs[3] || '?'} Co:${attrs[4] || '?'} In:${attrs[1] || '?'} Wi:${attrs[2] || '?'} Ch:${attrs[5] || '?'}`;
     const align = u.ualign?.type === 0 ? 'Neutral' : u.ualign?.type > 0 ? 'Lawful' : 'Chaotic';

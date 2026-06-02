@@ -124,6 +124,7 @@ const M1_NOLIMBS = 0x00006000;
 const M2_UNDEAD = 0x00000002;
 const M2_STALK = 0x01000000;
 const M2_NASTY = 0x02000000;
+const M2_STRONG = 0x04000000;
 const MS_SILENT = 0;
 const MS_BARK = 1;
 const MS_MEW = 2;
@@ -8993,6 +8994,18 @@ function adjustAttributeBasic(ndx, delta) {
     if (u.abase?.a) u.abase.a[ndx] = Math.max(3, (u.abase.a[ndx] ?? current) + delta);
 }
 
+function latchStatusAttrsForMoreFrame() {
+    if (!Array.isArray(game.u?.acurr?.a)) return;
+    game._latched_status_attrs = game.u.acurr.a.slice();
+    game._clear_latched_status_attrs_after_more = true;
+}
+
+function clearLatchedStatusAttrsAfterMore() {
+    if (!game._clear_latched_status_attrs_after_more) return;
+    game._clear_latched_status_attrs_after_more = false;
+    game._latched_status_attrs = null;
+}
+
 function loseExperienceLevelBasic() {
     // C ref: src/exper.c:losexp(NULL).  This covers the ordinary divine-anger
     // level-loss side effects; role intrinsic loss remains broader adjabil work.
@@ -9046,6 +9059,7 @@ async function angryGods(respGod) {
     case 2:
     case 3:
         await godVoice(respGod);
+        latchStatusAttrsForMoreFrame();
         adjustAttributeBasic(A_WIS, -1);
         loseExperienceLevelBasic();
         queuePrayerMoreMessages([
@@ -13748,6 +13762,7 @@ async function handleQueuedMore(ch) {
         }
         if (game._more_message_queue?.length) {
             const next = game._more_message_queue.shift();
+            clearLatchedStatusAttrsAfterMore();
             if (next.exercise) exercise(next.exercise.attr, !!next.exercise.positive);
             if (next.visionRecalcBefore) {
                 vision_recalc(2);
@@ -14172,6 +14187,7 @@ async function handleQueuedMore(ch) {
                 game._clear_latched_status_before_after_more = false;
                 game._latched_status_uhp = null;
             }
+            clearLatchedStatusAttrsAfterMore();
             if (game._clear_status_uencumber_override_before_after_more) {
                 game._clear_status_uencumber_override_before_after_more = false;
                 game._status_uencumber_override = null;
@@ -14470,6 +14486,7 @@ async function handleQueuedMore(ch) {
             game._clear_latched_status_after_more = false;
             game._latched_status_uhp = null;
         }
+        clearLatchedStatusAttrsAfterMore();
         if (!resumeTailOnly) game._resume_monster_turn = true;
         game.context.move = 1;
     } else if (!game._more && (game._nomul_turns_remaining || 0) > 0) {
@@ -14511,6 +14528,7 @@ async function handleQueuedMore(ch) {
         game._clear_status_uencumber_override_before_after_more = false;
         game._status_uencumber_override = null;
     }
+    if (!game._more) clearLatchedStatusAttrsAfterMore();
     return true;
 }
 
@@ -15261,6 +15279,7 @@ const INSIGHT_CLASS_WEIGHTS = new Map([
 
 function objectInsightWeight(obj) {
     if (!obj) return 0;
+    if (obj.otyp === BOULDER && heroThrowsRocksForCapacity()) return 0;
     if (obj.otyp === GOLD_PIECE) return Math.trunc(((obj.quan || 0) + 50) / 100);
     const quan = Math.max(1, obj.quan || 1);
     const unit = INSIGHT_OBJECT_WEIGHTS.get(obj.otyp)
@@ -15270,18 +15289,64 @@ function objectInsightWeight(obj) {
     return unit * quan;
 }
 
+function polyFormPtrForCapacity() {
+    const form = game.u?._poly_form;
+    if (!form) return null;
+    return form.ptr || monster_by_user_name(form.name) || null;
+}
+
+function heroThrowsRocksForCapacity() {
+    const ptr = polyFormPtrForCapacity();
+    return !!ptr?.throws_rocks;
+}
+
+function strengthRawFromStatusText(value) {
+    if (typeof value !== 'string') return Number(value);
+    const trimmed = value.trim();
+    if (trimmed === '18/**') return C.STR18(100);
+    const exceptional = trimmed.match(/^18\/(\d{1,3})$/);
+    if (exceptional) return 18 + Math.min(100, Math.max(0, Number(exceptional[1])));
+    return Number(trimmed);
+}
+
+function strengthForCapacityFormula() {
+    // C refs: src/hack.c:weight_cap(), src/attrib.c:acurrstr().
+    const raw = strengthRawFromStatusText(game.u?._poly_form?.strength ?? heroAttr(C.A_STR));
+    if (!Number.isFinite(raw)) return 3;
+    if (raw <= C.STR18(0)) return Math.max(raw, 3);
+    if (raw <= C.STR19(21)) return 19 + Math.trunc(raw / 50);
+    return Math.min(raw, C.STR19(25)) - 100;
+}
+
+function heroFlyingForCapacity() {
+    const form = game.u?._poly_form;
+    return !!(form?.fly || game.u?.uprops?.flying);
+}
+
 function heroWeightCap() {
-    // C ref: hack.c:weight_cap().  Current evidence is human-form, grounded
-    // carrying capacity, so use the Str+Con base and clamp.
-    const str = heroAttr(C.A_STR);
+    // C ref: hack.c:weight_cap().
+    const str = strengthForCapacityFormula();
     const con = heroAttr(C.A_CON);
-    let cap = 25 * (str + con) + 50;
-    if (!game.u?.uprops?.flying) {
+    let cap = C.WT_WEIGHTCAP_STRCON * (str + con) + C.WT_WEIGHTCAP_SPARE;
+    const ptr = polyFormPtrForCapacity();
+    if (ptr) {
+        if (ptr.mlet === 'S_NYMPH') {
+            cap = C.MAX_CARR_CAP;
+        } else if (!ptr.cwt) {
+            cap = Math.trunc((cap * (ptr.msize ?? MZ_HUMAN)) / MZ_HUMAN);
+        } else if (!((ptr.mflags2 ?? 0) & M2_STRONG) || ptr.cwt > C.WT_HUMAN) {
+            cap = Math.trunc((cap * ptr.cwt) / C.WT_HUMAN);
+        }
+    }
+    if (game.u?.uprops?.levitation || heroFlyingForCapacity()) {
+        cap = C.MAX_CARR_CAP;
+    } else {
+        cap = Math.min(cap, C.MAX_CARR_CAP);
         const side = game.u?.wounded_legs_side || (game.u?.uprops?.wounded_legs ? 'right' : '');
         if (side === 'left' || side === 'both') cap -= C.WT_WOUNDEDLEG_REDUCT;
         if (side === 'right' || side === 'both') cap -= C.WT_WOUNDEDLEG_REDUCT;
     }
-    return Math.max(1, Math.min(1000, cap));
+    return Math.max(1, cap);
 }
 
 function heroInventoryWeightDelta() {
