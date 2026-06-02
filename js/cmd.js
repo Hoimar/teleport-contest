@@ -1300,6 +1300,72 @@ function consumeInventoryObject(obj) {
     if (idx >= 0) game.inventory.splice(idx, 1);
 }
 
+function wornLifeSavingAmulet() {
+    return (game.inventory || []).find((obj) =>
+        obj?.otyp === AMULET_OF_LIFE_SAVING
+        && (obj.worn || ((obj.owornmask || 0) & C.W_AMUL))) || null;
+}
+
+function clearLifeSavingExtrinsic(obj) {
+    if (obj) {
+        obj.worn = false;
+        obj.owornmask = 0;
+    }
+    if (game.u?.uprops) {
+        game.u.uprops.life_will_be_saved = false;
+        game.u.uprops.life_saved = false;
+    }
+}
+
+function lifeSavingHp() {
+    const con = game.u?.acurr?.a?.[A_CON] ?? 10;
+    return Math.min(game.u?.uhpmax || 1, 50 + 10 * Math.trunc(con / 2));
+}
+
+function applyLifeSavingConPenalty() {
+    const u = game.u || (game.u = {});
+    if (!u.acurr) u.acurr = { a: [10, 10, 10, 10, 10, 10] };
+    if (!Array.isArray(u.acurr.a)) u.acurr.a = [10, 10, 10, 10, 10, 10];
+    u.acurr.a[A_CON] = Math.max(3, (u.acurr.a[A_CON] ?? 10) - 1);
+}
+
+async function showLifeSavingDeathMessage() {
+    const u = game.u || (game.u = {});
+    u.umortality = (u.umortality || 0) + 1;
+    if (typeof u.uhp === 'number') u.uhp = 0;
+    game._latched_status_uhp = 0;
+    game._monster_death_pending = false;
+    game._death_prompt_pending = false;
+    game._death_prompt_active = false;
+    game._death_bones_checked = false;
+    game._death_bones_check_pending = false;
+    game._death_bones_done_stage_prepared = false;
+    game._death_bones_corpse_prepared = false;
+    game._death_bones_ok = false;
+    game._life_saving_after_more_pending = true;
+    // C refs: src/end.c:done(), src/attrib.c:exercise().  Life-saving
+    // preempts wizard death prompts and, at this More-resume boundary, C has
+    // just run the periodic healthy-hunger Constitution exercise row.
+    exercise(A_CON, true);
+    await pline('You die...  But wait...  Your medallion begins to glow!');
+    queue_more_prompt();
+}
+
+async function finishLifeSavingAfterMore() {
+    const amulet = wornLifeSavingAmulet();
+    game._life_saving_after_more_pending = false;
+    game._fatal_monster_attack_paused = false;
+    applyLifeSavingConPenalty();
+    if (game.u) game.u.uhp = lifeSavingHp();
+    clearLifeSavingExtrinsic(amulet);
+    consumeInventoryObject(amulet);
+    game._latched_status_uhp = null;
+    game._nomovemsg = 'You survived that attempt on your life.';
+    game._savelife_resume_active = true;
+    game._resume_turn_tail_after_more = false;
+    await pline('You feel much better!');
+}
+
 function ensureConduct() {
     game.u = game.u || {};
     return game.u.uconduct || (game.u.uconduct = {});
@@ -13311,6 +13377,10 @@ async function handleQueuedMore(ch) {
     } else if (game._death_ray_death_pending) {
         game._more_dismissals_remaining = 0;
         await showDeathRayDeathMessage();
+    } else if (game._life_saving_after_more_pending) {
+        game._more_dismissals_remaining = 0;
+        game._more = false;
+        await finishLifeSavingAfterMore();
     } else if (game._sleep_wand_reflect_pending) {
         game._more_dismissals_remaining = 0;
         await showSleepRayReflectBounceAfterMore();
@@ -13328,20 +13398,25 @@ async function handleQueuedMore(ch) {
         return true;
     } else if (game._monster_death_pending && !game._after_more_message) {
         game._more_dismissals_remaining = 0;
+        const lifeSavingAmulet = wornLifeSavingAmulet();
         game._monster_death_pending = false;
-        game._death_prompt_pending = true;
+        game._death_prompt_pending = !lifeSavingAmulet;
         // C refs: src/end.c:done(), src/end.c:really_done(),
         // src/bones.c:can_make_bones().  Wizard/explore deaths ask whether to
         // die before really_done(); declining the prompt must not run the bones
         // feasibility RNG.
-        if (!deathUsesWizardPrompt()) runPendingDeathBonesCheck();
+        if (!lifeSavingAmulet && !deathUsesWizardPrompt()) runPendingDeathBonesCheck();
         if (!game._death_preserve_latched_status) game._latched_status_uhp = 0;
-        await pline('You die...');
-        if (game._death_shopkeeper_takes_name) {
-            await append_pline(`${game._death_shopkeeper_takes_name} takes all your possessions.`);
-            game._death_shopkeeper_takes_name = '';
+        if (lifeSavingAmulet) {
+            await showLifeSavingDeathMessage();
+        } else {
+            await pline('You die...');
+            if (game._death_shopkeeper_takes_name) {
+                await append_pline(`${game._death_shopkeeper_takes_name} takes all your possessions.`);
+                game._death_shopkeeper_takes_name = '';
+            }
+            queue_more_prompt();
         }
-        queue_more_prompt();
     } else if (game._death_prompt_pending) {
         if (deathUsesWizardPrompt()) await showDeathPrompt();
         else await showDeathDisclosureOrPrompt();

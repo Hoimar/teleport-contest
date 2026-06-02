@@ -7100,7 +7100,7 @@ async function maybe_finish_post_move_attack(g, mtmp, moveStatus, postMoveState,
         g._hallucination_warning_rng_active = true;
     }
     if (g._fatal_monster_attack_paused && g._monster_turn_paused_for_more
-        && g._more && !hallucinating()) {
+        && g._more) {
         g._resume_movemon_after_mon = mtmp;
         g._resume_somebody_can_move = somebody_can_move || mtmp.movement >= NORMAL_SPEED;
         g._resume_turn_tail_after_more = true;
