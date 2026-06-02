@@ -1604,9 +1604,9 @@ function offensive_potion_candidate_basic(mtmp) {
 }
 
 function misc_item_candidate_basic(mtmp) {
-    // C ref: muse.c:find_misc().  Current evidence only needs the speed
-    // wand branch, but the front-door predicates are shared with the broader
-    // miscellaneous item subsystem.
+    // C ref: muse.c:find_misc().  Choice is not prioritized; the last viable
+    // inventory object wins, with nomore() only suppressing adjacent duplicate
+    // checks for the same use type.
     if (mon_is_animal(mtmp) || mon_is_mindless(mtmp)) return null;
     if (game.u?.uswallow && game.u?.ustuck === mtmp) return null;
     if (dist2(mtmp.mx, mtmp.my, mtmp.mux ?? game.u?.ux ?? mtmp.mx, mtmp.muy ?? game.u?.uy ?? mtmp.my) > 36)
@@ -1615,12 +1615,34 @@ function misc_item_candidate_basic(mtmp) {
 
     let found = null;
     for (const obj of mtmp.inventory || []) {
-        if (obj?.otyp === WAN_SPEED_MONSTER && (obj.spe ?? 0) > 0
+        if (found?.kind !== 'WAN_SPEED_MONSTER'
+            && obj?.otyp === WAN_SPEED_MONSTER && (obj.spe ?? 0) > 0
             && mtmp.mspeed !== MFAST && !mtmp.isgd) {
             found = { kind: 'WAN_SPEED_MONSTER', obj };
         }
+        if (found?.kind !== 'POT_SPEED'
+            && obj?.otyp === POT_SPEED && mtmp.mspeed !== MFAST && !mtmp.isgd) {
+            found = { kind: 'POT_SPEED', obj };
+        }
     }
     return found;
+}
+
+function potion_display_name(obj) {
+    if (object_type_known_basic(obj?.otyp)) {
+        if (obj?.otyp === POT_SPEED) return 'a potion of speed';
+    }
+    const appearance = getObjectDescription(obj?.otyp) || '';
+    return appearance ? `a ${appearance} potion` : 'a potion';
+}
+
+async function mquaffmsg_basic(mtmp, obj) {
+    // C ref: muse.c:mquaffmsg().
+    if (hero_can_spot_monster(mtmp)) {
+        await append_monster_topline(`${monster_subject(mtmp)} drinks ${potion_display_name(obj)}!`);
+    } else {
+        await pline('You hear a chugging sound.');
+    }
 }
 
 async function mzapwand_basic(mtmp, obj, self = false) {
@@ -1663,6 +1685,12 @@ async function maybe_use_misc_item_basic(mtmp) {
     if (candidate.kind === 'WAN_SPEED_MONSTER') {
         if (!await mzapwand_basic(mtmp, candidate.obj, true)) return false;
         mon_adjust_speed_basic(mtmp, 1);
+        return true;
+    }
+    if (candidate.kind === 'POT_SPEED') {
+        await mquaffmsg_basic(mtmp, candidate.obj);
+        mon_adjust_speed_basic(mtmp, 1);
+        remove_monster_inventory_object(mtmp, candidate.obj);
         return true;
     }
     return false;
