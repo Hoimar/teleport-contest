@@ -4051,7 +4051,7 @@ async function append_monster_effect_topline(line, opts = {}) {
         const pending = game._after_more_message;
         if (topline_can_pack_message(pending, line)) {
             game._after_more_message = `${pending}  ${line}`;
-            if (opts.needsPrompt) game._after_more_needs_prompt = true;
+            game._after_more_needs_prompt = !!opts.needsPrompt;
         } else {
             game._after_more_needs_prompt = true;
             game._after_more_followup_messages = game._after_more_followup_messages || [];
@@ -6311,12 +6311,22 @@ async function physical_melee_attacks(mtmp, attacks, toHit) {
                 && topline_can_pack_message(game._after_more_message, displayLine);
             if (damageSharesDeferredHitLine) game._relocation_more_deferred = false;
             if (damage > 0 && game._monster_topline_deferred && !damageSharesDeferredHitLine) {
-                game._after_more_hero_damage = (game._after_more_hero_damage || 0) + damage;
-                game._after_more_damage_after_prompt = true;
+                apply_hero_damage(damage);
+                if (displayLine) stop_simple_timed_repeat_for_monster_attack(hitMessages);
+                // C refs: src/mhitu.c:hitmu(), src/end.c:done(),
+                // win/tty/topl.c:more().  The hit has already done damage and
+                // can enter death handling before the hit-line More is dismissed,
+                // but that More frame still shows the pre-damage status row.
+                game._latched_status_uhp = preDamageHp;
+                game._clear_latched_status_after_more = true;
+                if (handle_monster_fatal_damage(mtmp, preDamageHp)) {
+                    game._latched_status_uhp = preDamageHp;
+                    break;
+                }
                 if (attacks.slice(i + 1).some(Boolean)) {
                     // C ref: src/mhitu.c:mattacku().  A visible hit line can be
                     // queued behind tty More, but the remaining attack rows
-                    // resume from the same monster after that boundary.
+                    // resume from the same monster only after that displayed More.
                     game._deferred_monster_physical_attack = {
                         mtmp,
                         attacks,
@@ -6324,16 +6334,7 @@ async function physical_melee_attacks(mtmp, attacks, toHit) {
                         toHit,
                         attackVerbCounts: [...attackVerbCounts.entries()],
                         current: null,
-                    };
-                }
-                if (damage >= preDamageHp) {
-                    game._after_more_fatal_monster = {
-                        isshk: !!mtmp.isshk,
-                        female: !!mtmp.female,
-                        shopkeeperName: mtmp.isshk ? shopkeeper_name(mtmp) : '',
-                        monsterName: monster_name(mtmp),
-                        takes: !!(mtmp.isshk && shopkeeper_name(mtmp)
-                            && ((game.inventory || []).length || (game._goldCount || 0) > 0)),
+                        waitForDisplayedMore: true,
                     };
                 }
             } else {
