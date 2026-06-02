@@ -7449,6 +7449,27 @@ function currentJumpCursor() {
     return game._jump_cursor;
 }
 
+function jumpHighlightDisplayCursor() {
+    // C refs: src/apply.c:get_valid_jump_position(),
+    // src/getpos.c:getpos_sethilite(), src/selvar.c:selection_force_newsyms(),
+    // src/display.c:newsym_force()/flush_screen().
+    // Installing jump getpos highlighting redraws every currently valid
+    // location, but C buffers newsym_force() updates and flushes the map in
+    // row-major order.  The tty cursor is left just after the last glyph
+    // written by that redraw; the logical getpos cursor still starts on the
+    // hero.
+    let cursor = null;
+    for (let y = 0; y < ROWNO; y++) {
+        for (let x = 1; x < COLNO; x++) {
+            const loc = game.level?.at(x, y);
+            if (!loc || !C.ACCESSIBLE(loc.typ)) continue;
+            if (!jumpValidation(x, y, false).ok) continue;
+            cursor = { x, y };
+        }
+    }
+    return cursor;
+}
+
 function jumpTrajectory(x, y, magic = false) {
     const ux = game.u?.ux ?? 0;
     const uy = game.u?.uy ?? 0;
@@ -7643,6 +7664,8 @@ async function doJumpCommand() {
     } else {
         game._jump_cursor = { x: game.u?.ux ?? 1, y: game.u?.uy ?? 0 };
         game._awaiting_jump_prompt = true;
+        const displayCursor = jumpHighlightDisplayCursor();
+        if (displayCursor) setPromptCursorAfterMapGlyph(displayCursor.x, displayCursor.y);
     }
     game.context.move = 0;
 }
@@ -12011,6 +12034,17 @@ function setTravelMapCursor() {
 
 function setTravelMapCursorAt(x, y) {
     const col = Math.max(0, x - 1);
+    const row = Math.max(1, y + 1);
+    game._prompt_cursor = [col, row];
+    const display = game.nhDisplay;
+    if (display) {
+        display.cursorCol = col;
+        display.cursorRow = row;
+    }
+}
+
+function setPromptCursorAfterMapGlyph(x, y) {
+    const col = Math.max(0, x);
     const row = Math.max(1, y + 1);
     game._prompt_cursor = [col, row];
     const display = game.nhDisplay;
