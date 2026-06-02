@@ -54,7 +54,7 @@ import * as C from './const.js';
 import { initrack } from './track.js';
 import {
     COLNO, ROWNO, STONE, CORR, DOOR, D_NODOOR, D_CLOSED, D_LOCKED,
-    SDOOR, SCORR, IS_WALL, IS_OBSTRUCTED, IS_POOL, LR_UPTELE, LR_DOWNTELE, A_STR, A_DEX, A_CON, A_WIS,
+    SDOOR, SCORR, IS_WALL, IS_OBSTRUCTED, IS_POOL, IS_SOFT, LR_UPTELE, LR_DOWNTELE, A_STR, A_DEX, A_CON, A_WIS,
 } from './const.js';
 
 const M1_POIS = 0x10000000;
@@ -340,6 +340,7 @@ const GEM_CLASS = 13;
 const VENOM_CLASS = 17;
 const BALL_CLASS = 15;
 const CHAIN_CLASS = 16;
+const GLASS = 19;
 const FIRST_SPELL = 366;
 const LAST_SPELL = 407;
 const SPE_MAGIC_MISSILE = 367;
@@ -1416,6 +1417,98 @@ function thrownLanding(dx, dy) {
     return { ...last, hitHard };
 }
 
+function thrownMonsterTarget(dx, dy) {
+    // C ref: src/zap.c:bhit().  A thrown object stops at the first monster
+    // on the projectile line before the caller resolves thitmonst().
+    let x = game.u?.ux ?? 0;
+    let y = game.u?.uy ?? 0;
+    for (let range = 0; range < 8; range++) {
+        const nx = x + dx;
+        const ny = y + dy;
+        const loc = game.level?.at(nx, ny);
+        if (!loc || IS_OBSTRUCTED(loc.typ)) break;
+        const mon = mon_at(nx, ny);
+        if (mon) return { mon, x: nx, y: ny };
+        x = nx;
+        y = ny;
+    }
+    return null;
+}
+
+function plainThrownObjectMissesMonster(obj) {
+    // C ref: src/dothrow.c:thitmonst().  Weapons, weptools, gems, balls,
+    // boulders, potions, venoms, and food-like special cases need their own
+    // hit/effect paths; other carried object classes fall through to tmiss().
+    if (!obj) return false;
+    if (obj.oclass === WEAPON_CLASS || isWeaponTool(obj) || obj.oclass === GEM_CLASS) return false;
+    if (obj.oclass === POTION_CLASS || obj.oclass === VENOM_CLASS || obj.oclass === FOOD_CLASS) return false;
+    if (obj.oclass === BALL_CLASS || obj.otyp === BOULDER) return false;
+    return obj.oclass === ARMOR_CLASS
+        || obj.oclass === RING_CLASS
+        || obj.oclass === AMULET_CLASS
+        || obj.oclass === TOOL_CLASS
+        || obj.oclass === SCROLL_CLASS
+        || obj.oclass === SPBOOK_CLASS
+        || obj.oclass === WAND_CLASS;
+}
+
+async function tmissThrownObject(obj, mon) {
+    // C ref: src/dothrow.c:tmiss().
+    await pline(`The ${baseObjectName(obj)} misses the ${monsterName(mon)}.`);
+    if (!rn2(3)) {
+        mon.msleeping = 0;
+        mon.mstrategy = (mon.mstrategy || 0) & ~C.STRAT_WAITMASK;
+    }
+}
+
+async function thitmonstPlainMiss(obj, mon) {
+    // C ref: src/dothrow.c:thitmonst().  Even object classes that cannot
+    // damage this target still own the generic thrown to-hit roll first.
+    rnd(20);
+    await tmissThrownObject(obj, mon);
+}
+
+function thrownBreaktestDestroysObject(obj, landing) {
+    // C refs: src/dothrow.c:throwit(), src/dothrow.c:breaktest().
+    const loc = game.level?.at(landing.x, landing.y);
+    if (!landing.hitHard && (!loc || IS_SOFT(loc.typ))) return false;
+    if (obj_resists(obj, 1, 99)) return false;
+    const material = OBJECT_MATERIAL[obj.otyp] ?? 0;
+    if (material === GLASS && !obj.oartifact && obj.oclass !== GEM_CLASS) return true;
+    return obj.otyp === EXPENSIVE_CAMERA
+        || obj.oclass === POTION_CLASS
+        || obj.otyp === EGG
+        || obj.otyp === CREAM_PIE
+        || obj.otyp === MELON
+        || obj.oclass === VENOM_CLASS;
+}
+
+function encumbranceDecreaseMessage(newcap) {
+    // C ref: src/pickup.c:encumber_msg().
+    if (newcap <= C.UNENCUMBERED) return 'Your movements are now unencumbered.';
+    if (newcap === C.SLT_ENCUMBER) return 'Your movements are only slowed slightly by your load.';
+    if (newcap === C.MOD_ENCUMBER) return 'You rebalance your load.  Movement is still difficult.';
+    if (newcap === C.HVY_ENCUMBER) return 'You stagger under your load.  Movement is still very hard.';
+    return '';
+}
+
+async function stageThrowEncumbranceMessage(prevEncumbrance) {
+    const oldcap = Math.max(prevEncumbrance || 0, game.u?.uencumber || 0);
+    const newcap = heroNearCapacity();
+    if (game.u) game.u.uencumber = newcap;
+    if (oldcap <= newcap) return;
+    const msg = encumbranceDecreaseMessage(newcap);
+    if (!msg) return;
+    if (game._pending_message || game._more) {
+        game._after_more_message = game._after_more_message
+            ? `${msg}  ${game._after_more_message}`
+            : msg;
+        queue_more_prompt();
+    } else {
+        await pline(msg);
+    }
+}
+
 function matchingLauncherForAmmo(ammo, launcher) {
     return ammo?.otyp === ARROW && launcher?.otyp === BOW;
 }
@@ -1424,8 +1517,9 @@ function isAmmoObject(obj) {
     return obj?.otyp === ARROW;
 }
 
-function throwInventoryObject(obj, dirKey) {
+async function throwInventoryObject(obj, dirKey) {
     if (!obj) return;
+    const prevEncumbrance = game.u?.uencumber || 0;
     const wielded = heroWieldedWeapon();
     const thrownByHand = isAmmoObject(obj) && !matchingLauncherForAmmo(obj, wielded);
     if (obj.oclass === WEAPON_CLASS
@@ -1440,20 +1534,22 @@ function throwInventoryObject(obj, dirKey) {
     const dx = DIR_DX[dirKey] || 0;
     const dy = DIR_DY[dirKey] || 0;
     if (!thrown || (!dx && !dy)) return;
-    const landing = thrownLanding(dx, dy);
-    if (landing.hitHard) {
-        // C ref: dothrow.c:breaktest() -> zap.c:obj_resists().
-        rn2(100);
-    }
+    const target = plainThrownObjectMissesMonster(thrown) ? thrownMonsterTarget(dx, dy) : null;
+    if (target) await thitmonstPlainMiss(thrown, target.mon);
+    const landing = target || thrownLanding(dx, dy);
+    const destroyed = thrownBreaktestDestroysObject(thrown, landing);
     if (landing.x === (game.u?.ux ?? 0) && landing.y === (game.u?.uy ?? 0) && !landing.hitHard) return;
-    place_object(thrown, landing.x, landing.y);
-    see_objects();
+    if (!destroyed) {
+        place_object(thrown, landing.x, landing.y);
+        see_objects();
+    }
     if (thrownByHand) {
         const launcher = obj.otyp === ARROW ? 'a bow' : 'the appropriate launcher';
         const msg = `You aren't wielding ${launcher}, so you throw your ${baseObjectName(obj)} by hand.`;
         game._pending_message = msg;
         game._last_topline_message = msg;
     }
+    await stageThrowEncumbranceMessage(prevEncumbrance);
 }
 
 function lastInventoryLetter() {
@@ -18940,7 +19036,7 @@ export async function rhack(key) {
             await pline('You cannot throw an object at yourself.');
             return;
         }
-        throwInventoryObject(throwObj, ch);
+        await throwInventoryObject(throwObj, ch);
         game.context.move = 1;
         return;
     }
