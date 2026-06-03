@@ -1444,6 +1444,11 @@ async function finishLifeSavingAfterMore() {
     const amulet = wornLifeSavingAmulet();
     game._life_saving_after_more_pending = false;
     game._fatal_monster_attack_paused = false;
+    // C refs: src/end.c:done()/savelife(), win/tty/topl.c:more().
+    // ESC can leave an interrupted monster More in tty STOP state, but the
+    // amulet recovery sequence owns a new death/life-saving topline boundary;
+    // do not let that STOP suppress later fresh-command monster hit lines.
+    game._monster_topline_stop_after_esc_more = false;
     applyLifeSavingConPenalty();
     if (game.u) game.u.uhp = lifeSavingHp();
     clearLifeSavingExtrinsic(amulet);
@@ -13350,6 +13355,14 @@ function monsterPhysicalToplineChain(line) {
     return parts.length > 0 && parts.every(monsterPhysicalTopline);
 }
 
+function monsterMovementTopline(line) {
+    return /^You see .+ (?:fly|slither|ooze|wiggle|crawl|hide|dive) under .+\.$/.test(line || '');
+}
+
+function monsterPrayerResumeTopline(line) {
+    return monsterPhysicalToplineChain(line) || monsterMovementTopline(line);
+}
+
 function splitDeferredMonsterPhysicalTopline(line) {
     const msg = String(line || '');
     const match = /^(The .+? (?:misses|bites|hits|kicks|stings|butts|touches|claws|scratches|slashes|punches|jabs|pierces|attacks)(?: .+)?[.!])  (The .+)$/.exec(msg);
@@ -14382,6 +14395,7 @@ async function handleQueuedMore(ch) {
                 const resumePrayerBehindNewMore = ordinaryMonsterToplineDeferred
                     && !!game._pending_prayer_finish_message
                     && !rest
+                    && monsterPrayerResumeTopline(msg)
                     && !game._monster_death_pending
                     && !game._fatal_monster_attack_paused;
                 if (pausedMonsterTurn
