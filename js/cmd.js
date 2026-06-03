@@ -14391,7 +14391,14 @@ async function handleQueuedMore(ch) {
                 const resumePhysicalBehindNewMore = !!pendingPhysicalSplit
                     && !game._extra_encumbered_turn_pending
                     && !game._deferred_monster_physical_attack
-                    && !game._after_more_message;
+                    && !game._after_more_message
+                    // C refs: src/dogmove.c:dog_move(), src/mhitm.c:mattackm(),
+                    // src/mon.c:monkilled().  A pet-combat return hit whose
+                    // defender-death line is still pending owns the new tty More;
+                    // the broader monster scan resumes only after that death
+                    // side effect has been shown.
+                    && !deferredPetDeathNeedsPrompt
+                    && !splitHitDeathPrompt;
                 const resumePrayerBehindNewMore = ordinaryMonsterToplineDeferred
                     && !!game._pending_prayer_finish_message
                     && !rest
