@@ -14209,7 +14209,11 @@ async function handleQueuedMore(ch) {
                 game._latched_status_uhp = null;
                 game._latched_status_turn = null;
             }
-            if (ordinaryMonsterToplineDeferred && game._clear_latched_status_after_more) {
+            if (ordinaryMonsterToplineDeferred
+                && game._clear_latched_status_after_more
+                && game._after_more_latched_status_uhp == null
+                && !game._monster_death_pending
+                && !game._fatal_monster_attack_paused) {
                 game._clear_latched_status_after_more = false;
                 game._latched_status_uhp = null;
                 game._latched_status_turn = null;
