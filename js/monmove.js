@@ -3573,7 +3573,7 @@ function is_more_dismiss_key(ch) {
 }
 
 function is_simple_monster_hit_you_line(line) {
-    return /^[A-Z][^!]* (?:hits(?: again)?|bites|stings|kicks|butts|touches you|misses|just misses)!$/.test(line || '');
+    return /^[A-Z][^!]* (?:hits(?: again)?|bites|stings|kicks|butts|touches you|pricks(?: .+)?|misses|just misses)!$/.test(line || '');
 }
 
 function is_simple_monster_hit_you_chain(line) {
@@ -3789,6 +3789,10 @@ async function show_blocking_monster_message(line) {
         await append_monster_effect_topline(line, { needsPrompt: true });
         return;
     }
+    const followupPhysicalNeedsMore = !!game._monster_followup_physical_topline_needs_more
+        && is_simple_monster_hit_you_chain(line)
+        && !game._pending_message
+        && !game._more;
     if (game._pending_message?.startsWith('You hear nothing special.') && !game._more
         && `${game._pending_message}  ${line}`.length < 80) {
         game._pending_message = `${game._pending_message}  ${line}`;
@@ -3986,6 +3990,13 @@ async function show_blocking_monster_message(line) {
         return;
     }
     await pline(line);
+    if (followupPhysicalNeedsMore) {
+        game._monster_followup_physical_topline_needs_more = false;
+        queue_more_prompt();
+        return;
+    }
+    if (game._monster_followup_physical_topline_needs_more)
+        game._monster_followup_physical_topline_needs_more = false;
     if (game._monster_death_pending || game._fatal_monster_attack_paused) queue_more_prompt();
 }
 
@@ -6316,6 +6327,14 @@ async function physical_melee_attacks(mtmp, attacks, toHit) {
                 && displayLine
                 && game._after_more_message
                 && topline_can_pack_message(game._after_more_message, displayLine);
+            if (!suppressVisibleMessages
+                && damage > 0
+                && game._monster_topline_deferred
+                && !game._monster_turn_paused_for_more
+                && game._after_more_message) {
+                game._after_more_latched_status_uhp = preDamageHp;
+                game._after_more_latched_status_turn = game.moves || null;
+            }
             if (damageSharesDeferredHitLine) game._relocation_more_deferred = false;
             if (damage > 0 && game._monster_topline_deferred && !damageSharesDeferredHitLine) {
                 apply_hero_damage(damage);
@@ -6728,7 +6747,13 @@ export async function finish_deferred_monster_physical_attack() {
         if (toHit > roll) {
             const verb = monster_attack_verb(attack, attackVerbCounts);
             const line = monster_physical_hit_line_basic(mtmp, attack, verb);
+            const hadDeferredTopline = !!game._monster_topline_deferred;
+            const oldAfterMoreMessage = game._after_more_message || '';
             if (line) append_deferred_physical_attack_line(line);
+            const createdDeferredTopline = line && !hadDeferredTopline && !!game._monster_topline_deferred;
+            const extendedDeferredTopline = line
+                && !!game._monster_topline_deferred
+                && oldAfterMoreMessage !== (game._after_more_message || '');
             let damage = d(damn, damd);
             if (verb === 'weapon') damage += monster_weapon_damage(mtmp.mw);
             const poisonMessages = [];
@@ -6737,6 +6762,19 @@ export async function finish_deferred_monster_physical_attack() {
             if (adtyp === 'AD_COLD' && damage > 0)
                 game._pending_monster_attack_side_effect = "You're covered in frost!";
             const preDamageHp = game.u?.uhp ?? 0;
+            if (damage > 0 && (createdDeferredTopline || extendedDeferredTopline)) {
+                const statusTurn = game.moves || null;
+                // C refs: src/uhitm.c:mhitm_ad_phys(), src/mhitu.c:hitmu(),
+                // win/tty/topl.c:update_topl()/more().  A physical hit message
+                // can be visible on the tty More before that hit's mdamageu().
+                if (createdDeferredTopline && game._latched_status_uhp == null) {
+                    game._latched_status_uhp = preDamageHp;
+                    game._latched_status_turn = statusTurn;
+                    game._clear_latched_status_after_more = true;
+                }
+                game._after_more_latched_status_uhp = preDamageHp;
+                game._after_more_latched_status_turn = statusTurn;
+            }
             if (finish_deferred_physical_hit_damage(mtmp, damage, preDamageHp)) break;
         } else {
             const miss = monster_miss_text(toHit, roll);

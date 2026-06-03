@@ -13342,7 +13342,12 @@ function splitDeferredPetCombatTopline(line) {
 }
 
 function monsterPhysicalTopline(line) {
-    return /^The .+ (?:misses|bites|hits|kicks|stings|butts|touches|claws|scratches|slashes|punches|jabs|pierces|attacks)(?: .+)?[.!]$/.test(line || '');
+    return /^The .+ (?:misses|bites|hits|kicks|stings|butts|touches|claws|scratches|slashes|punches|jabs|pierces|pricks|attacks)(?: .+)?[.!]$/.test(line || '');
+}
+
+function monsterPhysicalToplineChain(line) {
+    const parts = String(line || '').split('  ').filter(Boolean);
+    return parts.length > 0 && parts.every(monsterPhysicalTopline);
 }
 
 function splitDeferredMonsterPhysicalTopline(line) {
@@ -13701,6 +13706,15 @@ async function handleQueuedMore(ch) {
             const text = typeof next === 'string' ? next : next?.text;
             clear_pending_message();
             if (text) await pline(text);
+            if (game._monster_followup_physical_topline_needs_more) {
+                game._monster_followup_physical_topline_needs_more = false;
+                if (text && monsterPhysicalToplineChain(text)) {
+                    game._clear_latched_status_after_more = false;
+                    game._latched_status_uhp = null;
+                    game._latched_status_turn = null;
+                    queue_more_prompt();
+                }
+            }
             if (game._deferred_monster_magic_spell_attack)
                 await finish_deferred_monster_physical_attack();
             if (next?.magicTrapInvis) {
@@ -14195,6 +14209,18 @@ async function handleQueuedMore(ch) {
                 game._latched_status_uhp = null;
                 game._latched_status_turn = null;
             }
+            if (ordinaryMonsterToplineDeferred && game._clear_latched_status_after_more) {
+                game._clear_latched_status_after_more = false;
+                game._latched_status_uhp = null;
+                game._latched_status_turn = null;
+            }
+            if (game._after_more_latched_status_uhp != null) {
+                game._latched_status_uhp = game._after_more_latched_status_uhp;
+                game._latched_status_turn = game._after_more_latched_status_turn ?? null;
+                game._clear_latched_status_after_more = true;
+            }
+            game._after_more_latched_status_uhp = null;
+            game._after_more_latched_status_turn = null;
             clearLatchedStatusAttrsAfterMore();
             if (game._clear_status_uencumber_override_before_after_more) {
                 game._clear_status_uencumber_override_before_after_more = false;
@@ -14324,6 +14350,15 @@ async function handleQueuedMore(ch) {
                 if (C.isok(glyph.x, glyph.y)) show_glyph_cell(glyph.x, glyph.y, glyph.ch, NO_COLOR, false);
             }
             if (needsPrompt) {
+                if (ordinaryMonsterToplineDeferred
+                    && !game._after_more_message
+                    && monsterPhysicalToplineChain(msg)) {
+                    // C refs: win/tty/topl.c:update_topl()/more(),
+                    // src/mhitu.c:hitmu().  A monster physical line printed as
+                    // a deferred tty More can be followed by another same-turn
+                    // physical line which still owns a C tty More boundary.
+                    game._monster_followup_physical_topline_needs_more = true;
+                }
                 if (!game._more || (game._more_dismissals_remaining || 0) <= 0) {
                     queue_more_prompt();
                 } else {
