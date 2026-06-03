@@ -3728,6 +3728,13 @@ async function flush_pending_more_before_monster_message() {
 async function show_blocking_monster_message(line) {
     if (!line) return;
     if (game._life_saving_silent_monster_resume) return;
+    if (game._monster_topline_stop_after_esc_more
+        && (is_simple_monster_hit_you_line(line) || is_simple_monster_hit_you_chain(line))) {
+        // C refs: win/tty/topl.c:more()/update_topl().  ESC at --More--
+        // leaves the tty message window in STOP mode; ordinary later monster
+        // hit lines update history/state without becoming the visible prompt.
+        return;
+    }
     if (game._nomovemsg === 'You survived that attempt on your life.'
         && game._pending_message === "OK, so you don't die."
         && !game._more
@@ -6149,7 +6156,8 @@ async function physical_melee_attacks(mtmp, attacks, toHit) {
             const hiddenLine = monster_hidden_under_hit_line_basic(mtmp);
             const line = monster_physical_hit_line_basic(mtmp, attack, verb);
             const displayLine = [hiddenLine, line].filter(Boolean).join('  ');
-            if (!suppressVisibleMessages && displayLine && hitMessages.length && game._pending_message && !game._more) {
+            if (!suppressVisibleMessages && displayLine && hitMessages.length && game._pending_message && !game._more
+                && !game._monster_topline_stop_after_esc_more) {
                 const pendingPrefix = `${game._pending_message}  ${hitMessages.join('  ')}`;
                 if (!tty_topline_can_pack_message_basic(pendingPrefix, displayLine)) {
                     // C refs: src/mhitu.c:hitmu(), win/tty/topl.c:update_topl().
@@ -6175,7 +6183,9 @@ async function physical_melee_attacks(mtmp, attacks, toHit) {
                 }
             }
             if (!suppressVisibleMessages && displayLine && hitMessages.length && game._pending_message && game._more
-                && game._monster_physical_pack_behind_active_more) {
+                && game._monster_physical_pack_behind_active_more
+                && !game._monster_topline_stop_after_esc_more
+                && !game._monster_attack_tail_transient_after_more) {
                 const pendingTail = hitMessages.join('  ');
                 const pendingPrefix = `${game._pending_message}  ${pendingTail}`;
                 if (!tty_topline_can_pack_message_basic(game._pending_message, `${pendingTail}  ${displayLine}`)) {
@@ -6314,7 +6324,7 @@ async function physical_melee_attacks(mtmp, attacks, toHit) {
                 // win/tty/topl.c:more().  The hit has already done damage and
                 // can enter death handling before the hit-line More is dismissed,
                 // but that More frame still shows the pre-damage status row.
-                game._latched_status_uhp = preDamageHp;
+                if (game._latched_status_uhp == null) game._latched_status_uhp = preDamageHp;
                 game._clear_latched_status_after_more = true;
                 if (handle_monster_fatal_damage(mtmp, preDamageHp)) {
                     game._latched_status_uhp = preDamageHp;
@@ -6637,8 +6647,10 @@ function queue_fatal_monster_hit_more_if_needed() {
     // C refs: src/mhitu.c:hitmsg(), src/end.c:done().  Fatal monster damage
     // leaves the hit/miss topline visible on a tty More before death handling.
     if ((game._monster_death_pending || game._fatal_monster_attack_paused)
-        && game._pending_message && !game._more) {
-        if (game._monster_attack_tail_transient_after_more
+        && (game._pending_message || game._monster_topline_stop_after_esc_more)
+        && !game._more) {
+        if ((game._monster_attack_tail_transient_after_more
+                || game._monster_topline_stop_after_esc_more)
             && (game.wizard || game.flags?.debug || game.flags?.explore)) {
             const msg = 'Die? [yn] (n)';
             const u = game.u || (game.u = {});
@@ -6657,6 +6669,7 @@ function queue_fatal_monster_hit_more_if_needed() {
             game._prompt_cursor = [msg.length + 1, 0];
             game._monster_attack_tail_pending_pack = false;
             game._monster_attack_tail_transient_after_more = false;
+            game._monster_topline_stop_after_esc_more = false;
             return;
         }
         queue_more_prompt();

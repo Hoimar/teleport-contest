@@ -13425,6 +13425,11 @@ async function handleQueuedMore(ch) {
     game._pending_more_strict_keys = false;
     game._more_dismissals_remaining--;
     game._monster_more_accepts_any_key = false;
+    game._monster_topline_stop_after_esc_more = ch === '\x1b'
+        && pausedMonsterTurn
+        && (monsterAttackResume
+            || !!game._deferred_monster_physical_attack
+            || monsterPhysicalTopline(afterMoreTopline));
     if (preserveMonsterMoreBase) {
         game._monster_more_base_screen = preserveMonsterMoreBase;
         game._monster_more_base_deferred = (game._deferred_warning_redraws || []).slice();
