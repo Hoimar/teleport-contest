@@ -1407,15 +1407,18 @@ function applyOccupationFinishObjectEffects(g) {
         obj.known = true;
     } else if (obj.otyp === GAUNTLETS_OF_POWER) {
         // C ref: do_wear.c:Gloves_on().  Wearing power gauntlets reveals the
-        // object type and recalculates strength before the finish message.
+        // object type through makeknown(); strength itself is recalculated as
+        // worn state, not by an explicit Strength exercise in Gloves_on().
         const order = Array.isArray(g.discoveryOrder) ? g.discoveryOrder : (g.discoveryOrder = []);
         if (!order.includes(obj.otyp)) order.push(obj.otyp);
         const discovered = g.discoveredObjects || (g.discoveredObjects = new Set());
-        if (!discovered.has(obj.otyp)) discovered.add(obj.otyp);
+        if (!discovered.has(obj.otyp)) {
+            discovered.add(obj.otyp);
+            exercise(A_WIS, true);
+        }
         obj.known = true;
         obj.knownName = true;
         if (g.u?.acurr?.a) g.u.acurr.a[A_STR] = 25;
-        exercise(A_STR, true);
     }
 }
 

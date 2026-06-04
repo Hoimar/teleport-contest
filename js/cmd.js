@@ -4624,6 +4624,13 @@ async function start_wearing_object(obj) {
     }
     const delay = OBJECT_DELAY[obj.otyp] || 0;
     if (obj.oclass === ARMOR_CLASS && delay > 0) {
+        if (obj.otyp === GAUNTLETS_OF_POWER) {
+            // C refs: do_wear.c:armor_or_accessory_on()/Gloves_on(),
+            // allmain.c:moveloop_core().  Power-gauntlet makeknown()/botl
+            // side effects run from afternmv after the final immobile turn
+            // tail; speed boots have distinct Type_on message evidence.
+            game._occupation_pre_finish_extra_turn = true;
+        }
         game._occupation_turns_remaining = Math.max(0, delay - 1);
         game._occupation_finish_message = armor_finish_message(obj);
         game._occupation_pack_finish_message = true;

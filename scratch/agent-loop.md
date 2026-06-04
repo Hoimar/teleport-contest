@@ -13,10 +13,18 @@ and `feature_map.md`.
 ## Current State
 
 - Current branch in this workspace: `main`, ahead of origin.
-- Latest committed parity repair: `Repair seed4500 startup and study timing`
+- Latest committed parity repair: `Repair seed0360 power gauntlet wear timing`
   (see `git log` for the current hash).
 - Last toolkit commit: `7d2f959` (`Track scratch tracing toolkit`).
 - Latest verified parity repair:
+  - `seed0360-wizard-world-tour`: `S 833/833 R 120639/120639 C 0 OK`.
+  - Strict sentinels exact: `5/5 S 1063/1063 R 64569/64569 C 0`.
+  - Implementation: power-gauntlet delayed wear now runs `Gloves_on()`
+    `makeknown()`/Wisdom and strength-state side effects after the final
+    immobile turn tail, while speed boots keep their established delayed-finish
+    message timing (`C refs: do_wear.c:armor_or_accessory_on()/Gloves_on(),
+    allmain.c:moveloop_core()`).
+- Previous verified parity repair:
   - `seed4500-knight-coverage`: `S 1814/1814 R 108275/108275 C 0 OK`.
   - Strict sentinels exact: `5/5 S 1063/1063 R 64569/64569 C 0`.
   - Extra guards: `seed0103-knight-ride-pony` exact and
@@ -37,8 +45,9 @@ and `feature_map.md`.
   hosted public cache `exact 30/44 S 8124/10982 R 437829/840358 C 1`;
   class `public-session-drift`; leaderboard fetch failed; strict sentinel exact.
 - `node scripts/triage-corpus.mjs --markdown scratch/divergence-inventory.md`
-  regenerated local divergence state after the `seed4500` WIP fix: `31/44`
-  local sessions pass, including `seed0012`, `seed0108`, and `seed4500`.
+  regenerated local divergence state after the `seed0360` WIP fix: `32/44`
+  local sessions pass, including `seed0012`, `seed0108`, `seed0360`, and
+  `seed4500`.
 - Hack audit remains `hard=0 suspicious=42`; `memory:lint` reports
   `issues=0`. Production `js/` has no intentional debug I/O or imports from
   `frozen/`.
@@ -53,14 +62,20 @@ and `feature_map.md`.
   - `seed0108-wizard-extcmd-wishlist` committed at `d71dd87`, exact
     `S 303/303 R 16958/16958 C 0`, strict sentinels exact. Fixed `#loot`
     take-out menu sequencing without RNG changes.
-  - `seed4500-knight-coverage` WIP exact after startup/tutorial, swim-tip, and
+  - `seed0360-wizard-world-tour` WIP exact after delayed power-gauntlet
+    occupation finish repair: `S 833/833 R 120639/120639 C 0`; strict
+    sentinels exact. The first frontier
+    `FR 101871 rn2(5)=>rn2(19)` was a general wear/occupation timing issue:
+    `Gloves_on()` side effects belong after the final immobile turn tail and
+    use `makeknown()`/Wisdom, not a direct Strength exercise.
+  - `seed4500-knight-coverage` exact after startup/tutorial, swim-tip, and
     spellbook occupation timing repairs:
     `S 1814/1814 R 108275/108275 C 0`; strict sentinels exact; `seed0103`
     and `seed0501` guards exact.
   - Regression classification: target screen-only UI drift repaired; strict
     sentinel stable; public vs hosted remains session-file drift, not a local
     engine regression.
-  - Next queue: choose the next checked-in public divergence; current
-    high-signal candidates include `seed0360-wizard-world-tour` (post-startup
-    map/RNG drift still shaped like `rn2(5)=>rn2(19)`) and early startup or
-    mklev/u_init sessions from `scratch/divergence-inventory.md`.
+  - Next queue: choose the next checked-in public divergence from
+    `scratch/divergence-inventory.md`; current high-signal candidates include
+    early startup/mklev-or-uinit frontiers such as `seed0361`, `seed0900`,
+    `seed1150`, or the post-startup role/session buckets.
