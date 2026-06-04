@@ -5481,7 +5481,10 @@ async function handleLootActionMenuKey(ch) {
     if (!menu) return false;
     game._override_prev = null;
     if (ch === 'o') {
-        await showLootTakeOutObjectMenu(menu.container, false, { held: menu.held });
+        if (takeOutNeedsClassMenu(menu.container))
+            showLootTypeMenu(menu.container, false, { putIn: false, held: menu.held });
+        else
+            await showLootTakeOutObjectMenu(menu.container, false, { held: menu.held });
         game.context.move = 0;
         return true;
     }
@@ -5508,6 +5511,27 @@ async function handleLootActionMenuKey(ch) {
 
 function containedGoldObject(container) {
     return containerContents(container).find((obj) => obj?.otyp === GOLD_PIECE) || null;
+}
+
+function lootObjectClass(obj) {
+    if (!obj) return null;
+    if (typeof obj.oclass === 'number') return obj.oclass;
+    if (typeof obj.otyp === 'number') return OBJECT_CLASS[obj.otyp] ?? null;
+    return null;
+}
+
+function takeOutNeedsClassMenu(container) {
+    // C refs: src/pickup.c:traditional_loot(), src/pickup.c:query_classes().
+    // query_classes() skips its prompt when collect_obj_classes() finds only
+    // one available object class, and askchain() goes straight to object rows.
+    const classes = new Set();
+    for (const obj of containerContents(container)) {
+        const cls = lootObjectClass(obj);
+        if (cls == null) continue;
+        classes.add(cls);
+        if (classes.size > 1) return true;
+    }
+    return false;
 }
 
 async function showLootTakeOutObjectMenu(container, selectedGold = false, opts = {}) {
@@ -5622,6 +5646,11 @@ async function handleLootTypeMenuKey(ch) {
     }
     if (menu.putIn && (ch === '\r' || ch === '\n')) {
         await showLootPutInGoldMenu(menu.container, false, { held: menu.held });
+        game.context.move = 0;
+        return true;
+    }
+    if (!menu.putIn && (ch === '\r' || ch === '\n')) {
+        await showLootTakeOutObjectMenu(menu.container, false, { held: menu.held });
         game.context.move = 0;
         return true;
     }

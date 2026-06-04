@@ -12,46 +12,43 @@ and `feature_map.md`.
 
 ## Current State
 
-- Current branch in this workspace: `main`.
-- Current dirty batch is based on `cf1dfc5` (`Pass seed0060 Orc Rogue session`).
-- Current target `seed0030-ten-diverse-deaths` advanced to:
-  `S 42/1953 R 7173/105529 FS 23:char:mixed:l FR 6732:rnd(5)=1=>rn2(5)=0 C 0`.
-- Strict sentinels are exact: `5/5 S 1063/1063 R 64569/64569 C 0`.
-- Full local public corpus after the dirty batch:
-  `exact 22/44 S 3713/11405 R 285834/792838 C 0`.
-- Hosted public cache still differs from checked-in sessions
-  (`public-session-drift`).
-- Hack audit remains `hard=0 suspicious=41`; `memory:lint` reports
+- Current branch in this workspace: `main`, ahead of origin.
+- Last committed parity repair: `7179887` (`Advance vault escort parity`).
+- Current WIP repair verified but not yet committed:
+  - `seed0108-wizard-extcmd-wishlist`: `S 303/303 R 16958/16958 C 0 OK`.
+  - Strict sentinels exact: `5/5 S 1063/1063 R 64569/64569 C 0`.
+  - Implementation: `#loot` take-out now enters the C `query_classes()` menu
+    before the object-specific take-out menu (`C refs: pickup.c:use_container()`,
+    `pickup.c:traditional_loot()`, `invent.c:query_classes()`).
+- Scratch trace/checkpoint files are agent-toolkit state and may be committed
+  when useful; keep production parity and scratch-tool commits coherent.
+- Strict sentinels are exact:
+  `5/5 S 1063/1063 R 64569/64569 C 0`.
+- `npm run parity:state -- --refresh-live` after commit `7179887`:
+  checked-in public `exact 29/44 S 7243/11405 R 468676/792838 C 1`;
+  hosted public cache `exact 28/44 S 6804/10982 R 379657/840358 C 1`;
+  class `public-session-drift`; leaderboard fetch failed; strict sentinel exact.
+- `node scripts/triage-corpus.mjs --markdown scratch/divergence-inventory.md`
+  regenerated local divergence state after the `seed0108` WIP fix: `30/44`
+  local sessions pass, including `seed0012` and `seed0108`.
+- Hack audit remains `hard=0 suspicious=42`; `memory:lint` reports
   `issues=0`. Production `js/` has no intentional debug I/O or imports from
   `frozen/`.
 
 ## Latest Loop Checkpoint
 
-- Target: `seed0030-ten-diverse-deaths`.
-- Focused verification: `S 42/1953 R 7173/105529 FS 23:char:mixed:l FR 6732:rnd(5)=1=>rn2(5)=0 C 0`.
-- Implemented subsystem truth in this iteration:
-  - `!legacy` Tourist startup now applies the recomputed Hawaiian-shirt AC
-    before the first map/status frame, while legacy startup keeps the
-    pre-`find_ac()` status until the deferred startup pager update
-    (`C refs: src/u_init.c:u_init_inventory_attrs()`,
-    `src/u_init.c:u_init_skills_discoveries()`,
-    `src/do_wear.c:find_ac()`);
-  - carried gold is inserted at the front of JS inventory so systems walking
-    inventory order, especially pet `dog_goal()` food scans, see `$` before
-    lettered items (`C refs: src/invent.c:assigninvlet()`,
-    `src/invent.c:reorder_invent()`, `src/dogmove.c:dog_goal()`).
-- Verification:
-  - `npm run verify -- --target seed0030-ten-diverse-deaths --full`
-    -> target advanced, strict exact, full suite
-    `S 3713/11405 R 285834/792838`, hack audit clean, memory lint clean.
-  - `npm run parity:state -- --no-leaderboard`
-    -> checked-in corpus `exact 22/44 S 3713/11405 R 285834/792838 C 0`,
-    strict exact, hosted cache drift noted.
-- Next queue:
-  - Commit this coherent verified batch.
-  - Per user request, hand off after this iteration instead of starting the
-    next subsystem.
-  - When resumed, continue `seed0030-ten-diverse-deaths` at the first mismatch:
-    expected `There's some graffiti on the floor here.--More--`, actual blank;
-    RNG first mismatch `6732:rnd(5)=1=>rn2(5)=0`. Start with engraving /
-    floor-look C refs, not startup AC or door logic.
+- Latest verified repairs on 2026-06-04:
+  - `seed0012-monk-vault-escort` committed at `7179887`, exact
+    `S 308/308 R 13878/13878 C 0`, strict sentinels exact. Ported the vault
+    escort cleanup boundary, fake-corridor restoration loop, active-guard sound
+    suppression, and counted-search vault timing.
+  - `seed0108-wizard-extcmd-wishlist` WIP exact
+    `S 303/303 R 16958/16958 C 0`, strict sentinels exact. Fixed `#loot`
+    take-out menu sequencing without RNG changes.
+  - Regression classification: target screen-only UI drift repaired; strict
+    sentinel stable; public vs hosted remains session-file drift, not a local
+    engine regression.
+  - Next queue after committing: refresh parity/corpus state and choose the
+    next checked-in public divergence; current high-signal candidates include
+    post-startup UI/display sessions and mklev/u_init sessions from
+    `scratch/divergence-inventory.md`.
