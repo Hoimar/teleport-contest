@@ -7,18 +7,17 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 
 | Sessions | Buckets | Screens | RNG calls | Errors |
 | --- | --- | --- | --- | --- |
-| 44 | 13 | 8887/11405 | 542483/792838 | 0 |
+| 44 | 12 | 8971/11405 | 547136/792838 | 0 |
 
 ## Bucket Summary
 
 | Count | Phase | Canonical evidence | Subsystem hypothesis | Owner | Needs deeper debug |
 | --- | --- | --- | --- | --- | --- |
-| 32 | passing | seed0116-wizard-wear-shop | Pet behavior: dog_goal() object scan, reachability, carry checks, and object resistance in dogmove.c. | Monsters / pets | yes |
+| 33 | passing | seed0116-wizard-wear-shop | Pet behavior: dog_goal() object scan, reachability, carry checks, and object resistance in dogmove.c. | Monsters / pets | yes |
 | 1 | early-startup | seed0361-archeologist-tour | Chargen, role/race/gender/align selection, options parsing, or early startup RNG ordering. | Player initialization / options | yes |
 | 1 | late-startup | seed0373-barbarian-quest-tour | Late startup side effects, special levels, monster/object initialization, or display setup. | Mklev / objects / monsters / display | yes |
-| 1 | mklev-or-uinit | seed1150-caveman-explore-move | u_init, mklev, dungeon initialization, initial inventory, or level topology setup. | Startup level generation / u_init | yes |
+| 1 | late-startup | seed1150-caveman-explore-move | Late startup side effects, special levels, monster/object initialization, or display setup. | Mklev / objects / monsters / display | yes |
 | 1 | mklev-or-uinit | seed2600-wizard-custom-binds | u_init, mklev, dungeon initialization, initial inventory, or level topology setup. | Startup level generation / u_init | yes |
-| 1 | mklev-or-uinit | seed0900-tourist-explore-actions | u_init, mklev, dungeon initialization, initial inventory, or level topology setup. | Startup level generation / u_init | no |
 | 1 | post-startup-live | seed0006-wizard-water-demon | Live command effects, movement, pet/monster behavior, or retained object/map state. | Commands / monsters / objects | no |
 | 1 | post-startup-live | seed0367-priest-quest-tour | Mixed live-state divergence spanning display, status, messages, or command side effects. | Display / command dispatch | yes |
 | 1 | post-startup-live | seed0004-feeding-pony | Mixed live-state divergence spanning display, status, messages, or command side effects. | Display / command dispatch | yes |
@@ -31,7 +30,7 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 
 ### passing: seed0116-wizard-wear-shop
 
-- Count: 32
+- Count: 33
 - Bucket key: `passing | FS=pass | FR=none | none/none | - | rows=-`
 - Canonical screens: 127/127
 - Canonical RNG: 12562/12562
@@ -41,7 +40,7 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 - Hypothesis: Pet behavior: dog_goal() object scan, reachability, carry checks, and object resistance in dogmove.c.
 - Next owner: Monsters / pets
 - Needs deeper debug: yes
-- Sessions: seed0002-healer-reflection-drummer, seed0012-monk-vault-escort, seed0013-friday13-save-then-fullmoon-restore, seed0013-rogue-friday13-combat, seed0015-valk-level2-pit-dog-wait, seed0016-healer-newmoon-eat-zap, seed0017-samurai-altar-pray, seed0030-ten-diverse-deaths, seed0060-orc-rogue-kick-search, seed0101-ranger-quiver-throw-travel-engrave, seed0102-ranger-name-cancel, seed0103-knight-ride-pony, seed0104-knight-ride-combat, seed0105-valk-chat-lamp-ration, seed0106-priest-extcmd-sweep, seed0107-samurai-twoweapon-enhance, seed0108-wizard-extcmd-wishlist, seed0116-wizard-wear-shop, seed0200-monk-north-search, seed0360-wizard-world-tour, seed0383-wizard-hallucinate, seed0398-wizard-wandpoly-pile, seed0399-wizard-hallu-actions, seed0501-priest-cast-read-turn, seed0700-samurai-explore-descend, seed1500-rogue-explore-move, seed1800-tourist-eat-throw, seed2200-wizard-quaff-zap-read, seed4500-knight-coverage, seed5002-wizard-coverage-pair, seed5006-tourist-stress-disaster, seed8000-tourist-starter
+- Sessions: seed0002-healer-reflection-drummer, seed0012-monk-vault-escort, seed0013-friday13-save-then-fullmoon-restore, seed0013-rogue-friday13-combat, seed0015-valk-level2-pit-dog-wait, seed0016-healer-newmoon-eat-zap, seed0017-samurai-altar-pray, seed0030-ten-diverse-deaths, seed0060-orc-rogue-kick-search, seed0101-ranger-quiver-throw-travel-engrave, seed0102-ranger-name-cancel, seed0103-knight-ride-pony, seed0104-knight-ride-combat, seed0105-valk-chat-lamp-ration, seed0106-priest-extcmd-sweep, seed0107-samurai-twoweapon-enhance, seed0108-wizard-extcmd-wishlist, seed0116-wizard-wear-shop, seed0200-monk-north-search, seed0360-wizard-world-tour, seed0383-wizard-hallucinate, seed0398-wizard-wandpoly-pile, seed0399-wizard-hallu-actions, seed0501-priest-cast-read-turn, seed0700-samurai-explore-descend, seed0900-tourist-explore-actions, seed1500-rogue-explore-move, seed1800-tourist-eat-throw, seed2200-wizard-quaff-zap-read, seed4500-knight-coverage, seed5002-wizard-coverage-pair, seed5006-tourist-stress-disaster, seed8000-tourist-starter
 
 ### early-startup: seed0361-archeologist-tour
 
@@ -71,17 +70,17 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 - Needs deeper debug: yes
 - Sessions: seed0373-barbarian-quest-tour
 
-### mklev-or-uinit: seed1150-caveman-explore-move
+### late-startup: seed1150-caveman-explore-move
 
 - Count: 1
-- Bucket key: `mklev-or-uinit | FS=0 | FR=251-1200 | char/mixed | rn2(5)=>rn2(3) | rows=18,19,20,22,23`
+- Bucket key: `late-startup | FS=0 | FR=>1200 | char/status | rn2(11)=>rn2(17) | rows=22,23`
 - Canonical screens: 0/51
-- Canonical RNG: 361/3137
-- First screen mismatch: 0 (char/mixed, rows 18,19,20,22,23)
-- First RNG mismatch: 302 (rn2(5)=>rn2(3))
-- Sample cells: [18,46] ch │/8 ->  /8; [18,47] ch @/15 ->  /8; [18,48] ch %/3 ->  /8; [18,49] ch ·/8 ->  /8; [18,50] ch ·/8 ->  /8
-- Hypothesis: u_init, mklev, dungeon initialization, initial inventory, or level topology setup.
-- Next owner: Startup level generation / u_init
+- Canonical RNG: 2387/3137
+- First screen mismatch: 0 (char/status, rows 22,23)
+- First RNG mismatch: 2305 (rn2(11)=>rn2(17))
+- Sample cells: [22,34] ch 1/8 -> ?/8; [22,35] ch 5/8 ->  /8; [22,36] ch  /8 -> D/8; [22,37] ch D/8 -> x/8; [22,38] ch x/8 -> :/8
+- Hypothesis: Late startup side effects, special levels, monster/object initialization, or display setup.
+- Next owner: Mklev / objects / monsters / display
 - Needs deeper debug: yes
 - Sessions: seed1150-caveman-explore-move
 
@@ -98,20 +97,6 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 - Next owner: Startup level generation / u_init
 - Needs deeper debug: yes
 - Sessions: seed2600-wizard-custom-binds
-
-### mklev-or-uinit: seed0900-tourist-explore-actions
-
-- Count: 1
-- Bucket key: `mklev-or-uinit | FS=0 | FR=251-1200 | char/status | rn2(5)=>rn2(3) | rows=22,23`
-- Canonical screens: 0/84
-- Canonical RNG: 356/2983
-- First screen mismatch: 0 (char/status, rows 22,23)
-- First RNG mismatch: 302 (rn2(5)=>rn2(3))
-- Sample cells: [22,35] ch 3/8 -> 5/8; [22,47] ch 2/8 -> 7/8; [22,53] ch 2/8 -> 4/8; [22,58] ch 1/8 -> 8/8; [22,59] ch 1/8 ->  /8
-- Hypothesis: u_init, mklev, dungeon initialization, initial inventory, or level topology setup.
-- Next owner: Startup level generation / u_init
-- Needs deeper debug: no
-- Sessions: seed0900-tourist-explore-actions
 
 ### post-startup-live: seed0006-wizard-water-demon
 
@@ -257,8 +242,8 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 | seed0399-wizard-hallu-actions | 532/532 | 11409/11409 | passing | -:none:none:- | -:- | - | - |
 | seed0501-priest-cast-read-turn | 28/28 | 2238/2238 | passing | -:none:none:- | -:- | - | - |
 | seed0700-samurai-explore-descend | 51/51 | 3230/3230 | passing | -:none:none:- | -:- | - | - |
-| seed0900-tourist-explore-actions | 0/84 | 356/2983 | mklev-or-uinit | 0:char:status:init | 302:rn2(5)=>rn2(3) | 22,23 | [22,35] ch 3/8 -> 5/8; [22,47] ch 2/8 -> 7/8; [22,53] ch 2/8 -> 4/8; [22,58] ch 1/8 -> 8/8; [22,59] ch 1/8 ->  /8 |
-| seed1150-caveman-explore-move | 0/51 | 361/3137 | mklev-or-uinit | 0:char:mixed:init | 302:rn2(5)=>rn2(3) | 18,19,20,22,23 | [18,46] ch │/8 ->  /8; [18,47] ch @/15 ->  /8; [18,48] ch %/3 ->  /8; [18,49] ch ·/8 ->  /8; [18,50] ch ·/8 ->  /8 |
+| seed0900-tourist-explore-actions | 84/84 | 2983/2983 | passing | -:none:none:- | -:- | - | - |
+| seed1150-caveman-explore-move | 0/51 | 2387/3137 | late-startup | 0:char:status:init | 2305:rn2(11)=>rn2(17) | 22,23 | [22,34] ch 1/8 -> ?/8; [22,35] ch 5/8 ->  /8; [22,36] ch  /8 -> D/8; [22,37] ch D/8 -> x/8; [22,38] ch x/8 -> :/8 |
 | seed1500-rogue-explore-move | 40/40 | 2768/2768 | passing | -:none:none:- | -:- | - | - |
 | seed1800-tourist-eat-throw | 26/26 | 2458/2458 | passing | -:none:none:- | -:- | - | - |
 | seed2200-wizard-quaff-zap-read | 230/230 | 3018/3018 | passing | -:none:none:- | -:- | - | - |

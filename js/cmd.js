@@ -579,6 +579,7 @@ const OBJECT_BASE_NAMES = new Map([
     [TIN_OPENER, 'tin opener'],
     [TIN_WHISTLE, 'tin whistle'],
     [MAGIC_WHISTLE, 'magic whistle'],
+    [WAN_WISHING, 'wand of wishing'],
     [OIL_LAMP, 'lamp'],
     [MAGIC_LAMP, 'lamp'],
     [MAGIC_MARKER, 'magic marker'],
@@ -2096,10 +2097,11 @@ async function readScrollOfTeleportation(obj, idx) {
 
 function eatLetters() {
     ensureInventoryLetters();
-    return (game.inventory || [])
+    const letters = (game.inventory || [])
         .filter((obj) => obj?.oclass === FOOD_CLASS)
         .map((obj) => obj.invlet)
-        .join('');
+        .filter(validInvlet);
+    return letters.length > 5 ? compactLettersInOrder(letters) : letters.join('');
 }
 
 function drinkLetters() {
@@ -3524,8 +3526,8 @@ function baseObjectName(obj) {
     if (obj?.otyp === CORPSE) {
         return `${corpseMonsterDisplayName(obj)} corpse`;
     }
-    if (obj?.otyp === TIN && obj.corpsenm) {
-        return `tin of ${objectMonsterDisplayName(obj)}`;
+    if (obj?.otyp === TIN && (obj.knownName || objectTypeNameKnown(obj))) {
+        return tinObjectName(obj);
     }
     if (obj?.otyp === STATUE) {
         return statueObjectName(obj);
@@ -3564,6 +3566,15 @@ function corpseMonsterPtr(obj) {
 function objectMonsterDisplayName(obj) {
     const ptr = corpseMonsterPtr(obj);
     return String(ptr?.name || 'monster').toLowerCase().replace(/_/g, ' ');
+}
+
+function tinObjectName(obj) {
+    // C refs: src/objnam.c:xname()/tin_details(), src/eat.c:tin_variety().
+    if (obj?.spe === 1) return 'tin of spinach';
+    const ptr = corpseMonsterPtr(obj);
+    if (!ptr) return 'empty tin';
+    const name = objectMonsterDisplayName(obj);
+    return `tin of ${name}${corpseIsVegetarian(obj) ? '' : ' meat'}`;
 }
 
 function corpseMonsterDisplayName(obj) {
@@ -16438,9 +16449,16 @@ async function showInventoryMenu() {
     }
 
     const maxLen = Math.max(0, ...lines.map((line) => line.text.length));
-    const menuCol = multipage ? 1 : Math.max(1, Math.min(COLNO - 1, COLNO - maxLen - 2));
-    const clearCol = Math.max(0, menuCol - 1);
-    for (let row = 0; row < lines.length; row++) {
+    const ttyMenuWidth = maxLen + 2;
+    // C ref: win/tty/wintty.c:tty_display_nhwindow().  TTY menus use a
+    // right-side corner window only when both width and height leave room.
+    const fullScreenMenu = multipage
+        || lines.length >= displayRows
+        || COLNO - ttyMenuWidth - 1 <= 10;
+    const menuCol = fullScreenMenu ? 1 : Math.max(1, Math.min(COLNO - 1, COLNO - maxLen - 2));
+    const clearCol = fullScreenMenu ? 0 : Math.max(0, menuCol - 1);
+    const clearRows = fullScreenMenu ? displayRows : lines.length;
+    for (let row = 0; row < clearRows; row++) {
         display.putstr(clearCol, row, ' '.repeat(COLNO - clearCol), NO_COLOR, 0);
     }
     for (let row = 0; row < lines.length; row++) {
@@ -17441,7 +17459,8 @@ function roleStatusInsightLines(level) {
 
 function roleMagicAttributesInsightLines() {
     // C ref: src/insight.c:attributes_enlightenment().
-    if (!(game.flags?.debug || game.wizard)) return [];
+    const wizardInsight = !!(game.flags?.debug || game.wizard);
+    if (!(wizardInsight || game.flags?.explore)) return [];
     const grayDragonMail = (game.inventory || [])
         .some((obj) => obj?.otyp === GRAY_DRAGON_SCALE_MAIL && objectIsWorn(obj));
     const teleRing = (game.inventory || []).find((obj) => obj?.otyp === RIN_TELEPORT_CONTROL);
@@ -17451,7 +17470,7 @@ function roleMagicAttributesInsightLines() {
     const pious = piousness(true, 'aligned');
     if ((game.u?.ualign?.record ?? 0) >= 0) lines.push(`  You are ${pious}.`);
     else lines.push(`  You have ${pious}.`);
-    lines.push(`  Your alignment is ${game.u?.ualign?.record ?? 0}.`);
+    if (wizardInsight) lines.push(`  Your alignment is ${game.u?.ualign?.record ?? 0}.`);
     if (grayDragonMail) lines.push('  You are magic-protected because of your gray dragon scale mail.');
     if (game.u?.uprops?.warning) lines.push('  You are warned because of your experience.');
     if (game.u?.uprops?.displaced) lines.push('  You are displaced because of your cloak of displacement.');
@@ -17474,10 +17493,10 @@ function roleMagicAttributesInsightLines() {
     if ((game.inventory || []).some((obj) => obj?.otyp === AMULET_OF_LIFE_SAVING && objectIsWorn(obj))) {
         lines.push('  Your life will be saved.');
     }
-    if (luck < 0) lines.push(`  You are unlucky (${luck}).`);
-    else if (luck > 0) lines.push(`  You are lucky (${luck}).`);
-    else lines.push('  Your luck is zero.');
-    lines.push(`  You can't safely pray (${prayerTimeout}).`);
+    if (luck < 0) lines.push(`  You are unlucky${wizardInsight ? ` (${luck})` : ''}.`);
+    else if (luck > 0) lines.push(`  You are lucky${wizardInsight ? ` (${luck})` : ''}.`);
+    else if (wizardInsight) lines.push('  Your luck is zero.');
+    lines.push(`  You can't safely pray${wizardInsight ? ` (${prayerTimeout})` : ''}.`);
     const mortality = game.u?.umortality || 0;
     if (mortality > 0) lines.push(`  You have been killed ${insightMortalityWord(mortality)}.`);
     return lines;
@@ -17536,8 +17555,9 @@ function roleAttributesAllLines() {
         '',
         ' Miscellaneous:',
     ];
-    if (game.flags?.debug || game.wizard) {
-        lines.push('  You are running in debug mode.');
+    if (game.flags?.debug || game.wizard || game.flags?.explore) {
+        const mode = game.flags?.explore && !(game.flags?.debug || game.wizard) ? 'explore' : 'debug';
+        lines.push(`  You are running in ${mode} mode.`);
         lines.push('  You haven\'t encountered any bones levels.');
     }
     lines.push('  Total elapsed playing time is none.');
