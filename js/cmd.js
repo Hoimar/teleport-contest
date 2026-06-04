@@ -4203,6 +4203,10 @@ async function beginStudySpellbook(obj, info) {
         ? `You learn the "${info.name}" spell.`
         : `You add the "${info.name}" spell to your repertoire, as '${String.fromCharCode(97 + knownCount)}'.`;
     game._occupation_pack_finish_message = true;
+    // C refs: src/spell.c:study_book()/learn(), src/allmain.c:moveloop_core().
+    // learn() returns "still busy" when its delay counter reaches zero; the
+    // final learning side effects happen after the following full turn tail.
+    game._occupation_pre_finish_extra_turn = true;
     game._occupation_finish_learn_spell = {
         obj,
         spell: {
@@ -14961,7 +14965,7 @@ async function showNextStartupPreambleMessage() {
     game._more = needsMore;
     game._more_dismissals_remaining = 0;
     game._startup_preamble_more_active = needsMore;
-    game._startup_preamble_done_waiting_tutorial = !hasMorePreamble;
+    game._startup_preamble_done_waiting_tutorial = hasTutorialPrompt;
     game.context.move = 0;
     return true;
 }
@@ -15089,6 +15093,18 @@ async function handleQueuedMore(ch) {
     game._pending_more_strict_keys = false;
     game._more_dismissals_remaining--;
     game._monster_more_accepts_any_key = false;
+    if (game._avoid_pool_tip_pending && game._more_dismissals_remaining <= 0) {
+        // C refs: src/hack.c:swim_move_danger(), src/hack.c:handle_tip().
+        // The liquid-avoidance line owns the blocking More; dismissing it
+        // immediately prints the once-per-game swim tip as the next topline.
+        game._avoid_pool_tip_pending = false;
+        game._more = false;
+        game._more_dismissals_remaining = 0;
+        clear_pending_message();
+        await pline("(Tip: use 'm' prefix to step in if you really want to.)");
+        game.context.move = 0;
+        return true;
+    }
     game._monster_topline_stop_after_esc_more = ch === '\x1b'
         && pausedMonsterTurn
         && (monsterAttackResume
@@ -21761,6 +21777,8 @@ export async function rhack(key) {
             if (ch === 'n' || ch === '\x1b') {
                 clear_pending_message();
                 game._tutorial_answered = true;
+                game._startup_preamble_done_waiting_tutorial = false;
+                game._startup_preamble_more_active = false;
                 game.context.move = 0;
                 return;
             }
@@ -21769,6 +21787,8 @@ export async function rhack(key) {
                 // the answer so regular play continues without corrupting RNG.
                 clear_pending_message();
                 game._tutorial_answered = true;
+                game._startup_preamble_done_waiting_tutorial = false;
+                game._startup_preamble_more_active = false;
                 game.context.move = 0;
                 return;
             }
@@ -22117,6 +22137,7 @@ export async function rhack(key) {
         && (ch === ' ' || ch === '\r' || ch === '\n' || ch === '\x1b')) {
         game._avoid_pool_tip_pending = false;
         game._more = false;
+        clear_pending_message();
         await pline("(Tip: use 'm' prefix to step in if you really want to.)");
         game.context.move = 0;
         return;
