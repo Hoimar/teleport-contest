@@ -97,7 +97,7 @@ function visible_gas_region_at(level, x, y) {
 
 function newsymOrIronBars(x, y) {
     const loc = game.level?.at(x, y);
-    if (loc?.typ !== IRONBARS) {
+    if (loc?.typ !== IRONBARS || !(game.viz_array?.[y]?.[x] & IN_SIGHT)) {
         newsym(x, y);
         return;
     }

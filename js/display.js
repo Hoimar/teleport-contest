@@ -1047,6 +1047,16 @@ export function newsym(x, y) {
             show_glyph_cell(x, y, hg.ch, hg.color, hg.dec);
             return;
         }
+        if (wormTail) {
+            if (loc.remembered_glyph) {
+                show_glyph_cell(x, y, loc.remembered_glyph.ch,
+                    loc.remembered_glyph.color, loc.remembered_glyph.decgfx,
+                    loc.remembered_glyph.attr || 0);
+            } else {
+                show_glyph_cell(x, y, ' ', NO_COLOR, false);
+            }
+            return;
+        }
         if (mon && see_with_infrared(mon) && monster_visible(mon)) {
             const mg = monster_glyph(mon, wormTail);
             show_glyph_cell(x, y, mg.ch, mg.color, mg.dec);
@@ -1153,6 +1163,12 @@ export async function docrt() {
     for (let y = 0; y < ROWNO; y++)
         for (let x = 1; x < COLNO; x++) {
             const loc = game.level.at(x, y);
+            if (loc) {
+                loc.disp_ch = undefined;
+                loc.disp_color = undefined;
+                loc.disp_decgfx = undefined;
+                loc.disp_attr = 0;
+            }
             if (!game.level?.flags?.hero_memory && cansee(x, y)) {
                 // C ref: display.c:docrt().  Air-level cells keep a stored
                 // map glyph, but visible cells are redrawn from current terrain.

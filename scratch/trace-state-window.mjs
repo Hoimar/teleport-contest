@@ -177,7 +177,8 @@ game._preNhgetchHook = async () => {
             for (let xx = (u.ux ?? 0) - 2; xx <= (u.ux ?? 0) + 2; xx++) wantedCells.add(`${xx},${yy}`);
         }
         for (const cell of requestedCells) wantedCells.add(cell);
-        if (!compact) for (const key of wantedCells) {
+        const cellsToInspect = compact && requestedCells.length ? requestedCells : wantedCells;
+        if (!compact || requestedCells.length) for (const key of cellsToInspect) {
             const [xx, yy] = key.split(',').map(Number);
                 const loc = game.level?.at?.(xx, yy) || null;
                 inspectCells.push({
@@ -192,7 +193,7 @@ game._preNhgetchHook = async () => {
                     seenv: loc?.seenv,
                     glyph: loc?.glyph,
                     remembered: loc?.remembered_glyph,
-                    disp: { ch: loc?.disp_ch, color: loc?.disp_color, dec: loc?.disp_dec },
+                    disp: { ch: loc?.disp_ch, color: loc?.disp_color, dec: loc?.disp_decgfx },
                     obj: (game.level?.objects || [])
                         .filter((obj) => obj.ox === xx && obj.oy === yy)
                         .map((obj) => ({ otyp: obj.otyp, oclass: obj.oclass, corpsenm: obj.corpsenm })),
@@ -205,6 +206,14 @@ game._preNhgetchHook = async () => {
                             m_ap_type: mon.m_ap_type,
                             mappearance: mon.mappearance,
                             mcorpsenm: mon.mcorpsenm,
+                        })),
+                    tail: (game.level?.monsters || [])
+                        .filter((mon) => (mon.wsegs || []).some((seg) => seg.wx === xx && seg.wy === yy))
+                        .map((mon) => ({
+                            id: mon.m_id,
+                            name: mon.data?.name,
+                            head: { x: mon.mx, y: mon.my },
+                            hp: mon.mhp,
                         })),
                 });
         }

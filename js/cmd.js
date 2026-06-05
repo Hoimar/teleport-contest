@@ -16136,6 +16136,20 @@ async function handleQueuedMore(ch) {
                 && String(next.text || '').length > (game.nhDisplay?.cols || COLNO);
             if (wrapWithMore) await plineWithMorePrompt(next.text);
             else await pline(next.text);
+            if (next.packAfter) {
+                if (game._pending_message && topline_can_pack_message(game._pending_message, next.packAfter)) {
+                    await append_pline(next.packAfter);
+                } else {
+                    queue_more_prompt();
+                    game._more_message_queue = [
+                        { text: next.packAfter, more: !!next.more },
+                        ...(game._more_message_queue || []),
+                    ];
+                    game._more_next_message_row = false;
+                    game.context.move = next.move ? 1 : 0;
+                    return true;
+                }
+            }
             if (next.amuletWishPromptAfterMore)
                 game._amulet_wish_prompt_after_more = true;
             if (game._cream_pie_resist_after_more) {
@@ -18525,9 +18539,7 @@ async function showTemperatureChangeMessage(tempMessage) {
 
 function temperatureMessageQueueItems(tempMessage) {
     if (!tempMessage?.line) return [];
-    const items = [{ text: tempMessage.line, more: !!tempMessage.afterMore }];
-    if (tempMessage.afterMore) items.push({ text: tempMessage.afterMore, more: false });
-    return items;
+    return [{ text: tempMessage.line, more: false, packAfter: tempMessage.afterMore || '' }];
 }
 
 function normalizeArrivalMessageQueue(items) {
@@ -18540,6 +18552,34 @@ function normalizeArrivalMessageQueue(items) {
 async function queueArrivalMessagesBehindTopline(items) {
     if (!items.length) return false;
     normalizeArrivalMessageQueue(items);
+    const [first, ...rest] = items;
+    if (game._pending_message && !game._more && !(game._more_message_queue || []).length
+        && topline_can_pack_message(game._pending_message, first.text)) {
+        await append_pline(first.text);
+        let restQueued = false;
+        if (first.packAfter) {
+            if (game._pending_message && topline_can_pack_message(game._pending_message, first.packAfter)) {
+                await append_pline(first.packAfter);
+            } else {
+                queue_more_prompt();
+                game._more_message_queue = [
+                    { text: first.packAfter, more: !!first.more },
+                    ...rest,
+                ];
+                restQueued = true;
+            }
+        }
+        if (first.amuletWishPromptAfterMore)
+            game._amulet_wish_prompt_after_more = true;
+        if (!restQueued && first.more) queue_more_prompt();
+        if (!restQueued && rest.length) {
+            game._more_message_queue = [
+                ...(game._more_message_queue || []),
+                ...rest,
+            ];
+        }
+        return true;
+    }
     if (game._pending_message || game._more || (game._more_message_queue || []).length) {
         if (!game._more) queue_more_prompt();
         game._more_message_queue = [
@@ -18548,12 +18588,24 @@ async function queueArrivalMessagesBehindTopline(items) {
         ];
         return true;
     }
-    const [first, ...rest] = items;
     await pline(first.text);
+    let restQueued = false;
+    if (first.packAfter) {
+        if (game._pending_message && topline_can_pack_message(game._pending_message, first.packAfter)) {
+            await append_pline(first.packAfter);
+        } else {
+            queue_more_prompt();
+            game._more_message_queue = [
+                { text: first.packAfter, more: !!first.more },
+                ...rest,
+            ];
+            restQueued = true;
+        }
+    }
     if (first.amuletWishPromptAfterMore)
         game._amulet_wish_prompt_after_more = true;
-    if (first.more) queue_more_prompt();
-    if (rest.length) {
+    if (!restQueued && first.more) queue_more_prompt();
+    if (!restQueued && rest.length) {
         game._more_message_queue = [
             ...(game._more_message_queue || []),
             ...rest,
