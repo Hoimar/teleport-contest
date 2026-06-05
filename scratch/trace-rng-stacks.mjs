@@ -6,12 +6,13 @@ import { runSegment } from '../js/jsmain.js';
 import { resolveSessionRef } from '../scripts/triage-lib.mjs';
 
 function parseArgs(argv) {
-    const opts = { ref: null, moves: null, rng: null, segment: 0 };
+    const opts = { ref: null, moves: null, rng: null, segment: 0, rngOnly: false };
     for (let i = 0; i < argv.length; i++) {
         const arg = argv[i];
         if (arg === '--moves') opts.moves = Number(argv[++i]);
         else if (arg === '--rng') opts.rng = argv[++i];
         else if (arg === '--segment') opts.segment = Number(argv[++i]);
+        else if (arg === '--rng-only') opts.rngOnly = true;
         else if (!opts.ref) opts.ref = arg;
         else throw new Error(`unexpected argument ${arg}`);
     }
@@ -59,6 +60,7 @@ async function main() {
         if (item.monster) console.log(`  monster ${JSON.stringify(item.monster)}`);
         for (const line of item.stack) console.log(`  ${line}`);
     }
+    if (opts.rngOnly) return;
     if (globalThis.__teleportApparxyTrace?.length) {
         console.log('apparxy trace');
         for (const item of globalThis.__teleportApparxyTrace) {
@@ -99,6 +101,12 @@ async function main() {
         console.log('throw trace');
         for (const item of globalThis.__teleportThrowTrace) {
             console.log(`  W@${item.idx} ${JSON.stringify(item)}`);
+        }
+    }
+    if (globalThis.__teleportDecisionTrace?.length) {
+        console.log('decision trace');
+        for (const item of globalThis.__teleportDecisionTrace) {
+            console.log(`  D@${item.idx} ${JSON.stringify(item)}`);
         }
     }
     if (globalThis.__teleportMazeWalkTrace?.length) {

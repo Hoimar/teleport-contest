@@ -13,25 +13,24 @@ and `feature_map.md`.
 ## Current State
 
 - Current branch in this workspace: `main`, ahead of origin.
-- Latest committed parity repair: `Repair seed0900 explore startup and search timing`
-  (see `git log` for the current hash).
+- Latest committed parity repair before the current WIP: `Repair seed0900 explore startup and search timing`
+  (see `git log` for the current hash). Current verified WIP targets
+  `seed0361-archeologist-tour` and is pending a coherent commit.
 - Last toolkit commit: `7d2f959` (`Track scratch tracing toolkit`).
 - Latest verified parity repair:
-  - `seed0900-tourist-explore-actions`: `S 84/84 R 2983/2983 C 0 OK`.
+  - `seed0361-archeologist-tour`: `S 366/366 R 53865/53865 C 0 OK`.
   - Strict sentinels exact: `5/5 S 1063/1063 R 64569/64569 C 0`.
-  - Guard sessions exact: `seed0012-monk-vault-escort`,
-    `seed0002-healer-reflection-drummer`,
-    `seed0700-samurai-explore-descend`, and `seed8000-tourist-starter`.
-  - Implementation: explore/discovery `playmode` now sets discover state,
-    skips bones RNG, grants the startup wand of wishing, and queues the
-    non-scoring startup notice; TTY inventory placement, known tin/wand naming,
-    and eat prompt-letter compaction follow the C menu/object front doors;
-    counted search timed occupations resume across pet-combat `--More--`
-    boundaries; explore `^X` uses magic enlightenment without wizard-only
-    numeric detail (`C refs: options.c:optfn_playmode(), bones.c:getbones(),
-    u_init.c:u_init_inventory_attrs(), sys/unix/unixmain.c:wd_message(),
-    win/tty/wintty.c:tty_display_nhwindow(), cmd.c:timed_occupation(),
-    insight.c:doattributes()`).
+  - Implementation: Archeologist startup stats/inventory/searching,
+    quest leader/nemesis role metadata, Arc fillers/goal special slices,
+    quest arrival/goal pager timing, one-line top-line quest pagers, level
+    teleport floor-look resumption, object-mimic memory cleanup, discovery
+    and object naming rows, weapon-tool startup use, automatic searching,
+    monster movement/wear front doors, and focused object/wish/insight
+    coverage (`C refs: role.c:role_init(), u_init.c:Archeologist[],
+    attrib.c:arc_abil[], dat/Arc-*.lua, quest.c:on_goal(),
+    questpgr.c:qt_pager(), pickup.c:check_here(), display.c:display_monster(),
+    objnam.c:xname_flags()/doname_base(), worn.c:m_dowear(),
+    muse.c:find_defensive(), allmain.c:moveloop_core()`).
 - Previous verified parity repair:
   - `seed4500-knight-coverage`: `S 1814/1814 R 108275/108275 C 0 OK`.
   - Strict sentinels exact: `5/5 S 1063/1063 R 64569/64569 C 0`.
@@ -48,19 +47,42 @@ and `feature_map.md`.
   when useful; keep production parity and scratch-tool commits coherent.
 - Strict sentinels are exact:
   `5/5 S 1063/1063 R 64569/64569 C 0`.
-- `npm run parity:state -- --refresh-live` on the latest verified repair:
-  checked-in public `exact 33/44 S 8970/11405 R 547136/792838 C 1`;
-  hosted public cache `exact 31/44 S 8208/10982 R 442485/840358 C 1`;
-  class `public-session-drift`; leaderboard fetch failed; strict sentinel exact.
-- `node scripts/triage-corpus.mjs --markdown scratch/divergence-inventory.md`
-  regenerated local divergence state after the `seed0900` fix: `33/44`
-  local sessions pass, including `seed0012`, `seed0108`, `seed0360`,
-  `seed0900`, and `seed4500`.
-- Hack audit remains `hard=0 suspicious=42`; `memory:lint` reports
+- `npm run parity:state -- --refresh-live` on the current verified WIP
+  (rerun with escalation for leaderboard network): checked-in public
+  `exact 31/44 S 8273/11405 R 539419/792838 C 1`; hosted public cache
+  `exact 29/44 S 7410/10982 R 411340/840358 C 1`; class
+  `public-session-drift`; strict sentinel exact. Leaderboard source
+  `https://mazesofmenace.ai/leaderboard/data.json`, team Hoimar, last scored
+  `2026-06-05T11:15:01.696Z`, public exact `26/44 S 8876/11405
+  R 547136/792838`, held-out `points 1735/11265 passing 1/44`.
+- Current non-sentinel regression classification in this WIP:
+  `seed0360-wizard-world-tour` is reopened at `S 786/833 R 114869/120639`
+  with the first visible frontier at screen 781; `seed4500-knight-coverage`
+  is reopened at `S 801/1814 R 52780/108275` after removing the broad
+  synthetic debug venom discovery row. Do not reintroduce per-debug Venoms
+  rows to recover that stale public pass.
+- Hack audit remains `hard=0 suspicious=45`; `memory:lint` reports
   `issues=0`. Production `js/` has no intentional debug I/O or imports from
   `frozen/`.
 
 ## Latest Loop Checkpoint
+
+- Latest verified WIP on 2026-06-05:
+  - `seed0361-archeologist-tour` exact:
+    `S 366/366 R 53865/53865 C 0`.
+  - Strict sentinel exact:
+    `5/5 S 1063/1063 R 64569/64569 C 0`.
+  - `verify --target seed0361-archeologist-tour` passed target, sentinels,
+    `hack:audit` (`hard=0 suspicious=45`), and `memory:lint` (`issues=0`).
+  - Regression classification: target exact; strict sentinel stable; current
+    local checked-in corpus is lower than the previous checkpoint because
+    `seed0360` is reopened by broader subsystem WIP and `seed4500` lost a
+    synthetic debug-wide venom discovery row. Hosted/public/leaderboard drift
+    remains session-file drift plus lagging leaderboard evidence.
+  - Next queue after committing this unit: start from `seed0360` screen 781 or
+    another checked-in public divergence with `npm run agent:brief -- --target
+    <session>`, then triage the first mismatch from C source rather than
+    restoring removed replay/debug rows.
 
 - Latest verified repairs on 2026-06-04:
   - `seed0012-monk-vault-escort` committed at `7179887`, exact

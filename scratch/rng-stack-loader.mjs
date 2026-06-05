@@ -288,6 +288,9 @@ function can_attack_after_move_basic`
                     mx: mtmp?.mx,
                     my: mtmp?.my,
                     movement: mtmp?.movement,
+                    mhp: mtmp?.mhp,
+                    mhpmax: mtmp?.mhpmax,
+                    mcansee: mtmp?.mcansee,
                     mux: mtmp?.mux,
                     muy: mtmp?.muy,
                     peaceful: !!mtmp?.mpeaceful,
@@ -463,6 +466,142 @@ function can_attack_after_move_basic`
         __monScanTrace('dochug-entry', mtmp, { monIndex });
 
         // C ref: monmove.c:dochug().  Awake movable monsters scuff any`
+        );
+        source = source.replace(
+            '        if (mtmp.mcanmove === 0 || (mtmp.mstrategy & STRAT_WAITMASK)) {\n            if (mtmp.mcanmove !== 0',
+            `        if (mtmp.mcanmove === 0 || (mtmp.mstrategy & STRAT_WAITMASK)) {
+            __monScanTrace('skip-cannot-move-or-wait', mtmp, { monIndex });
+            if (mtmp.mcanmove !== 0`
+        );
+        source = source.replace(
+            '        const fleeState = distfleeck(mtmp); // consuming rn2(5)',
+            `        {
+            const idx = globalThis.__teleportRngTraceIndex || 0;
+            const start = globalThis.__teleportApparxyStart ?? -Infinity;
+            const end = globalThis.__teleportApparxyEnd ?? Infinity;
+            if (idx >= start && idx <= end) {
+                globalThis.__teleportMonsterContext = {
+                    fn: 'movemon',
+                    phase: 'pre-distfleeck',
+                    id: mtmp?.m_id,
+                    name: mtmp?.data?.name,
+                    mx: mtmp?.mx,
+                    my: mtmp?.my,
+                    movement: mtmp?.movement,
+                    mhp: mtmp?.mhp,
+                    mhpmax: mtmp?.mhpmax,
+                    mcansee: mtmp?.mcansee,
+                    mux: mtmp?.mux,
+                    muy: mtmp?.muy,
+                    msleeping: mtmp?.msleeping,
+                    mcanmove: mtmp?.mcanmove,
+                    weapon_check: mtmp?.weapon_check,
+                    mw: mtmp?.mw ? { otyp: mtmp.mw.otyp, spe: mtmp.mw.spe, worn: mtmp.mw.owornmask } : null,
+                    inventory: (mtmp?.inventory || []).map((obj) => ({ otyp: obj?.otyp, spe: obj?.spe, worn: obj?.owornmask })),
+                    mtrack: (mtmp?.mtrack || []).slice(0, 8),
+                };
+            }
+        }
+        const fleeState = distfleeck(mtmp); // consuming rn2(5)
+        {
+            const idx = globalThis.__teleportRngTraceIndex || 0;
+            const start = globalThis.__teleportApparxyStart ?? -Infinity;
+            const end = globalThis.__teleportApparxyEnd ?? Infinity;
+            if (idx >= start && idx <= end) {
+                (globalThis.__teleportDecisionTrace ||= []).push({
+                    idx,
+                    phase: 'after-distfleeck',
+                    id: mtmp?.m_id,
+                    name: mtmp?.data?.name,
+                    mx: mtmp?.mx,
+                    my: mtmp?.my,
+                    movement: mtmp?.movement,
+                    mux: mtmp?.mux,
+                    muy: mtmp?.muy,
+                    state: fleeState,
+                    weapon_check: mtmp?.weapon_check,
+                    mw: mtmp?.mw ? { otyp: mtmp.mw.otyp, spe: mtmp.mw.spe, worn: mtmp.mw.owornmask } : null,
+                    inventory: (mtmp?.inventory || []).map((obj) => ({ otyp: obj?.otyp, spe: obj?.spe, worn: obj?.owornmask })),
+                });
+            }
+        }`
+        );
+        source = source.replace(
+            '        if (await maybe_use_defensive_item_basic(mtmp, false)) {',
+            `        let __teleportDefensiveResult = false;
+        {
+            const idx = globalThis.__teleportRngTraceIndex || 0;
+            const start = globalThis.__teleportApparxyStart ?? -Infinity;
+            const end = globalThis.__teleportApparxyEnd ?? Infinity;
+            if (idx >= start && idx <= end) {
+                const candidate = defensive_item_candidate_basic(mtmp, false);
+                (globalThis.__teleportDecisionTrace ||= []).push({
+                    idx,
+                    phase: 'before-defensive',
+                    id: mtmp?.m_id,
+                    name: mtmp?.data?.name,
+                    mx: mtmp?.mx,
+                    my: mtmp?.my,
+                    mhp: mtmp?.mhp,
+                    mhpmax: mtmp?.mhpmax,
+                    mcansee: mtmp?.mcansee,
+                    mux: mtmp?.mux,
+                    muy: mtmp?.muy,
+                    nohands: !!((mtmp?.data?.mflags1 ?? 0) & M1_NOHANDS),
+                    candidate: candidate ? {
+                        kind: candidate.kind,
+                        otyp: candidate.obj?.otyp,
+                        desc: getObjectDescription(candidate.obj?.otyp),
+                        blessed: !!candidate.obj?.blessed,
+                        cursed: !!candidate.obj?.cursed,
+                    } : null,
+                    inventory: (mtmp?.inventory || []).map((obj) => ({ otyp: obj?.otyp, spe: obj?.spe, blessed: !!obj?.blessed, cursed: !!obj?.cursed })),
+                });
+            }
+            __teleportDefensiveResult = await maybe_use_defensive_item_basic(mtmp, false);
+            if (idx >= start && idx <= end) {
+                (globalThis.__teleportDecisionTrace ||= []).push({
+                    idx: globalThis.__teleportRngTraceIndex || idx,
+                    phase: 'after-defensive',
+                    id: mtmp?.m_id,
+                    name: mtmp?.data?.name,
+                    result: __teleportDefensiveResult,
+                    mhp: mtmp?.mhp,
+                    mhpmax: mtmp?.mhpmax,
+                    inventory: (mtmp?.inventory || []).map((obj) => ({ otyp: obj?.otyp, spe: obj?.spe })),
+                });
+            }
+        }
+        if (__teleportDefensiveResult) {`
+        );
+        source = source.replace(
+            '        if (!mtmp.mtame && await maybe_wield_hth_before_move(mtmp, fleeState)) {',
+            `        let __teleportWieldBeforeMove = false;
+        if (!mtmp.mtame) {
+            __teleportWieldBeforeMove = await maybe_wield_hth_before_move(mtmp, fleeState);
+            const idx = globalThis.__teleportRngTraceIndex || 0;
+            const start = globalThis.__teleportApparxyStart ?? -Infinity;
+            const end = globalThis.__teleportApparxyEnd ?? Infinity;
+            if (idx >= start && idx <= end) {
+                (globalThis.__teleportDecisionTrace ||= []).push({
+                    idx,
+                    phase: 'after-hth-wield-gate',
+                    id: mtmp?.m_id,
+                    name: mtmp?.data?.name,
+                    mx: mtmp?.mx,
+                    my: mtmp?.my,
+                    movement: mtmp?.movement,
+                    mux: mtmp?.mux,
+                    muy: mtmp?.muy,
+                    state: fleeState,
+                    result: __teleportWieldBeforeMove,
+                    weapon_check: mtmp?.weapon_check,
+                    mw: mtmp?.mw ? { otyp: mtmp.mw.otyp, spe: mtmp.mw.spe, worn: mtmp.mw.owornmask } : null,
+                    inventory: (mtmp?.inventory || []).map((obj) => ({ otyp: obj?.otyp, spe: obj?.spe, worn: obj?.owornmask })),
+                });
+            }
+        }
+        if (!mtmp.mtame && __teleportWieldBeforeMove) {`
         );
         return { ...result, source };
     }

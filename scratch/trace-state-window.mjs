@@ -150,6 +150,10 @@ game._preNhgetchHook = async () => {
             // Current seed0399 first-diff cells from screen:diff.
             '59,5', '61,5', '59,6', '60,6', '35,7', '59,7', '60,7',
             '35,8', '31,10', '32,10', '10,13', '9,14',
+            // seed0361 Arc-loca single-cell screen 307 diff.
+            '57,13', '58,13', '59,13', '60,13',
+            '57,14', '58,14', '59,14', '60,14',
+            '57,15', '58,15', '59,15', '60,15',
         ]);
         for (let yy = 14; yy <= 16; yy++)
             for (let xx = 14; xx <= 16; xx++)
@@ -193,6 +197,7 @@ game._preNhgetchHook = async () => {
             ux0: u.ux0,
             uy0: u.uy0,
             acurr: u.acurr?.a,
+            uprops: u.uprops || {},
             uhp: u.uhp,
             uhpmax: u.uhpmax,
             latchedStatusHp: game._latched_status_uhp ?? null,
@@ -310,10 +315,17 @@ game._preNhgetchHook = async () => {
                 otyp: obj?.otyp,
                 oclass: obj?.oclass,
                 quan: obj?.quan,
+                spe: obj?.spe,
+                oartifact: obj?.oartifact,
+                oname: obj?.oname,
+                onamelth: obj?.onamelth,
+                wielded: !!obj?.wielded,
+                owornmask: obj?.owornmask,
                 appearanceName: obj?.appearanceName,
                 known: obj?.known,
                 knownName: obj?.knownName,
             })),
+            combatTrace: (globalThis.__teleportCombatTrace || []).slice(-8),
             nextInvlet: game._next_invlet_code || null,
             rngCount,
             totalRng,
