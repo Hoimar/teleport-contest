@@ -2827,6 +2827,7 @@ async function throw_venom_at_hero_basic(mtmp, obj) {
     while (range-- > 0) {
         x += dx;
         y += dy;
+        observe_thrown_object_basic(obj, x, y);
         if (x === game.u?.ux && y === game.u?.uy) {
             let hitv = 8;
             let damage = 0;
@@ -5766,6 +5767,17 @@ function object_type_known_basic(otyp) {
     return !!game.discoveredObjects
         && typeof game.discoveredObjects.has === 'function'
         && game.discoveredObjects.has(otyp);
+}
+
+function observe_thrown_object_basic(obj, x, y) {
+    // C refs: src/mthrowu.c:m_throw(), src/o_init.c:observe_object().
+    if (!Number.isInteger(obj?.otyp) || hallucinating() || !cansee(x, y)) return;
+    const order = Array.isArray(game.discoveryOrder)
+        ? game.discoveryOrder
+        : (game.discoveryOrder = []);
+    if (!order.includes(obj.otyp)) order.push(obj.otyp);
+    const encountered = game.encounteredObjects || (game.encounteredObjects = new Set());
+    if (typeof encountered.add === 'function') encountered.add(obj.otyp);
 }
 
 function discover_monster_wand_effect(otyp) {

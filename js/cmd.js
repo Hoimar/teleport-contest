@@ -21203,10 +21203,15 @@ export async function rhack(key) {
             const cursor = currentTeleportCursor();
             game._awaiting_teleport_prompt = false;
             game._teleport_cursor = null;
-            clear_pending_message();
             if (teleokBasic(cursor.x, cursor.y, false)) {
-                await teledsBasic(cursor.x, cursor.y, { deferArrivalBehindMore: true });
+                if (game.flags?.verbose === false) {
+                    await teledsBasic(cursor.x, cursor.y);
+                } else {
+                    clear_pending_message();
+                    await teledsBasic(cursor.x, cursor.y, { deferArrivalBehindMore: true });
+                }
             } else {
+                clear_pending_message();
                 await pline('Sorry...');
                 const deferTurnUntilLookHere = game.flags?.verbose === false && !game._more;
                 // C refs: src/teleport.c:scrolltele(), src/teleport.c:teleds().

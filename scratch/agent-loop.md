@@ -13,18 +13,23 @@ and `feature_map.md`.
 ## Current State
 
 - Current branch in this workspace: `main`, ahead of origin.
-- Latest committed parity repair: `Port Archeologist quest tour systems`
-  (`ad41112`). Current verified WIP targets `seed0360-wizard-world-tour`
-  and is pending a focused quest-pager commit.
+- Latest committed parity repair: `Restore seed4500 venom discovery parity`.
+  Next target should come from checked-in public corpus divergences, not
+  hosted/leaderboard drift.
 - Last toolkit commit: `7d2f959` (`Track scratch tracing toolkit`).
 - Latest verified parity repair:
+  - `seed4500-knight-coverage`: `S 1814/1814 R 108275/108275 C 0 OK`.
   - `seed0360-wizard-world-tour`: `S 833/833 R 120639/120639 C 0 OK`.
+  - `seed0361-archeologist-tour`: `S 366/366 R 53865/53865 C 0 OK`.
   - Strict sentinels exact: `5/5 S 1063/1063 R 64569/64569 C 0`.
-  - Implementation: post-arrival quest locate messages that are one-line
-    default quest text now use `deliver_by_pline()`/ordinary topline packing
-    instead of forcing a text-window-style `--More--`; current goal-message
-    evidence retains the top-line More boundary (`C refs: quest.c:on_locate(),
-    quest.c:on_goal(), questpgr.c:com_pager_core()/deliver_by_pline()`).
+  - Implementation: visible monster-spit venom now marks venom object types
+    encountered through the `m_throw()`/`observe_object()` path, restoring
+    Venoms discovery without debug-wide synthetic rows. Accepted controlled
+    teleports split on `flags.verbose`: verbose clears getpos text and defers
+    spot effects behind `You materialize...--More--`; `!verbose` runs arrival
+    look-here immediately and can pack behind retained getpos text
+    (`C refs: mthrowu.c:spitmm()/m_throw(), o_init.c:observe_object(),
+    teleport.c:dotele()/teleds(), pickup.c:check_here()`).
 - Previous verified parity repair:
   - `seed4500-knight-coverage`: `S 1814/1814 R 108275/108275 C 0 OK`.
   - Strict sentinels exact: `5/5 S 1063/1063 R 64569/64569 C 0`.
@@ -41,61 +46,43 @@ and `feature_map.md`.
   when useful; keep production parity and scratch-tool commits coherent.
 - Strict sentinels are exact:
   `5/5 S 1063/1063 R 64569/64569 C 0`.
-- `npm run parity:state -- --refresh-live` on the current verified WIP
-  (rerun with escalation for leaderboard network): checked-in public
-  `exact 32/44 S 8320/11405 R 545189/792838 C 1`; hosted public cache
-  `exact 29/44 S 7410/10982 R 411352/840358 C 1`; class
-  `public-session-drift`; strict sentinel exact. Leaderboard source
-  `https://mazesofmenace.ai/leaderboard/data.json`, team Hoimar, last scored
-  `2026-06-05T11:15:01.696Z`, public exact `26/44 S 8876/11405
-  R 547136/792838`, held-out `points 1735/11265 passing 1/44`.
-- Current non-sentinel regression classification in this WIP:
-  `seed4500-knight-coverage` remains reopened at `S 801/1814 R 52780/108275`
-  after removing the broad synthetic debug venom discovery row. Do not
-  reintroduce per-debug Venoms rows to recover that stale public pass.
+- `npm run parity:state -- --refresh-live` on the current verified WIP:
+  checked-in public `exact 33/44 S 9333/11405 R 600684/792838 C 1`;
+  hosted public cache `exact 30/44 S 8423/10982 R 466847/840358 C 1`;
+  class `public-session-drift`; strict sentinel exact. Leaderboard refresh
+  failed under sandbox networking and escalation was unavailable due a
+  harness usage-limit rejection, so leaderboard is not refreshed this pass.
+- Current non-sentinel regression classification in this WIP: none among
+  `seed0360`, `seed0361`, `seed4500`, or strict sentinels. Remaining public
+  misses should be selected from checked-in corpus/divergence inventory.
 - Hack audit remains `hard=0 suspicious=45`; `memory:lint` reports
   `issues=0`. Production `js/` has no intentional debug I/O or imports from
   `frozen/`.
 
 ## Latest Loop Checkpoint
 
-- Latest verified WIP on 2026-06-05 after `ad41112`:
-  - `seed0360-wizard-world-tour` restored exact:
-    `S 833/833 R 120639/120639 C 0`.
-  - `seed0361-archeologist-tour` guard remains exact:
+- Latest verified WIP on 2026-06-05:
+  - `seed4500-knight-coverage` restored exact:
+    `S 1814/1814 R 108275/108275 C 0`.
+  - Guard targets exact: `seed0360-wizard-world-tour`
+    `S 833/833 R 120639/120639 C 0`; `seed0361-archeologist-tour`
     `S 366/366 R 53865/53865 C 0`.
   - Strict sentinel exact:
     `5/5 S 1063/1063 R 64569/64569 C 0`.
-  - `verify --target seed0360-wizard-world-tour` passed target, sentinels,
+  - `verify --target seed4500-knight-coverage` passed target, sentinels,
     `hack:audit` (`hard=0 suspicious=45`), and `memory:lint` (`issues=0`).
   - `parity:state -- --refresh-live` checked-in public:
-    `32/44 S 8320/11405 R 545189/792838 C 1`; hosted public:
-    `29/44 S 7410/10982 R 411352/840358 C 1`; leaderboard public:
-    `26/44 S 8876/11405 R 547136/792838`; held-out remains
-    `points 1735/11265 passing 1/44`; class `public-session-drift`.
-  - Subsystem truth: Wizard `locate_first` one-line quest text is pline
-    delivery and should not force `--More--`; current goal-message evidence
-    still uses the post-arrival top-line More path.
-  - Next queue after committing this unit: `seed4500` remains a classified
-    dehack regression from removed synthetic venom discovery; otherwise choose
-    the next checked-in public divergence from the current corpus state.
-
-- Latest verified WIP on 2026-06-05:
-  - `seed0361-archeologist-tour` exact:
-    `S 366/366 R 53865/53865 C 0`.
-  - Strict sentinel exact:
-    `5/5 S 1063/1063 R 64569/64569 C 0`.
-  - `verify --target seed0361-archeologist-tour` passed target, sentinels,
-    `hack:audit` (`hard=0 suspicious=45`), and `memory:lint` (`issues=0`).
-  - Regression classification: target exact; strict sentinel stable; current
-    local checked-in corpus is lower than the previous checkpoint because
-    `seed0360` is reopened by broader subsystem WIP and `seed4500` lost a
-    synthetic debug-wide venom discovery row. Hosted/public/leaderboard drift
-    remains session-file drift plus lagging leaderboard evidence.
-  - Next queue after committing this unit: start from `seed0360` screen 781 or
-    another checked-in public divergence with `npm run agent:brief -- --target
-    <session>`, then triage the first mismatch from C source rather than
-    restoring removed replay/debug rows.
+    `33/44 S 9333/11405 R 600684/792838 C 1`; hosted public:
+    `30/44 S 8423/10982 R 466847/840358 C 1`; class
+    `public-session-drift`; leaderboard not refreshed due sandbox fetch
+    failure plus unavailable escalation.
+  - Subsystem truth: Venoms discovery belongs to real visible projectile
+    observation (`m_throw()` -> `observe_object()`), not debug discovery rows.
+    Valid controlled teleport arrival owns different tty boundaries under
+    verbose versus `!verbose`.
+  - Next queue after committing this unit: choose the next checked-in public
+    divergence from the current corpus state; do not chase hosted/leaderboard
+    drift as local implementation truth.
 
 - Latest verified repairs on 2026-06-04:
   - `seed0012-monk-vault-escort` committed at `7179887`, exact
