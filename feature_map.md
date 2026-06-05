@@ -21,12 +21,24 @@ Treat screen totals as lagging evidence of subsystem progress, not as the optimi
   (`S 1814/1814 R 108275/108275 C 0`), `seed0373-barbarian-quest-tour`
   remains at the known verify cursor-only boundary (`S 123/124 R 35386/35386
   C 1`; triage `S 124/124 R 35386/35386 C 1`), `seed1150-caveman-explore-move`
-  remains exact (`S 51/51 R 3137/3137 C 0`), and strict sentinels are exact
+  remains exact (`S 51/51 R 3137/3137 C 0`), `seed2600-wizard-custom-binds`
+  is exact (`S 38/38 R 11647/11647 C 0`), and strict sentinels are exact
   (`5/5 S 1063/1063 R 64569/64569 C 0`). The regenerated checked-in corpus
-  inventory is `35/44` passing (`S 9495/11405 R 634310/792838`). The latest
+  inventory is `32/44` passing (`S 9526/11405 R 645539/792838`). The latest
   live public refresh predates this WIP and remains unavailable due sandbox
   networking plus harness usage-limit rejection; treat hosted/leaderboard data
   as lagging evidence.
+- **Seed2600 startup/special-level parity:** `BIND=`/`BINDINGS=` options now
+  drive command dispatch; startup object knowledge follows `oc_uses_known` and
+  `OBJ_DESCR()` rather than blanket `knownName`; initial spellbooks populate the
+  known-spell menu including clairvoyance; Bigroom-9 loads the upstream static
+  map with grown lit selection regions; static gas regions are visible while
+  `ttl != -2`; and the current Cloud room / Temple of the gods themed fills are
+  live for evidence (`C refs: options.c:parsebindings(), cmd.c:cmdbind_get(),
+  mkobj.c:unknow_object(), u_init.c:ini_inv_use_obj(),
+  spell.c:initialspell()/dospellmenu(), dat/bigrm-9.lua,
+  sp_lev.c:lspo_region()/create_altar()/create_monster(),
+  region.c:visible_region_at(), dat/themerms.lua`).
 - **Archeologist startup and quest metadata:** `roles.js` now carries quest
   leader/nemesis names for configured roles; pre-Lua role init stores leader
   and nemesis gender from `role.c:role_init()`. Archeologist role stats,
@@ -333,7 +345,7 @@ Treat screen totals as lagging evidence of subsystem progress, not as the optimi
 | seed0060-orc-rogue-kick-search | 41 | 41 | 2026-05-24 | Full public pass (`S 41/41 R 3626/3626 C 0`). This pass covered Orc Rogue startup race inventory and substitutions, `Xtra_food`, orcish object preknowledge with deferred starting-inventory discovery order, same-turn tame/pacific `m_avoid_kicked_loc()` after `#kick`, infravision display of an out-of-sight pet via `couldsee()`, known orcish dagger naming, and `^X` weapon-skill class wording for racial short swords (`C refs: u_init.c:u_init_role()`, `u_init.c:u_init_race()`, `u_init.c:ini_inv_obj_substitution()`, `u_init.c:u_init_skills_discoveries()`, `dokick.c:dokick()`, `monmove.c:m_avoid_kicked_loc()`, `dogmove.c:dog_move()`, `display.h:_see_with_infrared()`, `display.c:newsym()`, `insight.c:weapon_insight()`). |
 | All other sessions | 1,893 | 7,617 | 2026-05-25 | Non-replay sessions now run general `init_objects()`, partial `role_init`, data-driven `init_dungeons()`, partial `u_init_misc`, starting pet placement, Wizard `ini_inv`, and broader mklev/monster equipment RNG. `seed0030-ten-diverse-deaths` now has all 1953 screens, all 105529 RNG calls, and all cursor positions matched; the latest seed0030 pass covered bones restore, sleeping `disturb()`, named ghost farlook, quick `;` getpos, gas-spore explosion staging, raw extended-command getline wrapping, and tty text-window/top-ten cursor placement. Strict sentinels are exact again (`5/5 S 1063/1063 R 64569/64569 C 0`). |
 
-**As of focused verification on 2026-06-05 after the current regression repair: `seed0360-wizard-world-tour` is exact (`S 833/833 R 120639/120639 C 0`), `seed4500-knight-coverage` is exact (`S 1814/1814 R 108275/108275 C 0`), `seed0373-barbarian-quest-tour` remains at its known verify cursor-only boundary (`S 123/124 R 35386/35386 C 1`; triage `S 124/124 R 35386/35386 C 1`), `seed1150-caveman-explore-move` is exact (`S 51/51 R 3137/3137 C 0`), and strict sentinels are exact (`5/5 S 1063/1063 R 64569/64569 C 0`). The regenerated checked-in corpus inventory is `35/44 S 9495/11405 R 634310/792838`. The latest live public refresh predates this WIP (`32/44` checked-in public and `30/44` hosted public cache at `1e15415`), and leaderboard refresh remains unavailable due sandbox networking plus harness usage-limit rejection; use checked-in sessions for implementation truth and treat hosted/leaderboard score as lagging evidence.**
+**As of focused verification on 2026-06-05 after the current regression repair: `seed0360-wizard-world-tour` is exact (`S 833/833 R 120639/120639 C 0`), `seed4500-knight-coverage` is exact (`S 1814/1814 R 108275/108275 C 0`), `seed2600-wizard-custom-binds` is exact (`S 38/38 R 11647/11647 C 0`), `seed0373-barbarian-quest-tour` remains at its known verify cursor-only boundary (`S 123/124 R 35386/35386 C 1`; triage `S 124/124 R 35386/35386 C 1`), `seed1150-caveman-explore-move` is exact (`S 51/51 R 3137/3137 C 0`), and strict sentinels are exact (`5/5 S 1063/1063 R 64569/64569 C 0`). The regenerated checked-in corpus inventory is `32/44 S 9526/11405 R 645539/792838`. The latest live public refresh predates this WIP (`32/44` checked-in public and `30/44` hosted public cache at `1e15415`), and leaderboard refresh remains unavailable due sandbox networking plus harness usage-limit rejection; use checked-in sessions for implementation truth and treat hosted/leaderboard score as lagging evidence.**
 
 ---
 

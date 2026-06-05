@@ -13,13 +13,15 @@ and `feature_map.md`.
 ## Current State
 
 - Current branch in this workspace: `main`, ahead of origin.
-- Latest committed parity repair before the current WIP: `1e15415` (`Port
-  Barbarian Endgame planes tour`).
+- Latest committed parity repair before the current WIP: `e9a92d3` (`Repair
+  arrival display regressions`).
   Next target should come from checked-in public corpus divergences, not
   hosted/leaderboard drift.
-- Last toolkit commit before the current WIP: `1e15415` (`Port Barbarian
-  Endgame planes tour`).
+- Last toolkit commit before the current WIP: `e9a92d3` (`Repair arrival
+  display regressions`).
 - Latest verified WIP:
+  - `seed2600-wizard-custom-binds`: exact
+    `S 38/38 R 11647/11647 C 0`.
   - `seed0360-wizard-world-tour`: `S 833/833 R 120639/120639 C 0 OK`.
   - `seed4500-knight-coverage`: `S 1814/1814 R 108275/108275 C 0 OK`.
   - Guard `seed0373-barbarian-quest-tour`: triage `S 124/124 R 35386/35386
@@ -27,14 +29,16 @@ and `feature_map.md`.
     boundary (`S 123/124 R 35386/35386 C 1`).
   - Guard `seed1150-caveman-explore-move`: `S 51/51 R 3137/3137 C 0 OK`.
   - Strict sentinels exact: `5/5 S 1063/1063 R 64569/64569 C 0`.
-  - Implementation: arrival materialize/temperature/smoke text now packs
-    through tty topline width rules; full `docrt()` redraws clear `disp_*`
-    state before memory/current redraw; unseen long-worm tail cells avoid
-    warning overlays; iron bars use the special bar glyph only for `IN_SIGHT`
-    cells (`C refs: do.c:goto_level()/temperature_change_msg()/
-    hellish_smoke_mesg(), display.c:docrt_flags()/display_monster(),
-    display.h:_mon_warning(), vision.h:IN_SIGHT/COULD_SEE,
-    vision.c:vision_recalc()`).
+  - Implementation: `seed2600` now uses parsed `BIND=` command bindings,
+    C-shaped startup object knowledge/discovery for `oc_uses_known` and
+    `OBJ_DESCR()`, initial spellbook learning/display for clairvoyance,
+    Bigroom-9 special loading with grown lit selections, static gas-region
+    visibility, and the current Cloud room / Temple of the gods themed fills
+    (`C refs: options.c:parsebindings(), cmd.c:cmdbind_get(),
+    mkobj.c:unknow_object(), u_init.c:ini_inv_use_obj(),
+    spell.c:initialspell()/dospellmenu(), dat/bigrm-9.lua,
+    sp_lev.c:lspo_region()/get_location()/create_altar()/create_monster(),
+    region.c:visible_region_at(), dat/themerms.lua`).
 - Previous verified parity repair:
   - `seed0373-barbarian-quest-tour`: triage `S 124/124 R 35386/35386 C 1`;
     verify reports no first screen/RNG mismatch and one cursor-only boundary.
@@ -67,9 +71,10 @@ and `feature_map.md`.
 - Strict sentinels are exact:
   `5/5 S 1063/1063 R 64569/64569 C 0`.
 - Regenerated checked-in corpus inventory after the current WIP:
-  `35/44 S 9495/11405 R 634310/792838`, with remaining misses
-  `seed0004`, `seed0006`, `seed0007`, `seed0009`, `seed0014`, `seed0077`,
-  `seed0102`, `seed0367`, and `seed2600`.
+  `32/44 S 9526/11405 R 645539/792838`, with remaining misses
+  `seed0004`, `seed0006`, `seed0007`, `seed0009`,
+  `seed0013-rogue-friday13-combat`, `seed0014`, `seed0060`, `seed0077`,
+  `seed0102`, `seed0361`, `seed0367`, and `seed1500`.
 - Latest `npm run parity:state -- --refresh-live` before the current WIP:
   checked-in public `exact 32/44 S 7388/11405 R 483381/792838 C 1`;
   hosted public cache `exact 30/44 S 7115/10982 R 428093/840358 C 1`;
@@ -88,6 +93,8 @@ and `feature_map.md`.
 ## Latest Loop Checkpoint
 
 - Latest verified WIP on 2026-06-05:
+  - `seed2600-wizard-custom-binds`: exact
+    `S 38/38 R 11647/11647 C 0`.
   - `seed0360-wizard-world-tour`: exact
     `S 833/833 R 120639/120639 C 0`.
   - `seed4500-knight-coverage`: exact
@@ -99,23 +106,23 @@ and `feature_map.md`.
     `S 51/51 R 3137/3137 C 0`.
   - Strict sentinel exact:
     `5/5 S 1063/1063 R 64569/64569 C 0`.
-  - `verify --target seed0360-wizard-world-tour`, `verify --target
-    seed4500-knight-coverage`, `verify --target seed0373-barbarian-quest-tour`,
-    and `verify --target seed1150-caveman-explore-move` all passed their target
+  - `verify --target seed2600-wizard-custom-binds` passed its target
     expectations plus strict sentinels, `hack:audit` (`hard=0 suspicious=45`),
     and `memory:lint` (`issues=0`).
   - Regenerated checked-in corpus inventory:
-    `35/44 S 9495/11405 R 634310/792838`. Remaining queue:
-    `seed2600`, `seed0004`, `seed0006`, `seed0007`, `seed0009`, `seed0014`,
-    `seed0077`, `seed0102`, and `seed0367`.
+    `32/44 S 9526/11405 R 645539/792838`. Remaining queue:
+    `seed0004`, `seed0006`, `seed0007`, `seed0009`,
+    `seed0013-rogue-friday13-combat`, `seed0014`, `seed0060`, `seed0077`,
+    `seed0102`, `seed0361`, `seed0367`, and `seed1500`.
   - Latest live `parity:state -- --refresh-live` predates this WIP:
     checked-in public `32/44 S 7388/11405 R 483381/792838 C 1`, hosted public
     `30/44 S 7115/10982 R 428093/840358 C 1`; leaderboard refresh remains
     unavailable due sandbox networking plus harness usage-limit rejection.
-  - Subsystem truth: arrival temperature and smoke lines are pack-after tty
-    topline work behind materialize; `docrt()` clears display state before
-    redraw; unseen long-worm tail cells do not get warning overlays; and iron
-    bars use the special bar glyph only when `IN_SIGHT`.
+  - Subsystem truth: parsed `BIND=` command bindings, C object knowledge
+    semantics for `oc_uses_known` and `OBJ_DESCR()`, Bigroom-9 static special
+    loading and grown lit selections, themed Cloud/Temple fill front doors,
+    static gas-region visibility, initial clairvoyance spell display, and
+    worn-source antimagic insight are live for current evidence.
   - Next queue after committing this unit: choose the next checked-in public
     divergence from the current corpus state; do not chase hosted/leaderboard
     drift as local implementation truth.
