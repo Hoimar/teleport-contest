@@ -13,23 +13,23 @@ and `feature_map.md`.
 ## Current State
 
 - Current branch in this workspace: `main`, ahead of origin.
-- Latest committed parity repair: `Restore seed4500 venom discovery parity`.
+- Latest committed parity repair: `Pack level teleport single-object look`.
   Next target should come from checked-in public corpus divergences, not
   hosted/leaderboard drift.
 - Last toolkit commit: `7d2f959` (`Track scratch tracing toolkit`).
 - Latest verified parity repair:
+  - `seed0108-wizard-extcmd-wishlist`: `S 303/303 R 16958/16958 C 0 OK`.
   - `seed4500-knight-coverage`: `S 1814/1814 R 108275/108275 C 0 OK`.
   - `seed0360-wizard-world-tour`: `S 833/833 R 120639/120639 C 0 OK`.
   - `seed0361-archeologist-tour`: `S 366/366 R 53865/53865 C 0 OK`.
   - Strict sentinels exact: `5/5 S 1063/1063 R 64569/64569 C 0`.
-  - Implementation: visible monster-spit venom now marks venom object types
-    encountered through the `m_throw()`/`observe_object()` path, restoring
-    Venoms discovery without debug-wide synthetic rows. Accepted controlled
-    teleports split on `flags.verbose`: verbose clears getpos text and defers
-    spot effects behind `You materialize...--More--`; `!verbose` runs arrival
-    look-here immediately and can pack behind retained getpos text
-    (`C refs: mthrowu.c:spitmm()/m_throw(), o_init.c:observe_object(),
-    teleport.c:dotele()/teleds(), pickup.c:check_here()`).
+  - Implementation: level-teleport `maybe_lvltport_feedback()` materialize
+    text can pack with a single-object `pickup(1)`/`look_here()` sentence when
+    tty width allows. Recent committed truth also includes real visible
+    projectile Venoms discovery and verbose/`!verbose` controlled-teleport
+    arrival boundaries (`C refs: do.c:maybe_lvltport_feedback(),
+    pickup.c:check_here(), invent.c:look_here(), mthrowu.c:m_throw(),
+    o_init.c:observe_object(), teleport.c:dotele()/teleds()`).
 - Previous verified parity repair:
   - `seed4500-knight-coverage`: `S 1814/1814 R 108275/108275 C 0 OK`.
   - Strict sentinels exact: `5/5 S 1063/1063 R 64569/64569 C 0`.
@@ -47,14 +47,15 @@ and `feature_map.md`.
 - Strict sentinels are exact:
   `5/5 S 1063/1063 R 64569/64569 C 0`.
 - `npm run parity:state -- --refresh-live` on the current verified WIP:
-  checked-in public `exact 33/44 S 9333/11405 R 600684/792838 C 1`;
-  hosted public cache `exact 30/44 S 8423/10982 R 466847/840358 C 1`;
+  checked-in public `exact 34/44 S 9336/11405 R 600684/792838 C 1`;
+  hosted public cache `exact 31/44 S 8433/10982 R 466828/840358 C 1`;
   class `public-session-drift`; strict sentinel exact. Leaderboard refresh
   failed under sandbox networking and escalation was unavailable due a
   harness usage-limit rejection, so leaderboard is not refreshed this pass.
 - Current non-sentinel regression classification in this WIP: none among
-  `seed0360`, `seed0361`, `seed4500`, or strict sentinels. Remaining public
-  misses should be selected from checked-in corpus/divergence inventory.
+  `seed0108`, `seed0360`, `seed0361`, `seed4500`, or strict sentinels.
+  Remaining public misses should be selected from checked-in corpus/divergence
+  inventory.
 - Hack audit remains `hard=0 suspicious=45`; `memory:lint` reports
   `issues=0`. Production `js/` has no intentional debug I/O or imports from
   `frozen/`.
@@ -62,6 +63,8 @@ and `feature_map.md`.
 ## Latest Loop Checkpoint
 
 - Latest verified WIP on 2026-06-05:
+  - `seed0108-wizard-extcmd-wishlist` restored exact:
+    `S 303/303 R 16958/16958 C 0`.
   - `seed4500-knight-coverage` restored exact:
     `S 1814/1814 R 108275/108275 C 0`.
   - Guard targets exact: `seed0360-wizard-world-tour`
@@ -69,14 +72,16 @@ and `feature_map.md`.
     `S 366/366 R 53865/53865 C 0`.
   - Strict sentinel exact:
     `5/5 S 1063/1063 R 64569/64569 C 0`.
-  - `verify --target seed4500-knight-coverage` passed target, sentinels,
+  - `verify --target seed0108-wizard-extcmd-wishlist` passed target, sentinels,
     `hack:audit` (`hard=0 suspicious=45`), and `memory:lint` (`issues=0`).
   - `parity:state -- --refresh-live` checked-in public:
-    `33/44 S 9333/11405 R 600684/792838 C 1`; hosted public:
-    `30/44 S 8423/10982 R 466847/840358 C 1`; class
+    `34/44 S 9336/11405 R 600684/792838 C 1`; hosted public:
+    `31/44 S 8433/10982 R 466828/840358 C 1`; class
     `public-session-drift`; leaderboard not refreshed due sandbox fetch
     failure plus unavailable escalation.
-  - Subsystem truth: Venoms discovery belongs to real visible projectile
+  - Subsystem truth: single-object arrival look after level teleport can pack
+    after the materialize line when tty width allows. Venoms discovery belongs
+    to real visible projectile
     observation (`m_throw()` -> `observe_object()`), not debug discovery rows.
     Valid controlled teleport arrival owns different tty boundaries under
     verbose versus `!verbose`.

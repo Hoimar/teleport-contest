@@ -19791,8 +19791,12 @@ async function finishLevelTeleportArrival({
     } else if (!game._more && arrivalObjects.length === 1) {
         const line = `You see here ${inventoryObjectName(arrivalObjects[0], { includePrice: true, observe: true })}.`;
         if (game._pending_message) {
-            deferArrivalFloorLook();
-            queue_more_prompt();
+            if (topline_can_pack_message(game._pending_message, line)) {
+                await append_pline(line);
+            } else {
+                deferArrivalFloorLook();
+                queue_more_prompt();
+            }
         } else {
             await append_pline(line);
         }
