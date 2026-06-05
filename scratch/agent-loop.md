@@ -13,23 +13,25 @@ and `feature_map.md`.
 ## Current State
 
 - Current branch in this workspace: `main`, ahead of origin.
-- Latest committed parity repair: `Pack level teleport single-object look`.
+- Latest committed parity repair: `6faaa53` (`Port Barbarian Endgame planes tour`).
   Next target should come from checked-in public corpus divergences, not
   hosted/leaderboard drift.
-- Last toolkit commit: `7d2f959` (`Track scratch tracing toolkit`).
+- Last toolkit commit: `6faaa53` (`Port Barbarian Endgame planes tour`).
 - Latest verified parity repair:
-  - `seed0108-wizard-extcmd-wishlist`: `S 303/303 R 16958/16958 C 0 OK`.
-  - `seed4500-knight-coverage`: `S 1814/1814 R 108275/108275 C 0 OK`.
-  - `seed0360-wizard-world-tour`: `S 833/833 R 120639/120639 C 0 OK`.
-  - `seed0361-archeologist-tour`: `S 366/366 R 53865/53865 C 0 OK`.
+  - `seed0373-barbarian-quest-tour`: triage `S 124/124 R 35386/35386 C 1`;
+    verify reports no first screen/RNG mismatch and one cursor-only boundary.
+  - Guard `seed1150-caveman-explore-move`: `S 51/51 R 3137/3137 C 0 OK`.
   - Strict sentinels exact: `5/5 S 1063/1063 R 64569/64569 C 0`.
-  - Implementation: level-teleport `maybe_lvltport_feedback()` materialize
-    text can pack with a single-object `pickup(1)`/`look_here()` sentence when
-    tty width allows. Recent committed truth also includes real visible
-    projectile Venoms discovery and verbose/`!verbose` controlled-teleport
-    arrival boundaries (`C refs: do.c:maybe_lvltport_feedback(),
-    pickup.c:check_here(), invent.c:look_here(), mthrowu.c:m_throw(),
-    o_init.c:observe_object(), teleport.c:dotele()/teleds()`).
+  - Implementation: Barbarian startup/quest and Endgame Plane travel are now
+    live systems for current evidence: Fire/Air special loading, Air
+    horizontal-flipped lregion bounds, `movebubbles()` and display memory,
+    wizard Endgame prerequisite Amulet, arrival Wizard/wish/fumarole queueing,
+    follower order, Amulet discovery, bimanual weapon wording, and debug `^X`
+    Endgame/role-innate insight
+    (`C refs: u_init.c:Barbarian_0[]/Barbarian_1[], dat/air.lua,
+    mkmaze.c:movebubbles()/mv_bubble()/fumaroles(),
+    teleport.c:level_tele(), do.c:goto_level(), o_init.c:dodiscovered(),
+    insight.c:background_enlightenment()/attributes_enlightenment()`).
 - Previous verified parity repair:
   - `seed4500-knight-coverage`: `S 1814/1814 R 108275/108275 C 0 OK`.
   - Strict sentinels exact: `5/5 S 1063/1063 R 64569/64569 C 0`.
@@ -47,13 +49,13 @@ and `feature_map.md`.
 - Strict sentinels are exact:
   `5/5 S 1063/1063 R 64569/64569 C 0`.
 - `npm run parity:state -- --refresh-live` on the current verified WIP:
-  checked-in public `exact 34/44 S 9336/11405 R 600684/792838 C 1`;
-  hosted public cache `exact 31/44 S 8433/10982 R 466828/840358 C 1`;
-  class `public-session-drift`; strict sentinel exact. Leaderboard refresh
-  failed under sandbox networking and escalation was unavailable due a
-  harness usage-limit rejection, so leaderboard is not refreshed this pass.
+  checked-in public `exact 32/44 S 7388/11405 R 483381/792838 C 1`;
+  hosted public cache `exact 30/44 S 7115/10982 R 428093/840358 C 1`;
+  class `public-session-drift`; strict sentinel exact. Latest leaderboard
+  refresh is unavailable because sandbox networking failed and escalation hit
+  the harness usage limit; use checked-in sessions for implementation truth.
 - Current non-sentinel regression classification in this WIP: none among
-  `seed0108`, `seed0360`, `seed0361`, `seed4500`, or strict sentinels.
+  `seed0373`, `seed1150`, or strict sentinels.
   Remaining public misses should be selected from checked-in corpus/divergence
   inventory.
 - Hack audit remains `hard=0 suspicious=45`; `memory:lint` reports
@@ -63,28 +65,26 @@ and `feature_map.md`.
 ## Latest Loop Checkpoint
 
 - Latest verified WIP on 2026-06-05:
-  - `seed0108-wizard-extcmd-wishlist` restored exact:
-    `S 303/303 R 16958/16958 C 0`.
-  - `seed4500-knight-coverage` restored exact:
-    `S 1814/1814 R 108275/108275 C 0`.
-  - Guard targets exact: `seed0360-wizard-world-tour`
-    `S 833/833 R 120639/120639 C 0`; `seed0361-archeologist-tour`
-    `S 366/366 R 53865/53865 C 0`.
+  - `seed0373-barbarian-quest-tour` exact under triage:
+    `S 124/124 R 35386/35386 C 1`; verify reports no first screen/RNG
+    mismatch and one cursor-only boundary.
+  - Guard target exact: `seed1150-caveman-explore-move`
+    `S 51/51 R 3137/3137 C 0`.
   - Strict sentinel exact:
     `5/5 S 1063/1063 R 64569/64569 C 0`.
-  - `verify --target seed0108-wizard-extcmd-wishlist` passed target, sentinels,
+  - `verify --target seed0373-barbarian-quest-tour` passed target, sentinels,
     `hack:audit` (`hard=0 suspicious=45`), and `memory:lint` (`issues=0`).
   - `parity:state -- --refresh-live` checked-in public:
-    `34/44 S 9336/11405 R 600684/792838 C 1`; hosted public:
-    `31/44 S 8433/10982 R 466828/840358 C 1`; class
-    `public-session-drift`; leaderboard not refreshed due sandbox fetch
-    failure plus unavailable escalation.
-  - Subsystem truth: single-object arrival look after level teleport can pack
-    after the materialize line when tty width allows. Venoms discovery belongs
-    to real visible projectile
-    observation (`m_throw()` -> `observe_object()`), not debug discovery rows.
-    Valid controlled teleport arrival owns different tty boundaries under
-    verbose versus `!verbose`.
+    `32/44 S 7388/11405 R 483381/792838 C 1`; hosted public:
+    `30/44 S 7115/10982 R 428093/840358 C 1`; class
+    `public-session-drift`; leaderboard refreshed from
+    `https://mazesofmenace.ai/leaderboard/data.json`.
+  - Subsystem truth: Air lregions are flipped with C's solidfill-STONE bounds
+    before waterlevel fixup; Air arrival then owns post-pet
+    `movebubbles()`/cloud redraw. Endgame wizard level teleport inventories and
+    prints a real Amulet before travel, the Amulet has fixed discovery text,
+    and debug insight uses C Endgame names, move-1 wording, Air max carrying
+    capacity, skill classes, and role-innate sources.
   - Next queue after committing this unit: choose the next checked-in public
     divergence from the current corpus state; do not chase hosted/leaderboard
     drift as local implementation truth.

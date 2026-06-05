@@ -34,6 +34,20 @@ function optionValue(name, fallback = null) {
     return value;
 }
 
+function optionList(name) {
+    const raw = optionValue(name, '');
+    const text = String(raw || '').trim();
+    if (!text) return [];
+    if (text.includes(';')) return text.split(';').filter(Boolean);
+    const parts = text.split(',').filter(Boolean);
+    if (parts.length > 1 && parts.length % 2 === 0)
+        return parts.reduce((acc, part, i) => {
+            if (i % 2 === 0) acc.push(`${part},${parts[i + 1]}`);
+            return acc;
+        }, []);
+    return parts;
+}
+
 const positional = process.argv.slice(2).filter((arg, idx, all) => {
     if (all[idx - 1] === '--segment') return false;
     return arg !== '--segment';
@@ -43,6 +57,7 @@ if (!sessionPath || !rangeRaw) throw new Error(usage());
 const { start, end } = parseRange(rangeRaw);
 const compact = process.argv.includes('--compact');
 const segmentIndex = Number(optionValue('--segment', '0'));
+const requestedCells = optionList('--cells');
 const session = normalizeSession(JSON.parse(readFileSync(sessionPath, 'utf8')));
 const seg = session.segments[segmentIndex];
 if (!seg) throw new Error(`segment ${segmentIndex} not found`);
@@ -161,6 +176,7 @@ game._preNhgetchHook = async () => {
         for (let yy = (u.uy ?? 0) - 1; yy <= (u.uy ?? 0) + 3; yy++) {
             for (let xx = (u.ux ?? 0) - 2; xx <= (u.ux ?? 0) + 2; xx++) wantedCells.add(`${xx},${yy}`);
         }
+        for (const cell of requestedCells) wantedCells.add(cell);
         if (!compact) for (const key of wantedCells) {
             const [xx, yy] = key.split(',').map(Number);
                 const loc = game.level?.at?.(xx, yy) || null;
@@ -182,7 +198,14 @@ game._preNhgetchHook = async () => {
                         .map((obj) => ({ otyp: obj.otyp, oclass: obj.oclass, corpsenm: obj.corpsenm })),
                     mon: (game.level?.monsters || [])
                         .filter((mon) => mon.mx === xx && mon.my === yy)
-                        .map((mon) => ({ id: mon.m_id, name: mon.data?.name, hp: mon.mhp })),
+                        .map((mon) => ({
+                            id: mon.m_id,
+                            name: mon.data?.name,
+                            hp: mon.mhp,
+                            m_ap_type: mon.m_ap_type,
+                            mappearance: mon.mappearance,
+                            mcorpsenm: mon.mcorpsenm,
+                        })),
                 });
         }
         console.log(JSON.stringify({
