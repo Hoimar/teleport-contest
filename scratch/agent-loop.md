@@ -13,24 +13,18 @@ and `feature_map.md`.
 ## Current State
 
 - Current branch in this workspace: `main`, ahead of origin.
-- Latest committed parity repair before the current WIP: `Repair seed0900 explore startup and search timing`
-  (see `git log` for the current hash). Current verified WIP targets
-  `seed0361-archeologist-tour` and is pending a coherent commit.
+- Latest committed parity repair: `Port Archeologist quest tour systems`
+  (`ad41112`). Current verified WIP targets `seed0360-wizard-world-tour`
+  and is pending a focused quest-pager commit.
 - Last toolkit commit: `7d2f959` (`Track scratch tracing toolkit`).
 - Latest verified parity repair:
-  - `seed0361-archeologist-tour`: `S 366/366 R 53865/53865 C 0 OK`.
+  - `seed0360-wizard-world-tour`: `S 833/833 R 120639/120639 C 0 OK`.
   - Strict sentinels exact: `5/5 S 1063/1063 R 64569/64569 C 0`.
-  - Implementation: Archeologist startup stats/inventory/searching,
-    quest leader/nemesis role metadata, Arc fillers/goal special slices,
-    quest arrival/goal pager timing, one-line top-line quest pagers, level
-    teleport floor-look resumption, object-mimic memory cleanup, discovery
-    and object naming rows, weapon-tool startup use, automatic searching,
-    monster movement/wear front doors, and focused object/wish/insight
-    coverage (`C refs: role.c:role_init(), u_init.c:Archeologist[],
-    attrib.c:arc_abil[], dat/Arc-*.lua, quest.c:on_goal(),
-    questpgr.c:qt_pager(), pickup.c:check_here(), display.c:display_monster(),
-    objnam.c:xname_flags()/doname_base(), worn.c:m_dowear(),
-    muse.c:find_defensive(), allmain.c:moveloop_core()`).
+  - Implementation: post-arrival quest locate messages that are one-line
+    default quest text now use `deliver_by_pline()`/ordinary topline packing
+    instead of forcing a text-window-style `--More--`; current goal-message
+    evidence retains the top-line More boundary (`C refs: quest.c:on_locate(),
+    quest.c:on_goal(), questpgr.c:com_pager_core()/deliver_by_pline()`).
 - Previous verified parity repair:
   - `seed4500-knight-coverage`: `S 1814/1814 R 108275/108275 C 0 OK`.
   - Strict sentinels exact: `5/5 S 1063/1063 R 64569/64569 C 0`.
@@ -49,23 +43,42 @@ and `feature_map.md`.
   `5/5 S 1063/1063 R 64569/64569 C 0`.
 - `npm run parity:state -- --refresh-live` on the current verified WIP
   (rerun with escalation for leaderboard network): checked-in public
-  `exact 31/44 S 8273/11405 R 539419/792838 C 1`; hosted public cache
-  `exact 29/44 S 7410/10982 R 411340/840358 C 1`; class
+  `exact 32/44 S 8320/11405 R 545189/792838 C 1`; hosted public cache
+  `exact 29/44 S 7410/10982 R 411352/840358 C 1`; class
   `public-session-drift`; strict sentinel exact. Leaderboard source
   `https://mazesofmenace.ai/leaderboard/data.json`, team Hoimar, last scored
   `2026-06-05T11:15:01.696Z`, public exact `26/44 S 8876/11405
   R 547136/792838`, held-out `points 1735/11265 passing 1/44`.
 - Current non-sentinel regression classification in this WIP:
-  `seed0360-wizard-world-tour` is reopened at `S 786/833 R 114869/120639`
-  with the first visible frontier at screen 781; `seed4500-knight-coverage`
-  is reopened at `S 801/1814 R 52780/108275` after removing the broad
-  synthetic debug venom discovery row. Do not reintroduce per-debug Venoms
-  rows to recover that stale public pass.
+  `seed4500-knight-coverage` remains reopened at `S 801/1814 R 52780/108275`
+  after removing the broad synthetic debug venom discovery row. Do not
+  reintroduce per-debug Venoms rows to recover that stale public pass.
 - Hack audit remains `hard=0 suspicious=45`; `memory:lint` reports
   `issues=0`. Production `js/` has no intentional debug I/O or imports from
   `frozen/`.
 
 ## Latest Loop Checkpoint
+
+- Latest verified WIP on 2026-06-05 after `ad41112`:
+  - `seed0360-wizard-world-tour` restored exact:
+    `S 833/833 R 120639/120639 C 0`.
+  - `seed0361-archeologist-tour` guard remains exact:
+    `S 366/366 R 53865/53865 C 0`.
+  - Strict sentinel exact:
+    `5/5 S 1063/1063 R 64569/64569 C 0`.
+  - `verify --target seed0360-wizard-world-tour` passed target, sentinels,
+    `hack:audit` (`hard=0 suspicious=45`), and `memory:lint` (`issues=0`).
+  - `parity:state -- --refresh-live` checked-in public:
+    `32/44 S 8320/11405 R 545189/792838 C 1`; hosted public:
+    `29/44 S 7410/10982 R 411352/840358 C 1`; leaderboard public:
+    `26/44 S 8876/11405 R 547136/792838`; held-out remains
+    `points 1735/11265 passing 1/44`; class `public-session-drift`.
+  - Subsystem truth: Wizard `locate_first` one-line quest text is pline
+    delivery and should not force `--More--`; current goal-message evidence
+    still uses the post-arrival top-line More path.
+  - Next queue after committing this unit: `seed4500` remains a classified
+    dehack regression from removed synthetic venom discovery; otherwise choose
+    the next checked-in public divergence from the current corpus state.
 
 - Latest verified WIP on 2026-06-05:
   - `seed0361-archeologist-tour` exact:

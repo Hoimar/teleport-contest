@@ -18666,6 +18666,36 @@ function postArrivalPagerUsesTopline(text) {
         && message.length + '--More--'.length <= (game.nhDisplay?.cols || COLNO);
 }
 
+async function queuePostArrivalPline(text) {
+    const message = String(text || '');
+    if (!message) return false;
+    // C ref: src/questpgr.c:com_pager_core()/deliver_by_pline().  Default
+    // one-line quest text is ordinary topline text; a More prompt only comes
+    // from normal topline overflow or later arrival work such as look_here().
+    if (game._more || (game._more_message_queue || []).length) {
+        if (!game._more) queue_more_prompt();
+        game._more_message_queue = [
+            ...(game._more_message_queue || []),
+            { text: message, more: false },
+        ];
+        return true;
+    }
+    if (game._pending_message) {
+        if (topline_can_pack_message(game._pending_message, message)) {
+            await append_pline(message);
+        } else {
+            queue_more_prompt();
+            game._more_message_queue = [
+                ...(game._more_message_queue || []),
+                { text: message, more: false },
+            ];
+        }
+        return true;
+    }
+    await pline(message);
+    return true;
+}
+
 const MIN_QUEST_ALIGN = 20;
 
 function questLeaderNeedsDebugAlignAdjust() {
@@ -18824,8 +18854,10 @@ function questGoalPagerText(oldUz) {
     return questMessageSubstitutions(text);
 }
 
-function queuePostArrivalPager(text) {
+async function queuePostArrivalPager(text, options = {}) {
     if (!text) return false;
+    if (!String(text || '').includes('\n') && options.plineOnly)
+        return queuePostArrivalPline(text);
     if (!game._pending_message && !game._more && !(game._more_message_queue || []).length) {
         const { screen, cursor } = postArrivalPagerDisplay(text);
         game._post_arrival_pager_screen = null;
@@ -19721,8 +19753,12 @@ async function finishLevelTeleportArrival({
             { text: 'You enter what seems to be an older, more primitive world.', more: false },
         ];
     }
-    const hasPostArrivalPager = queuePostArrivalPager(
-        questStartPagerText(oldUz) || locatePagerText || questGoalPagerText(oldUz));
+    const questStartText = questStartPagerText(oldUz);
+    const questGoalText = questStartText || locatePagerText ? null : questGoalPagerText(oldUz);
+    const postArrivalQuestText = questStartText || locatePagerText || questGoalText;
+    const hasPostArrivalPager = await queuePostArrivalPager(postArrivalQuestText, {
+        plineOnly: !!locatePagerText && !String(locatePagerText).includes('\n'),
+    });
     if (hasPostArrivalPager && materializeLine
         && game._pending_message === materializeLine && !game._more) {
         // C ref: do.c:goto_level()/maybe_lvltport_feedback().  Quest arrival
