@@ -49,6 +49,7 @@ import {
     create_gas_cloud_basic,
     monster_projectile_destroyed_by_hit,
 } from './monmove.js';
+import { noteMonsterDied, vanquishedMonsterEntries } from './monstats.js';
 import { writeSavedGame } from './save_restore.js';
 import { vfsReadFile, vfsWriteFile } from './storage.js';
 import {
@@ -3199,9 +3200,29 @@ function deathRecordScoreBaseBasic() {
     return score;
 }
 
+function depthForDlevelBasic(uz) {
+    const dungeon = game.dungeons?.[uz?.dnum ?? 0];
+    return (dungeon?.depth_start ?? 1) + ((uz?.dlevel ?? 1) - 1);
+}
+
+function deepestReachedDepthBasic() {
+    // C refs: src/dungeon.c:deepest_lev_reached(), src/botl.c:botl_score().
+    let deepest = Math.max(1, currentDungeonDepth());
+    if (Number.isFinite(game._deepestDepthReached))
+        deepest = Math.max(deepest, game._deepestDepthReached);
+    for (let dnum = 0; dnum < (game.dungeons || []).length; dnum++) {
+        const reached = game.dungeons[dnum]?.dunlev_ureached || 0;
+        if (reached > 0) deepest = Math.max(deepest, depthForDlevelBasic({ dnum, dlevel: reached }));
+    }
+    for (const entry of overviewEntries(overviewLevelStates())) {
+        deepest = Math.max(deepest, depthForDlevelBasic(entry.uz));
+    }
+    return deepest;
+}
+
 function deathScoreBasic() {
     // C ref: src/botl.c:botl_score().
-    const deepest = Math.max(1, game._deepestDepthReached ?? currentDungeonDepth());
+    const deepest = deepestReachedDepthBasic();
     const currentGold = deathGoldBasic();
     const initialGold = game._initialGoldCount || 0;
     const goldScore = Math.max(0, currentGold - initialGold);
@@ -4134,6 +4155,71 @@ function buildInventoryMenuLines() {
     return lines;
 }
 
+function buildDeathInventoryDisclosureLines() {
+    // C refs: src/end.c:really_done(), src/invent.c:display_inventory().
+    // Answering yes to the end-of-game inventory prompt identifies inventory
+    // before displaying it, and the disclosure pages omit the live menu's
+    // "(end)" sentinel.
+    for (const obj of game.inventory || []) fullyIdentifyObject(obj);
+    const lines = [];
+    const gold = game._goldCount || 0;
+    if (gold > 0) {
+        lines.push({ text: 'Coins', heading: true });
+        lines.push({ text: `$ - ${gold} gold pieces`, heading: false });
+    }
+    const entries = menuInventoryEntries();
+    for (const group of INVENTORY_GROUPS) {
+        const groupEntries = entries.filter((entry) => entry.cls === group.cls);
+        if (!groupEntries.length) continue;
+        lines.push({ text: group.title, heading: true });
+        for (const entry of groupEntries) lines.push({ text: entry.line, heading: false });
+    }
+    return lines;
+}
+
+function deathInventoryDisclosurePages() {
+    const allLines = buildDeathInventoryDisclosureLines();
+    const displayRows = C.TERMINAL_ROWS || 24;
+    const pageSize = Math.max(1, displayRows - 1);
+    const pages = [];
+    for (let i = 0; i < allLines.length; i += pageSize)
+        pages.push(allLines.slice(i, i + pageSize));
+    if (!pages.length) pages.push([]);
+    return pages.map((page, idx) => [
+        ...page.map((line) => ` ${line.text}`),
+        ` (${idx + 1} of ${pages.length})`,
+    ]);
+}
+
+function showDeathInventoryDisclosurePage(index = 0) {
+    const pages = Array.isArray(game._death_inventory_disclosure_pages)
+        ? game._death_inventory_disclosure_pages
+        : (game._death_inventory_disclosure_pages = deathInventoryDisclosurePages());
+    const page = pages[Math.max(0, Math.min(index, pages.length - 1))] || [];
+    game._death_inventory_disclosure_page = Math.max(0, Math.min(index, pages.length - 1));
+    const rows = Array(C.TERMINAL_ROWS || 24).fill('');
+    for (let row = 0; row < Math.min(rows.length, page.length); row++) rows[row] = page[row];
+    const lastRow = Math.min(rows.length - 1, Math.max(0, page.length - 1));
+    const cursorCol = Math.min(COLNO - 1, (rows[lastRow] || '').length);
+    const screen = rows.join('\n');
+    game._death_inventory_disclosure_screen = screen;
+    showOverride(screen, [cursorCol, lastRow]);
+    game.context.move = 0;
+}
+
+async function showDeathAttributesPrompt() {
+    game._death_attributes_prompt_active = true;
+    game._death_inventory_disclosure_screen = null;
+    game._death_inventory_disclosure_pages = null;
+    game._death_inventory_disclosure_page = 0;
+    clearOverrideScreen();
+    await redrawAfterFullScreenMenuDismiss();
+    const msg = 'Do you want to see your attributes? [ynq] (n)';
+    await showPromptLine(msg);
+    game._prompt_cursor = [msg.length + 1, 0];
+    game.context.move = 0;
+}
+
 function wizIdentifyInventoryEntries() {
     return menuInventoryEntries()
         .filter((entry) => entry.obj && notFullyIdentified(entry.obj));
@@ -4936,6 +5022,13 @@ async function lookHereAfterMove(opts = {}) {
         // C refs: hack.c:spoteffects(), pickup.c:pickup(), engrave.c:read_engr_at().
         await readEngravingAtHero({ pauseBeforeReading: true });
         return;
+    }
+    const run = game.context?.run;
+    if (run && !run.travel && run.mode !== 8 && !game.context?.nopick) {
+        // C ref: src/pickup.c:pickup().  During an ordinary run, any floor
+        // object at the destination stops repeated movement; the floor-list
+        // output itself may still be deferred until after the monster turn.
+        game._run_stop_after_move = true;
     }
     const feature = typeof opts.featureLine === 'string'
         ? { line: opts.featureLine, blocks: false }
@@ -8800,6 +8893,56 @@ async function monsterDetectFromFountain() {
     return true;
 }
 
+function monsterIndefiniteName(mon) {
+    const name = monsterName(mon);
+    return `${indefiniteArticle(name)} ${name}`;
+}
+
+function monsterSubjectPronoun(mon) {
+    if (mon?.female) return 'she';
+    if (mon?.male) return 'he';
+    return 'it';
+}
+
+function monsterPossessivePronoun(mon) {
+    if (mon?.female) return 'her';
+    if (mon?.male) return 'his';
+    return 'its';
+}
+
+async function waterDemonFromFountain() {
+    // C ref: src/fountain.c:dowaterdemon().
+    const ptr = monsterPtr('WATER_DEMON');
+    const mon = ptr ? makemon(ptr, game.u?.ux ?? 0, game.u?.uy ?? 0, C.MM_NOMSG) : null;
+    if (!mon) return;
+    newsym(mon.mx, mon.my);
+    if (game.u?.ublind || game.u?.blind || game.u?.uprops?.blind || game.u?.uprops?.blinded) {
+        await pline('You feel the presence of evil.');
+    } else {
+        await pline(`You unleash ${monsterIndefiniteName(mon)}!`);
+    }
+    if (rnd(100) > (80 + level_difficulty())) {
+        await append_pline(`Grateful for ${monsterPossessivePronoun(mon)} release, ${monsterSubjectPronoun(mon)} grants you a wish!`);
+        game.level.monsters = (game.level?.monsters || []).filter((mtmp) => mtmp !== mon);
+        newsym(mon.mx, mon.my);
+        game._fountain_wish_dryup_after_wish = true;
+        await beginWizardWishPrompt();
+        return true;
+    }
+    return false;
+}
+
+async function finishFountainWishDryupAfterWish() {
+    if (!game._fountain_wish_dryup_after_wish) return false;
+    game._fountain_wish_dryup_after_wish = false;
+    const dryupMsg = dryupFountainAfterDip();
+    if (dryupMsg) {
+        if (game._pending_message) await append_pline(dryupMsg);
+        else await pline(dryupMsg);
+    }
+    return true;
+}
+
 async function finishFountainDetectAfterMore() {
     // C ref: src/detect.c:monster_detect() restores the ordinary map before
     // src/fountain.c:drinkfountain() resumes and calls dryup().
@@ -8865,6 +9008,9 @@ async function drinkFountain() {
             if (typeof game.u?.uhp === 'number')
                 game.u.uhp = Math.max(0, game.u.uhp - rnd(10));
             exercise(A_CON, false);
+            break;
+        case 23:
+            if (await waterDemonFromFountain()) return;
             break;
         case 26:
             if (!(await monsterDetectFromFountain())) {
@@ -9143,7 +9289,14 @@ function overviewDungeonHeader(dnum, group, maxReached) {
     return `${name}: levels ${start} to ${end}`;
 }
 
-function showOverviewScreen() {
+function deathOverviewKillerPhrase() {
+    const killer = game._death_killer_name || 'monster';
+    if (game._death_killer_format === 'by') return `killed by ${killer}`;
+    if (game._death_killer_format === 'raw') return killer;
+    return `killed by ${game._death_killer_article || 'a'} ${killer}`;
+}
+
+function showOverviewScreen(options = {}) {
     // C refs: src/dungeon.c:show_overview(), print_mapseen().
     const display = game.nhDisplay;
     if (!display?.putstr) return;
@@ -9170,9 +9323,15 @@ function showOverviewScreen() {
             let text = `Level ${depth}:`;
             if (special) text += ` [${special}]`;
             if (custom) text += ` "${custom}"`;
-            if (sameLevel(uz, game.u?.uz)) text += ' <- You are here.';
+            if (sameLevel(uz, game.u?.uz))
+                text += options.final ? ' <- You were here.' : ' <- You are here.';
             lines.push({ text, heading: false, indent: 3 });
-            const feature = overviewFeatureLine(uz, state);
+            if (options.final && sameLevel(uz, game.u?.uz)) {
+                // C ref: src/dungeon.c:print_mapseen().
+                lines.push({ text: 'Final resting place for', heading: false, indent: 6 });
+                lines.push({ text: `you, ${deathOverviewKillerPhrase()}.`, heading: false, indent: 9 });
+            }
+            const feature = options.final ? '' : overviewFeatureLine(uz, state);
             if (feature) lines.push({ text: feature, heading: false, indent: 6 });
             for (const branch of overviewBranchesFrom(uz, state)) {
                 lines.push({ text: overviewBranchLine(branch), heading: false, indent: 6 });
@@ -9182,8 +9341,9 @@ function showOverviewScreen() {
     lines.push({ text: '(end)', heading: false });
     const maxLen = Math.max(0, ...lines.map((line) => line.text.length));
     const maxDisplayLen = Math.max(0, ...lines.map((line) => line.text.length + (line.indent || 0)));
-    const gutter = maxDisplayLen > maxLen ? 2 : 3;
-    const menuCol = Math.max(1, Math.min(COLNO - 1, COLNO - maxDisplayLen - gutter));
+    const displayLen = Math.max(maxDisplayLen, options.final ? 38 : 0);
+    const gutter = displayLen > maxLen ? 2 : 3;
+    const menuCol = Math.max(1, Math.min(COLNO - 1, COLNO - displayLen - gutter));
     display.putstr(0, 0, ' '.repeat(COLNO), NO_COLOR, 0);
     const clearCol = Math.max(0, menuCol - 1);
     for (let row = 0; row < lines.length; row++) {
@@ -9191,10 +9351,12 @@ function showOverviewScreen() {
     }
     for (let row = 0; row < lines.length; row++) {
         const line = lines[row];
-        display.putstr(menuCol + (line.indent || 0), row, line.text, NO_COLOR, line.heading ? ATR_INVERSE : 0);
+        const attr = line.heading && !options.final ? ATR_INVERSE : 0;
+        display.putstr(menuCol + (line.indent || 0), row, line.text, NO_COLOR, attr);
     }
     const screen = serialize_terminal_grid(display);
     game._overview_screen = screen;
+    game._death_overview_screen_active = !!options.death;
     showOverride(screen, [menuCol + '(end)'.length + 1, lines.length - 1]);
     game.context.move = 0;
 }
@@ -9249,7 +9411,7 @@ function achievementConductLine(achidx) {
     }
 }
 
-function conductLines() {
+function conductLines(options = {}) {
     const conduct = game.u?.uconduct || {};
     const roleplay = game.u?.uroleplay || {};
     const lines = ['Voluntary challenges:'];
@@ -9261,31 +9423,32 @@ function conductLines() {
         lines.push(` Your character was rerolled ${timesText(roleplay.numrerolls)}.`);
     }
 
-    if (!conduct.food) lines.push(' You have gone without food.');
-    else if (!conduct.unvegan) lines.push(' You have followed a strict vegan diet.');
-    else if (!conduct.unvegetarian) lines.push(' You have been vegetarian.');
+    if (!conduct.food) lines.push(options.final ? ' You went without food.' : ' You have gone without food.');
+    else if (!conduct.unvegan) lines.push(options.final ? ' You followed a strict vegan diet.' : ' You have followed a strict vegan diet.');
+    else if (!conduct.unvegetarian) lines.push(options.final ? ' You were vegetarian.' : ' You have been vegetarian.');
 
-    if (!conduct.gnostic) lines.push(' You have been an atheist.');
-    if (!conduct.weaphit) lines.push(' You have never hit with a wielded weapon.');
+    if (!conduct.gnostic) lines.push(options.final ? ' You were an atheist.' : ' You have been an atheist.');
+    if (!conduct.weaphit) lines.push(options.final ? ' You never hit with a wielded weapon.' : ' You have never hit with a wielded weapon.');
     else if (game.flags?.debug) lines.push(` You have hit with a wielded weapon ${timesText(conduct.weaphit)}.`);
-    if (!conduct.killer) lines.push(' You have been a pacifist.');
-    if (!conduct.literate) lines.push(' You have been illiterate.');
+    if (!conduct.killer) lines.push(options.final ? ' You were a pacifist.' : ' You have been a pacifist.');
+    if (!conduct.literate) lines.push(options.final ? ' You were illiterate.' : ' You have been illiterate.');
     else if (game.flags?.debug) lines.push(` You have read items or engraved ${timesText(conduct.literate)}.`);
-    if (!conduct.pets) lines.push(' You have never had a pet.');
+    if (!conduct.pets) lines.push(options.final ? ' You never had a pet.' : ' You have never had a pet.');
 
     const ngenocided = conductGenocideCount();
-    if (!ngenocided) lines.push(' You have never genocided any monsters.');
+    if (!ngenocided) lines.push(options.final ? ' You never genocided any monsters.' : ' You have never genocided any monsters.');
     else lines.push(` You have genocided ${ngenocided} type${ngenocided === 1 ? '' : 's'} of monster${ngenocided === 1 ? '' : 's'}.`);
 
-    if (!conduct.polypiles) lines.push(' You have never polymorphed an object.');
+    if (!conduct.polypiles) lines.push(options.final ? ' You never polymorphed an object.' : ' You have never polymorphed an object.');
     else if (game.flags?.debug) lines.push(` You have polymorphed ${conduct.polypiles} item${conduct.polypiles === 1 ? '' : 's'}.`);
-    if (!conduct.polyselfs) lines.push(' You have never changed form.');
+    if (!conduct.polyselfs) lines.push(options.final ? ' You never changed form.' : ' You have never changed form.');
     else if (game.flags?.debug) lines.push(` You have changed form ${timesText(conduct.polyselfs)}.`);
     if (!conduct.wishes) {
-        lines.push(' You have used no wishes.');
+        lines.push(options.final ? ' You used no wishes.' : ' You have used no wishes.');
     } else {
         lines.push(` You have used ${conduct.wishes} wish${conduct.wishes === 1 ? '' : 'es'}.`);
-        if (!conduct.wisharti) lines.push(" You haven't wished for any artifacts.");
+        if (!conduct.wisharti)
+            lines.push(options.final ? " You didn't wish for any artifacts." : " You haven't wished for any artifacts.");
     }
 
     const achievements = Array.isArray(game.u?.uachieved) ? game.u.uachieved : [];
@@ -9300,12 +9463,12 @@ function conductLines() {
     return lines;
 }
 
-function renderTtyMenuTextWindow(lines) {
+function renderTtyMenuTextWindow(lines, options = {}) {
     // C refs: win/tty/wintty.c:tty_display_nhwindow(),
     // win/tty/wintty.c:process_text_window().  NHW_MENU windows filled by
     // putstr() are corner text overlays: one blank column, text, then More.
     const display = game.nhDisplay;
-    const maxcol = Math.max(0, ...lines.map((line) => String(line).length + 1));
+    const maxcol = Math.max(options.minWindowWidth || 0, ...lines.map((line) => String(line).length + 1));
     const maxrow = lines.length;
     let offx = Math.max(10, COLNO - maxcol - 1);
     const overlay = offx !== 10 && maxrow < C.TERMINAL_ROWS;
@@ -9325,34 +9488,54 @@ function renderTtyMenuTextWindow(lines) {
     };
 }
 
-function showConductScreen() {
+function showConductScreen(options = {}) {
     // C ref: src/insight.c:doconduct()/show_conduct().
     const display = game.nhDisplay;
     if (!display?.putstr) return;
-    const rendered = renderTtyMenuTextWindow(conductLines());
+    const rendered = renderTtyMenuTextWindow(conductLines(options), { minWindowWidth: 39 });
     game._conduct_screen = rendered.screen;
+    game._death_conduct_screen_active = !!options.death;
     showOverride(rendered.screen, rendered.cursor);
     game.context.move = 0;
 }
 
-function showVanquishedScreen() {
-    // C ref: src/mon.c:list_vanquished().
+function vanquishedLineText(entry) {
+    const name = entry.name || 'monster';
+    if ((entry.count || 0) === 1) return `${articleForWord(name)} ${name}`;
+    return `${String(entry.count || 0).padStart(3)} ${pluralizeObjectName(name)}`;
+}
+
+function vanquishedMenuLine(entry) {
+    const text = vanquishedLineText(entry);
+    const lower = text.toLowerCase();
+    const pfx = lower.startsWith('the ') ? 0
+        : lower.startsWith('an ') ? 1
+            : lower.startsWith('a ') ? 2
+                : !/^\d$/.test(text[2] || '') ? 4 : 0;
+    return `${' '.repeat(pfx)}${text}`;
+}
+
+function showVanquishedScreen(options = {}) {
+    // C ref: src/insight.c:list_vanquished().
     const display = game.nhDisplay;
     if (!display?.putstr) return;
-    const rows = [
-        [41, 'Vanquished creatures:', false, 0],
-        [43, 'a kobold', false, 2],
-        [43, 'a lichen', false, 3],
-        [41, '2 creatures vanquished.', false, 5],
-        [41, '--More--', false, 6],
-    ];
-    for (let row = 0; row <= 6; row++) display.putstr(0, row, ' '.repeat(COLNO), NO_COLOR, 0);
-    for (const [col, text, inverse, row] of rows) {
-        display.putstr(col, row, text, NO_COLOR, inverse ? ATR_INVERSE : 0);
+    const entries = vanquishedMonsterEntries();
+    const total = entries.reduce((sum, entry) => sum + entry.count, 0);
+    const lines = ['Vanquished creatures:', ''];
+    if (entries.length) {
+        for (const entry of entries) lines.push(vanquishedMenuLine(entry));
+        if (entries.length > 1) {
+            lines.push('');
+            lines.push(`${total} creatures vanquished.`);
+        }
+    } else {
+        lines.push(options.final ? 'No creatures were vanquished.' : 'No creatures have been vanquished.');
     }
-    const screen = serialize_terminal_grid(display);
+    const rendered = renderTtyMenuTextWindow(lines, { minWindowWidth: 39 });
+    const screen = rendered.screen;
     game._vanquished_screen = screen;
-    showOverride(screen, [49, 6]);
+    game._death_vanquished_screen_active = !!options.death;
+    showOverride(screen, rendered.cursor);
     game.context.move = 0;
 }
 
@@ -12986,6 +13169,7 @@ async function heroKilledMonster(mon) {
     if (mon.mtame) adjalign(-15);
     else if (mon.mpeaceful) adjalign(-5);
     adjalign(mon.malign ?? 0);
+    noteMonsterDied(mon);
     const monsters = game.level?.monsters || [];
     const idx = monsters.indexOf(mon);
     clearRememberedInvisibleAt(mon.mx, mon.my, false);
@@ -13748,11 +13932,37 @@ function pickupTypesStringFromSet(selected) {
     return pickupTypeSymbols().filter((symbol) => selected.has(symbol)).join('');
 }
 
+function pickupTypesMenuRows(selected) {
+    const rows = Array(22).fill('');
+    rows[0] = 'Autopickup what?';
+    for (const [letter, symbol, text] of PICKUP_TYPE_CLASSES) {
+        const row = letter.charCodeAt(0) - 95;
+        const marker = selected.has(symbol) ? '+' : '-';
+        rows[row] = `${letter} ${marker} ${symbol}  ${text}`;
+    }
+    rows[18] = 'A -    All classes of objects';
+    rows[19] = 'Note: when no choices are selected, "all" is implied.';
+    rows[20] = optionBool('flags', 'pickup')
+        ? "Toggle off 'autopickup' to not pick up anything."
+        : "Toggle on 'autopickup' to automatically pick these things up.";
+    rows[21] = '(end)';
+    return rows;
+}
+
+function ttyOverlayMenuTextColumn(lines) {
+    // C refs: win/tty/wintty.c:tty_end_menu(), tty_display_nhwindow().
+    const maxLen = Math.max(0, ...lines.map((line) => String(line || '').length));
+    const maxCol = Math.max(maxLen + 2, '(end) '.length);
+    const offx = Math.max(10, COLNO - maxCol - 1);
+    return offx === 10 ? 1 : offx + 1;
+}
+
 function renderPickupTypesMenu() {
     const display = game.nhDisplay;
     if (!display?.putstr) return;
-    const col = 25;
     const selected = game._pickup_types_menu?.selected || new Set();
+    const rows = pickupTypesMenuRows(selected);
+    const col = ttyOverlayMenuTextColumn(rows);
     // C refs: src/options.c:optfn_pickup_types(),
     // src/windows.c:choose_classes_menu().  The tty class chooser is a menu
     // overlay on the map; row 0 is fully cleared, lower rows clear only the
@@ -13763,17 +13973,11 @@ function renderPickupTypesMenu() {
     }
     display.putstr(0, 22, ' '.repeat(COLNO), NO_COLOR, 0);
     display.putstr(0, 23, ' '.repeat(COLNO), NO_COLOR, 0);
-    display.putstr(col, 0, 'Autopickup what?', NO_COLOR, ATR_INVERSE);
-    for (const [letter, symbol, text] of PICKUP_TYPE_CLASSES) {
-        const row = letter.charCodeAt(0) - 95;
-        const marker = selected.has(symbol) ? '+' : '-';
-        display.putstr(col, row, `${letter} ${marker} ${symbol}  ${text}`, NO_COLOR, 0);
+    for (let row = 0; row < rows.length; row++) {
+        if (!rows[row]) continue;
+        display.putstr(col, row, rows[row], NO_COLOR, row === 0 ? ATR_INVERSE : 0);
     }
-    display.putstr(col, 18, 'A -    All classes of objects', NO_COLOR, 0);
-    display.putstr(col, 19, 'Note: when no choices are selected, "all" is implied.', NO_COLOR, 0);
-    display.putstr(col, 20, "Toggle off 'autopickup' to not pick up anything.", NO_COLOR, 0);
-    display.putstr(col, 21, '(end)', NO_COLOR, 0);
-    showOverride(serialize_terminal_grid(display), [31, 21]);
+    showOverride(serialize_terminal_grid(display), [col + '(end)'.length + 1, 21]);
 }
 
 async function beginPickupTypesMenu() {
@@ -16702,6 +16906,14 @@ async function handleQueuedMore(ch) {
                 game._extra_encumbered_turn_pending = false;
                 game._resume_encumbered_extra_turn_after_more_prompt = false;
             }
+            if (game._monster_attack_tail_packed_current_more) {
+                game._monster_attack_tail_packed_current_more = false;
+                if (!game._monster_death_pending
+                    && !game._after_more_message
+                    && !game._after_more_needs_prompt) {
+                    needsPrompt = false;
+                }
+            }
             if (game._monster_death_pending || game._after_more_message || game._after_more_needs_prompt)
                 needsPrompt = true;
             if (deferredPetDeathCanPack && game._pet_defender_death_pending) {
@@ -16965,6 +17177,22 @@ async function handleQueuedMore(ch) {
         game._monster_attack_more_waiting = false;
         game._resume_turn_tail_after_more = true;
         game.context.move = 1;
+    } else if (pausedMonsterTurn && !game._more
+        && (game._death_inventory_disclosure_prompt_active
+            || game._death_disclosure_active
+            || game._death_save_bones_prompt_active
+            || game._death_replace_bones_prompt_active
+            || game._death_blank_more_active)) {
+        // C refs: src/end.c:done()/really_done(), win/tty/topl.c:more().
+        // Once ordinary death has advanced into disclosure/bones prompts, the
+        // interrupted monster turn does not resume its allmain turn tail.
+        game._monster_turn_paused_for_more = false;
+        game._swallowed_damage_more_waiting = false;
+        game._pre_turn_more_waiting = false;
+        game._monster_attack_more_waiting = false;
+        game._resume_turn_tail_after_more = false;
+        game._resume_monster_turn = false;
+        game.context.move = 0;
     } else if (pausedMonsterTurn && !game._more && !game._death_prompt_active) {
         const resumeTailOnly = !!game._resume_turn_tail_after_more;
         game._monster_turn_paused_for_more = false;
@@ -18442,6 +18670,213 @@ function buildAttributesScreens() {
         return { page1: wizardAttributesPage1(), page2: wizardAttributesPage2(), page3: null };
     }
     return { page1: roleAttributesPage1(), page2: roleAttributesPage2(), page3: roleAttributesPage3() };
+}
+
+function deathEnergyLine() {
+    const en = game.u?.uen ?? 0;
+    const enmax = game.u?.uenmax ?? en;
+    if (en >= enmax) {
+        if (enmax === 1) return '  You had your single energy point (spell power).';
+        if (enmax === 2) return '  You had both energy points (spell power).';
+        return `  You had all ${enmax} energy points (spell power).`;
+    }
+    return `  You had ${en} out of ${enmax} energy points (spell power).`;
+}
+
+function deathAttrLine(label, index) {
+    const value = insightAttrValueText(index, heroAttr(index));
+    const limit = insightAttrValueText(index, heroAttrLimit(index));
+    return `  Your ${label} was ${value} (limit:${limit}).`;
+}
+
+function deathBackgroundRoleLine(role, roleName, rank, female) {
+    const gender = roleInsightGenderPrefix(role, female);
+    const level = game.u?.ulevel || 1;
+    return `  You were ${articleForWord(rank)} ${rank}, a level ${level} ${gender}${insightRaceAdjective()} ${roleName}.`;
+}
+
+function deathLocationLine() {
+    // C ref: src/insight.c:background_enlightenment().
+    const uz = game.u?.uz || { dnum: 0, dlevel: 1 };
+    if (C.In_endgame?.(uz)) return `  You were in the endgame, on the ${insightEndgameLevelName(uz)}.`;
+    let dungeonName = game.dungeons?.[uz.dnum]?.dname || 'The Dungeons of Doom';
+    if (/^The /i.test(dungeonName)) dungeonName = dungeonName[0].toLowerCase() + dungeonName.slice(1);
+    const levelNumber = C.In_quest?.(uz) ? (uz.dlevel ?? 1) : displayDepth(uz);
+    return `  You were in ${dungeonName}, on level ${levelNumber}.`;
+}
+
+function deathExperienceLine() {
+    // C ref: src/insight.c:background_enlightenment().
+    const level = game.u?.ulevel || 1;
+    const xp = game.u?.uexp || 0;
+    let text = `${xp} experience point${xp === 1 ? '' : 's'}`;
+    if (level < 30) {
+        const delta = Math.max(0, newuexp(level) - xp);
+        const attainText = level < 18 ? 'to attain' : 'for';
+        text += `, ${delta} ${xp > 0 ? 'more ' : ''}were needed ${attainText} level ${level + 1}`;
+    }
+    return `  You had ${text}.`;
+}
+
+function deathEncumbranceLine() {
+    const enc = game.u?.uencumber || 0;
+    if (enc <= 0) return '  You were unencumbered.';
+    if (enc === 1) return '  You were burdened; movement was slightly slowed.';
+    if (enc === 2) return '  You were stressed; movement was moderately slowed.';
+    if (enc === 3) return '  You were strained; movement was significantly slowed.';
+    if (enc === 4) return '  You were overtaxed; movement was extremely slowed.';
+    return '  You were overloaded; you could not move.';
+}
+
+function deathWeaponSkillInsightLine(obj, skillName) {
+    const levelName = weaponSkillLevelName(obj);
+    if (levelName === 'unskilled' || levelName === 'skilled')
+        return `  You were ${levelName} in ${skillName}.`;
+    return `  You had ${levelName} skill with ${skillName}.`;
+}
+
+function deathStatusLines() {
+    const wielded = (game.inventory || []).find((obj) => obj?.wielded || ((obj?.owornmask || 0) & C.W_WEP));
+    const lines = ['', 'Final Status:', "  You weren't hungry.", deathEncumbranceLine()];
+    if (wielded) {
+        const skill = weaponSkillName(wielded);
+        lines.push(`  You were wielding ${articleForWord(skill)} ${skill}.`);
+        lines.push(deathWeaponSkillInsightLine(wielded, skill));
+    } else {
+        lines.push(`  You were ${emptyHandedInsightText()}.`);
+        lines.push(bareHandSkillInsightLine().replace('You have', 'You had').replace('You are', 'You were'));
+    }
+    return lines;
+}
+
+function deathAlignmentLine() {
+    const alignRecord = game.u?.ualign?.record ?? 0;
+    const alignText = alignRecord < -20 ? 'had transgressed'
+        : alignRecord < 0 ? 'had strayed'
+            : alignRecord > 0 ? 'were haltingly aligned' : 'were nominally aligned';
+    return `  You ${alignText}.`;
+}
+
+function deathFinalAttributeLines() {
+    const lines = ['', 'Final Attributes:', deathAlignmentLine()];
+    if (magicResistanceInsightLine()) lines.push('  You were magic-protected.');
+    if (game.u?.uprops?.infravision || game.urace?.name === 'gnome')
+        lines.push('  You had infravision.');
+    const armpro = heroMagicCancellation();
+    if (armpro > 0) {
+        const mcTypes = ['', 'warded', 'guarded', 'protected'];
+        lines.push(`  You were ${mcTypes[Math.min(armpro, mcTypes.length - 1)]}.`);
+    }
+    const luck = game.u?.uluck ?? 0;
+    if (luck < 0) lines.push('  You were unlucky.');
+    else if (luck > 0) lines.push('  You were lucky.');
+    lines.push('  You are dead.');
+    return lines;
+}
+
+function deathAttributesPages() {
+    const role = game.urole || {};
+    const female = !!game.flags?.female;
+    const roleName = female ? (role.name?.f || role.name?.m || 'Adventurer') : (role.name?.m || 'Adventurer');
+    const rank = roleRankForLevel(role, game.u?.ulevel || 1, female) || roleName;
+    const alignName = alignNameForHero();
+    const playerName = sentenceStart(game.plname || 'Adventurer');
+    const moonLine = game.flags?.moonphase === 4
+        ? '  There was a full moon in effect when your adventure ended.'
+        : game.flags?.moonphase === 0
+            ? '  There was a new moon in effect when your adventure ended.'
+            : '';
+    const page1 = [
+        `${playerName} the ${roleName}'s attributes:`,
+        '',
+        'Background:',
+        deathBackgroundRoleLine(role, roleName, rank, female),
+        `  You were ${alignName}, on a mission for ${roleGod(role, alignName)}`,
+        roleOppositionLine(role, alignName).replace('is opposed', 'was opposed'),
+        `  You were ${game.u?.uhandedness || 'right'}-handed.`,
+        deathLocationLine(),
+        insightDungeonTurnsLine(),
+        ...(game.iflags?.at_night ? ['  It was nighttime.'] : []),
+        ...(moonLine ? [moonLine] : []),
+        deathExperienceLine(),
+        '',
+        'Basics:',
+        insightHpLine().replace('You have', 'You had'),
+        deathEnergyLine(),
+        `  Your armor class was ${game.u?.uac ?? 10}.`,
+        heroGoldAmount() > 0 ? `  Your wallet contained ${heroGoldAmount()} zorkmids.` : '  Your wallet was empty.',
+        autopickupInsightLine().replace('Autopickup is', 'Autopickup was'),
+        '',
+        'Final Characteristics:',
+        deathAttrLine('strength', C.A_STR),
+        deathAttrLine('dexterity', C.A_DEX),
+        '  --More--',
+    ];
+    const page2 = [
+        deathAttrLine('constitution', C.A_CON),
+        deathAttrLine('intelligence', C.A_INT),
+        deathAttrLine('wisdom', C.A_WIS),
+        deathAttrLine('charisma', C.A_CHA),
+        ...deathStatusLines(),
+        ...deathFinalAttributeLines(),
+        '',
+        'Miscellaneous:',
+        "  You didn't encounter any bones levels.",
+        '  Total elapsed playing time was none.',
+        '  --More--',
+    ];
+    const finalIndent = (line) => line.startsWith('  ') ? line.slice(1) : line;
+    return { page1: page1.map(finalIndent).join('\n'), page2: page2.map(finalIndent).join('\n') };
+}
+
+function showDeathAttributesPage1() {
+    const pages = deathAttributesPages();
+    game._death_attributes_page1_screen = pages.page1;
+    game._death_attributes_page2_screen = pages.page2;
+    showOverride(pages.page1, [9, C.TERMINAL_ROWS - 1]);
+    game.context.move = 0;
+}
+
+async function showDeathCreaturesPrompt() {
+    if (!vanquishedMonsterEntries().length) {
+        await showDeathConductPrompt();
+        return;
+    }
+    game._death_creatures_prompt_active = true;
+    game._death_attributes_page1_screen = null;
+    game._death_attributes_page2_screen = null;
+    clearOverrideScreen();
+    await redrawAfterFullScreenMenuDismiss();
+    const msg = 'Do you want an account of creatures vanquished? [ynaq] (n)';
+    await showPromptLine(msg);
+    game._prompt_cursor = [msg.length + 1, 0];
+    game.context.move = 0;
+}
+
+async function showDeathConductPrompt() {
+    // C ref: src/end.c:disclose().
+    game._death_conduct_prompt_active = true;
+    game._death_vanquished_screen_active = false;
+    game._vanquished_screen = null;
+    clearOverrideScreen();
+    await redrawAfterFullScreenMenuDismiss();
+    const msg = 'Do you want to see your conduct? [ynq] (n)';
+    await showPromptLine(msg);
+    game._prompt_cursor = [msg.length + 1, 0];
+    game.context.move = 0;
+}
+
+async function showDeathOverviewPrompt() {
+    // C ref: src/end.c:disclose().
+    game._death_overview_prompt_active = true;
+    game._death_conduct_screen_active = false;
+    game._conduct_screen = null;
+    clearOverrideScreen();
+    await redrawAfterFullScreenMenuDismiss();
+    const msg = 'Do you want to see the dungeon overview? [ynq] (n)';
+    await showPromptLine(msg);
+    game._prompt_cursor = [msg.length + 1, 0];
+    game.context.move = 0;
 }
 
 function shouldAskTutorial() {
@@ -20769,15 +21204,126 @@ export async function rhack(key) {
     }
 
     if (game._death_inventory_disclosure_prompt_active) {
-        if (ch === 'y' || ch === 'Y' || ch === 'n' || ch === 'N'
-            || ch === 'q' || ch === 'Q' || ch === ' ' || ch === '\r' || ch === '\n') {
+        if (ch === 'y' || ch === 'Y') {
             game._death_inventory_disclosure_prompt_active = false;
+            clear_pending_message();
+            showDeathInventoryDisclosurePage(0);
+            game.context.move = 0;
+            return;
+        }
+        if (ch === 'n' || ch === 'N' || ch === 'q' || ch === 'Q'
+            || ch === ' ' || ch === '\r' || ch === '\n') {
+            game._death_inventory_disclosure_prompt_active = false;
+            clear_pending_message();
+            await showDeathAttributesPrompt();
+            game.context.move = 0;
+            return;
+        }
+        const msg = 'Do you want your possessions identified? [ynq] (n)';
+        await showPromptLine(msg);
+        game._prompt_cursor = [msg.length + 1, 0];
+        game.context.move = 0;
+        return;
+    }
+
+    if (game._death_attributes_prompt_active) {
+        if (ch === 'y' || ch === 'Y') {
+            game._death_attributes_prompt_active = false;
+            clear_pending_message();
+            showDeathAttributesPage1();
+            game.context.move = 0;
+            return;
+        }
+        if (ch === 'n' || ch === 'N' || ch === 'q' || ch === 'Q'
+            || ch === ' ' || ch === '\r' || ch === '\n') {
+            game._death_attributes_prompt_active = false;
+            clear_pending_message();
+            await showDeathCreaturesPrompt();
+            game.context.move = 0;
+            return;
+        }
+        const msg = 'Do you want to see your attributes? [ynq] (n)';
+        await showPromptLine(msg);
+        game._prompt_cursor = [msg.length + 1, 0];
+        game.context.move = 0;
+        return;
+    }
+
+    if (game._death_creatures_prompt_active) {
+        if (ch === 'y' || ch === 'Y' || ch === 'a' || ch === 'A') {
+            game._death_creatures_prompt_active = false;
+            clear_pending_message();
+            showVanquishedScreen({ final: true, death: true });
+            game.context.move = 0;
+            return;
+        }
+        if (ch === 'q' || ch === 'Q') {
+            game._death_creatures_prompt_active = false;
             clear_pending_message();
             await showDeathDisclosure();
             game.context.move = 0;
             return;
         }
-        const msg = 'Do you want your possessions identified? [ynq] (n)';
+        if (ch === 'n' || ch === 'N' || ch === ' ' || ch === '\r' || ch === '\n') {
+            game._death_creatures_prompt_active = false;
+            clear_pending_message();
+            await showDeathConductPrompt();
+            game.context.move = 0;
+            return;
+        }
+        const msg = 'Do you want an account of creatures vanquished? [ynaq] (n)';
+        await showPromptLine(msg);
+        game._prompt_cursor = [msg.length + 1, 0];
+        game.context.move = 0;
+        return;
+    }
+
+    if (game._death_conduct_prompt_active) {
+        if (ch === 'y' || ch === 'Y') {
+            game._death_conduct_prompt_active = false;
+            clear_pending_message();
+            showConductScreen({ final: true, death: true });
+            game.context.move = 0;
+            return;
+        }
+        if (ch === 'q' || ch === 'Q') {
+            game._death_conduct_prompt_active = false;
+            clear_pending_message();
+            await showDeathDisclosure();
+            game.context.move = 0;
+            return;
+        }
+        if (ch === 'n' || ch === 'N' || ch === ' ' || ch === '\r' || ch === '\n') {
+            game._death_conduct_prompt_active = false;
+            clear_pending_message();
+            await showDeathOverviewPrompt();
+            game.context.move = 0;
+            return;
+        }
+        const msg = 'Do you want to see your conduct? [ynq] (n)';
+        await showPromptLine(msg);
+        game._prompt_cursor = [msg.length + 1, 0];
+        game.context.move = 0;
+        return;
+    }
+
+    if (game._death_overview_prompt_active) {
+        if (ch === 'y' || ch === 'Y') {
+            game._death_overview_prompt_active = false;
+            clear_pending_message();
+            showOverviewScreen({ final: true, death: true });
+            game.context.move = 0;
+            return;
+        }
+        if (ch === 'n' || ch === 'N' || ch === 'q' || ch === 'Q'
+            || ch === ' ' || ch === '\r' || ch === '\n') {
+            game._death_overview_prompt_active = false;
+            clear_pending_message();
+            await showDeathDisclosure();
+            game.context.move = 0;
+            return;
+        }
+        const msg = 'Do you want to see the dungeon overview? [ynq] (n)';
         await showPromptLine(msg);
         game._prompt_cursor = [msg.length + 1, 0];
         game.context.move = 0;
@@ -22070,7 +22616,7 @@ export async function rhack(key) {
             game._wish_input = '';
             const obj = make_wish_object(wish);
             if (obj) await pline(`${inventoryListing(obj, { includeCharges: false })}.`);
-            game.context.move = 0;
+            game.context.move = (await finishFountainWishDryupAfterWish()) ? 1 : 0;
             return;
         }
         if (ch === '\x1b') {
@@ -22081,7 +22627,7 @@ export async function rhack(key) {
             game._wish_input = '';
             const obj = make_wish_object('');
             if (obj) await pline(`${inventoryListing(obj, { includeCharges: false })}.`);
-            game.context.move = 0;
+            game.context.move = (await finishFountainWishDryupAfterWish()) ? 1 : 0;
             return;
         }
         game._wish_input = `${game._wish_input || ''}${ch}`;
@@ -23252,6 +23798,34 @@ export async function rhack(key) {
             game.context.move = 0;
             return;
         }
+        if (prev === game._death_inventory_disclosure_screen) {
+            const dismiss = ch === ' ' || ch === '\r' || ch === '\n';
+            const pages = Array.isArray(game._death_inventory_disclosure_pages)
+                ? game._death_inventory_disclosure_pages
+                : [];
+            const page = game._death_inventory_disclosure_page || 0;
+            if (dismiss && page + 1 < pages.length) {
+                showDeathInventoryDisclosurePage(page + 1);
+            } else {
+                await showDeathAttributesPrompt();
+            }
+            game.context.move = 0;
+            return;
+        }
+        if (prev === game._death_attributes_page1_screen) {
+            if (ch === ' ' || ch === '\r' || ch === '\n') {
+                showOverride(game._death_attributes_page2_screen, [9, Math.max(0, game._death_attributes_page2_screen.split('\n').length - 1)]);
+            } else {
+                await showDeathCreaturesPrompt();
+            }
+            game.context.move = 0;
+            return;
+        }
+        if (prev === game._death_attributes_page2_screen) {
+            await showDeathCreaturesPrompt();
+            game.context.move = 0;
+            return;
+        }
         if (prev === game._level_teleport_menu_screen) {
             if (ch === ' ') {
                 const menu = buildLevelTeleportMenuPage2();
@@ -23436,6 +24010,30 @@ export async function rhack(key) {
         }
         if (prev === game._enhance_skills_screen) {
             await handleEnhanceSelection(ch);
+            return;
+        }
+        if (prev === game._vanquished_screen && game._death_vanquished_screen_active) {
+            game._death_vanquished_screen_active = false;
+            game._vanquished_screen = null;
+            clearOverrideScreen();
+            await showDeathConductPrompt();
+            game.context.move = 0;
+            return;
+        }
+        if (prev === game._conduct_screen && game._death_conduct_screen_active) {
+            game._death_conduct_screen_active = false;
+            game._conduct_screen = null;
+            clearOverrideScreen();
+            await showDeathOverviewPrompt();
+            game.context.move = 0;
+            return;
+        }
+        if (prev === game._overview_screen && game._death_overview_screen_active) {
+            game._death_overview_screen_active = false;
+            game._overview_screen = null;
+            clearOverrideScreen();
+            await showDeathDisclosure();
+            game.context.move = 0;
             return;
         }
         if (prev === game._look_data_screen
