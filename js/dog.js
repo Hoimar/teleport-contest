@@ -6,7 +6,7 @@ import {
     enexto_core, makemon, mkcorpstat, mksobj, monsterPtr, next_ident,
     place_object, set_malign_basic, undead_to_corpse_ptr,
 } from './mklev.js';
-import { OBJECT_CLASS, OBJECT_DELAY } from './object_data.js';
+import { OBJECT_CLASS, OBJECT_DELAY, OBJECT_NAME } from './object_data.js';
 import { MONSTER_DATA } from './monster_data.js';
 import {
     newsym, pline, queue_more_prompt, flush_screen,
@@ -796,7 +796,27 @@ function object_name(obj) {
         const spe = typeof obj.spe === 'number' ? `${obj.spe >= 0 ? '+' : ''}${obj.spe} ` : '';
         return `a ${buc}${spe}quarterstaff`;
     }
+    const known = known_object_name(obj);
+    if (known) return `${indefinite_article(known)} ${known}`;
     return 'an object';
+}
+
+function known_object_type(obj) {
+    return !!obj?.knownName
+        || !!(game.discoveredObjects
+            && typeof game.discoveredObjects.has === 'function'
+            && game.discoveredObjects.has(obj?.otyp));
+}
+
+function known_object_name(obj) {
+    if (!obj || !Number.isInteger(obj.otyp)) return '';
+    const name = OBJECT_NAME[obj.otyp];
+    if (!name) return '';
+    // C refs: mon.c:mpickstuff(), dogmove.c:dog_move(),
+    // objnam.c:distant_name()/doname().  If a type has no OBJ_DESCR(), doname()
+    // can use the table name directly; otherwise require type discovery.
+    if (!getObjectDescription(obj.otyp) || known_object_type(obj)) return name;
+    return '';
 }
 
 function corpse_species_name(corpsenm) {

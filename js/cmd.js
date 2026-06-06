@@ -3700,7 +3700,7 @@ function baseObjectName(obj) {
         if (obj.cursed) return 'potion of unholy water';
         return 'potion of water';
     }
-    if (obj?.otyp === SACK && !obj.knownName) {
+    if (obj?.otyp === SACK && !objectTypeNameKnown(obj)) {
         // C ref: src/objnam.c:xname_flags().  A plain sack uses its object
         // description, "bag", until its exact type is known.
         return 'bag';
