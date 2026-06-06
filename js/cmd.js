@@ -20063,6 +20063,14 @@ function renderLevelTeleportPage(pageIndex) {
     };
 }
 
+function levelTeleportMenuCursor(screen) {
+    // C ref: win/tty/wintty.c:process_menu_window()/dmore().
+    // tty leaves the cursor after the printed "(N of M)" page footer.
+    const lines = String(screen || '').split('\n');
+    const row = Math.max(0, lines.length - 1);
+    return [Math.min(lines[row]?.length ?? 0, COLNO - 1), row];
+}
+
 function buildLevelTeleportMenu() {
     return renderLevelTeleportPage(0);
 }
@@ -22513,7 +22521,7 @@ export async function rhack(key) {
                 const menu = buildLevelTeleportMenu();
                 game._level_teleport_menu_screen = menu.screen;
                 game._level_teleport_menu_choices = menu.choices;
-                showOverride(menu.screen, [9, 23]);
+                showOverride(menu.screen, levelTeleportMenuCursor(menu.screen));
             }
             game.context.move = 0;
             return;
@@ -23823,7 +23831,7 @@ export async function rhack(key) {
                 const menu = buildLevelTeleportMenuPage2();
                 game._level_teleport_menu_page2_screen = menu.screen;
                 game._level_teleport_menu_page2_choices = menu.choices;
-                showOverride(menu.screen, [9, 23]);
+                showOverride(menu.screen, levelTeleportMenuCursor(menu.screen));
                 game.context.move = 0;
                 return;
             }
@@ -23841,7 +23849,7 @@ export async function rhack(key) {
                 if (menu.pageIndex < menu.totalPages) {
                     game._level_teleport_menu_page3_screen = menu.screen;
                     game._level_teleport_menu_page3_choices = menu.choices;
-                    showOverride(menu.screen, [9, 23]);
+                    showOverride(menu.screen, levelTeleportMenuCursor(menu.screen));
                 }
                 game.context.move = 0;
                 return;

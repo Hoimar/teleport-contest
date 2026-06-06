@@ -64,6 +64,7 @@ game._preNhgetchHook = async () => {
         const screen = nhGame.getScreens().at(-1) || '';
         const top = String(screen).split('\n')[0] || '';
         const expected = seg.steps?.[screenIndex] || {};
+        const actualCursor = nhGame.getCursors().at(-1) || null;
         const monsters = (game.level?.monsters || [])
             .filter((mon) => !ids || ids.has(mon.m_id))
             .map((mon, index) => ({
@@ -91,6 +92,8 @@ game._preNhgetchHook = async () => {
             more: !!game._more,
             ux: game.u?.ux,
             uy: game.u?.uy,
+            cursorExpected: expected.cursor ?? null,
+            cursorActual: actualCursor,
             monsters,
         }));
     }
