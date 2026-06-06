@@ -24,6 +24,7 @@ import {
     continueRunStep, dosearch0_basic, finish_pending_eaten_corpse, finishPrayerResult,
     invaultBasic, monsterNearbyForSafety,
     performLevelTeleport, rhack,
+    resumeFireDirectionAfterTurnMore,
     shouldStopRunForNearbyMonster, showDeferredMoveFloorList,
 } from './cmd.js';
 import { nhgetch } from './input.js';
@@ -2327,6 +2328,12 @@ export async function moveloop_core() {
                     // swap can consume a turn and produce monster/pet output
                     // before the canned dofire retry reaches getdir().
                     queue_more_prompt();
+                    return;
+                }
+                if (fireDirectionNeedsTurnMore
+                    && !g._more
+                    && !g._monster_turn_paused_for_more) {
+                    await resumeFireDirectionAfterTurnMore();
                     return;
                 }
                 if (g._more && g._deferred_move_floor_list_resume_turn_tail) return;

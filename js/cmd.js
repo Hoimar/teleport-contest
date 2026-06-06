@@ -2362,7 +2362,11 @@ async function doFireCommand() {
             if (wielded && wielded !== launcher) {
                 game._more_message_queue = [
                     ...(game._more_message_queue || []),
-                    { text: `${inventoryListing(wielded, { includeWorn: true })}.`, more: true },
+                    {
+                        text: `${inventoryListing(wielded, { includeWorn: true })}.`,
+                        more: true,
+                        skipOnEscMore: true,
+                    },
                 ];
             }
             game._fire_direction_after_more = obj;
@@ -2383,6 +2387,18 @@ async function doFireCommand() {
     game._awaiting_throw_direction = obj;
     game.context.move = 0;
     await showPromptLine('In what direction? ');
+}
+
+export async function resumeFireDirectionAfterTurnMore() {
+    const obj = game._fire_direction_after_more;
+    if (!obj) return false;
+    game._fire_direction_after_more = null;
+    game._fire_direction_after_more_takes_turn = false;
+    game._fire_turn_before_direction_after_more = false;
+    game._awaiting_throw_direction = obj;
+    await showPromptLine('In what direction? ');
+    game.context.move = 0;
+    return true;
 }
 
 function stairAtHero() {
@@ -15865,6 +15881,7 @@ async function handleQueuedMore(ch) {
     game._pending_more_strict_keys = false;
     game._more_dismissals_remaining--;
     game._monster_more_accepts_any_key = false;
+    const moreDismissedByEsc = ch === '\x1b';
     if (game._avoid_pool_tip_pending && game._more_dismissals_remaining <= 0) {
         // C refs: src/hack.c:swim_move_danger(), src/hack.c:handle_tip().
         // The liquid-avoidance line owns the blocking More; dismissing it
@@ -16355,65 +16372,69 @@ async function handleQueuedMore(ch) {
         }
         if (game._more_message_queue?.length) {
             const next = game._more_message_queue.shift();
-            clearLatchedStatusAttrsAfterMore();
-            if (next.exercise) exercise(next.exercise.attr, !!next.exercise.positive);
-            if (next.visionRecalcBefore) {
-                vision_recalc(2);
-                vision_recalc(0);
-            }
-            if (next.attrDelta && game.u?.acurr?.a) {
-                for (const [attr, delta] of Object.entries(next.attrDelta)) {
-                    const ndx = Number(attr);
-                    game.u.acurr.a[ndx] = Math.max(3, (game.u.acurr.a[ndx] || 3) + delta);
+            if (next.skipOnEscMore && moreDismissedByEsc) {
+                game._more_next_message_row = false;
+            } else {
+                clearLatchedStatusAttrsAfterMore();
+                if (next.exercise) exercise(next.exercise.attr, !!next.exercise.positive);
+                if (next.visionRecalcBefore) {
+                    vision_recalc(2);
+                    vision_recalc(0);
                 }
-            }
-            const wrapWithMore = !!next.wrapWithMore
-                && String(next.text || '').length > (game.nhDisplay?.cols || COLNO);
-            if (wrapWithMore) await plineWithMorePrompt(next.text);
-            else await pline(next.text);
-            if (next.packAfter) {
-                if (game._pending_message && topline_can_pack_message(game._pending_message, next.packAfter)) {
-                    await append_pline(next.packAfter);
-                } else {
-                    queue_more_prompt();
-                    game._more_message_queue = [
-                        { text: next.packAfter, more: !!next.more },
-                        ...(game._more_message_queue || []),
-                    ];
-                    game._more_next_message_row = false;
-                    game.context.move = next.move ? 1 : 0;
+                if (next.attrDelta && game.u?.acurr?.a) {
+                    for (const [attr, delta] of Object.entries(next.attrDelta)) {
+                        const ndx = Number(attr);
+                        game.u.acurr.a[ndx] = Math.max(3, (game.u.acurr.a[ndx] || 3) + delta);
+                    }
+                }
+                const wrapWithMore = !!next.wrapWithMore
+                    && String(next.text || '').length > (game.nhDisplay?.cols || COLNO);
+                if (wrapWithMore) await plineWithMorePrompt(next.text);
+                else await pline(next.text);
+                if (next.packAfter) {
+                    if (game._pending_message && topline_can_pack_message(game._pending_message, next.packAfter)) {
+                        await append_pline(next.packAfter);
+                    } else {
+                        queue_more_prompt();
+                        game._more_message_queue = [
+                            { text: next.packAfter, more: !!next.more },
+                            ...(game._more_message_queue || []),
+                        ];
+                        game._more_next_message_row = false;
+                        game.context.move = next.move ? 1 : 0;
+                        return true;
+                    }
+                }
+                if (next.amuletWishPromptAfterMore)
+                    game._amulet_wish_prompt_after_more = true;
+                if (game._cream_pie_resist_after_more) {
+                    obj_resists(game._cream_pie_resist_after_more, 0, 0);
+                    game._cream_pie_resist_after_more = null;
+                }
+                applyPolyselfQueuedState(next.polyState);
+                if (wrapWithMore) {
+                    if (next.resumeSpotEffects) game._resume_spot_effects_after_more = true;
+                    game.context.move = 0;
                     return true;
                 }
-            }
-            if (next.amuletWishPromptAfterMore)
-                game._amulet_wish_prompt_after_more = true;
-            if (game._cream_pie_resist_after_more) {
-                obj_resists(game._cream_pie_resist_after_more, 0, 0);
-                game._cream_pie_resist_after_more = null;
-            }
-            applyPolyselfQueuedState(next.polyState);
-            if (wrapWithMore) {
-                if (next.resumeSpotEffects) game._resume_spot_effects_after_more = true;
-                game.context.move = 0;
+                game._more_next_message_row = false;
+                if (next.more) queue_more_prompt();
+                else {
+                    game._more = false;
+                    if (next.resumeSpotEffects) {
+                        game._resume_floor_list_turn = false;
+                        await triggerSpotEffectsAtHero();
+                        if (!game._more) finishPendingMoveSmudge();
+                    }
+                    if (preTurnResume) {
+                        game._deferred_pre_turn_after_more = true;
+                        game._monster_turn_paused_for_more = false;
+                        game._pre_turn_more_waiting = false;
+                    }
+                }
+                game.context.move = next.move ? 1 : 0;
                 return true;
             }
-            game._more_next_message_row = false;
-            if (next.more) queue_more_prompt();
-            else {
-                game._more = false;
-                if (next.resumeSpotEffects) {
-                    game._resume_floor_list_turn = false;
-                    await triggerSpotEffectsAtHero();
-                    if (!game._more) finishPendingMoveSmudge();
-                }
-                if (preTurnResume) {
-                    game._deferred_pre_turn_after_more = true;
-                    game._monster_turn_paused_for_more = false;
-                    game._pre_turn_more_waiting = false;
-                }
-            }
-            game.context.move = next.move ? 1 : 0;
-            return true;
         }
         if (game._amulet_wish_prompt_after_more) {
             game._amulet_wish_prompt_after_more = false;
