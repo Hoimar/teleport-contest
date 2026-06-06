@@ -588,9 +588,10 @@ function startupMenuColumn(kind, lines, rightSide) {
     if (!rightSide) return 1;
     if (kind !== 'confirm') return 41;
 
-    // C refs: win/tty/wintty.c:tty_end_menu(), tty_display_nhwindow().
+    // C refs: src/role.c:plsel_startmenu(),
+    // win/tty/wintty.c:tty_end_menu()/tty_display_nhwindow().
     const maxLen = Math.max(...lines.map(visibleStartupMenuLength));
-    return Math.max(0, COLNO - maxLen - 2);
+    return Math.max(0, COLNO - Math.max(maxLen, 37) - 2);
 }
 
 function renderStartupMenu(lines, kind, rightSide) {

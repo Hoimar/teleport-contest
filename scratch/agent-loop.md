@@ -14,41 +14,35 @@ and `feature_map.md`.
 
 - Current branch in this workspace: `main`, ahead of origin.
 - Latest verified repair unit:
-  - `seed0006-wizard-water-demon`: exact
+  - `seed0012-monk-vault-escort`: exact
+    `S 308/308 R 13878/13878 C 0`.
+  - Guard `seed0006-wizard-water-demon`: exact
     `S 123/123 R 6736/6736 C 0`.
-  - `seed0383-wizard-hallucinate`: exact
-    `S 219/219 R 16915/16915 C 0`.
+  - Guard `seed0077-rogue-chargen`: improved from
+    `S 29/33 R 3242/3242 C 0` to `S 30/33 R 3242/3242 C 0`; remaining
+    first mismatch is later map glyph state at screen 15.
   - Strict sentinels exact: `5/5 S 1063/1063 R 64569/64569 C 0`.
-  - `verify --target seed0006-wizard-water-demon` and
-    `verify --target seed0383-wizard-hallucinate` passed their target
-    expectations plus strict sentinels, `hack:audit`
-    (`hard=0 suspicious=45`), and `memory:lint` (`issues=0`).
-  - `git diff --check` passed.
-  - Latest live `parity:state -- --refresh-live`: checked-in public
-    `exact 28/44 S 8851/11405 R 637095/792838 C 1`; hosted public cache
-    `exact 26/44 S 7947/10982 R 503231/840358 C 1`; class
-    `public-session-drift`; strict sentinel exact. Leaderboard refresh was
-    unavailable because the fetch failed.
-  - Implementation: startup/manual chargen edge cases, pickup type menu/current
-    column/run-stop behavior, fountain water demon creation and rare wish
-    branch, tame/pet and stale display repairs, monster weapon/demon attack
-    sequencing, ordinary death disclosure through inventory/attributes,
-    vanquished/conduct/overview/final resting place, `mvitals[].died`-style
-    death accounting, and deferred `AD_COLD` side-effect packing after a
-    monster hit More (`C refs: role.c:ok_role()/ok_race()/ok_gend()/ok_align(),
-    fountain.c:drinkfountain()/dowaterdemon()/dryup(),
-    mhitu.c:mattacku()/hitmu(), end.c:disclose(),
-    insight.c:list_vanquished()/show_conduct(),
-    dungeon.c:show_overview(), botl.c:botl_score(),
-    win/tty/topl.c:update_topl()`).
+  - `verify --target seed0012-monk-vault-escort` passed target expectations
+    plus strict sentinels, `hack:audit` (`hard=0 suspicious=45`), and
+    `memory:lint` (`issues=0`).
+  - Regenerated checked-in corpus inventory after this WIP:
+    `30/44 S 9236/11405 R 653981/792838 C 0`. Remaining checked-in misses:
+    `seed0004`, `seed0007`, `seed0009`,
+    `seed0013-rogue-friday13-combat`, `seed0014`, `seed0030`, `seed0060`,
+    `seed0077`, `seed0102`, `seed0361`, `seed0367`, `seed0399`,
+    `seed4500`, and `seed1500`.
+  - Implementation: C-shaped manual chargen confirmation menu width, with
+    `role.c:plsel_startmenu(RS_filter)` identity-line sizing and
+    `win/tty/wintty.c:tty_end_menu()/tty_display_nhwindow()` right-side
+    placement. Short identity lines stay at the ordinary right-side column;
+    longer identity lines still expand the menu leftward.
 - Scratch trace/checkpoint files are agent-toolkit state and may be committed
   when useful; keep production parity and scratch-tool commits coherent.
 - Strict sentinels are exact:
   `5/5 S 1063/1063 R 64569/64569 C 0`.
-- Current public classification: checked-in and hosted public corpora differ
-  from the local evidence cache (`public-session-drift`). Use checked-in
-  sessions for implementation truth until the hosted/leaderboard source can be
-  refreshed reliably.
+- Current public classification: checked-in corpus has 30 exact local sessions;
+  hosted/leaderboard state remains secondary until a reliable refresh is
+  available.
 - Current sentinel regression classification: none; strict sentinel is exact.
 - Hack audit remains `hard=0 suspicious=45`; `memory:lint` reports
   `issues=0`. Production `js/` has no intentional debug I/O or imports from
@@ -57,24 +51,24 @@ and `feature_map.md`.
 ## Latest Loop Checkpoint
 
 - Latest verified WIP on 2026-06-06:
-  - `seed0006-wizard-water-demon`: exact
+  - `seed0012-monk-vault-escort`: exact
+    `S 308/308 R 13878/13878 C 0`.
+  - Guard `seed0006-wizard-water-demon`: exact
     `S 123/123 R 6736/6736 C 0`.
-  - `seed0383-wizard-hallucinate`: exact
-    `S 219/219 R 16915/16915 C 0`.
+  - Guard `seed0077-rogue-chargen`: improved to
+    `S 30/33 R 3242/3242 C 0`; remaining first mismatch is later map glyph
+    state at screen 15.
   - Strict sentinel exact:
     `5/5 S 1063/1063 R 64569/64569 C 0`.
-  - `verify --target seed0006-wizard-water-demon` and
-    `verify --target seed0383-wizard-hallucinate` passed their target
-    expectations plus strict sentinels, `hack:audit` (`hard=0 suspicious=45`),
-    and `memory:lint` (`issues=0`).
-  - Latest live `parity:state -- --refresh-live`: checked-in public
-    `28/44 S 8851/11405 R 637095/792838 C 1`, hosted public
-    `26/44 S 7947/10982 R 503231/840358 C 1`, class
-    `public-session-drift`; leaderboard refresh unavailable due fetch failure.
-  - Subsystem truth: fountain water demon/wish behavior, monster weapon and
-    demon attack sequencing, pet/death monster accounting, death disclosure
-    menus and final overview, deepest-level death score, and deferred
-    `AD_COLD` physical-hit side-effect packing are live for current evidence.
+  - `verify --target seed0012-monk-vault-escort` passed target expectations
+    plus strict sentinels, `hack:audit` (`hard=0 suspicious=45`), and
+    `memory:lint` (`issues=0`).
+  - Regenerated checked-in corpus inventory:
+    `30/44 S 9236/11405 R 653981/792838 C 0`.
+  - Subsystem truth: role-selection confirmation windows use
+    `plsel_startmenu(RS_filter)` identity-line sizing and tty right-side menu
+    placement, so short confirmation lines stay at the standard right-side
+    column while longer identity lines expand left.
   - Next queue after committing this unit: choose the next checked-in public
     divergence from the current corpus state; do not chase hosted/leaderboard
     drift as local implementation truth.
