@@ -48,7 +48,8 @@ for (const item of globalThis.__teleportRngTrace) {
         .filter(Boolean)
         .slice(0, 4)
         .join(' <- ');
-    console.log(`R${item.idx} ${item.entry} ${JSON.stringify(item.monster)} ${frames}`);
+    const lines = item.stack.slice(0, 3).join(' | ');
+    console.log(`R${item.idx} ${item.entry} ${JSON.stringify(item.monster)} ${frames} :: ${lines}`);
 }
 
 for (const item of globalThis.__teleportShapeTrace || []) {
@@ -62,4 +63,24 @@ for (const item of globalThis.__teleportMonfleeTrace || []) {
 for (const item of globalThis.__teleportMonTrackTrace || []) {
     if (item.idx < opts.start - 50 || item.idx >= opts.end + 5) continue;
     console.log(`MONTRACK ${JSON.stringify(item)}`);
+}
+for (const item of globalThis.__teleportDecisionTrace || []) {
+    if (item.idx < opts.start - 50 || item.idx >= opts.end + 5) continue;
+    console.log(`DECISION ${JSON.stringify(item)}`);
+}
+for (const item of globalThis.__teleportMonScanTrace || []) {
+    if (item.idx < opts.start - 20 || item.idx >= opts.end + 5) continue;
+    console.log(`MONSCAN ${JSON.stringify(item)}`);
+}
+for (const item of globalThis.__teleportMonAllocTrace || []) {
+    if (item.idx < opts.start - 20 || item.idx >= opts.end + 5) continue;
+    console.log(`MONALLOC ${JSON.stringify(item)}`);
+}
+for (const item of globalThis.__teleportCandidateTrace || []) {
+    if (item.idx < opts.start - 20 || item.idx >= opts.end + 5) continue;
+    console.log(`CANDIDATES ${JSON.stringify(item)}`);
+}
+for (const item of globalThis.__teleportAdvanceTrace || []) {
+    if (item.idx < opts.start - 20 || item.idx >= opts.end + 5) continue;
+    console.log(`ADVANCE ${JSON.stringify(item)}`);
 }

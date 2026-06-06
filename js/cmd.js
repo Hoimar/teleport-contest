@@ -13,6 +13,7 @@ import {
     apply_hallucination_display_transition, refresh_swallowed_overlay,
     see_monsters, see_objects, see_nearby_objects, see_traps, refresh_warning_monsters, map_level_for_wizard,
     object_glyph_for_menu, serialize_known_terrain_view_screen, terrain_glyph, cls,
+    unmap_invisible_memory,
 } from './display.js';
 import { cansee, couldsee, vision_recalc, vision_reset } from './vision.js';
 import {
@@ -13210,16 +13211,7 @@ async function forceFightEmpty(dx, dy) {
 }
 
 function clearRememberedInvisibleAt(x, y, redraw = true) {
-    const loc = game.level?.at(x, y);
-    if (loc?.remembered_glyph?.ch !== 'I') return false;
-    const glyph = terrain_glyph(loc, x, y);
-    loc.remembered_glyph = {
-        ch: glyph.ch,
-        color: glyph.color,
-        decgfx: !!(glyph.dec ?? glyph.decgfx),
-    };
-    if (redraw) newsym(x, y);
-    return true;
+    return unmap_invisible_memory(x, y, { redraw });
 }
 
 async function attackRememberedInvisibleEmpty(dx, dy) {

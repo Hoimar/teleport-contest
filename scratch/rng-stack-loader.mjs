@@ -203,6 +203,8 @@ function can_attack_after_move_basic`
                 name: mtmp?.data?.name,
                 mx: mtmp?.mx,
                 my: mtmp?.my,
+                ux: game.u?.ux,
+                uy: game.u?.uy,
                 mux: mtmp?.mux,
                 muy: mtmp?.muy,
                 mflee: !!mtmp?.mflee,
@@ -291,6 +293,8 @@ function can_attack_after_move_basic`
                     mhp: mtmp?.mhp,
                     mhpmax: mtmp?.mhpmax,
                     mcansee: mtmp?.mcansee,
+                    ux: game.u?.ux,
+                    uy: game.u?.uy,
                     mux: mtmp?.mux,
                     muy: mtmp?.muy,
                     peaceful: !!mtmp?.mpeaceful,
@@ -603,6 +607,93 @@ function can_attack_after_move_basic`
         }
         if (!mtmp.mtame && __teleportWieldBeforeMove) {`
         );
+        source = source.replace(
+            `                // C calls distfleeck() again after m_move() returns for ordinary
+                // movement, even when the monster is off-screen.
+                postMoveState = distfleeck(mtmp);`,
+            `                // C calls distfleeck() again after m_move() returns for ordinary
+                // movement, even when the monster is off-screen.
+                postMoveState = distfleeck(mtmp);
+                {
+                    const idx = globalThis.__teleportRngTraceIndex || 0;
+                    const start = globalThis.__teleportApparxyStart ?? -Infinity;
+                    const end = globalThis.__teleportApparxyEnd ?? Infinity;
+                    if (idx >= start && idx <= end) {
+                        (globalThis.__teleportDecisionTrace ||= []).push({
+                            idx,
+                            phase: 'after-postmove-distfleeck',
+                            id: mtmp?.m_id,
+                            name: mtmp?.data?.name,
+                            mx: mtmp?.mx,
+                            my: mtmp?.my,
+                            movement: mtmp?.movement,
+                            moveStatus,
+                            postMoveState,
+                            ranged: ranged_attk_available_basic(mtmp),
+                            atWeap: mon_has_attack_type(mtmp, 'AT_WEAP'),
+                            offensive: !!offensive_item_candidate_basic(mtmp),
+                        });
+                    }
+                }`
+        );
+        source = source.replace(
+            `                if (!await maybe_finish_post_move_attack(g, mtmp, moveStatus, postMoveState, somebody_can_move)) {`,
+            `                {
+                    const idx = globalThis.__teleportRngTraceIndex || 0;
+                    const start = globalThis.__teleportApparxyStart ?? -Infinity;
+                    const end = globalThis.__teleportApparxyEnd ?? Infinity;
+                    if (idx >= start && idx <= end) {
+                        (globalThis.__teleportDecisionTrace ||= []).push({
+                            idx,
+                            phase: 'before-finish-postmove-attack',
+                            id: mtmp?.m_id,
+                            name: mtmp?.data?.name,
+                            mx: mtmp?.mx,
+                            my: mtmp?.my,
+                            moveStatus,
+                            postMoveState,
+                            reaches: moved_monster_reaches_attack_phase_basic(mtmp, postMoveState),
+                            standard: can_standard_attack_basic(postMoveState),
+                        });
+                    }
+                }
+                if (!await maybe_finish_post_move_attack(g, mtmp, moveStatus, postMoveState, somebody_can_move)) {`
+        );
+        source = source.replace(
+            `    let candidates = m_move_candidate_list_basic(mtmp, omx, omy);
+    if (!candidates.length && mtmp.data?.mlet === 'S_EEL'`,
+            `    let candidates = m_move_candidate_list_basic(mtmp, omx, omy);
+    {
+        const idx = globalThis.__teleportRngTraceIndex || 0;
+        const start = globalThis.__teleportApparxyStart ?? -Infinity;
+        const end = globalThis.__teleportApparxyEnd ?? Infinity;
+        if (idx >= start && idx <= end) {
+            (globalThis.__teleportCandidateTrace ||= []).push({
+                idx,
+                name: mtmp?.data?.name,
+                mx: mtmp?.mx,
+                my: mtmp?.my,
+                ux: game.u?.ux,
+                uy: game.u?.uy,
+                mux: mtmp?.mux,
+                muy: mtmp?.muy,
+                ggx,
+                ggy,
+                appr,
+                candidates: candidates.map(({ x, y, tunnel }) => ({
+                    x,
+                    y,
+                    tunnel,
+                    typ: game.level?.at(x, y)?.typ,
+                    doormask: game.level?.at(x, y)?.doormask,
+                    objects: (game.level?.objects || []).filter((o) => o.ox === x && o.oy === y).map((o) => o.otyp),
+                    mon: (game.level?.monsters || []).find((m) => m !== mtmp && m.mx === x && m.my === y)?.data?.name || null,
+                })),
+            });
+        }
+    }
+    if (!candidates.length && mtmp.data?.mlet === 'S_EEL'`
+        );
         return { ...result, source };
     }
     if (url.endsWith('/js/allmain.js')) {
@@ -622,6 +713,10 @@ function can_attack_after_move_basic`
                 contextMove: g.context?.move,
                 more: !!g._more,
                 pending: g._pending_message || '',
+                ux: g.u?.ux ?? null,
+                uy: g.u?.uy ?? null,
+                ux0: g.u?.ux0 ?? null,
+                uy0: g.u?.uy0 ?? null,
                 resumeMonsterTurn: !!g._resume_monster_turn,
                 resumeTailOnly: !!g._resume_turn_tail_after_more,
                 deferredPreTurn: !!g._deferred_pre_turn_after_more,

@@ -852,6 +852,17 @@ function unmapped_object_memory(loc, x, y, visible) {
     return { ch: ' ', color: NO_COLOR, decgfx: false };
 }
 
+export function unmap_invisible_memory(x, y, options = {}) {
+    // C refs: src/display.c:unmap_invisible(), src/display.c:unmap_object().
+    // Ordinary newsym() preserves remembered invisible markers; explicit
+    // probes clear them and restore trap/engraving/background memory.
+    const loc = game.level?.at(x, y);
+    if (loc?.remembered_glyph?.ch !== 'I') return false;
+    loc.remembered_glyph = unmapped_object_memory(loc, x, y, cansee(x, y));
+    if (options.redraw !== false) newsym(x, y);
+    return true;
+}
+
 export function map_level_for_wizard(revealTraps = false) {
     // C refs: wizcmds.c:wiz_map(), detect.c:do_mapping(), detect.c:show_map_spot().
     if (!game.level) return;
@@ -1042,10 +1053,6 @@ export function newsym(x, y) {
     const monInfo = monster_at_display(x, y);
     const mon = monInfo?.mon || null;
     const wormTail = !!monInfo?.wormTail;
-    if (!mon && loc.remembered_glyph?.ch === 'I') {
-        // C refs: src/display.c:unmap_invisible(), unmap_object(), newsym().
-        loc.remembered_glyph = unmapped_object_memory(loc, x, y, visible);
-    }
 
     if (!visible) {
         if (game.u?.ux === x && game.u?.uy === y && hero_visible_to_self()) {

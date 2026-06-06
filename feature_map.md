@@ -14,7 +14,7 @@ Context note: this file is an index. Prefer `rg` by session id, subsystem, JS mo
 **Metric column:** "gates Y screens" means getting this right is expected to unlock Y screens across the public corpus.
 Treat screen totals as lagging evidence of subsystem progress, not as the optimization target.
 
-## Current WIP Addendum (2026-06-05)
+## Current WIP Addendum (2026-06-06)
 
 - **Current verified WIP:** `seed0360-wizard-world-tour` is exact
   (`S 833/833 R 120639/120639 C 0`), `seed4500-knight-coverage` is exact
@@ -24,10 +24,24 @@ Treat screen totals as lagging evidence of subsystem progress, not as the optimi
   remains exact (`S 51/51 R 3137/3137 C 0`), `seed2600-wizard-custom-binds`
   is exact (`S 38/38 R 11647/11647 C 0`), and strict sentinels are exact
   (`5/5 S 1063/1063 R 64569/64569 C 0`). The regenerated checked-in corpus
-  inventory is `32/44` passing (`S 9526/11405 R 645539/792838`). The latest
-  live public refresh predates this WIP and remains unavailable due sandbox
-  networking plus harness usage-limit rejection; treat hosted/leaderboard data
-  as lagging evidence.
+  inventory is `35/44` passing (`S 9607/11405 R 656902/792838 C 1`).
+  Hosted public data is session-file drift (`32/44 S 8704/10982
+  R 523048/840358 C 1`, fetched 2026-06-06), and leaderboard public data is
+  also drifted (`24/44 S 9431/11405 R 645539/792838`); held-out/private
+  sessions remain the cleanliness benchmark.
+- **Seed4500 invisible/topline/weapon parity:** `seed4500-knight-coverage`
+  is exact after restoring C-shaped remembered invisible marker lifetime,
+  monster physical-hit tty overflow, and hand-to-hand weapon selection. Ordinary
+  `newsym()` preserves remembered `I` glyphs; explicit probes route through
+  `unmap_invisible()`/`unmap_object()` semantics. Physical hit chains that
+  overflow a command-result topline preserve the displayed prefix as the
+  pending tty line while later hit damage/knockback can continue behind
+  `WIN_STOP`; the deferred tail need not own another prompt. Adjacent
+  `AT_WEAP` uses `weapon.c:select_hwep()`'s fixed HTH order, excluding ordinary
+  polearms such as glaives from the wield-turn hand-to-hand picker (`C refs:
+  display.c:newsym()/map_invisible()/unmap_invisible(), mhitu.c:mattacku()/hitmu(),
+  win/tty/topl.c:update_topl()/more(), weapon.c:select_hwep()`;
+  `JS refs: js/display.js, js/cmd.js, js/monmove.js`).
 - **Seed2600 startup/special-level parity:** `BIND=`/`BINDINGS=` options now
   drive command dispatch; startup object knowledge follows `oc_uses_known` and
   `OBJ_DESCR()` rather than blanket `knownName`; initial spellbooks populate the

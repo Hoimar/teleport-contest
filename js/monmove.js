@@ -7,7 +7,7 @@ import {
     pick_newcham_shape_for, mkobj, mksobj, place_object, next_ident, stackobj,
     set_malign_basic,
 } from './mklev.js';
-import { OBJECT_CLASS, OBJECT_DIR, OBJECT_WEIGHT } from './object_data.js';
+import { OBJECT_CLASS, OBJECT_DIR, OBJECT_MATERIAL, OBJECT_WEIGHT } from './object_data.js';
 import {
     BURN, DUST, ENGR_BLOOD, HEADSTONE, ICE,
     D_BROKEN, D_CLOSED, D_ISOPEN, D_LOCKED, D_NODOOR, D_TRAPPED,
@@ -400,6 +400,13 @@ const CROSSBOW_BOLT = 23;
 const DART = 24;
 const SHURIKEN = 25;
 const BOOMERANG = 26;
+const SPEAR = 27;
+const ELVEN_SPEAR = 28;
+const ORCISH_SPEAR = 29;
+const DWARVISH_SPEAR = 30;
+const SILVER_SPEAR = 31;
+const JAVELIN = 32;
+const TRIDENT = 33;
 const PARTISAN = 59;
 const RANSEUR = 60;
 const SPETUM = 61;
@@ -415,11 +422,34 @@ const DAGGER = 34;
 const ELVEN_DAGGER = 35;
 const ORCISH_DAGGER = 36;
 const SILVER_DAGGER = 37;
+const ATHAME = 38;
+const SCALPEL = 39;
 const KNIFE = 40;
+const WORM_TOOTH = 42;
+const CRYSKNIFE = 43;
 const SHORT_SWORD = 46;
 const ELVEN_SHORT_SWORD = 47;
 const ORCISH_SHORT_SWORD = 48;
 const DWARVISH_SHORT_SWORD = 49;
+const SCIMITAR = 50;
+const SILVER_SABER = 51;
+const BROADSWORD = 52;
+const ELVEN_BROADSWORD = 53;
+const TWO_HANDED_SWORD = 55;
+const KATANA = 56;
+const TSURUGI = 57;
+const RUNESWORD = 58;
+const MACE = 73;
+const SILVER_MACE = 74;
+const MORNING_STAR = 75;
+const WAR_HAMMER = 76;
+const CLUB = 77;
+const RUBBER_HOSE = 78;
+const QUARTERSTAFF = 79;
+const FLAIL = 81;
+const BULLWHIP = 82;
+const UNICORN_HORN = 261;
+const SILVER = 14;
 const BOW_LAUNCHERS = [YUMI, ELVEN_BOW, BOW, ORCISH_BOW];
 const BOW_PROJECTILE_ORDER = [YA, SILVER_ARROW, ELVEN_ARROW, ARROW, ORCISH_ARROW];
 const BOW_AMMO = new Set(BOW_PROJECTILE_ORDER);
@@ -445,10 +475,19 @@ const THROWN_LARGE_DAMAGE_DICE = new Map([
     [KNIFE, 2], [SHORT_SWORD, 8],
     [FLINT, 6], [ROCK, 3], [LOADSTONE, 3], [LUCKSTONE, 3],
 ]);
-const NON_HTH_WEAPONS = new Set([
-    ARROW, ELVEN_ARROW, ORCISH_ARROW, SILVER_ARROW, YA, CROSSBOW_BOLT, DART, SHURIKEN, BOOMERANG,
-    BOW, ELVEN_BOW, ORCISH_BOW, YUMI, SLING, CROSSBOW,
-]);
+const HTH_WEAPON_ORDER = [
+    CORPSE,
+    TSURUGI, RUNESWORD, DWARVISH_MATTOCK, TWO_HANDED_SWORD, BATTLE_AXE,
+    KATANA, UNICORN_HORN, CRYSKNIFE, TRIDENT, LONG_SWORD, ELVEN_BROADSWORD,
+    BROADSWORD, SCIMITAR, SILVER_SABER, MORNING_STAR, ELVEN_SHORT_SWORD,
+    DWARVISH_SHORT_SWORD, SHORT_SWORD, ORCISH_SHORT_SWORD, SILVER_MACE, MACE,
+    AXE, DWARVISH_SPEAR, SILVER_SPEAR, ELVEN_SPEAR, SPEAR, ORCISH_SPEAR, FLAIL,
+    BULLWHIP, QUARTERSTAFF, JAVELIN, AKLYS, CLUB, PICK_AXE, RUBBER_HOSE,
+    WAR_HAMMER, SILVER_DAGGER, ELVEN_DAGGER, DAGGER, ORCISH_DAGGER, ATHAME,
+    SCALPEL, KNIFE, WORM_TOOTH,
+];
+const HTH_WEAPON_TYPES = new Set(HTH_WEAPON_ORDER);
+const BIMANUAL_HTH_WEAPONS = new Set([TSURUGI, DWARVISH_MATTOCK, TWO_HANDED_SWORD, BATTLE_AXE]);
 const BASIC_MELEE_ATTACKS = new Set(['AT_CLAW', 'AT_KICK', 'AT_BITE', 'AT_STNG', 'AT_TUCH', 'AT_BUTT', 'AT_TENT', 'AT_WEAP']);
 const BASIC_MELEE_ADTYPES = new Set(['AD_PHYS', 'AD_ELEC', 'AD_COLD', 'AD_FIRE', 'AD_ACID', 'AD_BLND', 'AD_DRST', 'AD_DRDX', 'AD_DRCO', 'AD_STON', 'AD_LEGS']);
 const DISTANCE_ATTACK_TYPES = new Set(['AT_SPIT', 'AT_BREA', 'AT_MAGC', 'AT_GAZE']);
@@ -1770,12 +1809,58 @@ function m_balks_at_approaching_basic(oldappr, mtmp) {
     return { appr: oldappr, preferredMin: 0, preferredMax: 0 };
 }
 
+function monster_hates_silver_basic(mtmp) {
+    // C refs: src/mondata.c:mon_hates_silver(), hates_silver().
+    const ptr = mtmp?.data || {};
+    return !!((ptr.mflags2 ?? 0) & (M2_WERE | M2_DEMON))
+        || ptr.mlet === 'S_VAMPIRE'
+        || ptr.name === 'SHADE'
+        || (ptr.mlet === 'S_IMP' && ptr.name !== 'TENGU');
+}
+
+function monster_can_use_hth_weapon_basic(mtmp, obj) {
+    if (!obj) return false;
+    if (!HTH_WEAPON_TYPES.has(obj.otyp) && object_class(obj) !== WEAPON_CLASS) return false;
+    const ptr = mtmp?.data || {};
+    const strong = !!((ptr.mflags2 ?? 0) & M2_STRONG);
+    const wearingShield = !!((mtmp?.misc_worn_check ?? 0) & W_ARMS);
+    if (BIMANUAL_HTH_WEAPONS.has(obj.otyp) && (!strong || wearingShield)) return false;
+    if ((OBJECT_MATERIAL[obj.otyp] ?? 0) === SILVER && monster_hates_silver_basic(mtmp)) return false;
+    return true;
+}
+
+function hth_weapon_candidate_by_type_basic(mtmp, otyp) {
+    // C ref: src/weapon.c:oselect().  select_hwep() only selects cockatrice
+    // corpses, then asks can_touch_safely() before accepting the object.
+    return (mtmp.inventory || []).find((obj) => {
+        if (obj?.otyp !== otyp) return false;
+        if (otyp === CORPSE) {
+            const ptr = monsterPtr(obj.corpsenm);
+            if (!monster_touch_petrifies_basic(ptr)) return false;
+        }
+        return can_touch_safely_basic(mtmp, obj);
+    }) || null;
+}
+
 function hth_weapon_candidate(mtmp) {
-    // C ref: src/weapon.c:select_hwep().  Projectile-only weapons such as
-    // arrows, darts, shuriken, boomerangs, and launchers are ranged
-    // candidates, but dagger-family throwing weapons remain valid HTH picks.
-    return (mtmp.inventory || []).find((obj) => object_class(obj) === WEAPON_CLASS
-        && !NON_HTH_WEAPONS.has(obj.otyp));
+    // C ref: src/weapon.c:select_hwep().  The HTH picker uses a fixed weapon
+    // preference table; ordinary polearms like glaives are not in that table
+    // and should not consume the adjacent AT_WEAP row by being wielded.
+    const artifact = (mtmp.inventory || []).find((obj) =>
+        object_class(obj) === WEAPON_CLASS
+        && obj.oartifact
+        && monster_can_use_hth_weapon_basic(mtmp, obj)
+        && can_touch_safely_basic(mtmp, obj));
+    if (artifact) return artifact;
+    if (mtmp?.data?.mlet === 'S_GIANT') {
+        const club = hth_weapon_candidate_by_type_basic(mtmp, CLUB);
+        if (club && monster_can_use_hth_weapon_basic(mtmp, club)) return club;
+    }
+    for (const otyp of HTH_WEAPON_ORDER) {
+        const obj = hth_weapon_candidate_by_type_basic(mtmp, otyp);
+        if (obj && monster_can_use_hth_weapon_basic(mtmp, obj)) return obj;
+    }
+    return null;
 }
 
 function pick_weapon_candidate(mtmp) {
@@ -6531,26 +6616,19 @@ async function physical_melee_attacks(mtmp, attacks, toHit) {
                 const pendingPrefix = `${game._pending_message}  ${hitMessages.join('  ')}`;
                 if (!tty_topline_can_pack_message_basic(pendingPrefix, displayLine)) {
                     // C refs: src/mhitu.c:hitmu(), win/tty/topl.c:update_topl().
-                    // A command-result topline can pack one monster hit, then
-                    // block before the next attack row rolls damage or side
-                    // effects.  The resumed hit owns its damage/knockback tail.
-                    game._pending_message = pendingPrefix;
-                    game._after_more_message = displayLine;
-                    game._after_more_needs_prompt = false;
-                    game._monster_attack_more_latched = true;
-                    game._monster_attack_pause_after_more = true;
-                    game._monster_attack_resume_behind_after_more = false;
-                    game._deferred_monster_physical_attack = {
-                        mtmp,
-                        attacks,
-                        nextIndex: i + 1,
-                        toHit,
-                        attackVerbCounts: [...attackVerbCounts.entries()],
-                        current: { attack, verb },
-                    };
-                    mark_savelife_resume_physical_more(displayLine);
-                    queue_more_prompt();
-                    return [];
+                    // When a physical-hit chain overflows a command-result
+                    // topline, tty stops the visible frame but later hitmsg()
+                    // updates can continue behind WIN_STOP.  Damage and
+                    // knockback for the deferred hit are already committed
+                    // before the user dismisses the visible More.
+                    if (await latch_monster_attack_more_frame(hitMessages.join('  '))) {
+                        game._pending_message = pendingPrefix;
+                        game._monster_attack_more_latched = true;
+                        game._monster_attack_pause_after_more = true;
+                        game._monster_attack_resume_behind_after_more = false;
+                        game._monster_physical_pack_behind_active_more = false;
+                        latchedTailStart = hitMessages.length;
+                    }
                 }
             }
             if (!suppressVisibleMessages && displayLine && hitMessages.length && game._pending_message && game._more
@@ -6588,25 +6666,11 @@ async function physical_melee_attacks(mtmp, attacks, toHit) {
                 const pendingPrefix = hitMessages.join('  ');
                 if (!tty_topline_can_pack_message_basic(pendingPrefix, displayLine)
                     && await latch_monster_attack_more_frame(pendingPrefix)) {
-                    // C refs: win/tty/topl.c:update_topl(), mhitu.c:hitmu().
-                    // When the current hit line cannot pack with the prior
-                    // monster hit topline, tty blocks before printing it; do
-                    // not roll later attack rows until this hit has resumed.
-                    game._after_more_message = displayLine;
-                    game._after_more_needs_prompt = false;
-                    game._monster_attack_more_latched = true;
-                    game._monster_attack_pause_after_more = true;
-                    game._monster_attack_resume_behind_after_more = false;
-                    game._monster_physical_pack_behind_active_more = false;
-                    game._deferred_monster_physical_attack = {
-                        mtmp,
-                        attacks,
-                        nextIndex: i + 1,
-                        toHit,
-                        attackVerbCounts: [...attackVerbCounts.entries()],
-                        current: { attack, verb },
-                    };
-                    return [];
+                    // C refs: src/mhitu.c:hitmu(), win/tty/topl.c:update_topl().
+                    // hitmsg() can leave tty stopped on the prior physical-hit
+                    // frame while later attack-row damage and knockback still
+                    // run behind it; the new line becomes the deferred tail.
+                    latchedTailStart = hitMessages.length;
                 }
             }
             if (!suppressVisibleMessages && hiddenLine && displayLine && game._pending_message && !game._more
