@@ -15309,6 +15309,7 @@ async function runTeleportArrivalSpotEffects(feature, options = {}) {
             featureAlreadyShown: autopicked,
             arrivalFloorListNoTurn: !!options.arrivalFloorListNoTurn,
         });
+    return { autopicked };
 }
 
 async function teledsBasic(x, y, options = {}) {
@@ -16643,8 +16644,9 @@ async function handleQueuedMore(ch) {
             game._resume_teleport_arrival_after_more = false;
             const featureLine = game._resume_look_here_feature_line_after_more || '';
             game._resume_look_here_feature_line_after_more = '';
-            if (teleportArrival) await runTeleportArrivalSpotEffects({ line: featureLine });
-            else await lookHereAfterMove(featureLine ? { featureLine } : {});
+            const arrivalEffects = teleportArrival
+                ? await runTeleportArrivalSpotEffects({ line: featureLine })
+                : (await lookHereAfterMove(featureLine ? { featureLine } : {}), null);
             if (game._more && game._deferred_blind_floor_list) {
                 game.context.move = 0;
                 return true;
@@ -16657,11 +16659,12 @@ async function handleQueuedMore(ch) {
             }
             await triggerSpotEffectsAtHero();
             if (!game._more) finishPendingMoveSmudge();
-            if (teleportArrival && game._pending_message && !game._more) {
+            if (teleportArrival && game._pending_message && !game._more
+                && !arrivalEffects?.autopicked) {
                 // C refs: win/tty/topl.c:more(), src/teleport.c:teleds(),
-                // src/hack.c:spoteffects().  A spot-effect topline printed
-                // after dismissing an arrival More gets its own input boundary;
-                // the next key acknowledges that topline before new commands.
+                // src/hack.c:spoteffects().  Non-pickup spot-effect text
+                // after an arrival More gets its own input boundary; pickup(1)
+                // lines are ordinary top-lines before the next command.
                 game._arrival_topline_absorbs_next_key = true;
             }
             game.context.move = 1;

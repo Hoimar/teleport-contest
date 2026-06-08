@@ -7,15 +7,14 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 
 | Sessions | Buckets | Screens | RNG calls | Errors |
 | --- | --- | --- | --- | --- |
-| 44 | 9 | 9606/11405 | 609982/792838 | 0 |
+| 44 | 8 | 9660/11405 | 610501/792838 | 0 |
 
 ## Bucket Summary
 
 | Count | Phase | Canonical evidence | Subsystem hypothesis | Owner | Needs deeper debug |
 | --- | --- | --- | --- | --- | --- |
-| 36 | passing | seed0116-wizard-wear-shop | Pet behavior: dog_goal() object scan, reachability, carry checks, and object resistance in dogmove.c. | Monsters / pets | yes |
+| 37 | passing | seed0116-wizard-wear-shop | Pet behavior: dog_goal() object scan, reachability, carry checks, and object resistance in dogmove.c. | Monsters / pets | yes |
 | 1 | post-startup-live | seed0361-archeologist-tour | Message buffer, prompt/menu lifecycle, or command dispatch timing after startup. | Messages / command dispatch | no |
-| 1 | post-startup-live | seed0012-monk-vault-escort | Mixed live-state divergence spanning display, status, messages, or command side effects. | Display / command dispatch | yes |
 | 1 | post-startup-live | seed0367-priest-quest-tour | Mixed live-state divergence spanning display, status, messages, or command side effects. | Display / command dispatch | yes |
 | 1 | post-startup-live | seed0004-feeding-pony | Mixed live-state divergence spanning display, status, messages, or command side effects. | Display / command dispatch | yes |
 | 1 | post-startup-live | seed0006-wizard-water-demon | Live command effects, movement, pet/monster behavior, or retained object/map state. | Commands / monsters / objects | no |
@@ -27,7 +26,7 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 
 ### passing: seed0116-wizard-wear-shop
 
-- Count: 36
+- Count: 37
 - Bucket key: `passing | FS=pass | FR=none | none/none | - | rows=-`
 - Canonical screens: 127/127
 - Canonical RNG: 12562/12562
@@ -37,7 +36,7 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 - Hypothesis: Pet behavior: dog_goal() object scan, reachability, carry checks, and object resistance in dogmove.c.
 - Next owner: Monsters / pets
 - Needs deeper debug: yes
-- Sessions: seed0002-healer-reflection-drummer, seed0013-friday13-save-then-fullmoon-restore, seed0013-rogue-friday13-combat, seed0015-valk-level2-pit-dog-wait, seed0016-healer-newmoon-eat-zap, seed0017-samurai-altar-pray, seed0030-ten-diverse-deaths, seed0060-orc-rogue-kick-search, seed0077-rogue-chargen, seed0101-ranger-quiver-throw-travel-engrave, seed0102-ranger-name-cancel, seed0103-knight-ride-pony, seed0104-knight-ride-combat, seed0105-valk-chat-lamp-ration, seed0106-priest-extcmd-sweep, seed0107-samurai-twoweapon-enhance, seed0108-wizard-extcmd-wishlist, seed0116-wizard-wear-shop, seed0200-monk-north-search, seed0360-wizard-world-tour, seed0373-barbarian-quest-tour, seed0383-wizard-hallucinate, seed0398-wizard-wandpoly-pile, seed0399-wizard-hallu-actions, seed0501-priest-cast-read-turn, seed0700-samurai-explore-descend, seed0900-tourist-explore-actions, seed1150-caveman-explore-move, seed1500-rogue-explore-move, seed1800-tourist-eat-throw, seed2200-wizard-quaff-zap-read, seed2600-wizard-custom-binds, seed4500-knight-coverage, seed5002-wizard-coverage-pair, seed5006-tourist-stress-disaster, seed8000-tourist-starter
+- Sessions: seed0002-healer-reflection-drummer, seed0012-monk-vault-escort, seed0013-friday13-save-then-fullmoon-restore, seed0013-rogue-friday13-combat, seed0015-valk-level2-pit-dog-wait, seed0016-healer-newmoon-eat-zap, seed0017-samurai-altar-pray, seed0030-ten-diverse-deaths, seed0060-orc-rogue-kick-search, seed0077-rogue-chargen, seed0101-ranger-quiver-throw-travel-engrave, seed0102-ranger-name-cancel, seed0103-knight-ride-pony, seed0104-knight-ride-combat, seed0105-valk-chat-lamp-ration, seed0106-priest-extcmd-sweep, seed0107-samurai-twoweapon-enhance, seed0108-wizard-extcmd-wishlist, seed0116-wizard-wear-shop, seed0200-monk-north-search, seed0360-wizard-world-tour, seed0373-barbarian-quest-tour, seed0383-wizard-hallucinate, seed0398-wizard-wandpoly-pile, seed0399-wizard-hallu-actions, seed0501-priest-cast-read-turn, seed0700-samurai-explore-descend, seed0900-tourist-explore-actions, seed1150-caveman-explore-move, seed1500-rogue-explore-move, seed1800-tourist-eat-throw, seed2200-wizard-quaff-zap-read, seed2600-wizard-custom-binds, seed4500-knight-coverage, seed5002-wizard-coverage-pair, seed5006-tourist-stress-disaster, seed8000-tourist-starter
 
 ### post-startup-live: seed0361-archeologist-tour
 
@@ -52,20 +51,6 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 - Next owner: Messages / command dispatch
 - Needs deeper debug: no
 - Sessions: seed0361-archeologist-tour
-
-### post-startup-live: seed0012-monk-vault-escort
-
-- Count: 1
-- Bucket key: `post-startup-live | FS=240 | FR=>1200 | char/mixed | rn2(5)=>null | rows=0,14,15,23`
-- Canonical screens: 254/308
-- Canonical RNG: 13359/13878
-- First screen mismatch: 240 (char/mixed, rows 0,14,15,23)
-- First RNG mismatch: 13359 (rn2(5)=>null)
-- Sample cells: [0,0] ch $/8 ->  /8; [0,2] ch -/8 ->  /8; [0,4] ch 2/8 ->  /8; [0,5] ch 4/8 ->  /8; [0,6] ch 6/8 ->  /8
-- Hypothesis: Mixed live-state divergence spanning display, status, messages, or command side effects.
-- Next owner: Display / command dispatch
-- Needs deeper debug: yes
-- Sessions: seed0012-monk-vault-escort
 
 ### post-startup-live: seed0367-priest-quest-tour
 
@@ -168,7 +153,7 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 | seed0006-wizard-water-demon | 111/123 | 6735/6736 | post-startup-live | 77:char:map:H | 6735:rn2(1)=>rnd(22) | 9 | [9,62] ch #/8 -> I/8 |
 | seed0007-rogue-snake-swamp | 8/302 | 239/16373 | post-startup-live | 8:char+attr:mixed:y | 0:rn2(13)=>rn2(2) | 0,1,2,4,5,6+8 | [0,0] ch  /8 -> A/8; [0,1] ch  /8 -> l/8; [0,2] ch  /8 -> o/8; [0,3] ch  /8 -> h/8; [0,4] ch  /8 -> a/8 |
 | seed0009-swimmer-mforce | 9/73 | 74/3713 | post-startup-live | 9:char:mixed:y | 0:rn2(13)=>rn2(2) | 0,1,2,4,5,6+8 | [0,0] ch  /8 -> A/8; [0,1] ch  /8 -> l/8; [0,2] ch  /8 -> o/8; [0,3] ch  /8 -> h/8; [0,4] ch  /8 -> a/8 |
-| seed0012-monk-vault-escort | 254/308 | 13359/13878 | post-startup-live | 240:char:mixed:k | 13359:rn2(5)=>null | 0,14,15,23 | [0,0] ch $/8 ->  /8; [0,2] ch -/8 ->  /8; [0,4] ch 2/8 ->  /8; [0,5] ch 4/8 ->  /8; [0,6] ch 6/8 ->  /8 |
+| seed0012-monk-vault-escort | 308/308 | 13878/13878 | passing | -:none:none:- | -:- | - | - |
 | seed0013-friday13-save-then-fullmoon-restore | 99/99 | 4804/4804 | passing | -:none:none:- | -:- | - | - |
 | seed0013-rogue-friday13-combat | 59/59 | 4838/4838 | passing | -:none:none:- | -:- | - | - |
 | seed0014-dequa-fountain-explore | 8/714 | 3066/59178 | post-startup-live | 8:char:map:v | 2956:rn2(7)=>rn2(12) | 2,9 | [2,57] ch f/8 -> </8; [2,58] ch e/8 -> g/8; [2,59] ch m/8 -> e/8; [2,60] ch a/8 -> n/8; [2,61] ch l/8 -> d/8 |
