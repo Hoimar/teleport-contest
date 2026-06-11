@@ -17346,6 +17346,20 @@ async function handleQueuedMore(ch) {
                 game._latched_status_uhp = null;
                 game._latched_status_turn = null;
             }
+            if ((game._monster_death_pending || game._fatal_monster_attack_paused)
+                && game._after_more_latched_status_uhp == null
+                && game._latched_status_uhp != null
+                && monsterPhysicalToplineChain(msg)
+                && !/^The wand hits you!$/.test(msg)) {
+                // C refs: src/mhitu.c:hitmu(), src/end.c:done_in_by(),
+                // win/tty/topl.c:more().  Once a deferred fatal physical line
+                // is revealed, its damage is already reflected in botl().
+                game._clear_latched_status_after_more = false;
+                game._latched_status_uhp = null;
+                game._latched_status_turn = null;
+                game._monster_fatal_preserve_hit_status = false;
+                game._death_preserve_latched_status = false;
+            }
             if (game._after_more_latched_status_uhp != null) {
                 game._latched_status_uhp = game._after_more_latched_status_uhp;
                 game._latched_status_turn = game._after_more_latched_status_turn ?? null;
@@ -17408,7 +17422,9 @@ async function handleQueuedMore(ch) {
             const physicalWaitsForDisplayedMore = !!game._deferred_monster_physical_attack?.waitForDisplayedMore;
             if (physicalWaitsForDisplayedMore) {
                 game._deferred_monster_physical_attack.waitForDisplayedMore = false;
-            } else if (!promptDefersPendingMagic) {
+            } else if (!promptDefersPendingMagic
+                && !game._monster_death_pending
+                && !game._fatal_monster_attack_paused) {
                 await finish_deferred_monster_physical_attack();
             }
             if (suppressPhysicalResume

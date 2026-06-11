@@ -11,6 +11,7 @@ import { MONSTER_DATA } from './monster_data.js';
 import {
     newsym, pline, queue_more_prompt, flush_screen,
     serialize_terminal_grid, show_glyph_cell, topline_can_pack_message,
+    unmap_invisible_memory,
 } from './display.js';
 import { NO_COLOR } from './terminal.js';
 import {
@@ -1241,6 +1242,9 @@ function apply_pet_kill_side_effects(mtmp, target, oldx, oldy, targetX, targetY,
     // C ref: src/mon.c:monkilled()->mondied().  The defender square is
     // redrawn for removal/corpse placement; the attacker square is not
     // refreshed just because damage resolved.
+    // C ref: src/mon.c:mondead().  Monster death clears a remembered
+    // invisible glyph before the final square redraw.
+    unmap_invisible_memory(targetX, targetY, { redraw: false });
     newsym(targetX, targetY);
 }
 
