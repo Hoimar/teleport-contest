@@ -10692,13 +10692,24 @@ function showNameCommandMenu() {
 }
 
 async function beginWizardWishPrompt() {
-    // C ref: src/wizcmds.c:wiz_wish() -> objnam.c:makewish().
+    // C refs: src/wizcmds.c:wiz_wish(), src/zap.c:makewish().
     const msg = 'For what do you wish? ';
     await pline(msg);
     game._prompt_cursor = [msg.length, 0];
     game._awaiting_wish = true;
     game._wish_input = '';
     game.context.move = 0;
+}
+
+async function beginAmuletWishPromptAfterMore() {
+    // C ref: src/zap.c:makewish().  The verbose Amulet wish line owns a tty
+    // More, then makewish() immediately asks for the object name.
+    game._amulet_wish_prompt_after_more = false;
+    game._more = false;
+    game._more_dismissals_remaining = 0;
+    clear_pending_message();
+    await beginWizardWishPrompt();
+    return true;
 }
 
 async function beginWizardPolyselfPrompt() {
@@ -16331,6 +16342,8 @@ async function handleQueuedMore(ch) {
     game._latched_more_screen = null;
     game._latched_more_cursor = null;
     game._latched_more_keep_until_dismiss = false;
+    if (game._amulet_wish_prompt_after_more && game._more_dismissals_remaining <= 0)
+        return await beginAmuletWishPromptAfterMore();
     if (!(game._monster_death_pending && game._after_more_projectile_clear_after_prompt))
         finishDeferredProjectileClearAfterMore();
     if (pausedMonsterTurn
@@ -16908,12 +16921,7 @@ async function handleQueuedMore(ch) {
             return true;
         }
         if (game._amulet_wish_prompt_after_more) {
-            game._amulet_wish_prompt_after_more = false;
-            game._more = false;
-            game._more_dismissals_remaining = 0;
-            clear_pending_message();
-            await beginWizardWishPrompt();
-            return true;
+            return await beginAmuletWishPromptAfterMore();
         }
         const petMissLineAfterMore = game._deferred_pet_miss_passive
             && /^The (?:kitten|little dog|(?:saddled )?pony) misses /.test(game._pending_message || '')
