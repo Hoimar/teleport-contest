@@ -343,6 +343,27 @@ const FOOD_RATION = 293;
 const K_RATION = 294;
 const C_RATION = 295;
 const TIN = 296;
+const ORDINARY_FOOD_NUTRITION = new Map([
+    [APPLE, 50],
+    [ORANGE, 80],
+    [PEAR, 50],
+    [MELON, 100],
+    [BANANA, 80],
+    [CARROT, 50],
+    [SPRIG_OF_WOLFSBANE, 40],
+    [CLOVE_OF_GARLIC, 40],
+    [SLIME_MOLD, 250],
+    [LUMP_OF_ROYAL_JELLY, 200],
+    [CREAM_PIE, 100],
+    [CANDY_BAR, 100],
+    [FORTUNE_COOKIE, 40],
+    [PANCAKE, 200],
+    [LEMBAS_WAFER, 800],
+    [CRAM_RATION, 600],
+    [FOOD_RATION, 800],
+    [K_RATION, 400],
+    [C_RATION, 300],
+]);
 const PLATE_MAIL = 121;
 const SPLINT_MAIL = 124;
 const CHAIN_MAIL = 128;
@@ -8599,6 +8620,15 @@ function ordinaryFoodFirstBiteLine(obj) {
     return `This ${baseObjectName(obj)} is ${taste}`;
 }
 
+function lessHungryFromOrdinaryFood(obj) {
+    const nutrition = ORDINARY_FOOD_NUTRITION.get(obj?.otyp) || 0;
+    if (!nutrition || !game.u) return;
+    // C ref: src/eat.c:eatfood()/lesshungry().  Current ordinary food
+    // evidence is one-turn food, so apply the object's full nutrition when
+    // the item is consumed.
+    game.u.uhunger = (game.u.uhunger ?? 900) + nutrition;
+}
+
 function heroCurrentFormIsUndead() {
     const ptr = game.u?._poly_form?.ptr || game.u?.data;
     return !!((ptr?.mflags2 ?? 0) & M2_UNDEAD);
@@ -8640,17 +8670,20 @@ async function eatSelectedFood(obj, { floor = false } = {}) {
     game.context.move = 1;
     if (obj.otyp === APPLE) {
         noteFoodConduct(obj);
+        lessHungryFromOrdinaryFood(obj);
         consumeOneFloorFood(obj);
         await pline('Delicious!  Must be a Macintosh!');
         return true;
     }
     if (obj.otyp === CARROT) {
         noteFoodConduct(obj);
+        lessHungryFromOrdinaryFood(obj);
         consumeOneFloorFood(obj);
         await pline('This carrot is delicious!');
         return true;
     }
     noteFoodConduct(obj);
+    lessHungryFromOrdinaryFood(obj);
     applyGarlicBreathSideEffect(obj);
     consumeOneFloorFood(obj);
     await pline(ordinaryFoodFirstBiteLine(obj));
@@ -8747,6 +8780,7 @@ async function handleEatItemKey(ch) {
 
     if (food.otyp === FORTUNE_COOKIE) {
         noteFoodConduct(food);
+        lessHungryFromOrdinaryFood(food);
         removeInventoryInstance(food);
         const rumor = getRumor(0, false);
         exercise(A_WIS, true);
@@ -8764,17 +8798,20 @@ async function handleEatItemKey(ch) {
     game.context.move = 1;
     if (food.otyp === APPLE) {
         noteFoodConduct(food);
+        lessHungryFromOrdinaryFood(food);
         removeInventoryInstance(food);
         await pline('Delicious!  Must be a Macintosh!');
         return true;
     }
     if (food.otyp === CARROT) {
         noteFoodConduct(food);
+        lessHungryFromOrdinaryFood(food);
         removeInventoryInstance(food);
         await pline('This carrot is delicious!');
         return true;
     }
     noteFoodConduct(food);
+    lessHungryFromOrdinaryFood(food);
     applyGarlicBreathSideEffect(food);
     removeInventoryInstance(food);
     await pline(ordinaryFoodFirstBiteLine(food));
@@ -13519,11 +13556,26 @@ function gainExperienceForKill(mon) {
     moreExperienced(monsterExperienceBasic(mon), 0);
 }
 
+function observeMonsterDropNameSideEffects(mon, obj) {
+    if (!mon || !obj || !cansee(mon.mx, mon.my)) return;
+    const r = Math.max(game.u?.xray_range || 0, 2);
+    const neardist = (r * r) * 2 - r;
+    if (!obj.oartifact
+        && dist2(mon.mx, mon.my, game.u?.ux ?? 0, game.u?.uy ?? 0) > neardist) {
+        return;
+    }
+    // C ref: src/steal.c:mdrop_obj() calls distant_name(obj, doname)
+    // before extract_from_minvent(); nearby visible drops get doname()
+    // side effects in monster-inventory order, before floor stack order.
+    inventoryObjectName(obj, { observe: true });
+}
+
 function dropMonsterInventory(mon) {
     // C ref: src/mon.c:m_detach() -> relobj().  A dying monster releases
     // minvent before xkilled() creates any extra treasure or corpse.
     const inv = mon.inventory || [];
     for (const obj of inv) {
+        observeMonsterDropNameSideEffects(mon, obj);
         obj.owornmask = 0;
         place_object(obj, mon.mx, mon.my);
     }
@@ -18647,11 +18699,10 @@ function insightHungerValue(level) {
 }
 
 function noteTeleportNutritionDebt() {
-    // C ref: src/teleport.c:dotele() -> morehungry(100).  The live hunger
-    // model still owns some adjacent turn-side effects separately; retain the
-    // current missing insight delta without perturbing monster/RNG evidence.
+    // C ref: src/teleport.c:dotele() -> morehungry(100).  Keep this as
+    // insight debt until morehungry()/newuhs() side effects are live-owned.
     if (!game.u) return;
-    game.u._teleport_hunger_debt = (game.u._teleport_hunger_debt || 0) + 60;
+    game.u._teleport_hunger_debt = (game.u._teleport_hunger_debt || 0) + 100;
 }
 
 function energyLine() {
