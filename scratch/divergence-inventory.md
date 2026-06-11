@@ -7,14 +7,14 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 
 | Sessions | Buckets | Screens | RNG calls | Errors |
 | --- | --- | --- | --- | --- |
-| 44 | 7 | 9822/11405 | 659847/792838 | 0 |
+| 44 | 7 | 9824/11405 | 659847/792838 | 0 |
 
 ## Bucket Summary
 
 | Count | Phase | Canonical evidence | Subsystem hypothesis | Owner | Needs deeper debug |
 | --- | --- | --- | --- | --- | --- |
 | 38 | passing | seed0116-wizard-wear-shop | Pet behavior: dog_goal() object scan, reachability, carry checks, and object resistance in dogmove.c. | Monsters / pets | yes |
-| 1 | post-startup-live | seed0367-priest-quest-tour | Mixed live-state divergence spanning display, status, messages, or command side effects. | Display / command dispatch | yes |
+| 1 | post-startup-live | seed0367-priest-quest-tour | Live command effects, movement, pet/monster behavior, or retained object/map state. | Commands / monsters / objects | no |
 | 1 | post-startup-live | seed0004-feeding-pony | Mixed live-state divergence spanning display, status, messages, or command side effects. | Display / command dispatch | yes |
 | 1 | post-startup-live | seed0006-wizard-water-demon | Live command effects, movement, pet/monster behavior, or retained object/map state. | Commands / monsters / objects | no |
 | 1 | post-startup-live | seed0014-dequa-fountain-explore | Live command effects, movement, pet/monster behavior, or retained object/map state. | Commands / monsters / objects | no |
@@ -40,15 +40,15 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 ### post-startup-live: seed0367-priest-quest-tour
 
 - Count: 1
-- Bucket key: `post-startup-live | FS=65 | FR=>1200 | char+attr/mixed | rnd(4)=>rn2(4) | rows=0,2,3,4,5,6`
-- Canonical screens: 219/324
+- Bucket key: `post-startup-live | FS=203 | FR=>1200 | char/map | rnd(4)=>rn2(4) | rows=1,2,3,4,5,6+15`
+- Canonical screens: 221/324
 - Canonical RNG: 4951/50125
-- First screen mismatch: 65 (char+attr/mixed, rows 0,2,3,4,5,6)
+- First screen mismatch: 203 (char/map, rows 1,2,3,4,5,6+15)
 - First RNG mismatch: 4869 (rnd(4)=>rn2(4))
-- Sample cells: [0,13] ch C/8 ->  /8; [0,14] ch u/8 ->  /8; [0,15] ch r/8 ->  /8; [0,16] ch r/8 ->  /8; [0,17] ch e/8 ->  /8
-- Hypothesis: Mixed live-state divergence spanning display, status, messages, or command side effects.
-- Next owner: Display / command dispatch
-- Needs deeper debug: yes
+- Sample cells: [1,0] ch  /8 -> ·/8; [1,1] ch  /8 -> ·/8; [1,2] ch  /8 -> ·/8; [1,3] ch  /8 -> ·/8; [1,4] ch  /8 -> ·/8
+- Hypothesis: Live command effects, movement, pet/monster behavior, or retained object/map state.
+- Next owner: Commands / monsters / objects
+- Needs deeper debug: no
 - Sessions: seed0367-priest-quest-tour
 
 ### post-startup-live: seed0004-feeding-pony
@@ -160,7 +160,7 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 | seed0200-monk-north-search | 40/40 | 3822/3822 | passing | -:none:none:- | -:- | - | - |
 | seed0360-wizard-world-tour | 833/833 | 120639/120639 | passing | -:none:none:- | -:- | - | - |
 | seed0361-archeologist-tour | 366/366 | 53865/53865 | passing | -:none:none:- | -:- | - | - |
-| seed0367-priest-quest-tour | 219/324 | 4951/50125 | post-startup-live | 65:char+attr:mixed:5 | 4869:rnd(4)=>rn2(4) | 0,2,3,4,5,6 | [0,13] ch C/8 ->  /8; [0,14] ch u/8 ->  /8; [0,15] ch r/8 ->  /8; [0,16] ch r/8 ->  /8; [0,17] ch e/8 ->  /8 |
+| seed0367-priest-quest-tour | 221/324 | 4951/50125 | post-startup-live | 203:char:map:z | 4869:rnd(4)=>rn2(4) | 1,2,3,4,5,6+15 | [1,0] ch  /8 -> ·/8; [1,1] ch  /8 -> ·/8; [1,2] ch  /8 -> ·/8; [1,3] ch  /8 -> ·/8; [1,4] ch  /8 -> ·/8 |
 | seed0373-barbarian-quest-tour | 124/124 | 35386/35386 | passing | -:none:none:- | -:- | - | - |
 | seed0383-wizard-hallucinate | 219/219 | 16915/16915 | passing | -:none:none:- | -:- | - | - |
 | seed0398-wizard-wandpoly-pile | 87/87 | 3026/3026 | passing | -:none:none:- | -:- | - | - |

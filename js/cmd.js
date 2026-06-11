@@ -24254,6 +24254,22 @@ export async function rhack(key) {
             else game.context.move = 0;
             return;
         }
+        if (prev === game._spell_menu_screen) {
+            const dismiss = ch === ' ' || ch === '\r' || ch === '\n' || ch === '\x1b';
+            const validSelection = ch === '+'
+                || knownSpellEntries().some((entry) => entry.letter === ch);
+            if (!dismiss && !validSelection) {
+                // C ref: spell.c:dospellmenu() via tty select_menu(); invalid
+                // selectors keep the menu active instead of dismissing it.
+                showSerializedOverride(prev, game._spell_menu_cursor || null);
+            } else {
+                game._spell_menu_screen = null;
+                game._spell_menu_cursor = null;
+                clearOverrideScreen();
+            }
+            game.context.move = 0;
+            return;
+        }
         if (prev === game._help_menu_screen) {
             clearOverrideScreen();
             await handleHelpMenuSelection(ch);

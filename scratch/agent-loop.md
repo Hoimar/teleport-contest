@@ -14,14 +14,32 @@ and `feature_map.md`.
 
 - Current branch in this workspace: `main`, ahead of origin.
 - Latest verified repair unit:
-  - Current WIP after commit `756eb8f` restores
-    `seed0361-archeologist-tour` from `S 204/366 R 4519/53865`
-    to exact `S 366/366 R 53865/53865 C 0`.
+  - Current WIP after commit `47297f2` advances
+    `seed0367-priest-quest-tour` from `S 219/324 R 4951/50125`
+    to `S 221/324 R 4951/50125 C 0`.
+  - Strict sentinels exact: `5/5 S 1063/1063 R 64569/64569 C 0`.
+  - `verify --target seed0367-priest-quest-tour` passed target expectations
+    plus strict sentinels, `hack:audit` (`hard=0 suspicious=45`), and
+    `memory:lint` (`issues=0`).
+  - Local parity refresh after this WIP:
+    checked-in public `38/44 S 9824/11405 R 659847/792838 C 0`;
+    cached hosted public `35/44 S 8923/10982 R 525993/840358 C 0`,
+    classified `public-session-drift`; leaderboard fetch failed.
+  - Implementation: `+` known-spells menus keep the same menu visible for
+    invalid selector keys such as `5`, while dismissal keys return through the
+    lightweight override path rather than forcing a hallucination-sensitive
+    map redraw (`C ref: src/spell.c:dospellmenu()`).
+  - Remaining checked-in misses: `seed0004`, `seed0006`, `seed0007`,
+    `seed0009`, `seed0014`, and `seed0367`.
+- Previous committed repair unit:
+  - Commit `47297f2` restored `seed0361-archeologist-tour` from WIP
+    `S 204/366 R 4519/53865` to exact
+    `S 366/366 R 53865/53865 C 0`.
   - Strict sentinels exact: `5/5 S 1063/1063 R 64569/64569 C 0`.
   - `verify --target seed0361-archeologist-tour` passed target expectations
     plus strict sentinels, `hack:audit` (`hard=0 suspicious=45`), and
     `memory:lint` (`issues=0`).
-  - Local parity refresh after this WIP:
+  - Local parity refresh after the committed WIP:
     checked-in public `38/44 S 9822/11405 R 659847/792838 C 0`;
     cached hosted public `35/44 S 8921/10982 R 525993/840358 C 0`,
     classified `public-session-drift`; leaderboard fetch failed.
@@ -31,27 +49,6 @@ and `feature_map.md`.
     `quest_talk()`/`chat_with_leader()`.
   - Remaining checked-in misses: `seed0004`, `seed0006`, `seed0007`,
     `seed0009`, `seed0014`, and `seed0367`.
-- Previous committed repair unit:
-  - Commit `756eb8f` restored `seed0012-monk-vault-escort` from WIP
-    `S 254/308 R 13359/13878` to exact
-    `S 308/308 R 13878/13878 C 0`.
-  - Teleport-arrival guards stayed exact:
-    `seed0108-wizard-extcmd-wishlist`,
-    `seed0360-wizard-world-tour`, and
-    `seed4500-knight-coverage`.
-  - Strict sentinels exact: `5/5 S 1063/1063 R 64569/64569 C 0`.
-  - `verify --target seed0012-monk-vault-escort` passed target expectations
-    plus strict sentinels, `hack:audit` (`hard=0 suspicious=45`), and
-    `memory:lint` (`issues=0`).
-  - Local parity refresh after the committed WIP:
-    checked-in public `37/44 S 9660/11405 R 610501/792838 C 0`;
-    cached hosted public `35/44 S 8879/10982 R 505823/840358 C 0`,
-    classified `public-session-drift`; leaderboard fetch failed.
-  - Implementation: `teleds()` arrival pickup lines produced by
-    `spoteffects(TRUE)`/`pickup(1)` after a materialize More are normal
-    top-lines and must not synthetic-acknowledge-swallow the next input key.
-  - Remaining checked-in misses: `seed0004`, `seed0006`, `seed0007`,
-    `seed0009`, `seed0014`, `seed0361`, and `seed0367`.
 - Scratch trace/checkpoint files are agent-toolkit state and may be committed
   when useful; keep production parity and scratch-tool commits coherent.
 - Strict sentinels are exact:
@@ -67,6 +64,22 @@ and `feature_map.md`.
 ## Latest Loop Checkpoint
 
 - Latest verified WIP on 2026-06-11:
+  - `seed0367-priest-quest-tour`: advanced to
+    `S 221/324 R 4951/50125 C 0`; first mismatch is now screen 203
+    at the level-teleport materialize More map redraw.
+  - Strict sentinel exact:
+    `5/5 S 1063/1063 R 64569/64569 C 0`.
+  - `verify --target seed0367-priest-quest-tour` passed.
+  - Local parity refresh:
+    checked-in public `38/44 S 9824/11405 R 659847/792838 C 0`;
+    cached hosted public `35/44 S 8923/10982 R 525993/840358 C 0`.
+  - Subsystem truth: invalid selectors in the `+` known-spells view do not
+    dismiss the menu, and dismissal does not force a full playfield redraw.
+  - Next queue: continue `seed0367-priest-quest-tour` at screen 203
+    (`You materialize on a different level!--More--` map cells); startup-drift
+    sessions remain grouped at RNG 0.
+
+- Previous checkpoint:
   - `seed0361-archeologist-tour`: exact
     `S 366/366 R 53865/53865 C 0`.
   - Strict sentinel exact:
@@ -78,25 +91,8 @@ and `feature_map.md`.
   - Subsystem truth: door-force formulas use condensed `ACURRSTR`, and a
     quest-leader pager that interrupts monster movement must resume that same
     monster pass after dismissal.
-  - Next queue: `seed0367-priest-quest-tour` has the best screen prefix among
-    failing sessions; startup-drift sessions remain grouped at RNG 0.
-
-- Previous checkpoint:
-  - `seed0012-monk-vault-escort`: exact
-    `S 308/308 R 13878/13878 C 0`.
-  - Teleport arrival guards `seed0108`, `seed0360`, and `seed4500` exact.
-  - Strict sentinel exact:
-    `5/5 S 1063/1063 R 64569/64569 C 0`.
-  - `verify --target seed0012-monk-vault-escort` passed.
-  - Local parity refresh:
-    checked-in public `37/44 S 9660/11405 R 610501/792838 C 0`;
-    cached hosted public `35/44 S 8879/10982 R 505823/840358 C 0`.
-  - Subsystem truth: arrival pickup messages after a materialize More do not
-    consume the next input key; they are ordinary top-lines before the next
-    command dispatch.
-  - Next queue: choose among remaining checked-in misses from the regenerated
-    divergence inventory; `seed0361-archeologist-tour` had the best screen
-    prefix among failing sessions.
+  - Next queue: `seed0367-priest-quest-tour` had the best screen prefix among
+    failing sessions.
 
 - Older checkpoint history lives in git and `feature_map.md`; keep this file
   focused on the active loop state and next queue.
