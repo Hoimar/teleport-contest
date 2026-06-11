@@ -7,14 +7,13 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 
 | Sessions | Buckets | Screens | RNG calls | Errors |
 | --- | --- | --- | --- | --- |
-| 44 | 8 | 9660/11405 | 610501/792838 | 0 |
+| 44 | 7 | 9822/11405 | 659847/792838 | 0 |
 
 ## Bucket Summary
 
 | Count | Phase | Canonical evidence | Subsystem hypothesis | Owner | Needs deeper debug |
 | --- | --- | --- | --- | --- | --- |
-| 37 | passing | seed0116-wizard-wear-shop | Pet behavior: dog_goal() object scan, reachability, carry checks, and object resistance in dogmove.c. | Monsters / pets | yes |
-| 1 | post-startup-live | seed0361-archeologist-tour | Message buffer, prompt/menu lifecycle, or command dispatch timing after startup. | Messages / command dispatch | no |
+| 38 | passing | seed0116-wizard-wear-shop | Pet behavior: dog_goal() object scan, reachability, carry checks, and object resistance in dogmove.c. | Monsters / pets | yes |
 | 1 | post-startup-live | seed0367-priest-quest-tour | Mixed live-state divergence spanning display, status, messages, or command side effects. | Display / command dispatch | yes |
 | 1 | post-startup-live | seed0004-feeding-pony | Mixed live-state divergence spanning display, status, messages, or command side effects. | Display / command dispatch | yes |
 | 1 | post-startup-live | seed0006-wizard-water-demon | Live command effects, movement, pet/monster behavior, or retained object/map state. | Commands / monsters / objects | no |
@@ -26,7 +25,7 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 
 ### passing: seed0116-wizard-wear-shop
 
-- Count: 37
+- Count: 38
 - Bucket key: `passing | FS=pass | FR=none | none/none | - | rows=-`
 - Canonical screens: 127/127
 - Canonical RNG: 12562/12562
@@ -36,21 +35,7 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 - Hypothesis: Pet behavior: dog_goal() object scan, reachability, carry checks, and object resistance in dogmove.c.
 - Next owner: Monsters / pets
 - Needs deeper debug: yes
-- Sessions: seed0002-healer-reflection-drummer, seed0012-monk-vault-escort, seed0013-friday13-save-then-fullmoon-restore, seed0013-rogue-friday13-combat, seed0015-valk-level2-pit-dog-wait, seed0016-healer-newmoon-eat-zap, seed0017-samurai-altar-pray, seed0030-ten-diverse-deaths, seed0060-orc-rogue-kick-search, seed0077-rogue-chargen, seed0101-ranger-quiver-throw-travel-engrave, seed0102-ranger-name-cancel, seed0103-knight-ride-pony, seed0104-knight-ride-combat, seed0105-valk-chat-lamp-ration, seed0106-priest-extcmd-sweep, seed0107-samurai-twoweapon-enhance, seed0108-wizard-extcmd-wishlist, seed0116-wizard-wear-shop, seed0200-monk-north-search, seed0360-wizard-world-tour, seed0373-barbarian-quest-tour, seed0383-wizard-hallucinate, seed0398-wizard-wandpoly-pile, seed0399-wizard-hallu-actions, seed0501-priest-cast-read-turn, seed0700-samurai-explore-descend, seed0900-tourist-explore-actions, seed1150-caveman-explore-move, seed1500-rogue-explore-move, seed1800-tourist-eat-throw, seed2200-wizard-quaff-zap-read, seed2600-wizard-custom-binds, seed4500-knight-coverage, seed5002-wizard-coverage-pair, seed5006-tourist-stress-disaster, seed8000-tourist-starter
-
-### post-startup-live: seed0361-archeologist-tour
-
-- Count: 1
-- Bucket key: `post-startup-live | FS=182 | FR=>1200 | message/message | rn2(3)=>rn2(5) | rows=0`
-- Canonical screens: 204/366
-- Canonical RNG: 4519/53865
-- First screen mismatch: 182 (message/message, rows 0)
-- First RNG mismatch: 4365 (rn2(3)=>rn2(5))
-- Sample cells: [0,0] ch Y/8 ->  /8; [0,1] ch o/8 ->  /8; [0,2] ch u/8 ->  /8; [0,4] ch a/8 ->  /8; [0,5] ch r/8 ->  /8
-- Hypothesis: Message buffer, prompt/menu lifecycle, or command dispatch timing after startup.
-- Next owner: Messages / command dispatch
-- Needs deeper debug: no
-- Sessions: seed0361-archeologist-tour
+- Sessions: seed0002-healer-reflection-drummer, seed0012-monk-vault-escort, seed0013-friday13-save-then-fullmoon-restore, seed0013-rogue-friday13-combat, seed0015-valk-level2-pit-dog-wait, seed0016-healer-newmoon-eat-zap, seed0017-samurai-altar-pray, seed0030-ten-diverse-deaths, seed0060-orc-rogue-kick-search, seed0077-rogue-chargen, seed0101-ranger-quiver-throw-travel-engrave, seed0102-ranger-name-cancel, seed0103-knight-ride-pony, seed0104-knight-ride-combat, seed0105-valk-chat-lamp-ration, seed0106-priest-extcmd-sweep, seed0107-samurai-twoweapon-enhance, seed0108-wizard-extcmd-wishlist, seed0116-wizard-wear-shop, seed0200-monk-north-search, seed0360-wizard-world-tour, seed0361-archeologist-tour, seed0373-barbarian-quest-tour, seed0383-wizard-hallucinate, seed0398-wizard-wandpoly-pile, seed0399-wizard-hallu-actions, seed0501-priest-cast-read-turn, seed0700-samurai-explore-descend, seed0900-tourist-explore-actions, seed1150-caveman-explore-move, seed1500-rogue-explore-move, seed1800-tourist-eat-throw, seed2200-wizard-quaff-zap-read, seed2600-wizard-custom-binds, seed4500-knight-coverage, seed5002-wizard-coverage-pair, seed5006-tourist-stress-disaster, seed8000-tourist-starter
 
 ### post-startup-live: seed0367-priest-quest-tour
 
@@ -174,7 +159,7 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 | seed0116-wizard-wear-shop | 127/127 | 12562/12562 | passing | -:none:none:- | -:- | - | - |
 | seed0200-monk-north-search | 40/40 | 3822/3822 | passing | -:none:none:- | -:- | - | - |
 | seed0360-wizard-world-tour | 833/833 | 120639/120639 | passing | -:none:none:- | -:- | - | - |
-| seed0361-archeologist-tour | 204/366 | 4519/53865 | post-startup-live | 182:message:message:Enter | 4365:rn2(3)=>rn2(5) | 0 | [0,0] ch Y/8 ->  /8; [0,1] ch o/8 ->  /8; [0,2] ch u/8 ->  /8; [0,4] ch a/8 ->  /8; [0,5] ch r/8 ->  /8 |
+| seed0361-archeologist-tour | 366/366 | 53865/53865 | passing | -:none:none:- | -:- | - | - |
 | seed0367-priest-quest-tour | 219/324 | 4951/50125 | post-startup-live | 65:char+attr:mixed:5 | 4869:rnd(4)=>rn2(4) | 0,2,3,4,5,6 | [0,13] ch C/8 ->  /8; [0,14] ch u/8 ->  /8; [0,15] ch r/8 ->  /8; [0,16] ch r/8 ->  /8; [0,17] ch e/8 ->  /8 |
 | seed0373-barbarian-quest-tour | 124/124 | 35386/35386 | passing | -:none:none:- | -:- | - | - |
 | seed0383-wizard-hallucinate | 219/219 | 16915/16915 | passing | -:none:none:- | -:- | - | - |
