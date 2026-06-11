@@ -818,6 +818,11 @@ export function see_nearby_objects() {
         if (typeof obj.ox !== 'number' || typeof obj.oy !== 'number') continue;
         if (obj.ox <= 0 || obj.oy < 0) continue;
         if (dist2(obj.ox, obj.oy, game.u?.ux ?? 0, game.u?.uy ?? 0) > neardist) continue;
+        if (!cansee(obj.ox, obj.oy)) continue;
+        // C ref: src/display.c:see_nearby_objects().  Nearby visible objects
+        // are marked encountered even when their map glyph is already a
+        // non-generic class glyph such as a scroll or wand.
+        if (!obj.dknown) observe_object(obj);
         const key = `${obj.ox},${obj.oy}`;
         if (seen.has(key)) continue;
         seen.add(key);

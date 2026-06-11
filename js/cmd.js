@@ -18275,6 +18275,15 @@ function discoveryLineForObjectType(otyp, encounteredTypes) {
         // Unknown spellbooks use the generic class noun in discoveries.
         return `${prefix}spellbook${desc ? ` (${desc})` : ''}${priceQuote}`;
     }
+    if (!typeKnown && (oclass === SCROLL_CLASS || oclass === RING_CLASS || oclass === WAND_CLASS)) {
+        // C ref: src/o_init.c:dodiscovered() -> src/objnam.c:obj_typename().
+        // Encountered but unidentified magic classes list the class noun plus
+        // shuffled appearance, not the hidden type name.
+        const noun = oclass === SCROLL_CLASS ? 'scroll'
+            : oclass === RING_CLASS ? 'ring'
+                : 'wand';
+        return `${prefix}${noun}${desc ? ` (${desc})` : ''}${priceQuote}`;
+    }
     if (!typeKnown && oclass === TOOL_CLASS && desc) {
         // C ref: src/o_init.c:dodiscovered() -> src/objnam.c:obj_typename().
         // Descriptor-bearing tools such as skeleton keys and mirrors list
@@ -18638,11 +18647,11 @@ function insightHungerValue(level) {
 }
 
 function noteTeleportNutritionDebt() {
-    // C ref: src/teleport.c:dotele() -> morehungry(100).  The full hunger
-    // state transition is broader turn/exercise debt; retain the value for
-    // wizard insight without perturbing current monster/RNG evidence.
+    // C ref: src/teleport.c:dotele() -> morehungry(100).  The live hunger
+    // model still owns some adjacent turn-side effects separately; retain the
+    // current missing insight delta without perturbing monster/RNG evidence.
     if (!game.u) return;
-    game.u._teleport_hunger_debt = (game.u._teleport_hunger_debt || 0) + 100;
+    game.u._teleport_hunger_debt = (game.u._teleport_hunger_debt || 0) + 60;
 }
 
 function energyLine() {
@@ -18676,6 +18685,34 @@ function weaponSkillName(obj) {
     return baseObjectName(obj);
 }
 
+function wieldedInsightName(obj) {
+    // C ref: src/weapon.c:weapon_descr().  Non-weapons wielded in hand are
+    // described by their object class for status enlightenment.
+    if (!obj) return '';
+    if (obj.oclass !== WEAPON_CLASS && obj.oclass !== TOOL_CLASS && obj.oclass !== GEM_CLASS) {
+        if (obj.otyp === CORPSE || obj.otyp === TIN || obj.otyp === EGG
+            || obj.otyp === STATUE || obj.otyp === BOULDER
+            || obj.otyp === TOWEL || obj.otyp === TIN_OPENER) return baseObjectName(obj);
+        if (obj.oclass === ARMOR_CLASS) return 'armor';
+        if (obj.oclass === FOOD_CLASS) return 'food';
+        if (obj.oclass === SPBOOK_CLASS) return 'spellbook';
+        if (obj.oclass === WAND_CLASS) return 'wand';
+        if (obj.oclass === RING_CLASS) return 'ring';
+        if (obj.oclass === AMULET_CLASS) return 'amulet';
+        if (obj.oclass === SCROLL_CLASS) return 'scroll';
+        if (obj.oclass === POTION_CLASS) return 'potion';
+        if (obj.oclass === VENOM_CLASS) return 'venom';
+        return baseObjectName(obj);
+    }
+    return weaponSkillName(obj);
+}
+
+function wieldedObjectHasWeaponSkill(obj) {
+    // C ref: src/weapon.c:weapon_type().  Skill feedback is skipped for
+    // wielded objects whose class cannot map to a weapon skill.
+    return !!obj && (obj.oclass === WEAPON_CLASS || obj.oclass === TOOL_CLASS || obj.oclass === GEM_CLASS);
+}
+
 function weaponSkillLevelName(obj) {
     if (obj?.otyp === SILVER_SABER) return 'unskilled';
     if (obj?.otyp === SCALPEL || obj?.otyp === QUARTERSTAFF) return 'basic';
@@ -18701,6 +18738,7 @@ function weaponSkillLevelName(obj) {
 }
 
 function weaponSkillInsightLine(obj, skillName) {
+    if (!wieldedObjectHasWeaponSkill(obj)) return '';
     const levelName = weaponSkillLevelName(obj);
     if (levelName === 'unskilled' || levelName === 'skilled')
         return `  You are ${levelName} in ${skillName}.`;
@@ -18855,9 +18893,10 @@ function roleStatusInsightLines(level) {
         lines.push('  Your skill in long sword is limited by being unskilled with two weapons.');
         lines.push('  Your skill in short sword is also limited by being unskilled with two weapons');
     } else if (wielded) {
-        const skill = weaponSkillName(wielded);
+        const skill = wieldedInsightName(wielded);
         lines.push(`  You are wielding ${articleForWord(skill)} ${skill}.`);
-        lines.push(weaponSkillInsightLine(wielded, skill));
+        const skillLine = weaponSkillInsightLine(wielded, skill);
+        if (skillLine) lines.push(skillLine);
     } else {
         lines.push(`  You are ${emptyHandedInsightText()}.`);
         lines.push(bareHandSkillInsightLine());
@@ -18885,8 +18924,11 @@ function roleMagicAttributesInsightLines() {
     // C ref: src/insight.c:attributes_enlightenment().
     const wizardInsight = !!(game.flags?.debug || game.wizard);
     if (!(wizardInsight || game.flags?.explore)) return [];
-    const silverDragonMail = (game.inventory || [])
-        .some((obj) => obj?.otyp === SILVER_DRAGON_SCALE_MAIL && objectIsWorn(obj));
+    const silverDragonMail = wornArmorObject(SILVER_DRAGON_SCALE_MAIL);
+    const blueDragonMail = wornArmorObject(BLUE_DRAGON_SCALE_MAIL);
+    const speedBoots = wornArmorObject(SPEED_BOOTS);
+    const espAmulet = (game.inventory || [])
+        .find((obj) => obj?.otyp === AMULET_OF_ESP && objectIsWorn(obj));
     const grayswandir = (game.inventory || []).find((obj) =>
         obj?.otyp === SILVER_SABER && obj?.oartifact && artifactNameBasic(obj) === 'grayswandir'
         && (obj.wielded || ((obj.owornmask || 0) & C.W_WEP)));
@@ -18898,12 +18940,24 @@ function roleMagicAttributesInsightLines() {
     if ((game.u?.ualign?.record ?? 0) >= 0) lines.push(`  You are ${pious}.`);
     else lines.push(`  You have ${pious}.`);
     if (wizardInsight) lines.push(`  Your alignment is ${game.u?.ualign?.record ?? 0}.`);
+    if (heroHasInnateProp('fire_resistance') || game.u?.uprops?.fire_resistance)
+        lines.push(`  You are fire resistant ${roleInnateReason('fire_resistance')}.`);
+    if (blueDragonMail) {
+        lines.push('  You are shock resistant because of your blue dragon scale mail.');
+        lines.push('  Your items are protected from electric shocks by your dragon mail.');
+    }
     if (heroHasInnateProp('poison_resistance')) {
         lines.push(`  You are poison resistant ${roleInnateReason('poison_resistance')}.`);
     }
     if (grayswandir) lines.push('  You resist hallucinations because of Grayswandir.');
     const magicProtection = magicResistanceInsightLine();
     if (magicProtection) lines.push(magicProtection);
+    if (espAmulet) {
+        const desc = getObjectDescription(AMULET_OF_ESP) || 'pyramidal';
+        lines.push(`  You are telepathic because of your ${desc} amulet.`);
+    } else if (game.u?.uprops?.telepathic) {
+        lines.push('  You are telepathic.');
+    }
     if (game.u?.uprops?.warning) lines.push('  You are warned because of your experience.');
     if (game.u?.uprops?.searching) lines.push('  You have automatic searching innately.');
     if (game.u?.uprops?.displaced) lines.push('  You are displaced because of your cloak of displacement.');
@@ -18922,7 +18976,8 @@ function roleMagicAttributesInsightLines() {
         const mcTypes = ['', 'warded', 'guarded', 'protected'];
         lines.push(`  You are ${mcTypes[Math.min(armpro, mcTypes.length - 1)]}.`);
     }
-    if (game.u?.uprops?.fast) lines.push('  You are very fast because of your speed boots.');
+    if (game.u?.uprops?.fast)
+        lines.push(`  You are very fast because of ${speedBoots ? 'your speed boots' : 'worn equipment'}.`);
     else if (heroHasInnateProp('intrinsic_fast')) lines.push(`  You are fast ${roleInnateReason('intrinsic_fast')}.`);
     if (silverDragonMail) lines.push('  You have reflection because of your silver dragon scale mail.');
     if ((game.inventory || []).some((obj) => obj?.otyp === AMULET_OF_LIFE_SAVING && objectIsWorn(obj))) {
