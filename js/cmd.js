@@ -11003,7 +11003,7 @@ function showOverviewScreen(options = {}) {
     const displayLen = Math.max(maxDisplayLen, options.final ? 38 : 0);
     const gutter = displayLen > maxLen ? 2 : 3;
     const menuCol = Math.max(1, Math.min(COLNO - 1, COLNO - displayLen - gutter));
-    const textCol = menuCol + (options.final ? 1 : 0);
+    const textCol = menuCol + (options.final && byDungeon.size > 1 ? 1 : 0);
     display.putstr(0, 0, ' '.repeat(COLNO), NO_COLOR, 0);
     const clearCol = Math.max(0, textCol - 1);
     for (let row = 0; row < lines.length; row++) {
@@ -15805,6 +15805,10 @@ function renderPickupTypesMenu() {
         const clearCol = row === 0 ? 0 : col - 1;
         display.putstr(clearCol, row, ' '.repeat(COLNO - clearCol), NO_COLOR, 0);
     }
+    if (game._pickup_types_menu?.returnToBasicOptions) {
+        display.putstr(0, 22, ' '.repeat(COLNO), NO_COLOR, 0);
+        display.putstr(0, 23, ' '.repeat(COLNO), NO_COLOR, 0);
+    }
     for (let row = 0; row < rows.length; row++) {
         if (!rows[row]) continue;
         display.putstr(col, row, rows[row], NO_COLOR, row === 0 ? ATR_INVERSE : 0);
@@ -15829,7 +15833,13 @@ async function handlePickupTypesMenuKey(ch) {
         game.flags = game.flags || {};
         game.flags.pickup_types = pickupTypesStringFromSet(menu.selected);
         const returnToPlay = !!menu.returnToPlay;
+        const returnToBasicOptions = !!menu.returnToBasicOptions;
         game._pickup_types_menu = null;
+        if (returnToBasicOptions) {
+            rerenderBasicOptionsFromFirstPage();
+            game.context.move = 0;
+            return true;
+        }
         if (returnToPlay) {
             clearOverrideScreen();
             await redrawAfterFullScreenMenuDismiss();
@@ -15844,7 +15854,13 @@ async function handlePickupTypesMenuKey(ch) {
         game.flags = game.flags || {};
         game.flags.pickup_types = menu.previous;
         const returnToPlay = !!menu.returnToPlay;
+        const returnToBasicOptions = !!menu.returnToBasicOptions;
         game._pickup_types_menu = null;
+        if (returnToBasicOptions) {
+            rerenderBasicOptionsFromFirstPage();
+            game.context.move = 0;
+            return true;
+        }
         if (returnToPlay) {
             clearOverrideScreen();
             await redrawAfterFullScreenMenuDismiss();
@@ -15974,6 +15990,168 @@ function simpleOptionValue(name) {
     const def = SIMPLE_OPTION_DEFS.get(name);
     if (!def) return null;
     return tf(optionBool(def.container, def.key, def.defaultValue));
+}
+
+function optionBoxValue(name) {
+    const def = SIMPLE_OPTION_DEFS.get(name);
+    return def && optionBool(def.container, def.key, def.defaultValue) ? 'X' : ' ';
+}
+
+function basicOptionLine(key, name, value, suffix = '') {
+    return ` ${key} - ${name.padEnd(24)}[${value}]${suffix}`;
+}
+
+function basicOptionsLines(page) {
+    if (page === 1) {
+        return [
+            '',
+            ' \x1b[7m Map\x1b[0m',
+            basicOptionLine('a', 'bgcolors', optionBool('iflags', 'bgcolors', true) ? 'X' : ' '),
+            basicOptionLine('b', 'color', optionBoxValue('color')),
+            basicOptionLine('c', 'customcolors', optionBoxValue('customcolors')),
+            basicOptionLine('d', 'customsymbols', optionBoxValue('customsymbols')),
+            basicOptionLine('e', 'hilite_pet', optionBoxValue('hilite_pet')),
+            basicOptionLine('f', 'hilite_pile', optionBoxValue('hilite_pile')),
+            basicOptionLine('g', 'showrace', optionBoxValue('showrace')),
+            basicOptionLine('h', 'sparkle', optionBoxValue('sparkle')),
+            basicOptionLine('i', 'symset', 'DECgraphics, active, handler=DEC'),
+            '',
+            ' \x1b[7m Status\x1b[0m',
+            basicOptionLine('j', 'hitpointbar', optionBoxValue('hitpointbar')),
+            basicOptionLine('k', 'menu colors', '(0 currently set)'),
+            basicOptionLine('l', 'showexp', optionBoxValue('showexp')),
+            basicOptionLine('m', 'status condition fields', '(16 currently set)'),
+            basicOptionLine('n', 'status highlight rules', '(0 currently set)'),
+            basicOptionLine('o', 'statuslines', '2'),
+            basicOptionLine('p', 'time', optionBoxValue('time')),
+            ' (2 of 2)',
+        ];
+    }
+    return [
+        ' \x1b[7mOptions\x1b[0m',
+        '',
+        ' ? - show help',
+        '',
+        ' \x1b[7m General\x1b[0m',
+        basicOptionLine('a', 'fruit', currentFruitName()),
+        basicOptionLine('b', 'number_pad', '0=off'),
+        basicOptionLine('c', 'price_quotes', optionBoxValue('price_quotes')),
+        '',
+        ' \x1b[7m Behavior\x1b[0m',
+        basicOptionLine('d', 'autodig', optionBoxValue('autodig')),
+        basicOptionLine('e', 'autoopen', optionBoxValue('autoopen')),
+        basicOptionLine('f', 'autopickup', optionBoxValue('autopickup')),
+        basicOptionLine('g', 'autopickup exceptions', '(0 currently set)'),
+        basicOptionLine('h', 'autoquiver', optionBoxValue('autoquiver')),
+        basicOptionLine('i', 'autounlock', 'apply-key'),
+        basicOptionLine('j', 'cmdassist', optionBoxValue('cmdassist')),
+        basicOptionLine('k', 'dropped_nopick', optionBoxValue('dropped_nopick'), '  (for autopickup)'),
+        basicOptionLine('l', 'fireassist', optionBoxValue('fireassist')),
+        basicOptionLine('m', 'pickup_stolen', optionBoxValue('pickup_stolen'), '  (for autopickup)'),
+        basicOptionLine('n', 'pickup_thrown', optionBoxValue('pickup_thrown'), '  (for autopickup)'),
+        basicOptionLine('o', 'pickup_types', pickupTypesDescription(), '  (for autopickup)'),
+        basicOptionLine('p', 'pushweapon', optionBoxValue('pushweapon')),
+        ' (1 of 2)',
+    ];
+}
+
+function renderBasicOptionsMenu() {
+    const menu = game._basic_options_menu || (game._basic_options_menu = { page: 0 });
+    const lines = basicOptionsLines(menu.page || 0);
+    const footerRow = lines.length - 1;
+    const footer = lines[footerRow] || '';
+    showSerializedOverride(lines.join('\n'), [footer.length, footerRow]);
+    game.context.move = 0;
+}
+
+function beginBasicOptionsMenu() {
+    // C ref: src/cmd.c:cmdlist['O'] -> src/options.c:doset_simple().
+    game._basic_options_menu = { page: 0 };
+    renderBasicOptionsMenu();
+}
+
+async function finishBasicOptionsMenu() {
+    game._basic_options_menu = null;
+    clearOverrideScreen();
+    await redrawAfterFullScreenMenuDismiss();
+    game.context.move = 0;
+}
+
+function rerenderBasicOptionsFromFirstPage() {
+    if (!game._basic_options_menu) {
+        game.context.move = 0;
+        return;
+    }
+    game._basic_options_menu.page = 0;
+    renderBasicOptionsMenu();
+}
+
+const BASIC_OPTIONS_SELECTIONS = [
+    {
+        c: 'price_quotes',
+        d: 'autodig',
+        e: 'autoopen',
+        f: 'autopickup',
+        h: 'autoquiver',
+        j: 'cmdassist',
+        k: 'dropped_nopick',
+        l: 'fireassist',
+        m: 'pickup_stolen',
+        n: 'pickup_thrown',
+        o: 'pickup_types',
+        p: 'pushweapon',
+    },
+    {
+        a: 'bgcolors',
+        b: 'color',
+        c: 'customcolors',
+        d: 'customsymbols',
+        e: 'hilite_pet',
+        f: 'hilite_pile',
+        g: 'showrace',
+        h: 'sparkle',
+        j: 'hitpointbar',
+        l: 'showexp',
+        p: 'time',
+    },
+];
+
+async function handleBasicOptionsMenuKey(ch) {
+    const menu = game._basic_options_menu || (game._basic_options_menu = { page: 0 });
+    if (ch === '\x1b' || ch === '\r' || ch === '\n') {
+        await finishBasicOptionsMenu();
+        return;
+    }
+    if (ch === ' ') {
+        if ((menu.page || 0) === 0) {
+            menu.page = 1;
+            renderBasicOptionsMenu();
+        } else {
+            await finishBasicOptionsMenu();
+        }
+        return;
+    }
+    const name = BASIC_OPTIONS_SELECTIONS[menu.page || 0]?.[ch];
+    if (name === 'pickup_types') {
+        await beginPickupTypesMenu();
+        if (game._pickup_types_menu) {
+            game._pickup_types_menu.returnToBasicOptions = true;
+            renderPickupTypesMenu();
+        }
+        return;
+    }
+    if (name === 'bgcolors') {
+        toggleOptionBool('iflags', 'bgcolors', true);
+        rerenderBasicOptionsFromFirstPage();
+        return;
+    }
+    const def = SIMPLE_OPTION_DEFS.get(name);
+    if (def) {
+        toggleOptionBool(def.container, def.key, def.defaultValue);
+        rerenderBasicOptionsFromFirstPage();
+        return;
+    }
+    renderBasicOptionsMenu();
 }
 
 function optionLine(menu, page, key, name, spaces, value = null) {
@@ -24764,6 +24942,10 @@ export async function rhack(key) {
         await handlePickupTypesMenuKey(ch);
         return;
     }
+    if (game._basic_options_menu) {
+        await handleBasicOptionsMenuKey(ch);
+        return;
+    }
     if (game._options_menu) {
         await handleSimpleOptionsMenuKey(ch);
         return;
@@ -25014,7 +25196,7 @@ export async function rhack(key) {
             } else if (cmd === 'offer') {
                 await doOfferCommand();
             } else if (cmd === 'options') {
-                beginSimpleOptionsMenu();
+                beginBasicOptionsMenu();
             } else if (cmd === 'overview') {
                 showOverviewScreen();
             } else if (cmd === 'version') {
@@ -27614,7 +27796,8 @@ export async function rhack(key) {
         game.context.move = 0;
         await showHelpMenu();
     } else if (ch === 'O') {
-        beginSimpleOptionsMenu();
+        if (forceCommandPrefix) beginSimpleOptionsMenu();
+        else beginBasicOptionsMenu();
     } else if (ch === '/') {
         game.context.move = 0;
         await showLookAtMenu();
