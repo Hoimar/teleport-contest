@@ -1747,6 +1747,7 @@ export async function bot() {
 export async function pline(msg) {
     game._topline_residue = '';
     game._pending_message = msg;
+    game._travel_description_pending = false;
     game._pending_message_wrap_cols = 0;
     game._last_topline_message = msg;
     game._last_topline_can_force_more = false;
@@ -1822,6 +1823,8 @@ function terminalCellWidth(text) {
 
 export function clear_pending_message() {
     game._pending_message = '';
+    game._simple_timed_repeat_stop_after_pending = false;
+    game._travel_description_pending = false;
     game._topline_residue = '';
     game._pending_message_wrap_cols = 0;
     game._more = false;

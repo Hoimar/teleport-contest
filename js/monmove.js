@@ -3052,10 +3052,10 @@ async function throw_weapon_at_hero_basic(mtmp, obj) {
         const hitMessage = seenThrower
             ? `The ${monster_weapon_name(projectile)} hits the ${monster_name(hit.mon)}.`
             : 'It is hit.';
-        const afterDx = dx || sgn((mtmp.mux ?? game.u?.ux ?? glyphX) - mtmp.mx);
-        const afterDy = dy || sgn((mtmp.muy ?? game.u?.uy ?? glyphY) - mtmp.my);
-        const landingX = glyphX + afterDx;
-        const landingY = glyphY + afterDy;
+        // C refs: src/mthrowu.c:ohitmon(), drop_throw().  A missile that
+        // hits another monster lands at gb.bhitpos, the hit monster square.
+        const landingX = hit.x;
+        const landingY = hit.y;
         const projectileDestroyed = monster_projectile_destroyed_by_hit(projectile);
         prepare_monster_projectile_for_floor(projectile, landingX, landingY);
         projectile._defer_pet_pickup = true;
@@ -3070,8 +3070,8 @@ async function throw_weapon_at_hero_basic(mtmp, obj) {
             if (!projectileDestroyed) {
                 stackobj(place_object(projectile, landingX, landingY));
             }
+            game._simple_timed_repeat_stop_after_pending = true;
             await pline(hitMessage);
-            if (isok(landingX, landingY)) newsym(landingX, landingY);
         }
     } else if (hit?.hero) {
         const glyphX = hit.x - dx;
@@ -4223,6 +4223,7 @@ function mark_active_more_for_physical_pack() {
 async function show_blocking_monster_message(line) {
     if (!line) return;
     if (game._life_saving_silent_monster_resume) return;
+    clear_transient_travel_description_for_monster_line();
     if (game._monster_topline_stop_after_esc_more
         && (is_simple_monster_hit_you_line(line) || is_simple_monster_hit_you_chain(line))) {
         // C refs: win/tty/topl.c:more()/update_topl().  ESC at --More--
@@ -4530,6 +4531,15 @@ async function append_swallowed_damage_message(line) {
     }
 }
 
+function clear_transient_travel_description_for_monster_line() {
+    if (!game._travel_description_pending || !game._pending_message || game._more) return;
+    // C refs: src/getpos.c:getpos()/auto_describe(), win/tty/topl.c:update_topl().
+    // Travel target descriptions linger only until real movement output
+    // replaces them; monster output should not pack behind that description.
+    game._pending_message = '';
+    game._travel_description_pending = false;
+}
+
 async function append_monster_topline(line) {
     if (game._life_saving_silent_monster_resume) return true;
     if (game.context?.run) {
@@ -4538,6 +4548,7 @@ async function append_monster_topline(line) {
         // the next repeated movement boundary.
         game.context.run.stopBeforeOpenDoor = true;
     }
+    clear_transient_travel_description_for_monster_line();
     if (game._pending_message) {
         const pending = game._pending_message;
         if (!topline_can_pack_message(pending, line)) {
@@ -4568,6 +4579,7 @@ async function append_monster_topline(line) {
 
 async function append_monster_effect_topline(line, opts = {}) {
     if (game._life_saving_silent_monster_resume) return;
+    clear_transient_travel_description_for_monster_line();
     if ((game._monster_topline_deferred || monster_attack_tail_pack_pending())
         && game._after_more_message) {
         const pending = game._after_more_message;

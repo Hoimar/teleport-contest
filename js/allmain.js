@@ -2184,13 +2184,17 @@ async function continueSimpleTimedRepeats(g, options = {}) {
         }
         if ((g.context?.multi || 0) > 0) g.context.multi--;
         await advanceTurn();
-        if (checkStopSearching && g._pending_message && !g._more) {
-            // C refs: src/allmain.c:moveloop_core(), src/cmd.c:timed_occupation().
-            // A timed search which produces ordinary tty output exposes one
-            // final occupation turn at the next input-boundary pass, then stops
-            // before stale positive multi can consume another queued command.
+        if (checkStopSearching && g._simple_timed_repeat_stop_after_pending
+            && g._pending_message && !g._more) {
+            // C refs: src/allmain.c:moveloop_core(), src/cmd.c:timed_occupation(),
+            // src/mthrowu.c:ohitmon().  Some monster-turn projectile output
+            // becomes the next timed-search frame instead of allowing the JS
+            // repeat batch to consume another queued command behind it.
             g._simple_timed_repeats_remaining = Math.min(g._simple_timed_repeats_remaining || 0, 1);
             if (g.context) g.context.multi = Math.min(g.context.multi || 0, g._simple_timed_repeats_remaining || 0);
+            g._simple_timed_repeat_stop_after_pending = false;
+        } else if (!g._pending_message || g._more) {
+            g._simple_timed_repeat_stop_after_pending = false;
         }
         if (checkStopSearching
             && (g._simple_timed_repeats_remaining || 0) > 0
