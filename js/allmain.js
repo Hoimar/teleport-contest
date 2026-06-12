@@ -2323,11 +2323,17 @@ async function continueSimpleTimedRepeats(g, options = {}) {
         if (checkStopSearching
             && (g._simple_timed_repeats_remaining || 0) > 0
             && (monsterNearbyForSafety()
-                || (!g._pending_message && !g._more && monsterNearbyForSafety(2)))) {
+                || (!g._pending_message && !g._more
+                    && (monsterNearbyForSafety(2)
+                        || (leaveTailForInputBoundary
+                            && (g._simple_timed_repeats_remaining || 0) <= 2
+                            && monsterNearbyForSafety(4)))))) {
             // C refs: src/allmain.c:moveloop_core(), src/hack.c:monster_nearby().
             // Timed search occupations stop for neighboring monsters; the
             // radius-2 fallback is the legacy batched-search tail catch-up,
-            // and must not overwrite already pending tty output.
+            // and the radius-4 tail edge covers the same JS batch boundary
+            // before a fast extra tick can consume the reserved tail.  Neither
+            // fallback should overwrite already pending tty output.
             g._simple_timed_repeats_remaining = 0;
             g._simple_timed_repeat_text = '';
             if (g.context) g.context.multi = 0;
@@ -2354,10 +2360,23 @@ async function continueSimpleTimedRepeats(g, options = {}) {
         // allocation is not charged inside this JS batching loop.
         if (leaveTailForInputBoundary) accrueEncumberedMoveDebt(g, { capPendingExtra: true });
     }
+    const stoppedSearchingInTail = g._simple_timed_repeat_text === 'searching'
+        && (g.context?.multi || 0) > 0
+        && monsterNearbyForSafety(4);
+    if (leaveTailForInputBoundary
+        && (g._simple_timed_repeats_remaining || 0) === 1
+        && stoppedSearchingInTail) {
+        // C refs: src/cmd.c:timed_occupation(), src/allmain.c:moveloop_core().
+        // The JS batcher preserves one timed-search tick for the next input
+        // boundary, but an occupation stop at that edge must be visible before
+        // the following queued command gets to own the final tick.
+        g._simple_timed_repeats_remaining = 0;
+        g._simple_timed_repeat_text = '';
+        if (g.context) g.context.multi = 0;
+        if (g.flags?.verbose !== false) await pline('You stop searching.');
+        return true;
+    }
     if ((g._simple_timed_repeats_remaining || 0) <= 0) {
-        const stoppedSearchingInTail = g._simple_timed_repeat_text === 'searching'
-            && (g.context?.multi || 0) > 0
-            && monsterNearbyForSafety(4);
         g._simple_timed_repeat_text = '';
         if (g.context) g.context.multi = 0;
         if (stoppedSearchingInTail && g.flags?.verbose !== false)
