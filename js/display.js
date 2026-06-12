@@ -1689,7 +1689,7 @@ function _buildScreenOutput() {
                 const inverse = game._floor_list_show_more === false
                     && line
                     && line !== '(end)'
-                    && !/^[a-z] [+-] /.test(line);
+                    && !/^(?:[a-z]|\$) [+-] /.test(line);
                 for (let c = clearCol; c < display.cols; c++)
                     display.setCell(c, row, ' ', NO_COLOR, 0);
                 for (let c = 0; c < Math.min(line.length, display.cols - col); c++)
