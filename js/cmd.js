@@ -21318,7 +21318,7 @@ function deathAttributesPages() {
         : game.flags?.moonphase === 0
             ? '  There was a new moon in effect when your adventure ended.'
             : '';
-    const page1 = [
+    const lines = [
         `${playerName} the ${roleName}'s attributes:`,
         '',
         'Background:',
@@ -21344,9 +21344,6 @@ function deathAttributesPages() {
         deathAttrLine('dexterity', C.A_DEX),
         deathAttrLine('constitution', C.A_CON),
         deathAttrLine('intelligence', C.A_INT),
-        '  --More--',
-    ];
-    const page2 = [
         deathAttrLine('wisdom', C.A_WIS),
         deathAttrLine('charisma', C.A_CHA),
         ...deathStatusLines(),
@@ -21355,13 +21352,17 @@ function deathAttributesPages() {
         'Miscellaneous:',
         "  You didn't encounter any bones levels.",
         '  Total elapsed playing time was none.',
-        '  --More--',
     ];
     const finalIndent = (line) => line.startsWith('  ') ? line.slice(1) : line;
+    const content = lines.map(finalIndent);
+    const pages = [];
+    for (let i = 0; i < content.length; i += 23) {
+        pages.push([...content.slice(i, i + 23), ' --More--'].join('\n'));
+    }
     return {
-        page1: page1.map(finalIndent).join('\n'),
-        page2: page2.map(finalIndent).join('\n'),
-        page3: null,
+        page1: pages[0] || ' --More--',
+        page2: pages[1] || null,
+        page3: pages[2] || null,
     };
 }
 
@@ -26962,7 +26963,7 @@ export async function rhack(key) {
             return;
         }
         if (prev === game._death_attributes_page1_screen) {
-            if (ch === ' ' || ch === '\r' || ch === '\n') {
+            if ((ch === ' ' || ch === '\r' || ch === '\n') && game._death_attributes_page2_screen) {
                 showOverride(game._death_attributes_page2_screen, [9, Math.max(0, game._death_attributes_page2_screen.split('\n').length - 1)]);
             } else {
                 await showDeathCreaturesPrompt();
