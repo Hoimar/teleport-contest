@@ -9670,10 +9670,18 @@ function corpseRotAgeBucket(obj, nonrotting = corpseIsNonrotting(obj)) {
     return rotted;
 }
 
+function heroCorpseTasteMonsterPtr() {
+    // C ref: src/eat.c:eatcorpse() tests carnivorous/herbivorous against
+    // gy.youmonst.data; in normal form that is the role monster, not the race.
+    if (game.u?._poly_form?.ptr) return game.u._poly_form.ptr;
+    const roleName = String(game.urole?.name?.m || '').toUpperCase().replace(/[^A-Z0-9]+/g, '_');
+    return monsterPtr(roleName) || game.youmonst?.data || game.u?.youmonst?.data || game.u?.data || null;
+}
+
 function corpseTasteLine(obj, guilty = false, rotted = 0) {
     const corpseName = baseObjectName(obj);
     const vegetarian = corpseIsVegetarian(obj);
-    const flags = game.u?._poly_form?.ptr?.mflags1 ?? game.u?.data?.mflags1 ?? M1_OMNIVORE;
+    const flags = heroCorpseTasteMonsterPtr()?.mflags1 ?? 0;
     const herbivorous = !!(flags & M1_HERBIVORE);
     const carnivorous = !!(flags & M1_CARNIVORE);
     const yummy = corpseIsVegan(obj)
