@@ -8510,7 +8510,9 @@ async function triggerTrapAtHero() {
     if (trap.ttyp === C.BEAR_TRAP) {
         // C ref: src/trap.c:trapeffect_bear_trap().
         const oldcap = u.uencumber || 0;
+        const oldHp = typeof u.uhp === 'number' ? u.uhp : null;
         const damage = d(2, 4);
+        let encumbranceMore = false;
         trap.tseen = true;
         newsym(trap.tx, trap.ty);
         u.utrap = rn1(4, 4);
@@ -8525,9 +8527,21 @@ async function triggerTrapAtHero() {
             if (encmsg) game._after_more_message = game._after_more_message
                 ? `${encmsg}  ${game._after_more_message}`
                 : encmsg;
+            encumbranceMore = !!encmsg;
         }
         exercise(A_DEX, false);
         await pline('A bear trap closes on your foot!');
+        if (encumbranceMore) {
+            // C refs: src/trap.c:trapeffect_bear_trap(),
+            // win/tty/topl.c:update_topl().  The encumbrance pline behind
+            // the trap line owns a tty More; botl still shows pre-losehp HP.
+            if (oldHp != null) {
+                game._latched_status_uhp = oldHp;
+                game._latched_status_turn = game.moves ?? null;
+                game._bear_trap_clear_latched_hp_after_more = true;
+            }
+            if (!game._more) queue_more_prompt();
+        }
         return true;
     }
     if (trap.ttyp === C.DART_TRAP) {
