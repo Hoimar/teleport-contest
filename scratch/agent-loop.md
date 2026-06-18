@@ -14,23 +14,25 @@ and `feature_map.md`.
 
 - Current branch in this workspace: `main`, ahead of origin.
 - Latest verified repair unit:
-  - Current WIP after commit `47297f2` advances
-    `seed0367-priest-quest-tour` from `S 219/324 R 4951/50125`
-    to `S 221/324 R 4951/50125 C 0`.
+  - Current WIP after commit `9fe3415` restores
+    `seed0009-swimmer-mforce` from
+    `S 42/73 R 3458/3713 FS 27 FR 3457` to exact
+    `S 73/73 R 3713/3713 C 0`.
   - Strict sentinels exact: `5/5 S 1063/1063 R 64569/64569 C 0`.
-  - `verify --target seed0367-priest-quest-tour` passed target expectations
-    plus strict sentinels, `hack:audit` (`hard=0 suspicious=45`), and
-    `memory:lint` (`issues=0`).
-  - Local parity refresh after this WIP:
-    checked-in public `38/44 S 9824/11405 R 659847/792838 C 0`;
-    cached hosted public `35/44 S 8923/10982 R 525993/840358 C 0`,
-    classified `public-session-drift`; leaderboard fetch failed.
-  - Implementation: `+` known-spells menus keep the same menu visible for
-    invalid selector keys such as `5`, while dismissal keys return through the
-    lightweight override path rather than forcing a hallucination-sensitive
-    map redraw (`C ref: src/spell.c:dospellmenu()`).
-  - Remaining checked-in misses: `seed0004`, `seed0006`, `seed0007`,
-    `seed0009`, `seed0014`, and `seed0367`.
+  - `verify --target seed0009-swimmer-mforce` passed target expectations,
+    strict sentinels, `hack:audit` (`hard=0 suspicious=47`), and
+    `memory:lint` (`issues=0`). `verify --target seed0367-priest-quest-tour`
+    also remains exact, guarding the Medusa `align_shift()` cache behavior.
+  - Local parity refresh after commit `9fe3415` was checked-in public
+    `33/44 S 8676/11405 R 481403/792838 C 1`; hosted public remained
+    `public-session-drift`, and leaderboard fetch failed.
+  - Implementation: startup move-counter timing now follows C: initial
+    `mklev()` and `makedog()` run at moves 0, then `u_init_role()`/role
+    inventory starts ordinary play at moves 1. This lets Tutorial generation
+    refresh `makemon.c:align_shift()` for the `tut-1` special-level alignment.
+  - Remaining checked-in misses before the next refresh: `seed0014`,
+    `seed0030`, `seed0060`, `seed0108`, `seed0360`, `seed0361`, `seed0399`,
+    `seed4500`, `seed5002`, and `seed5006`.
 - Previous committed repair unit:
   - Commit `47297f2` restored `seed0361-archeologist-tour` from WIP
     `S 204/366 R 4519/53865` to exact

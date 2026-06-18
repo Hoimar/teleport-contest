@@ -777,6 +777,7 @@ function can_attack_after_move_basic`
             phase,
             minadj,
             maxadj,
+            moves: game.moves,
             uz: game.u?.uz ? { ...game.u.uz } : null,
             ulevel: game.u?.ulevel,
             special: currentSpecialLevel()?.proto || null,

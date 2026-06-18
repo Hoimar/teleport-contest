@@ -1407,7 +1407,6 @@ export async function newgame() {
     g.flags.female = startupFemale();
     // C refs: src/attrib.c:newhp(), include/you.h:Role.initrecord.
     g.u.ualign = { type: align.value, record: g.urole?.initrecord ?? 10 };
-    g.moves = 1;
     const startupRoleName = g.flags?.female ? (g.urole.name.f || g.urole.name.m) : g.urole.name.m;
     const configuredPlayerName = g.plname;
     g.plname = g._seed === 2 ? 'David'
@@ -1426,6 +1425,10 @@ export async function newgame() {
     g.u.acurr = { a: [0, 0, 0, 0, 0, 0] };
     g.u.amax = { a: [0, 0, 0, 0, 0, 0] };
     await makedog();
+    // C ref: src/u_init.c:u_init_role().  Initial level generation and
+    // makedog() run with svm.moves == 0; inventory initialization then starts
+    // ordinary play at turn 1.
+    g.moves = 1;
     if (ff) {
         // Fast-forward through post-pet startup RNG calls.
         // Covers remaining unported u_init/attribute/moveloop-preamble work.

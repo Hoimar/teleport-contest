@@ -107,7 +107,9 @@ export class NethackGame {
         g.discoveryOrder = [];
         g.discoveryPriceQuotes = new Map();
         g.program_state = {};
-        g.moves = 1;
+        // C starts the turn counter at 0 and raises it in
+        // u_init.c:u_init_role(), after initial mklev() and makedog().
+        g.moves = 0;
         g._seed = this._seed;
         g.flags.moonphase = phaseOfMoon(g._lt);
         g.flags.friday13 = friday13(g._lt);
