@@ -348,7 +348,7 @@ const BELL = 255;
 const BUGLE = 256;
 const LEATHER_DRUM = 257;
 const PICK_AXE = 259;
-const SPE_FORCE_BOLT = 383;
+const SPE_FORCE_BOLT = 376;
 const SPE_CONFUSE_MONSTER = 377;
 const SPE_PROTECTION = 403;
 const APPLE = 277;
@@ -824,6 +824,23 @@ export function merge_inventory_object(obj) {
     const target = game.inventory.find((into) => mergeable_inventory_object(into, obj));
     if (!target) return null;
     target.quan = (target.quan || 1) + (obj.quan || 1);
+    let discovered = false;
+    // C ref: src/invent.c:merged().  Stacking can identify an attribute by
+    // comparing the incoming object with an already-carried stack.
+    if (!!obj.known !== !!target.known) {
+        target.known = true;
+        discovered = true;
+    }
+    if (!!obj.rknown !== !!target.rknown) {
+        target.rknown = true;
+        if (target.oerodeproof) discovered = true;
+    }
+    if (!!obj.bknown !== !!target.bknown) {
+        target.bknown = true;
+        if (game.urole?.name?.m !== 'Priest') discovered = true;
+    }
+    if (discovered && obj.how_lost !== 'LOST_THROWN' && target.how_lost !== 'LOST_THROWN')
+        game._inventory_merge_discovered = true;
     return target;
 }
 
@@ -1474,8 +1491,9 @@ export function newuexp(level) {
     return 10000000 * (lev - 19);
 }
 
-export function pluslvl() {
+export function pluslvl(incremental = false) {
     const u = game.u || {};
+    const oldLevel = u.ulevel || 1;
     const hpinc = newhp();
     u.uhp = (u.uhp || 0) + hpinc;
     u.uhpmax = (u.uhpmax || 0) + hpinc;
@@ -1486,9 +1504,14 @@ export function pluslvl() {
     u.uenmax = (u.uenmax || 0) + eninc;
     u.uenpeak = Math.max(u.uenpeak || 0, u.uenmax);
 
-    if ((u.ulevel || 1) < 30) {
-        u.uexp = newuexp(u.ulevel || 1);
-        u.ulevel = (u.ulevel || 1) + 1;
+    if (oldLevel < 30) {
+        if (incremental) {
+            const nextLevelXp = newuexp(oldLevel + 1);
+            if ((u.uexp || 0) >= nextLevelXp) u.uexp = nextLevelXp - 1;
+        } else {
+            u.uexp = newuexp(oldLevel);
+        }
+        u.ulevel = oldLevel + 1;
         u.ulevelmax = Math.max(u.ulevelmax || 0, u.ulevel);
         u.ulevelpeak = Math.max(u.ulevelpeak || 0, u.ulevel);
     }

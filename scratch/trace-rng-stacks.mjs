@@ -85,6 +85,12 @@ async function main() {
             console.log(`  S@${item.idx} ${JSON.stringify(item)}`);
         }
     }
+    if (globalThis.__teleportRndmonstTrace?.length) {
+        console.log('rndmonst trace');
+        for (const item of globalThis.__teleportRndmonstTrace) {
+            console.log(`  R@${item.idx} ${JSON.stringify(item)}`);
+        }
+    }
     if (globalThis.__teleportMonAllocTrace?.length) {
         console.log('mon alloc trace');
         for (const item of globalThis.__teleportMonAllocTrace) {

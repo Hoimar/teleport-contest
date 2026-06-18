@@ -2168,23 +2168,18 @@ function noteleport_level_for(mon = null, ptr = mon?.data) {
 
 let alignShiftOldMoves = null;
 let alignShiftSeed = null;
-let alignShiftDnum = null;
-let alignShiftDlevel = null;
 let alignShiftSpecial = null;
 
 function align_shift(ptr) {
     const uz = game.u?.uz;
     // C ref: makemon.c:align_shift() caches Is_special(&u.uz) until moves
-    // changes.  JS can enter a new level during the same replay move, so keep
-    // the cache level-sensitive to avoid carrying a stale non-special value.
-    if (alignShiftOldMoves !== (game.moves ?? 0) || alignShiftSeed !== game.currentSeed
-        || alignShiftDnum !== uz?.dnum || alignShiftDlevel !== uz?.dlevel) {
+    // changes, even if level generation enters a different special level
+    // during that same move.  The seed guard is JS harness hygiene only.
+    if (alignShiftOldMoves !== (game.moves ?? 0) || alignShiftSeed !== game.currentSeed) {
         alignShiftSpecial = (game.specialLevels || []).find((lev) =>
             lev?.dlevel?.dnum === uz?.dnum && lev?.dlevel?.dlevel === uz?.dlevel) || null;
         alignShiftOldMoves = game.moves ?? 0;
         alignShiftSeed = game.currentSeed;
-        alignShiftDnum = uz?.dnum;
-        alignShiftDlevel = uz?.dlevel;
     }
     // C ref: dungeon.c:init_dungeon_dungeons() stores shifted D_ALIGN_* values
     // in dungeon flags, while align_shift() compares against AM_* masks. Only
@@ -16316,6 +16311,7 @@ const THEMED_MAPS = new Map([
         skipFillerRegion: true,
         forceRoomType: THEMEROOM,
         forceNeedfill: FILL_NONE,
+        forceNeedjoining: false,
         postMap: waterSurroundedVaultThemedMapPostprocess,
         map: [
             '}}}}}}',
@@ -16446,13 +16442,29 @@ function blockedCenterThemedMapPreFiller() {
     };
 }
 
+function themeEscapeObjectFromName(name) {
+    const otyp = {
+        'scroll of teleportation': SCR_TELEPORTATION,
+        'ring of teleportation': RIN_TELEPORTATION,
+        'wand of teleportation': WAN_TELEPORTATION,
+        'wand of digging': WAN_DIGGING,
+    }[name];
+    if (!otyp) return null;
+    // C refs: src/nhlobj.c:l_obj_new_readobjnam(),
+    // src/objnam.c:readobjnam_postparse3()/rnd_otyp_by_namedesc().  obj.new()
+    // resolves even exact-looking escape item names through the wish parser,
+    // adding one to the matching object's random-generation probability.
+    rn2((OBJECT_PROB[otyp] ?? 0) + 1);
+    return mksobj(otyp, true, false);
+}
+
 function waterSurroundedVaultThemedMapPostprocess(croom, xstart, ystart) {
     // C ref: dat/themerms.lua "Water-surrounded vault" map contents.
     const chestSpots = [[2, 2], [3, 2], [2, 3], [3, 3]];
     lua_shuffle(chestSpots);
 
-    const escapeItems = [SCR_TELEPORTATION, RIN_TELEPORTATION, WAN_TELEPORTATION, WAN_DIGGING];
-    const itm = mksobj(escapeItems[rn2(escapeItems.length)], true, false);
+    const escapeItems = ['scroll of teleportation', 'ring of teleportation', 'wand of teleportation', 'wand of digging'];
+    const itm = themeEscapeObjectFromName(escapeItems[rn2(escapeItems.length)]);
     const [boxRelX, boxRelY] = chestSpots[0];
     const box = mksobj_at(CHEST, xstart + boxRelX, ystart + boxRelY, true, false);
     if (box) {
@@ -16467,7 +16479,10 @@ function waterSurroundedVaultThemedMapPostprocess(croom, xstart, ystart) {
     const nastyUndead = ['giant zombie', 'ettin zombie', 'vampire lord'];
     lua_shuffle(nastyUndead);
     const ptr = monster_by_user_name(nastyUndead[0]);
-    if (ptr) makemon(ptr, xstart + 2, ystart + 2, 0);
+    if (ptr) {
+        induced_align_80();
+        makemon(ptr, xstart + 2, ystart + 2, 0);
+    }
     croom.needfill = FILL_NONE;
 }
 
@@ -16952,7 +16967,7 @@ function create_themed_map_room(spec) {
         lx: minx, ly: miny, hx: maxx, hy: maxy,
         rtype: spec.forceRoomType ?? (themedFill ? THEMEROOM : OROOM), rlit: lit ? 1 : 0,
         doorct: 0, fdoor: game.level.doorindex,
-        irregular: true, needjoining: true,
+        irregular: true, needjoining: spec.forceNeedjoining ?? true,
         nsubrooms: 0, sbrooms: [],
         roomnoidx: game.level.nroom,
         needfill: spec.forceNeedfill ?? FILL_NORMAL,
@@ -19216,8 +19231,10 @@ async function fill_ordinary_room(croom, bonus_items) {
                     const otmp = mksobj(otyp, true, false);
                     if (otmp && otyp === POT_HEALING && rn2(2)) {
                         otmp.quan = 2;
+                        otmp.owt = weight(otmp);
                     }
                     cursed_item = otmp?.cursed ?? false;
+                    add_to_container(supply_chest, otmp);
                     if (++tryct2 >= 50) break;
                 } while (cursed_item || !rn2(5));
                 if (rn2(3)) {
@@ -19233,7 +19250,9 @@ async function fill_ordinary_room(croom, bonus_items) {
                             mkobj(oclass, false);
                         }
                     }
+                    add_to_container(supply_chest, otmp);
                 }
+                supply_chest.owt = weight(supply_chest);
             }
             skip_chests = true;
         }

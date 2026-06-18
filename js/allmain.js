@@ -15,11 +15,15 @@ import {
     promptPendingPetCombatBeforeDeferredFloorList,
 } from './monmove.js';
 import { initrack, settrack } from './track.js';
-import { expire_corpse_timeouts, mklev, l_nhcore_init, monster_by_user_name, u_on_upstairs } from './mklev.js';
+import {
+    expire_corpse_timeouts, mklev, l_nhcore_init, monster_by_user_name,
+    place_object, stackobj, u_on_upstairs,
+} from './mklev.js';
+import { OBJECT_MATERIAL, OBJECT_NAME } from './object_data.js';
 import { init_objects } from './o_init.js';
 import { init_dungeons } from './dungeon.js';
 import { apply_startup_role_state, calculated_armor_class, u_init_misc_rng, u_init_role_inventory } from './u_init.js';
-import { makedog } from './dog.js';
+import { makedog, obj_resists } from './dog.js';
 import {
     applyEatingBiteNutrition,
     applyEatingCorpsePostEffects,
@@ -54,6 +58,8 @@ const STARTUP_REPLAY_BY_SEED = new Map([
 ]);
 
 const SPEED_BOOTS = 166;
+const GAUNTLETS_OF_FUMBLING = 160;
+const FUMBLE_BOOTS = 171;
 const BLUE_DRAGON_SCALE_MAIL = 108;
 const BLUE_DRAGON_SCALES = 118;
 const GAUNTLETS_OF_POWER = 161;
@@ -64,6 +70,15 @@ const TOWEL = 234;
 const LOCK_PICK = 222;
 const CREDIT_CARD = 223;
 const CHEST = 215;
+const POTION_CLASS = 8;
+const SCROLL_CLASS = 9;
+const SPBOOK_CLASS = 10;
+const WAX = 2;
+const VEGGY = 3;
+const FLESH = 4;
+const PAPER = 5;
+const WOOD = 8;
+const GLASS = 19;
 const NAME_PROMPT_BASE = "\n\n\n\nNetHack, Copyright 1985-2026\n\x1b[9CBy Stichting Mathematisch Centrum and M. Stephenson.\n\x1b[9CVersion 5.0.0 MacOS, built May  2 2026 12:00:00.\n\x1b[9CSee license for details.\n\n\n\n\nWho are you?";
 
 const ROLE_SELECTION_CHOICES = [
@@ -104,6 +119,58 @@ const ALIGN_SELECTION_CHOICES = [
 function wearingBlindfoldLike(g) {
     return (g.inventory || []).some((obj) => (obj?.otyp === BLINDFOLD || obj?.otyp === TOWEL)
         && (obj.worn || ((obj.owornmask || 0) & W_TOOL)));
+}
+
+async function slipOrTripBasic() {
+    // C ref: src/timeout.c:slip_or_trip().  This covers the ordinary on-foot
+    // fumble case; object-specific and ice-specific variants are added as
+    // evidence reaches them.
+    switch (rn2(4)) {
+    case 1:
+        await pline('You trip over your own feet.');
+        break;
+    case 2:
+        await pline('You slip and nearly fall.');
+        break;
+    case 3:
+        await pline('You flounder.');
+        break;
+    default:
+        await pline('You stumble.');
+        break;
+    }
+}
+
+async function timeoutFumblingBasic(u) {
+    if (!u?.uprops) return;
+    if (typeof u.uprops.fumbling_timeout !== 'number' || u.uprops.fumbling_timeout <= 0) return;
+    u.uprops.fumbling_timeout = Math.max(0, u.uprops.fumbling_timeout - 1);
+    if (u.uprops.fumbling_timeout > 0) return;
+    // C ref: src/timeout.c:nh_timeout() FUMBLING.  Fumble messages are only
+    // emitted when a move took place and the hero is neither levitating nor
+    // flying; worn fumble armor then reseeds the recurring timeout.
+    if (u.umoved && !u.uprops.levitation && !u.uprops.flying) {
+        await slipOrTripBasic();
+        // C ref: src/timeout.c:nh_timeout() FUMBLING.  The fumble line is
+        // followed by nomul(-2) with an empty nomovemsg.  nomul() also calls
+        // end_running(TRUE), so active run/travel/multi state stops here.
+        if (game.context) {
+            game.context.run = null;
+            game.context.travel = null;
+            game.context.travel1 = null;
+            game.context.mv = 0;
+            game.context.multi = -2;
+        }
+        game._simple_timed_repeats_remaining = 0;
+        game._simple_timed_repeat_text = '';
+        game._simple_timed_repeat_stop_text = '';
+        // The already completed command turn counts, leaving one helpless turn.
+        game._nomul_turns_remaining = Math.max(game._nomul_turns_remaining || 0, 2);
+        game._nomul_finish_message = '';
+        game._fumble_nomul_pet_inventory_scan = true;
+    }
+    if (wornFumblingArmor(game)) u.uprops.fumbling_timeout += rnd(20);
+    else u.uprops.fumbling = false;
 }
 
 async function nhTimeoutBasic() {
@@ -156,6 +223,7 @@ async function nhTimeoutBasic() {
     }
     if (typeof u?.uprops?.invulnerable === 'number' && u.uprops.invulnerable > 0)
         u.uprops.invulnerable = Math.max(0, u.uprops.invulnerable - 1);
+    await timeoutFumblingBasic(u);
 
     // C ref: timeout.c:nh_timeout() WOUNDED_LEGS case -> do.c:heal_legs().
     const timeout = u?.uprops?.wounded_legs || 0;
@@ -478,14 +546,29 @@ function forcedAlignmentConstraint(state) {
     return null;
 }
 
+function forcedGenderConstraint(state) {
+    const role = state.role ? roleChoiceForName(state.role) : null;
+    if (role?.genders?.length === 1) return { source: 'role', gender: role.genders[0] };
+    return null;
+}
+
 function effectiveStartupAlignName(state) {
     return forcedAlignmentConstraint(state)?.align || state.align || null;
+}
+
+function effectiveStartupGenderName(state) {
+    return forcedGenderConstraint(state)?.gender || state.gender || null;
 }
 
 function consumeForcedAlignmentSelection(state) {
     if (state.align) return;
     const forced = forcedAlignmentConstraint(state);
     if (!forced) {
+        state._forcedAlignConsumed = null;
+        return;
+    }
+    if (forced.source !== 'role'
+        && !(forced.source === 'race' && !effectiveStartupGenderName(state))) {
         state._forcedAlignConsumed = null;
         return;
     }
@@ -496,22 +579,44 @@ function consumeForcedAlignmentSelection(state) {
     state._forcedAlignConsumed = token;
 }
 
+function consumeForcedGenderSelection(state) {
+    if (state.gender) return;
+    const forced = forcedGenderConstraint(state);
+    if (!forced) {
+        state._forcedGenderConsumed = null;
+        return;
+    }
+    const token = `${forced.source}:${forced.gender}`;
+    if (state._forcedGenderConsumed === token) return;
+    // C refs: src/role.c:rigid_role_checks(), pick_gend().
+    rn2(1);
+    state._forcedGenderConsumed = token;
+}
+
 function manualSelectionPrompt(state) {
-    const role = state.role ? roleNameForSelection(roleChoiceForName(state.role), state) : '<role>';
+    const gender = effectiveStartupGenderName(state);
+    const promptState = { ...state, gender };
+    const role = state.role ? roleNameForSelection(roleChoiceForName(state.role), promptState) : '<role>';
     const race = state.race || '<race>';
-    const gender = state.gender || '<gender>';
     const align = effectiveStartupAlignName(state) || '<alignment>';
-    return `${role} ${race} ${gender} ${align}`;
+    return `${role} ${race} ${gender || '<gender>'} ${align}`;
 }
 
 function startupConfirmationLine(state) {
-    const role = roleNameForSelection(roleChoiceForName(state.role), state);
+    const gender = effectiveStartupGenderName(state);
+    const role = roleNameForSelection(roleChoiceForName(state.role), { ...state, gender });
     const race = raceChoiceForName(state.race);
     const align = effectiveStartupAlignName(state);
-    return `${game.plname} the ${align} ${state.gender} ${(race?.adj || state.race)} ${role}`;
+    return `${game.plname} the ${align} ${gender} ${(race?.adj || state.race)} ${role}`;
 }
 
 function addStartupExtra(lines, key, state, facet) {
+    const forcedGender = facet === 'gender' ? forcedGenderConstraint(state) : null;
+    if (forcedGender) {
+        // C ref: src/role.c:role_menu_extra().
+        lines.push(`    ${forcedGender.source} forces ${forcedGender.gender}`);
+        return;
+    }
     const forcedAlign = facet === 'align' ? forcedAlignmentConstraint(state) : null;
     if (forcedAlign) {
         // C ref: src/role.c:role_menu_extra().
@@ -682,7 +787,7 @@ async function showStartupConfirmationOnNamePrompt(state) {
 function nextManualSelectionMenu(state) {
     if (!state.role) return 'role';
     if (!state.race) return 'race';
-    if (!state.gender) return 'gender';
+    if (!effectiveStartupGenderName(state)) return 'gender';
     if (!effectiveStartupAlignName(state)) return 'align';
     return 'confirm';
 }
@@ -888,14 +993,15 @@ async function runStartupFilterMenu() {
 
 function applyManualStartupSelection(state) {
     const g = game;
+    const gender = effectiveStartupGenderName(state);
     g._selected_startup_role = state.role;
     g._selected_startup_race = state.race;
-    g._selected_startup_gender = state.gender;
+    g._selected_startup_gender = gender;
     g._selected_startup_align = effectiveStartupAlignName(state);
     g._nhopts = g._nhopts || {};
     g._nhopts.role = state.role;
     g._nhopts.race = state.race;
-    g._nhopts.gender = state.gender;
+    g._nhopts.gender = gender;
     g._nhopts.align = g._selected_startup_align;
 }
 
@@ -910,6 +1016,7 @@ function chooseStartupExtra(kind, key, state) {
     };
     const next = nextByKey[key];
     if (!next || next === kind) return null;
+    if (next === 'gender' && forcedGenderConstraint(state)) return null;
     if (next === 'align' && forcedAlignmentConstraint(state)) return null;
     state[next] = null;
     return next;
@@ -920,6 +1027,7 @@ async function selectManualCharacter(initialState = {}) {
     // setup_racemenu(), setup_gendmenu(), setup_algnmenu().
     let state = { ...initialState };
     consumeForcedAlignmentSelection(state);
+    consumeForcedGenderSelection(state);
     let kind = nextManualSelectionMenu(state);
     let rightSide = false;
 
@@ -980,6 +1088,7 @@ async function selectManualCharacter(initialState = {}) {
             if (choice) state.align = choice.name;
         }
         consumeForcedAlignmentSelection(state);
+        consumeForcedGenderSelection(state);
         kind = nextManualSelectionMenu(state);
         rightSide = true;
     }
@@ -1584,6 +1693,7 @@ function applyOccupationTakeoffObject(g) {
 function occupationPending(g) {
     return (g._occupation_turns_remaining || 0) > 0
         || !!g._occupation_finish_message
+        || !!g._occupation_silent_finish
         || !!g._pick_lock
         || (g._pick_lock_post_success_turns || 0) > 0
         || !!g._force_lock
@@ -1592,7 +1702,8 @@ function occupationPending(g) {
 
 function delayedOccupationPending(g) {
     return (g._occupation_turns_remaining || 0) > 0
-        || !!g._occupation_finish_message;
+        || !!g._occupation_finish_message
+        || !!g._occupation_silent_finish;
 }
 
 async function packedOccupationPline(msg) {
@@ -1600,9 +1711,68 @@ async function packedOccupationPline(msg) {
     else await pline(msg);
 }
 
+function containerContents(box) {
+    return (box?.cobj || box?.contents || []).filter(Boolean);
+}
+
+function clearContainerContents(box) {
+    if (!box) return;
+    if (box.cobj) box.cobj = [];
+    if (box.contents) box.contents = [];
+}
+
+function forceLockShatterThing(obj) {
+    if (obj?.oclass === SPBOOK_CLASS) return 'spellbook';
+    if (obj?.oclass === SCROLL_CLASS) return 'scroll';
+    if (obj?.oclass === POTION_CLASS) return 'potion';
+    return OBJECT_NAME[obj?.otyp] || 'object';
+}
+
+function forceLockArticle(noun) {
+    return /^[aeiou]/i.test(noun || '') ? 'An' : 'A';
+}
+
+function forceLockShatterMessage(obj) {
+    if (obj?.oclass === POTION_CLASS) return 'You see a potion shatter!';
+    const noun = forceLockShatterThing(obj);
+    let disposition = 'is destroyed';
+    switch (OBJECT_MATERIAL[obj?.otyp] ?? 0) {
+    case PAPER:
+        disposition = 'is torn to shreds';
+        break;
+    case WAX:
+        disposition = 'is crushed';
+        break;
+    case VEGGY:
+        disposition = 'is pulped';
+        break;
+    case FLESH:
+        disposition = 'is mashed';
+        break;
+    case GLASS:
+        disposition = 'shatters';
+        break;
+    case WOOD:
+        disposition = 'splinters to fragments';
+        break;
+    default:
+        break;
+    }
+    return `${forceLockArticle(noun)} ${noun} ${disposition}!`;
+}
+
+function placeForceLockContent(obj, x, y) {
+    if (!obj) return;
+    delete obj.ocontainer;
+    obj.where = 'floor';
+    place_object(obj, x, y);
+    stackobj(obj);
+}
+
 function clearForceLock(g) {
     g._force_lock = null;
     g._force_lock_resume_turn_first = false;
+    g._force_lock_start_more_after_turn = false;
 }
 
 function clearPickLock(g) {
@@ -1720,6 +1890,58 @@ async function forceLockAttempt(g) {
         clearForceLock(g);
         return true;
     }
+    if (state.stage === 'breakchest') {
+        state.stage = 'contents';
+        await pline("In fact, you've totally destroyed the chest.");
+        return true;
+    }
+    if (state.stage === 'shatter-message') {
+        const otmp = state.pendingShatterObject;
+        const msg = state.pendingShatterMessage;
+        state.pendingShatterObject = null;
+        state.pendingShatterMessage = '';
+        state.stage = 'contents';
+        await pline(msg);
+        if (otmp && (otmp.quan || 1) > 1) {
+            otmp.quan = (otmp.quan || 1) - 1;
+            placeForceLockContent(otmp, g.u?.ux, g.u?.uy);
+        }
+        return true;
+    }
+    if (state.stage === 'contents') {
+        if (!state.contents) {
+            state.contents = containerContents(box);
+            state.contentIndex = 0;
+            clearContainerContents(box);
+        }
+        while ((state.contentIndex || 0) < state.contents.length) {
+            const otmp = state.contents[state.contentIndex++];
+            const shattered = rn2(3) === 0 || otmp.oclass === POTION_CLASS;
+            if (shattered) {
+                const msg = forceLockShatterMessage(otmp);
+                if (g._pending_message) {
+                    state.pendingShatterObject = otmp;
+                    state.pendingShatterMessage = msg;
+                    state.stage = 'shatter-message';
+                    queue_more_prompt();
+                    g._occupation_paused_for_more = true;
+                    return true;
+                }
+                await pline(msg);
+                if ((otmp.quan || 1) <= 1) continue;
+                otmp.quan = (otmp.quan || 1) - 1;
+            }
+            placeForceLockContent(otmp, g.u?.ux, g.u?.uy);
+        }
+        const idx = g.level?.objects?.indexOf(box) ?? -1;
+        if (!obj_resists(box, 0, 0) && idx >= 0) g.level.objects.splice(idx, 1);
+        newsym(box.ox, box.oy);
+        // C's movement loop drains one final monster/allmain allocation after
+        // forcelock() clears the occupation, before the next input prompt.
+        g._force_lock_post_success_turns = 1;
+        clearForceLock(g);
+        return true;
+    }
     if ((state.usedtime || 0) >= 50 || !state.weapon) {
         await packedOccupationPline('You give up your attempt to force the lock.');
         if ((state.usedtime || 0) >= 50) exercise(state.picktyp ? A_DEX : A_STR, true);
@@ -1732,17 +1954,19 @@ async function forceLockAttempt(g) {
     // turn after that turn's monster/allmain tail has completed.
     if (rn2(100) >= (state.chance || 0)) return false;
 
-    await packedOccupationPline('You succeed in forcing the lock.');
+    await pline('You succeed in forcing the lock.');
     exercise(state.picktyp ? A_DEX : A_STR, true);
     const destroyit = !state.picktyp && rn2(3) === 0;
+    state.destroyit = destroyit;
+    if (destroyit) {
+        state.stage = 'breakchest';
+        queue_more_prompt();
+        g._occupation_paused_for_more = true;
+        return true;
+    }
     box.olocked = false;
     box.obroken = true;
     box.lknown = true;
-    if (destroyit) {
-        const idx = g.level?.objects?.indexOf(box) ?? -1;
-        if (idx >= 0) g.level.objects.splice(idx, 1);
-        await packedOccupationPline("In fact, you've totally destroyed the chest.");
-    }
     newsym(box.ox, box.oy);
     // C's movement loop drains one final monster/allmain allocation after
     // forcelock() clears the occupation, before the next input prompt.
@@ -1767,6 +1991,10 @@ async function continueForceLockTurns(g) {
         if (resumeTurnFirst) {
             resumeTurnFirst = false;
         } else if (await forceLockAttempt(g)) {
+            if ((g._more || g._monster_turn_paused_for_more) && occupationPending(g)) {
+                g._occupation_paused_for_more = true;
+                return false;
+            }
             continue;
         }
         await advanceTurn();
@@ -1947,11 +2175,34 @@ function wornVeryFastArmor(g) {
         obj?.oclass === ARMOR_CLASS && (obj.worn || obj.owornmask) && armorGrantsVeryFast(obj));
 }
 
+function wornFumblingArmor(g, exclude = null) {
+    return (g.inventory || []).some((obj) =>
+        obj !== exclude
+        && (obj?.worn || obj?.owornmask)
+        && (obj.otyp === GAUNTLETS_OF_FUMBLING || obj.otyp === FUMBLE_BOOTS));
+}
+
 function refreshVeryFastFromWornArmor(g) {
     if (!g.u) return;
     g.u.uprops = g.u.uprops || {};
     if (wornVeryFastArmor(g)) g.u.uprops.fast = true;
     else if (typeof g.u.uprops.fast !== 'number') g.u.uprops.fast = false;
+}
+
+function applyFumblingArmorOn(g, obj) {
+    if (!g.u) return;
+    g.u.uprops = g.u.uprops || {};
+    const hasOtherFumblingArmor = wornFumblingArmor(g, obj);
+    const hasNonTimeoutFumbling = g.u.uprops.fumbling === true;
+    // C ref: src/do_wear.c:Boots_on()/Gloves_on().  Fumbling armor grants an
+    // extrinsic and seeds the recurring HFumbling timeout after the delayed
+    // donning action, unless another non-timeout source is already active.
+    if (!hasOtherFumblingArmor && !hasNonTimeoutFumbling) {
+        const previous = Number.isFinite(Number(g.u.uprops.fumbling_timeout))
+            ? Number(g.u.uprops.fumbling_timeout) : 0;
+        g.u.uprops.fumbling_timeout = previous + rnd(20);
+    }
+    g.u.uprops.fumbling = true;
 }
 
 function applyOccupationFinishObjectEffects(g) {
@@ -1974,6 +2225,8 @@ function applyOccupationFinishObjectEffects(g) {
         // C ref: do_wear.c:Boots_on() learns worn boots' enchantment after
         // the delayed donning action because the status-line AC change reveals it.
         obj.known = true;
+    } else if (obj.otyp === GAUNTLETS_OF_FUMBLING || obj.otyp === FUMBLE_BOOTS) {
+        applyFumblingArmorOn(g, obj);
     } else if (obj.otyp === BLUE_DRAGON_SCALE_MAIL || obj.otyp === BLUE_DRAGON_SCALES) {
         // C ref: do_wear.c:Armor_on() -> dragon_armor_handling(). Blue
         // dragon armor grants FAST at Armor_on(), after the donning delay.
@@ -2233,6 +2486,18 @@ async function continueOccupationTurns(g) {
             g._occupation_paused_for_more = true;
             return false;
         }
+    }
+    if (g._occupation_silent_finish && !g._occupation_finish_message) {
+        if (g._occupation_finish_removes_eaten_corpse) {
+            await applyEatingCorpsePostEffects();
+            finish_pending_eaten_corpse();
+            g._occupation_finish_removes_eaten_corpse = false;
+        }
+        g._occupation_bite_nutrition = null;
+        g._occupation_silent_finish = false;
+        g._occupation_pack_finish_message = false;
+        g._occupation_pre_finish_turn_done = false;
+        g._occupation_pre_finish_catchup = false;
     }
     if (g._occupation_finish_message) {
         if (g._more) {
@@ -2708,6 +2973,19 @@ export async function moveloop_core() {
                 if (!await finishDeferredSpellbookStudy(g)) return;
                 if (!await continueNomulTurns(g, { countCurrentTurn: true })) return;
                 if (!occupationPending(g)) finish_pending_eaten_corpse();
+                if (g._force_lock_start_more_after_turn
+                    && g._force_lock
+                    && !g._more
+                    && !g._monster_turn_paused_for_more) {
+                    // C refs: src/lock.c:doforce(), src/allmain.c:moveloop_core().
+                    // Starting a blunt force-lock occupation consumes the
+                    // command turn first; tty then blocks on the start line
+                    // before the first forcelock() occupation tick.
+                    g._force_lock_start_more_after_turn = false;
+                    queue_more_prompt();
+                    g._occupation_paused_for_more = true;
+                    return;
+                }
                 if (g._more && occupationPending(g) && !g._occupation_continue_behind_more) {
                     if (g._pick_lock) g._pick_lock_resume_turn_first = true;
                     if (g._force_lock) g._force_lock_resume_turn_first = true;

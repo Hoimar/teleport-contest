@@ -765,6 +765,74 @@ function can_attack_after_move_basic`
     if (url.endsWith('/js/mklev.js')) {
         let source = String(result.source);
         source = source.replace(
+            'function rndmonst_adj(minadj = 0, maxadj = 0) {',
+            `function rndmonst_adj(minadj = 0, maxadj = 0) {
+    const __rndmonstTrace = (phase, extra = {}) => {
+        const idx = globalThis.__teleportRngTraceIndex || 0;
+        const start = globalThis.__teleportApparxyStart ?? -Infinity;
+        const end = globalThis.__teleportApparxyEnd ?? Infinity;
+        if (idx < start || idx > end) return;
+        (globalThis.__teleportRndmonstTrace ||= []).push({
+            idx,
+            phase,
+            minadj,
+            maxadj,
+            uz: game.u?.uz ? { ...game.u.uz } : null,
+            ulevel: game.u?.ulevel,
+            special: currentSpecialLevel()?.proto || null,
+            specialAlign: currentSpecialLevel()?.flags?.align ?? null,
+            dungeonAlign: game.dungeons?.[game.u?.uz?.dnum ?? 0]?.flags?.align ?? null,
+            ...extra,
+        });
+    };`
+        );
+        source = source.replace(
+            `    const zlevel = level_difficulty();
+    const minmlev = monmin_difficulty(zlevel) + minadj;
+    const maxmlev = monmax_difficulty(zlevel) + maxadj;
+    let totalweight = 0;
+    let selected = null;`,
+            `    const zlevel = level_difficulty();
+    const minmlev = monmin_difficulty(zlevel) + minadj;
+    const maxmlev = monmax_difficulty(zlevel) + maxadj;
+    let totalweight = 0;
+    let selected = null;
+    __rndmonstTrace('entry', { zlevel, minmlev, maxmlev });`
+        );
+        source = source.replace(
+            `        const weight = (ptr.geno & G_FREQ) + align_shift(ptr) + temperature_shift(ptr);
+        if (weight <= 0) continue;
+        totalweight += weight;
+        if (rn2(totalweight) < weight) selected = ptr;`,
+            `        const baseWeight = (ptr.geno & G_FREQ);
+        const alignWeight = align_shift(ptr);
+        const tempWeight = temperature_shift(ptr);
+        const weight = baseWeight + alignWeight + tempWeight;
+        if (weight <= 0) continue;
+        totalweight += weight;
+        __rndmonstTrace('candidate', {
+            name: ptr.name,
+            difficulty: ptr.difficulty,
+            maligntyp: ptr.maligntyp,
+            geno: ptr.geno,
+            baseWeight,
+            alignWeight,
+            tempWeight,
+            weight,
+            totalweight,
+        });
+        if (rn2(totalweight) < weight) selected = ptr;`
+        );
+        source = source.replace(
+            `    }
+    return selected;
+}`,
+            `    }
+    __rndmonstTrace('return', { selected: selected?.name || null, totalweight });
+    return selected;
+}`
+        );
+        source = source.replace(
             'function sanctumCreateMonster(id, x = null, y = null, peaceful = null) {',
             `function sanctumCreateMonster(id, x = null, y = null, peaceful = null) {
     globalThis.__teleportMonsterContext = { fn: 'sanctumCreateMonster', phase: 'entry', id, x, y, peaceful };`

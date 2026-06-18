@@ -96,6 +96,7 @@ const M1_SLITHY = 0x00080000;
 const M1_UNSOLID = 0x00100000;
 const M1_REGEN = 0x00800000;
 const M1_SEE_INVIS = 0x01000000;
+const M1_TPORT = 0x02000000;
 const M1_CARNIVORE = 0x20000000;
 const M2_STRONG = 0x04000000;
 const M2_COLLECT = 0x40000000;
@@ -847,8 +848,12 @@ function rloc_basic(mtmp) {
     return false;
 }
 
+function monster_can_teleport_basic(mtmp) {
+    return !!((mtmp?.data?.mflags1 ?? 0) & M1_TPORT);
+}
+
 function monster_relocation_subject_basic(mtmp, appearmsg) {
-    if (!hero_can_spot_monster(mtmp)) return 'It';
+    if (!hero_can_notice_relocated_monster_basic(mtmp)) return 'It';
     if (mtmp?.isshk && shopkeeper_name(mtmp)) return shopkeeper_name(mtmp);
     const named = named_monster_name(mtmp);
     if (named) return sentence_case(named);
@@ -858,20 +863,29 @@ function monster_relocation_subject_basic(mtmp, appearmsg) {
     return `${article} ${name}`;
 }
 
+function hero_can_notice_relocated_monster_basic(mtmp) {
+    if (!mtmp || mtmp.mundetected) return false;
+    if (mtmp.minvis && !(game.u?.usee_invisible || game.u?.uprops?.see_invisible)) return false;
+    return hero_can_spot_monster(mtmp) || couldsee(mtmp.mx, mtmp.my);
+}
+
 async function emit_monster_relocation_message_basic(mtmp, oldx, oldy, opts = {}) {
     if (!opts.msg) return;
     // C ref: src/teleport.c:rloc_to_core().  RLOC_MSG/STRAT_APPEARMSG
     // relocation plines are ordinary tty toplines and can block an older
     // --More-- before subsequent monster attacks update map or status.
     let appearmsg = !!((mtmp?.mstrategy || 0) & STRAT_APPEARMSG);
-    if (!hero_can_spot_monster(mtmp) && !appearmsg) return;
+    if (!hero_can_notice_relocated_monster_basic(mtmp) && !appearmsg) return;
     const du = dist2(mtmp.mx, mtmp.my, game.u?.ux ?? mtmp.mx, game.u?.uy ?? mtmp.my);
     const next = du <= 2 ? ' next to you' : '';
     const nearu = !next && du <= BOLT_LIM * BOLT_LIM ? ' close by' : '';
     const subject = monster_relocation_subject_basic(mtmp, appearmsg);
     if (appearmsg) mtmp.mstrategy &= ~STRAT_APPEARMSG;
     const packed = await append_monster_topline(`${subject} ${appearmsg ? 'suddenly ' : ''}${hero_is_blind_basic() ? 'arrives' : 'appears'}${next || nearu}!`);
-    if (!packed) game._relocation_more_deferred = true;
+    if (!packed) {
+        game._relocation_more_deferred = true;
+        game._after_more_needs_prompt = false;
+    }
 }
 
 async function mnexto_basic(mtmp, opts = {}) {
@@ -5328,12 +5342,14 @@ async function postmove_door_basic(mtmp) {
     }
     if (loc.doormask === D_CLOSED && mon_can_open_doors(mtmp)) {
         set_door_mask_basic(loc, D_ISOPEN);
-        // C ref: monmove.c:postmov().  The monster has already moved to the
-        // door square, but an unseen opener is reported as the door changing.
-        mtmp._opened_unseen_door = true;
         refresh_monster_door_vision(mtmp);
         canseeit = canseeit || cansee(mtmp.mx, mtmp.my);
-        if (canseeit) await append_pline('You see a door open.');
+        const canSpotOpener = canseeit && hero_can_spot_monster(mtmp);
+        // C ref: src/monmove.c:postmov().  Name a visible opener; only the
+        // unseen case is reported as the door changing by itself.
+        mtmp._opened_unseen_door = !canSpotOpener;
+        if (canSpotOpener) await append_pline(`${monster_subject(mtmp)} opens a door.`);
+        else if (canseeit) await append_pline('You see a door open.');
         else await append_pline('You hear a door open.');
     } else if ((loc.doormask & D_CLOSED) && trapped) {
         set_door_mask_basic(loc, D_NODOOR);
@@ -7302,6 +7318,8 @@ function choose_stealable_hero_object() {
 }
 
 function theft_display_name(obj) {
+    if (object_class(obj) === RING_CLASS) return theft_accessory_name(obj, 'ring');
+    if (object_class(obj) === AMULET_CLASS) return theft_accessory_name(obj, 'amulet');
     return object_class(obj) === WEAPON_CLASS ? carried_weapon_name(obj) : floor_object_name(obj);
 }
 
@@ -7309,7 +7327,45 @@ function theft_disarm_name(obj) {
     return object_class(obj) === WEAPON_CLASS ? carried_weapon_your_name(obj) : floor_object_name(obj);
 }
 
+function article_for_basic(noun) {
+    return /^[aeiou]/i.test(String(noun || '')) ? 'an' : 'a';
+}
+
+function theft_accessory_name(obj, noun, opts = {}) {
+    const desc = obj?.dknown === false ? '' : (getObjectDescription(obj?.otyp) || '');
+    const base = desc ? `${desc} ${noun}` : noun;
+    const name = opts.possessive ? `your ${base}` : `${article_for_basic(base)} ${base}`;
+    if (opts.fromHand && object_class(obj) === RING_CLASS && obj?.wornSide)
+        return `${name} (from ${obj.wornSide} hand)`;
+    return name;
+}
+
+function theft_worn_object_name(obj, wornMask) {
+    if (object_class(obj) === RING_CLASS)
+        return theft_accessory_name(obj, 'ring', { possessive: true, fromHand: true });
+    if (object_class(obj) === AMULET_CLASS)
+        return theft_accessory_name(obj, 'amulet', { possessive: true });
+    if (wornMask & W_WEAPONS) return carried_weapon_your_name(obj);
+    return theft_display_name(obj).replace(/^(?:an?|the) /, 'your ');
+}
+
+function theft_worn_removal_line(mtmp, obj, wornMask) {
+    const verb = (wornMask & W_WEAPONS) ? 'disarms'
+        : (wornMask & W_ACCESSORY) ? 'removes'
+        : 'takes off';
+    return `${monster_subject(mtmp)} ${verb} ${theft_worn_object_name(obj, wornMask)}.`;
+}
+
+function nymph_stole_line(mtmp, obj, wornMask, vanishSubject) {
+    const who = (wornMask & (W_ARMOR | W_ACCESSORY | W_WEAPONS))
+        ? monster_pronoun_subject(mtmp)
+        : monster_subject(mtmp);
+    const line = `${who} stole ${theft_display_name(obj)}.`;
+    return vanishSubject ? `${line}  ${vanishSubject} vanishes!` : line;
+}
+
 function transfer_stolen_object_to_monster(mtmp, obj) {
+    const wornMask = hero_object_wornmask_basic(obj);
     const inv = game.inventory || [];
     const idx = inv.indexOf(obj);
     if (idx >= 0) inv.splice(idx, 1);
@@ -7320,8 +7376,31 @@ function transfer_stolen_object_to_monster(mtmp, obj) {
     obj.wornSide = null;
     obj.worn = false;
     if (game.uquiver === obj) game.uquiver = null;
+    if ((wornMask & W_ARMOR) && game.u) {
+        game.u.uac = calculated_armor_class();
+        game._status_uac_override = null;
+        game._clear_status_uac_override_after_more = false;
+        game._status_uac_override_move = null;
+    }
     mtmp.inventory = mtmp.inventory || [];
     mtmp.inventory.unshift(obj);
+}
+
+export async function finish_deferred_nymph_steal() {
+    const pending = game._deferred_nymph_steal;
+    if (!pending) return false;
+    game._deferred_nymph_steal = null;
+    const mtmp = pending.mtmp || (game.level?.monsters || []).find((mon) => mon.m_id === pending.monId);
+    const obj = pending.obj;
+    if (!mtmp || !obj || !game.level?.monsters?.includes(mtmp) || (mtmp.mhp ?? 1) <= 0) return true;
+    const wasVisible = hero_can_spot_monster(mtmp);
+    const vanishSubject = wasVisible ? monster_subject(mtmp) : '';
+    transfer_stolen_object_to_monster(mtmp, obj);
+    const vanished = wasVisible && rloc_basic(mtmp);
+    monflee_basic(mtmp, 0, false);
+    mhitm_knockback_frontdoor();
+    await pline(nymph_stole_line(mtmp, obj, pending.wornMask || 0, vanished ? vanishSubject : ''));
+    return true;
 }
 
 async function steal_item_melee_attack(mtmp, state, toHit) {
@@ -7340,12 +7419,34 @@ async function steal_item_melee_attack(mtmp, state, toHit) {
         return true;
     }
     const wornMask = hero_object_wornmask_basic(obj);
-    transfer_stolen_object_to_monster(mtmp, obj);
-    const subject = monster_subject(mtmp);
     const wakeupTail = game._hero_melee_post_wakeup_more
         || (game._hero_melee_post_wakeup_steal_tail?.monId === mtmp.m_id
             ? game._hero_melee_post_wakeup_steal_tail : null);
+    if (wakeupTail) {
+        game._hero_melee_post_wakeup_knockback_after_monster_more = true;
+        game._nymph_steal_after_more = {
+            monId: mtmp.m_id || 0,
+            maybeKnockback: !!wakeupTail.maybeKnockback,
+        };
+    }
+    if (wornMask & (W_ARMOR | W_ACCESSORY | W_WEAPONS)) {
+        const packed = await append_monster_topline(theft_worn_removal_line(mtmp, obj, wornMask));
+        if (!packed) {
+            game._after_more_needs_prompt = true;
+            game._deferred_nymph_steal = {
+                mtmp,
+                monId: mtmp.m_id || 0,
+                obj,
+                wornMask,
+            };
+            return true;
+        }
+    }
+    transfer_stolen_object_to_monster(mtmp, obj);
     if (wornMask & W_WEAPONS) {
+        const packed = await append_monster_topline(`${monster_pronoun_subject(mtmp)} stole ${theft_display_name(obj)}.`);
+        if (!packed) game._after_more_needs_prompt = true;
+    } else if (!(wornMask & (W_ARMOR | W_ACCESSORY))) {
         if (wakeupTail) {
             game._hero_melee_post_wakeup_knockback_after_monster_more = true;
             game._nymph_steal_after_more = {
@@ -7353,19 +7454,15 @@ async function steal_item_melee_attack(mtmp, state, toHit) {
                 maybeKnockback: !!wakeupTail.maybeKnockback,
             };
         }
-        const packed = await append_monster_topline(`${subject} disarms ${theft_disarm_name(obj)}.  ${monster_pronoun_subject(mtmp)} stole ${theft_display_name(obj)}.`);
+        const packed = await append_monster_topline(`${monster_subject(mtmp)} steals ${theft_display_name(obj)}!`);
         if (!packed) game._after_more_needs_prompt = true;
     } else {
-        if (wakeupTail) {
-            game._hero_melee_post_wakeup_knockback_after_monster_more = true;
-            game._nymph_steal_after_more = {
-                monId: mtmp.m_id || 0,
-                maybeKnockback: !!wakeupTail.maybeKnockback,
-            };
-        }
-        const packed = await append_monster_topline(`${subject} steals ${theft_display_name(obj)}!`);
+        const packed = await append_monster_topline(`${monster_pronoun_subject(mtmp)} stole ${theft_display_name(obj)}.`);
         if (!packed) game._after_more_needs_prompt = true;
     }
+    rloc_basic(mtmp);
+    monflee_basic(mtmp, 0, false);
+    mhitm_knockback_frontdoor();
     return true;
 }
 
@@ -8754,7 +8851,24 @@ export async function movemon() {
         // C ref: monmove.c:dochug().  Fleeing monsters check the random
         // teleport gate before can_teleport(); non-teleporting pets still
         // consume the rn2(40) while fleeing.
-        if (mtmp.mflee) rn2(40);
+        if (mtmp.mflee) {
+            const fleeTeleport = rn2(40);
+            if (!fleeTeleport
+                && monster_can_teleport_basic(mtmp)
+                && !mtmp.iswiz
+                && !game.level?.flags?.noteleport) {
+                const oldx = mtmp.mx;
+                const oldy = mtmp.my;
+                if (rloc_basic(mtmp))
+                    await emit_monster_relocation_message_basic(mtmp, oldx, oldy, { msg: true });
+                if (g._monster_turn_paused_for_more) {
+                    g._resume_movemon_after_mon = mtmp;
+                    g._resume_somebody_can_move = somebody_can_move || mtmp.movement >= NORMAL_SPEED;
+                    return false;
+                }
+                continue;
+            }
+        }
         if (mtmp.mflee && !mtmp.mfleetim && mtmp.mhp === mtmp.mhpmax && !rn2(25))
             mtmp.mflee = false;
 

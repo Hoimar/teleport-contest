@@ -1199,16 +1199,25 @@ export function newsym(x, y) {
         }
         return;
     }
+    let drewMonsterOrWarning = false;
     if (monster_visible(mon) || (!wormTail && tp_sensemon(mon))) {
         const mg = monster_glyph(mon, wormTail);
         draw_ch = mg.ch; draw_color = mg.color; draw_dec = mg.dec;
         draw_attr = monster_display_attr(mon);
+        drewMonsterOrWarning = true;
     } else if (mon) {
         const wg = warning_glyph(mon);
         if (wg) {
             draw_ch = wg.ch; draw_color = wg.color; draw_dec = false;
             draw_attr = 0;
+            drewMonsterOrWarning = true;
         }
+    }
+
+    if (!drewMonsterOrWarning && loc.remembered_glyph?.ch === 'I') {
+        const mem = loc.remembered_glyph;
+        show_glyph_cell(x, y, mem.ch, mem.color, mem.decgfx, mem.attr || 0);
+        return;
     }
 
     // Only update display/memory if cell is IN_SIGHT (lit and visible)
