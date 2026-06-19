@@ -13,7 +13,7 @@ and `feature_map.md`.
 ## Current State
 
 - Current branch in this workspace: `main`, ahead of origin.
-- Latest verified repair unit: throw inventory menu active-state retirement.
+- Latest verified repair unit: potion menu active-state retirement.
 - Checked-in public corpus is exact: `44/44 S 11405/11405 R 792838/792838 C 0`.
 - Hosted public cache remains `public-session-drift` at
   `40/44 S 10417/10982 R 629747/840358 C 0`; leaderboard fetch failed.
@@ -32,6 +32,27 @@ and `feature_map.md`.
 ## Latest Loop Checkpoint
 
 - Latest verified WIP on 2026-06-19:
+  - Potion menu override-state retirement:
+    `seed2200-wizard-quaff-zap-read` remains exact
+    (`S 230/230 R 3018/3018 C 0`), with focused guards `seed0002`,
+    `seed0014`, `seed0030`, `seed0399`, `seed4500`, and `seed5006`
+    exact.
+  - Strict sentinel exact:
+    `5/5 S 1063/1063 R 64569/64569 C 0`.
+  - `verify --target seed2200-wizard-quaff-zap-read` passed target, strict
+    sentinels, `hack:audit` (`hard=0 suspicious=11`), and `memory:lint`
+    (`issues=0`).
+  - Full corpus inventory: 44 passing sessions, checked-in public
+    `44/44 S 11405/11405 R 792838/792838 C 0`.
+  - Dehack truth:
+    - Quaff `?/*` potion picker is active serialized potion-menu state
+      rendered by `display.js`, not a generic `_override_prev` screen.
+    - Invalid selectors remain in the menu; cancel or valid selection clears
+      active state and redraws before returning or drinking.
+  - Next queue: remaining hack debt is `hard=0 suspicious=11`, dominated by
+    generic override-screen plumbing plus the forbidden-file replay comments.
+
+- Previous verified WIP on 2026-06-19:
   - Throw inventory menu override-state retirement:
     `seed0108-wizard-extcmd-wishlist` remains exact
     (`S 303/303 R 16958/16958 C 0`), with focused guards `seed0101`,
@@ -111,27 +132,6 @@ and `feature_map.md`.
       `display.js`, not a generic `_override_prev` screen.
     - Valid selection, cancel/end keys, and invalid-key redisplay are owned
       by explicit wizidentify menu state.
-  - Next queue: remaining hack debt is `hard=0 suspicious=11`, dominated by
-    generic override-screen plumbing plus the forbidden-file replay comments.
-
-- Previous verified WIP on 2026-06-19:
-  - Level-teleport-menu override-state retirement:
-    `seed0373-barbarian-quest-tour` remains exact
-    (`S 124/124 R 35386/35386 C 0`) and covers multi-page `^V ?`
-    menu cursor/selection behavior; focused guards `seed0360`, `seed4500`,
-    and `seed0383` remained exact.
-  - Strict sentinel exact:
-    `5/5 S 1063/1063 R 64569/64569 C 0`.
-  - `verify --target seed0373-barbarian-quest-tour` passed target, strict
-    sentinels, `hack:audit` (`hard=0 suspicious=11`), and `memory:lint`
-    (`issues=0`).
-  - Full corpus inventory: 44 passing sessions, checked-in public
-    `44/44 S 11405/11405 R 792838/792838 C 0`.
-  - Dehack truth:
-    - Wizard `^V ?` level-teleport menus are active serialized menu state
-      rendered by `display.js`, not generic `_override_prev` screens.
-    - Page controls, invalid-key redisplay, cancellation, and target selection
-      are owned by explicit level-teleport menu state.
   - Next queue: remaining hack debt is `hard=0 suspicious=11`, dominated by
     generic override-screen plumbing plus the forbidden-file replay comments.
 

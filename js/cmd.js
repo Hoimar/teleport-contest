@@ -22043,6 +22043,28 @@ function buildPotionMenuLines() {
     return rows;
 }
 
+function setPotionMenuScreen(screen, cursor) {
+    installSerializedScreenHook();
+    clearOverrideScreen();
+    game._potion_menu_screen = screen;
+    game._potion_menu_cursor = cursor ? [cursor[0], cursor[1]] : null;
+    game._potion_menu_active = true;
+    if (game.nhDisplay && cursor) {
+        if (typeof game.nhDisplay.setCursor === 'function')
+            game.nhDisplay.setCursor(cursor[0], cursor[1]);
+        else {
+            game.nhDisplay.cursorCol = cursor[0];
+            game.nhDisplay.cursorRow = cursor[1];
+        }
+    }
+}
+
+function clearPotionMenuScreen() {
+    game._potion_menu_active = false;
+    game._potion_menu_screen = null;
+    game._potion_menu_cursor = null;
+}
+
 async function showPotionMenu() {
     await flush_screen(1);
     const display = game.nhDisplay;
@@ -22059,8 +22081,34 @@ async function showPotionMenu() {
     const lastRow = lines.length - 1;
     const cursorCol = menuCol + '(end)'.length + 1;
     const screen = serialize_terminal_grid(display);
-    game._potion_menu_screen = screen;
-    showOverride(screen, [cursorCol, lastRow]);
+    setPotionMenuScreen(screen, [cursorCol, lastRow]);
+}
+
+async function dismissPotionMenu() {
+    clearPotionMenuScreen();
+    clearOverrideScreen();
+    await redrawAfterFullScreenMenuDismiss();
+    game._awaiting_drink_item = false;
+    game.context.move = 0;
+}
+
+async function handlePotionMenuInput(ch) {
+    if (ch === '\x1b' || ch === ' ' || ch === '\r' || ch === '\n') {
+        await dismissPotionMenu();
+        return;
+    }
+    const idx = inventoryIndexForLetter(ch);
+    const obj = idx >= 0 ? game.inventory?.[idx] : null;
+    if (obj?.oclass === POTION_CLASS) {
+        clear_pending_message();
+        clearPotionMenuScreen();
+        clearOverrideScreen();
+        await redrawAfterFullScreenMenuDismiss();
+        game._awaiting_drink_item = false;
+        await drinkPotion(obj, idx);
+        return;
+    }
+    game.context.move = 0;
 }
 
 function actionMenuItemType(obj) {
@@ -28490,6 +28538,11 @@ export async function rhack(key) {
         return;
     }
 
+    if (game._potion_menu_active) {
+        await handlePotionMenuInput(ch);
+        return;
+    }
+
     if (game._awaiting_drink_item) {
         clear_pending_message();
         if (ch === '?' || ch === '*') {
@@ -29383,17 +29436,6 @@ export async function rhack(key) {
             game._inventory_menu_page2_cursor = null;
             await redrawAfterFullScreenMenuDismiss();
             game.context.move = 0;
-            return;
-        }
-        if (prev === game._potion_menu_screen) {
-            clear_pending_message();
-            game._override_prev = null;
-            game._potion_menu_screen = null;
-            game._awaiting_drink_item = false;
-            const idx = inventoryIndexForLetter(ch);
-            const obj = idx >= 0 ? game.inventory?.[idx] : null;
-            if (obj?.oclass === POTION_CLASS) await drinkPotion(obj, idx);
-            else game.context.move = 0;
             return;
         }
         if (prev === game._look_data_screen

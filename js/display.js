@@ -1818,6 +1818,8 @@ function activeSerializedTextScreen() {
         if (game._throw_inventory_menu_screen)
             return game._throw_inventory_menu_screen;
     }
+    if (game._potion_menu_active && game._potion_menu_screen)
+        return game._potion_menu_screen;
     if (game._direction_help_active && game._direction_help_screen)
         return game._direction_help_screen;
     if (game._getpos_help_active && game._getpos_help_screen)
@@ -1971,6 +1973,10 @@ function _buildScreenOutput(options = {}) {
             renderTextScreen(display, game._throw_inventory_menu_screen, game._throw_inventory_menu_cursor || null);
             return;
         }
+    }
+    if (game._potion_menu_active && game._potion_menu_screen) {
+        renderTextScreen(display, game._potion_menu_screen, game._potion_menu_cursor || null);
+        return;
     }
     if (game._direction_help_active && game._direction_help_screen) {
         renderTextScreen(display, game._direction_help_screen, game._direction_help_cursor || null);
