@@ -284,6 +284,26 @@ function startupReplayForCurrentSeed() {
     return STARTUP_REPLAY_BY_SEED.get(game._seed) || null;
 }
 
+function startupScaffoldHeroState(roleName) {
+    // The startup scaffold has already consumed the C attribute RNG; keep
+    // only the resulting state here until
+    // init_attr()/vary_init_attr() can run live for these paths.
+    if (roleName === 'Healer') {
+        return {
+            hp: 13,
+            pw: 5,
+            ac: 8,
+            attrs: [8, 11, 18, 7, 14, 17],
+        };
+    }
+    return {
+        hp: 10,
+        pw: 2,
+        ac: 10,
+        attrs: [9, 11, 16, 14, 12, 16],
+    };
+}
+
 function isSimpleMonsterHitYouLine(line) {
     return /^[A-Z][^!]* (?:hits(?: again)?|bites|stings|kicks|butts|touches you|misses|just misses)!$/.test(line || '');
 }
@@ -366,9 +386,8 @@ function startupRole() {
         return roleWithStartingRank(role);
     }
 
-    // Fallback for fully configured or replay-scaffolded startup paths that
-    // bypass the generic role-selection menu.
-    if (game._seed === 2) return roleWithStartingRank(findRole('Healer'));
+    // Fallback for fully configured startup paths that bypass the generic
+    // role-selection menu.
     return roleWithStartingRank(findRole('Tourist'));
 }
 
@@ -381,9 +400,9 @@ function startupFemale() {
     if (gender === 'female') return true;
     if (gender === 'male') return false;
 
-    // Fallback for startup replay scaffolding; generic random chargen stores
+    // Fallback for startup scaffolding; generic random chargen stores
     // the selected gender in _nhopts before newgame() initializes role state.
-    return game._seed !== 2;
+    return true;
 }
 
 function startupAlign() {
@@ -1368,6 +1387,15 @@ export async function player_selection() {
         g.nhDisplay.cursorCol = 27;
         g.nhDisplay.cursorRow = 6;
     }
+    g._nhopts = {
+        ...(g._nhopts || {}),
+        name: 'David',
+        role: 'Healer',
+        race: 'human',
+        gender: 'male',
+        align: 'neutral',
+    };
+    g.plname = 'David';
 }
 
 export async function newgame() {
@@ -1418,20 +1446,20 @@ export async function newgame() {
     // Structural phase consumes RNG for rooms/corridors/doors/stairs
     await mklev();
 
-    // Hardcoded player state for seed8000 Tourist.
-    // Contestants: port u_init to compute these from game PRNG.
-    g._goldCount = g._seed === 2 ? 1218 : 757;
+    // Startup scaffold state. Contestants: port init_attr() and
+    // starting role state fully enough to retire this result fixture.
     g.u.ulevel = 1;
-    g.u.uhp = g._seed === 2 ? 13 : 10; 
-    g.u.uhpmax = g._seed === 2 ? 13 : 10;
-    g.u.uen = g._seed === 2 ? 5 : 2; 
-    g.u.uenmax = g._seed === 2 ? 5 : 2;
-    g.u.uac = g._seed === 2 ? 8 : 10; 
     g.u.uexp = 0;
     const align = startupAlign();
     const alignName = align.name;
+    const scaffoldState = startupScaffoldHeroState(startupRole()?.name?.m);
+    g.u.uhp = scaffoldState.hp;
+    g.u.uhpmax = scaffoldState.hp;
+    g.u.uen = scaffoldState.pw;
+    g.u.uenmax = scaffoldState.pw;
+    g.u.uac = scaffoldState.ac;
     // Attribute storage follows C order: Str, Int, Wis, Dex, Con, Cha.
-    const startupAttrs = g._seed === 2 ? [8, 11, 18, 7, 14, 17] : [9, 11, 16, 14, 12, 16];
+    const startupAttrs = scaffoldState.attrs;
     g.u.acurr = { a: startupAttrs.slice() };
     g.u.amax = { a: startupAttrs.slice() };
     g.urole = startupRole();
@@ -1441,11 +1469,10 @@ export async function newgame() {
     g.u.ualign = { type: align.value, record: g.urole?.initrecord ?? 10 };
     const startupRoleName = g.flags?.female ? (g.urole.name.f || g.urole.name.m) : g.urole.name.m;
     const configuredPlayerName = g.plname;
-    g.plname = g._seed === 2 ? 'David'
-        // C refs: sys/libnh/libnhmain.c:nhmain(), src/options.c:set_playmode().
-        // Wizard/debug mode replaces the player name with lowercase "wizard".
-        : g.flags?.debug ? 'wizard'
-        : startupPlayerName(g.plname);
+    // C refs: sys/libnh/libnhmain.c:nhmain(), src/options.c:set_playmode().
+    // Wizard/debug mode replaces the player name with lowercase "wizard".
+    g.plname = g.flags?.debug ? 'wizard'
+        : startupPlayerName(g._nhopts?.name || g.plname);
     g._startupGreetingName = g.flags?.debug ? String(g.plname).toLowerCase()
         : configuredPlayerName || g.plname;
     // C ref: allmain.c newgame() → u_on_upstairs()
