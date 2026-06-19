@@ -6853,7 +6853,10 @@ function showLootContainerContents(container, alreadyUsed = false, opts = {}) {
     game._loot_contents_more = { container, used: alreadyUsed || gainedInfo, held };
     game._pending_message = `${' '.repeat(headerCol)}Contents of ${name}:`;
     queue_more_prompt();
-    showOverride(serialize_terminal_grid(display), [moreCol + '--More--'.length, moreRow]);
+    game._latched_more_screen = serializeBaseTerminalGrid(display);
+    game._latched_more_cursor = [moreCol + '--More--'.length, moreRow, 1];
+    game._latched_more_keep_until_dismiss = true;
+    game._latched_more_use_pending_topline = false;
 }
 
 const LOOT_CLASS_ORDER = [
