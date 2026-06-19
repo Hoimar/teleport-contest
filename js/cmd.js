@@ -26581,6 +26581,10 @@ export async function rhack(key) {
                 picktyp,
                 usedtime: 0,
             };
+            // C refs: src/lock.c:doforce(), win/tty/topl.c:update_topl().
+            // The start-bashing line enters TOPLINE_NEED_MORE, but the main
+            // loop keeps running occupation turns until a later topline update
+            // cannot pack and tty services the old line's More.
             game._force_lock_start_more_after_turn = true;
             game.context.move = 1;
             return;
@@ -28808,7 +28812,8 @@ export async function rhack(key) {
 
     const occupationMore = ch === ' '
         && game._occupation_paused_for_more
-        && game._more;
+        && game._more
+        && !game._monster_turn_paused_for_more;
     if (occupationMore) {
         clear_pending_message();
         game._occupation_paused_for_more = false;

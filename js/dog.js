@@ -1155,7 +1155,7 @@ async function pet_reluctance_pline(line) {
     queue_more_prompt();
 }
 
-function pet_inventory_pline(line) {
+async function pet_inventory_pline(line) {
     // C tty keeps the post-move floor-look line at the next prompt even when
     // a visible pet inventory drop happens during the following monster turn.
     if (typeof game._pending_message === 'string'
@@ -1172,15 +1172,17 @@ function pet_inventory_pline(line) {
     if (game._pending_message) {
         const packed = `${game._pending_message}  ${line}`;
         if (!topline_can_pack_message(game._pending_message, line)) {
+            game._force_lock_start_more_after_turn = false;
             queue_more_prompt();
             game._pet_inventory_more_latched = true;
             game._after_more_message = line;
             game._after_more_needs_prompt = false;
+            await latch_more_frame_before_pet_inventory();
             if (game._more) return;
         }
         game._pending_message = packed;
     } else {
-        pline(line);
+        await pline(line);
     }
 }
 
@@ -1213,7 +1215,7 @@ async function dog_eat(mtmp, obj, startX, startY, devour = false) {
 
     if (cansee(mtmp.mx, mtmp.my) || (cansee(startX, startY) && cansee(mtmp.mx, mtmp.my))) {
         if (cansee(mtmp.mx, mtmp.my)) await latch_more_frame_before_pet_inventory();
-        pet_inventory_pline(`${pet_noit_subject(mtmp)} ${devour ? 'devours' : 'eats'} ${object_name(obj)}.`);
+        await pet_inventory_pline(`${pet_noit_subject(mtmp)} ${devour ? 'devours' : 'eats'} ${object_name(obj)}.`);
     }
 
     const eatenFoodType = dogfood(mtmp, obj);
@@ -1631,7 +1633,7 @@ async function dog_invent(mtmp, udist) {
             // announced when the drop square is visible.
             if (cansee(mtmp.mx, mtmp.my)) {
                 mark_object_encountered(obj);
-                pet_inventory_pline(`${pet_subject(mtmp)} drops ${object_name(obj)}.`);
+                await pet_inventory_pline(`${pet_subject(mtmp)} drops ${object_name(obj)}.`);
             }
             if (edog.apport > 1) edog.apport--;
             newsym(mtmp.mx, mtmp.my);
@@ -1667,7 +1669,7 @@ async function dog_invent(mtmp, udist) {
                     mtmp.inventory.unshift(picked);
                     if (cansee(omx, omy)) {
                         mark_object_encountered(picked);
-                        pet_inventory_pline(`${pet_subject(mtmp)} picks up ${object_name(picked)}.`);
+                        await pet_inventory_pline(`${pet_subject(mtmp)} picks up ${object_name(picked)}.`);
                     }
                     newsym(omx, omy);
                 }

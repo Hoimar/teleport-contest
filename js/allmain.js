@@ -1930,7 +1930,30 @@ async function forceLockAttempt(g) {
     const state = g._force_lock;
     if (!state) return true;
     const box = state.box;
+    const successLine = 'You succeed in forcing the lock.';
     if (!box || box.ox !== g.u?.ux || box.oy !== g.u?.uy) {
+        clearForceLock(g);
+        return true;
+    }
+    if (state.stage === 'success-after-start-more') {
+        state.stage = '';
+        await packedOccupationPline(successLine);
+        exercise(state.picktyp ? A_DEX : A_STR, true);
+        const destroyit = !state.picktyp && rn2(3) === 0;
+        state.destroyit = destroyit;
+        if (destroyit) {
+            state.stage = 'breakchest';
+            queue_more_prompt();
+            g._occupation_paused_for_more = true;
+            return true;
+        }
+        box.olocked = false;
+        box.obroken = true;
+        box.lknown = true;
+        newsym(box.ox, box.oy);
+        // C's movement loop drains one final monster/allmain allocation after
+        // forcelock() clears the occupation, before the next input prompt.
+        g._force_lock_post_success_turns = 1;
         clearForceLock(g);
         return true;
     }
@@ -1998,7 +2021,23 @@ async function forceLockAttempt(g) {
     // turn after that turn's monster/allmain tail has completed.
     if (rn2(100) >= (state.chance || 0)) return false;
 
-    await pline('You succeed in forcing the lock.');
+    if (g._force_lock_start_more_after_turn
+        && g._pending_message
+        && !g._more
+        && !topline_can_pack_message(g._pending_message, successLine)) {
+        // C refs: src/lock.c:forcelock(), win/tty/topl.c:update_topl().
+        // The initial "start bashing" topline remains in TOPLINE_NEED_MORE
+        // while force-lock turns continue.  The success pline cannot pack
+        // with it, so tty blocks on the old start line before consuming the
+        // success side effects.
+        g._force_lock_start_more_after_turn = false;
+        state.stage = 'success-after-start-more';
+        queue_more_prompt();
+        g._occupation_paused_for_more = true;
+        return true;
+    }
+
+    await packedOccupationPline(successLine);
     exercise(state.picktyp ? A_DEX : A_STR, true);
     const destroyit = !state.picktyp && rn2(3) === 0;
     state.destroyit = destroyit;
@@ -3056,19 +3095,6 @@ export async function moveloop_core() {
                 if (!await finishDeferredSpellbookStudy(g)) return;
                 if (!await continueNomulTurns(g, { countCurrentTurn: true })) return;
                 if (!occupationPending(g)) finish_pending_eaten_corpse();
-                if (g._force_lock_start_more_after_turn
-                    && g._force_lock
-                    && !g._more
-                    && !g._monster_turn_paused_for_more) {
-                    // C refs: src/lock.c:doforce(), src/allmain.c:moveloop_core().
-                    // Starting a blunt force-lock occupation consumes the
-                    // command turn first; tty then blocks on the start line
-                    // before the first forcelock() occupation tick.
-                    g._force_lock_start_more_after_turn = false;
-                    queue_more_prompt();
-                    g._occupation_paused_for_more = true;
-                    return;
-                }
                 if (g._more && occupationPending(g) && !g._occupation_continue_behind_more) {
                     if (g._pick_lock) g._pick_lock_resume_turn_first = true;
                     if (g._force_lock) g._force_lock_resume_turn_first = true;

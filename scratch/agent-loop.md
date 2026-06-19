@@ -68,35 +68,31 @@ and `feature_map.md`.
 ## Latest Loop Checkpoint
 
 - Latest verified WIP on 2026-06-19:
-  - `seed0030-ten-diverse-deaths`: restored exact parity after the current
-    WIP batch:
-    `S 1953/1953 R 105529/105529 C 0`.
-  - `seed0014-dequa-fountain-explore` remains exact after startup discovery
-    repair:
+  - `seed0108-wizard-extcmd-wishlist`: restored exact parity after the
+    force-lock start-More repair:
+    `S 303/303 R 16958/16958 C 0` (pre-fix WIP baseline was
+    `S 301/303 R 16958/16958 C 0`).
+  - `seed0014-dequa-fountain-explore` remains exact as the force-lock
+    timing guard:
     `S 714/714 R 59178/59178 C 0`.
   - Strict sentinel exact:
     `5/5 S 1063/1063 R 64569/64569 C 0`.
-  - `verify --target seed0030-ten-diverse-deaths` and
+  - `verify --target seed0108-wizard-extcmd-wishlist` and
     `verify --target seed0014-dequa-fountain-explore` passed target
     expectations, strict sentinels, `hack:audit` (`hard=0 suspicious=47`),
     and `memory:lint` (`issues=0`).
-  - Focused guards exact: `seed0009-swimmer-mforce`,
-    `seed0106-priest-extcmd-sweep`, `seed5002-wizard-coverage-pair`,
-    `seed0060-orc-rogue-kick-search`, and
-    `seed0367-priest-quest-tour`.
+  - Focused guards exact: `seed0030-ten-diverse-deaths`,
+    `seed0060-orc-rogue-kick-search`, `seed0106-priest-extcmd-sweep`, and
+    `seed5002-wizard-coverage-pair`.
   - Subsystem truth:
-    - `monmove.c:m_search_items()` may let monsters pick up rocks, but rocks
-      are skipped as movement goals.
-    - `steal.c:mdrop_obj()` / `objnam.c:distant_name()` on nearby visible
-      drops applies `observe_object()`-style dknown/encountered side effects,
-      not armor type discovery.
-    - `hack.c:moverock_core()` clears remembered invisible glyphs at a pushed
-      boulder's destination before `movobj()` redraws it.
-    - `u_init.c:u_init_role()` gives Valkyries `knows_class(ARMOR_CLASS)`,
-      and `u_init.c:u_init_race()` pre-knows dwarvish objects for dwarves.
-    - During an adjacent tame-pet kill with a blocking edible-corpse kill More,
-      the C display focus can show the pet on the defender square while model
-      movement/eating resumes only after the More.
+    - `lock.c:doforce()` prints the blunt force-lock start line as latent
+      tty `TOPLINE_NEED_MORE`; it is not an immediate occupation pause.
+    - `allmain.c:moveloop_core()` keeps running force-lock occupation turns
+      until a later `forcelock()` result or visible pet inventory line cannot
+      pack with that start line.
+    - `win/tty/topl.c:update_topl()` then services the old start line's More
+      and defers the new line until dismissal; `dogmove.c:dog_invent()` can
+      own that boundary before the force-lock result.
   - Next queue after commit: run `parity:state -- --refresh-live` and pick the
     next checked-in divergence from the refreshed inventory.
 
