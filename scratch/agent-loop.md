@@ -21,11 +21,11 @@ and `feature_map.md`.
     `44/44 S 11405/11405 R 792838/792838 C 0`.
   - Strict sentinels exact: `5/5 S 1063/1063 R 64569/64569 C 0`.
   - `verify --target seed0002-healer-reflection-drummer` passed target
-    expectations, strict sentinels, `hack:audit` (`hard=0 suspicious=16`), and
+    expectations, strict sentinels, `hack:audit` (`hard=0 suspicious=14`), and
     `memory:lint` (`issues=0`).
   - Focused guards exact: `seed0002-healer-reflection-drummer`,
-    `seed8000-tourist-starter`, `seed0077-rogue-chargen`, and
-    `seed0900-tourist-explore-actions`.
+    `seed8000-tourist-starter`, `seed0077-rogue-chargen`,
+    `seed0102-ranger-name-cancel`, and `seed0900-tourist-explore-actions`.
   - Full corpus inventory after the dehack: 44 passing sessions.
   - Local parity refresh after the audit/comment cleanup was checked-in public
     `44/44 S 11405/11405 R 792838/792838 C 0`; cached hosted public remains
@@ -36,6 +36,9 @@ and `feature_map.md`.
       result path after `u_init_role_inventory()`/`apply_startup_role_state()`.
     - The seed gate, hardcoded Healer/Tourist visible states, and
       startup-state capture/restore fixture are deleted from `js/allmain.js`.
+    - Startup askname/autopick/confirmation screens render directly into the
+      tty grid via `renderTextScreen()` before `nhgetch()`, so they no longer
+      use gameplay override-screen state.
     - `makedog()` still observes zeroed pre-inventory attributes for
       `edog.apport`, matching C ordering.
   - Remaining checked-in public misses after the refresh: none.
@@ -47,7 +50,7 @@ and `feature_map.md`.
   hosted cache differs from checked-in sessions, and leaderboard state remains
   secondary until refreshed.
 - Current sentinel regression classification: none; strict sentinel is exact.
-- Hack audit remains `hard=0 suspicious=16`; `memory:lint` reports
+- Hack audit remains `hard=0 suspicious=14`; `memory:lint` reports
   `issues=0`. Production `js/` has no intentional debug I/O or imports from
   `frozen/`.
 
@@ -61,7 +64,7 @@ and `feature_map.md`.
   - Strict sentinel exact:
     `5/5 S 1063/1063 R 64569/64569 C 0`.
   - `verify --target seed0002-healer-reflection-drummer` passed target,
-    strict sentinels, `hack:audit` (`hard=0 suspicious=16`), and
+    strict sentinels, `hack:audit` (`hard=0 suspicious=14`), and
     `memory:lint` (`issues=0`).
   - Full corpus inventory: 44 passing sessions, checked-in public
     `44/44 S 11405/11405 R 792838/792838 C 0`.
@@ -74,7 +77,9 @@ and `feature_map.md`.
       live role inventory, live startup attributes, and ordinary AC deferral.
     - No visible initial HP/Pw/AC/attribute fixture remains for seed0002 or
       seed8000; generic override-screen plumbing remains visible debt.
-  - Next queue: remaining hack debt is `hard=0 suspicious=16`, dominated by
+    - Startup askname/autopick/confirmation screens are direct tty-grid renders
+      before `nhgetch()`, not gameplay override screens.
+  - Next queue: remaining hack debt is `hard=0 suspicious=14`, dominated by
     generic override-screen plumbing plus the forbidden-file replay comments.
 
 - Previous verified WIP on 2026-06-19:

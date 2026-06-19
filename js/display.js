@@ -1708,7 +1708,8 @@ function applySgr(params, state) {
     }
 }
 
-function renderOverrideScreen(display, screen) {
+export function renderTextScreen(display, screen, cursor = null) {
+    if (!display) return;
     if (display.clearScreen) display.clearScreen();
     const state = { row: 0, col: 0, color: NO_COLOR, attr: 0, dec: false };
     const text = String(screen || '');
@@ -1758,12 +1759,16 @@ function renderOverrideScreen(display, screen) {
         state.col++;
     }
 
-    const cursor = game._override_cursor
-        || game._latched_more_cursor
-        || (game._override_serialized_persistent ? game._override_serialized_cursor : null);
     if (cursor && display.setCursor) {
         display.setCursor(cursor[0], cursor[1]);
     }
+}
+
+function renderOverrideScreen(display, screen) {
+    const cursor = game._override_cursor
+        || game._latched_more_cursor
+        || (game._override_serialized_persistent ? game._override_serialized_cursor : null);
+    renderTextScreen(display, screen, cursor);
 }
 
 function currentLatchedMoreScreen() {

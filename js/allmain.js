@@ -39,6 +39,7 @@ import {
     docrt, cls, bot, flush_screen, pline, append_pline, newsym, serialize_terminal_grid,
     refresh_warning_monsters, refresh_swallowed_overlay, clear_pending_message,
     queue_more_prompt, see_monsters, see_objects, see_traps, topline_can_pack_message,
+    renderTextScreen,
 } from './display.js';
 import { vision_recalc, vision_reset, init_vision_globals } from './vision.js';
 import { roles, findAlign, findRace, findRole, roleGod, roleGreeting, roleWithStartingRank } from './roles.js';
@@ -405,13 +406,7 @@ async function promptForPlayerName({ showBanner = true } = {}) {
 
     for (;;) {
         const cursorCol = 13 + name.length;
-        g._override_screen = namePromptWithName(name, showBanner);
-        g._override_cursor = [cursorCol, cursorRow, 1];
-        if (g.nhDisplay) {
-            g.nhDisplay.cursorCol = cursorCol;
-            g.nhDisplay.cursorRow = cursorRow;
-        }
-        await flush_screen(1);
+        renderTextScreen(g.nhDisplay, namePromptWithName(name, showBanner), [cursorCol, cursorRow, 1]);
 
         const rawKey = await nhgetch();
         const ch = typeof rawKey === 'number' ? String.fromCharCode(rawKey) : rawKey;
@@ -450,14 +445,7 @@ function namePromptWithName(name, showBanner = true) {
 }
 
 async function showStartupOverride(screen, cursor) {
-    const g = game;
-    g._override_screen = screen;
-    g._override_cursor = cursor;
-    if (g.nhDisplay) {
-        g.nhDisplay.cursorCol = cursor[0];
-        g.nhDisplay.cursorRow = cursor[1];
-    }
-    await flush_screen(1);
+    renderTextScreen(game.nhDisplay, screen, cursor);
     return startupInputChar(await nhgetch());
 }
 
