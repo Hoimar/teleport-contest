@@ -1826,6 +1826,8 @@ function activeSerializedTextScreen() {
         if (game._inventory_menu_screen)
             return game._inventory_menu_screen;
     }
+    if (game._pay_menu_active && game._pay_menu_screen)
+        return game._pay_menu_screen;
     if (game._direction_help_active && game._direction_help_screen)
         return game._direction_help_screen;
     if (game._getpos_help_active && game._getpos_help_screen)
@@ -1993,6 +1995,10 @@ function _buildScreenOutput(options = {}) {
             renderTextScreen(display, game._inventory_menu_screen, game._inventory_menu_cursor || null);
             return;
         }
+    }
+    if (game._pay_menu_active && game._pay_menu_screen) {
+        renderTextScreen(display, game._pay_menu_screen, game._pay_menu_cursor || null);
+        return;
     }
     if (game._direction_help_active && game._direction_help_screen) {
         renderTextScreen(display, game._direction_help_screen, game._direction_help_cursor || null);

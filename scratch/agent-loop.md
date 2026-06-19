@@ -13,7 +13,7 @@ and `feature_map.md`.
 ## Current State
 
 - Current branch in this workspace: `main`, ahead of origin.
-- Latest verified repair unit: ordinary inventory menu active-state retirement.
+- Latest verified repair unit: pay menu active-state retirement.
 - Checked-in public corpus is exact: `44/44 S 11405/11405 R 792838/792838 C 0`.
 - Hosted public cache remains `public-session-drift` at
   `40/44 S 10417/10982 R 629747/840358 C 0`; leaderboard fetch failed.
@@ -32,23 +32,22 @@ and `feature_map.md`.
 ## Latest Loop Checkpoint
 
 - Latest verified WIP on 2026-06-19:
-  - Ordinary inventory menu override-state retirement:
-    `seed0108-wizard-extcmd-wishlist` remains exact
-    (`S 303/303 R 16958/16958 C 0`), with focused guards `seed0002`,
-    `seed2200`, `seed0383`, and `seed4500` exact.
+  - Pay menu override-state retirement:
+    `seed0002-healer-reflection-drummer` remains exact
+    (`S 595/595 R 27158/27158 C 0`), with focused guards `seed4500`,
+    `seed0116`, and `seed2200` exact.
   - Strict sentinel exact:
     `5/5 S 1063/1063 R 64569/64569 C 0`.
-  - `verify --target seed0108-wizard-extcmd-wishlist` passed target, strict
+  - `verify --target seed0002-healer-reflection-drummer` passed target, strict
     sentinels, `hack:audit` (`hard=0 suspicious=11`), and `memory:lint`
     (`issues=0`).
   - Full corpus inventory: 44 passing sessions, checked-in public
     `44/44 S 11405/11405 R 792838/792838 C 0`.
   - Dehack truth:
-    - Ordinary `i` inventory pages and pagination are active serialized
-      inventory-menu state rendered by `display.js`, not generic
-      `_override_prev` screens.
-    - Selection and lookup dismissal clear active state and redraw before
-      opening follow-up action menus or lore text windows.
+    - `#pay` itemized bills are active serialized pay-menu state rendered by
+      `display.js`, not generic `_override_prev` screens.
+    - Selector/invalid-key redisplay serializes from the terminal base
+      serializer so old `-`/`+` row state is not recaptured.
   - Next queue: remaining hack debt is `hard=0 suspicious=11`, dominated by
     generic override-screen plumbing plus the forbidden-file replay comments.
 

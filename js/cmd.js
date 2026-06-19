@@ -7958,10 +7958,31 @@ function renderPayMenu(menu) {
     }
     const lastRow = lines.length - 1;
     const cursorCol = menuCol + '(end)'.length + 1;
-    const screen = serialize_terminal_grid(display);
-    game._pay_menu_screen = screen;
-    showOverride(screen, [cursorCol, lastRow]);
+    const screen = serializeBaseTerminalGrid(display);
+    setPayMenuScreen(screen, [cursorCol, lastRow]);
     return true;
+}
+
+function setPayMenuScreen(screen, cursor) {
+    installSerializedScreenHook();
+    clearOverrideScreen();
+    game._pay_menu_active = true;
+    game._pay_menu_screen = screen;
+    game._pay_menu_cursor = cursor ? [cursor[0], cursor[1]] : null;
+    if (game.nhDisplay && cursor) {
+        if (typeof game.nhDisplay.setCursor === 'function')
+            game.nhDisplay.setCursor(cursor[0], cursor[1]);
+        else {
+            game.nhDisplay.cursorCol = cursor[0];
+            game.nhDisplay.cursorRow = cursor[1];
+        }
+    }
+}
+
+function clearPayMenuScreen() {
+    game._pay_menu_active = false;
+    game._pay_menu_screen = null;
+    game._pay_menu_cursor = null;
 }
 
 function shopThankYouMessage(shkp) {
@@ -7994,7 +8015,8 @@ async function commitPayMenuSelection(menu) {
     const selected = (menu?.entries || []).filter((entry) => entry.selected);
     const shkp = menu?.shkp;
     game._pay_menu = null;
-    game._pay_menu_screen = null;
+    clearPayMenuScreen();
+    clearOverrideScreen();
     await redrawAfterFullScreenMenuDismiss();
     if (!selected.length || !shkp) {
         game.context.move = 0;
@@ -8026,9 +8048,30 @@ async function showPayMenu(shkp) {
     game._pay_menu = menu;
     if (!menu.entries.length || !renderPayMenu(menu)) {
         game._pay_menu = null;
-        game._pay_menu_screen = null;
+        clearPayMenuScreen();
         await pline(`You do not owe ${shkname(shkp)} anything.`);
     }
+    game.context.move = 0;
+}
+
+async function handlePayMenuInput(ch) {
+    const menu = game._pay_menu;
+    if (ch === '\x1b') {
+        game._pay_menu = null;
+        clearPayMenuScreen();
+        clearOverrideScreen();
+        await redrawAfterFullScreenMenuDismiss();
+        game.context.move = 0;
+        return;
+    }
+    if (ch === '\r' || ch === '\n') {
+        await commitPayMenuSelection(menu);
+        game.context.move = 0;
+        return;
+    }
+    const entry = menu?.entries?.find((item) => item.selector === ch);
+    if (entry) entry.selected = !entry.selected;
+    if (menu) renderPayMenu(menu);
     game.context.move = 0;
 }
 
@@ -28633,6 +28676,11 @@ export async function rhack(key) {
         return;
     }
 
+    if (game._pay_menu_active) {
+        await handlePayMenuInput(ch);
+        return;
+    }
+
     if (game._awaiting_drink_item) {
         clear_pending_message();
         if (ch === '?' || ch === '*') {
@@ -29451,26 +29499,6 @@ export async function rhack(key) {
             // C ref: win/tty/topl.c:more(); a latched More override ignores
             // non-dismissal keys instead of treating them as menu input.
             showOverride(prev, game._latched_more_cursor || null);
-            game.context.move = 0;
-            return;
-        }
-        if (prev === game._pay_menu_screen) {
-            const menu = game._pay_menu;
-            if (ch === '\x1b') {
-                game._pay_menu = null;
-                game._pay_menu_screen = null;
-                await redrawAfterFullScreenMenuDismiss();
-                game.context.move = 0;
-                return;
-            }
-            if (ch === '\r' || ch === '\n') {
-                await commitPayMenuSelection(menu);
-                game.context.move = 0;
-                return;
-            }
-            const entry = menu?.entries?.find((item) => item.selector === ch);
-            if (entry) entry.selected = !entry.selected;
-            if (menu) renderPayMenu(menu);
             game.context.move = 0;
             return;
         }
