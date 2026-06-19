@@ -3793,13 +3793,16 @@ export function makemon(mdat, x, y, mmflags = 0) {
     const allowInventory = allow_minvent && !(mmflags & NO_MINVENT);
     let initialItemCount = 0;
     let initialHasGold = false;
-    if (allowInventory && ptr.msound === MS_NEMESIS) {
+    let mitem = 0;
+    if (ptr.name === 'CROESUS') mitem = TWO_HANDED_SWORD;
+    else if (ptr.msound === MS_NEMESIS) mitem = BELL_OF_OPENING;
+    if (allowInventory && mitem) {
         game._in_monster_init = true;
         game._monster_init_current = mon;
         game._monster_init_item_count = 0;
         game._monster_init_has_gold = false;
         try {
-            mksobj(BELL_OF_OPENING, true, false);
+            mksobj(mitem, true, false);
             initialItemCount = game._monster_init_item_count || 0;
             initialHasGold = !!game._monster_init_has_gold;
         } finally {
@@ -4845,9 +4848,58 @@ const MEDUSA1_MAP = [
     '}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}',
     '}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}',
 ];
+const MEDUSA2_MAP = [
+    '}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}',
+    '}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}',
+    '}------}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}-------}}}}}}}}--------------}',
+    '}|....|}}}}}}}}}..}.}}..}}}}}}}}}}}}}..}}}}}}-.....--}}}}}}}|............|}',
+    '}|....|.}}}}}}}}}}}.}...}}..}}}}}}}}}}}}}}}}}---......}}}}}.|............|}',
+    '}S....|.}}}}}}---}}}}}}}}}}}}}}}}}}}}}}}}}}---...|..-}}}}}}.S..----------|}',
+    '}|....|.}}}}}}-...}}}}}}}}}.}}...}.}}}}.}}}......----}}}}}}.|............|}',
+    '}|....|.}}}}}}-....--}}}}}}}}}}}}}}}}}}}}}}----...--}}}}}}}.|..--------+-|}',
+    '}|....|.}}}}}}}......}}}}...}}}}}}.}}}}}}}}}}}---..---}}}}}.|..|..S...|..|}',
+    '}|....|.}}}}}}-....-}}}}}}}------}}}}}}}}}}}}}}-...|.-}}}}}.|..|..|...|..|}',
+    '}|....|.}}}}}}}}}---}}}}}}}........}}}}}}}}}}---.|....}}}}}.|..|..|...|..|}',
+    '}|....|.}}}}}}}}}}}}}}}}}}-....|...-}}}}}}}}--...----.}}}}}.|..|..|...|..|}',
+    '}|....|.}}}}}}..}}}}}}}}}}---..--------}}}}}-..---}}}}}}}}}.|..|..-------|}',
+    '}|...}|...}}}.}}}}}}...}}}}}--..........}}}}..--}}}}}}}}}}}.|..|.........|}',
+    '}|...}S...}}.}}}}}}}}}}}}}}}-..--------}}}}}}}}}}}}}}...}}}.|..--------..S}',
+    '}|...}|...}}}}}}}..}}}}}}----..|....-}}}}}}}}}}}}}}}}}..}}}.|............|}',
+    '}|....|}}}}}....}}}}..}}.-.......----}}......}}}}}}.......}}|............|}',
+    '}------}}}}}}}}}}}}}}}}}}---------}}}}}}}}}}}}}}}}}}}}}}}}}}--------------}',
+    '}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}',
+    '}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}',
+];
+const KNOX_MAP = [
+    '----------------------------------------------------------------------------',
+    '| |........|...............................................................|',
+    '| |........|.................................................------------..|',
+    '| --S----S--.................................................|..........|..|',
+    '|   #   |........}}}}}}}....................}}}}}}}..........|..........|..|',
+    '|   #   |........}-----}....................}-----}..........--+--+--...|..|',
+    '|   # ---........}|...|}}}}}}}}}}}}}}}}}}}}}}|...|}.................|...|..|',
+    '|   # |..........}---S------------------------S---}.................|...|..|',
+    '|   # |..........}}}|...............|..........|}}}.................+...|..|',
+    '| --S----..........}|...............S..........|}...................|...|..|',
+    '| |.....|..........}|...............|......\\...S}...................|...|..|',
+    '| |.....+........}}}|...............|..........|}}}.................+...|..|',
+    '| |.....|........}---S------------------------S---}.................|...|..|',
+    '| |.....|........}|...|}}}}}}}}}}}}}}}}}}}}}}|...|}.................|...|..|',
+    '| |..-S----......}-----}....................}-----}..........--+--+--...|..|',
+    '| |..|....|......}}}}}}}....................}}}}}}}..........|..........|..|',
+    '| |..|....|..................................................|..........|..|',
+    '| -----------................................................------------..|',
+    '|           |..............................................................|',
+    '----------------------------------------------------------------------------',
+];
 const MEDUSA1_X = 3;
 const MEDUSA1_Y = 1;
+const MEDUSA2_X = 3;
+const MEDUSA2_Y = 1;
+const KNOX_X = 3;
+const KNOX_Y = 1;
 const MEDUSA1_PLACE_WIDTH = 75;
+const MEDUSA2_PLACE_WIDTH = 75;
 const MEDUSA3_PLACE_WIDTH = 76;
 const MEDUSA3_X = 3;
 const MEDUSA3_Y = 1;
@@ -8098,6 +8150,136 @@ function medusa1Monster(id = null, x = null, y = null, mmflags = 0) {
     return makemonSpecialLevelAt(ptr, loc.x, loc.y, mmflags);
 }
 
+function medusa2SetTerrain() {
+    game.level.flags.is_maze_lev = true;
+    game.level.flags.noteleport = true;
+    for (let y = 0; y < MEDUSA2_MAP.length; y++) {
+        const row = MEDUSA2_MAP[y];
+        for (let x = 0; x < row.length; x++) {
+            const loc = game.level?.at(MEDUSA2_X + x, MEDUSA2_Y + y);
+            if (!loc) continue;
+            loc.lit = false;
+            switch (row[x]) {
+            case '.':
+                loc.typ = ROOM;
+                break;
+            case '}':
+                loc.typ = MOAT;
+                break;
+            case '-':
+                loc.typ = HWALL;
+                break;
+            case '|':
+                loc.typ = VWALL;
+                break;
+            case '+':
+                loc.typ = DOOR;
+                set_door_mask(loc, D_CLOSED);
+                break;
+            case 'S':
+                loc.typ = SDOOR;
+                loc.horizontal = row[x - 1] === '-' || row[x + 1] === '-';
+                set_door_mask(loc, D_CLOSED);
+                break;
+            default:
+                loc.typ = STONE;
+                break;
+            }
+        }
+    }
+}
+
+function medusa2ApplyLitRegion(x1, y1, x2, y2, lit) {
+    for (let y = y1; y <= y2; y++) {
+        for (let x = x1; x <= x2; x++) {
+            const loc = game.level?.at(MEDUSA2_X + x, MEDUSA2_Y + y);
+            if (loc) loc.lit = !!lit;
+        }
+    }
+}
+
+function medusa2AddRoom(x1, y1, x2, y2, lit) {
+    const before = game.level?.nroom ?? 0;
+    add_room(MEDUSA2_X + x1, MEDUSA2_Y + y1, MEDUSA2_X + x2, MEDUSA2_Y + y2,
+        lit ? 1 : 0, OROOM, true);
+    const croom = game.level?.rooms?.[before];
+    if (croom) {
+        croom.needfill = FILL_NONE;
+        croom.needjoining = true;
+        croom.irregular = true;
+    }
+    medusa2ApplyLitRegion(x1, y1, x2, y2, lit);
+    return croom;
+}
+
+function medusa2SetDoor(x, y, mask) {
+    const loc = game.level?.at(MEDUSA2_X + x, MEDUSA2_Y + y);
+    if (!loc) return;
+    if (!IS_DOOR(loc.typ) && loc.typ !== SDOOR) loc.typ = DOOR;
+    set_door_mask(loc, mask);
+}
+
+function medusa2DryLocation() {
+    return specialRandomDryLocation(MEDUSA2_PLACE_WIDTH, MEDUSA2_MAP.length, MEDUSA2_X, MEDUSA2_Y);
+}
+
+function medusa2MonsterLocation(ptr) {
+    let x = 0, y = 0;
+    let trycnt = 0;
+    do {
+        x = MEDUSA2_X + rn2(MEDUSA2_PLACE_WIDTH);
+        y = MEDUSA2_Y + rn2(MEDUSA2_MAP.length);
+        if (specialMonsterLocationOk(x, y, ptr)) return { x, y };
+    } while (++trycnt < 100);
+    return medusa2DryLocation();
+}
+
+function medusa2Object(otyp = null, x = null, y = null) {
+    const loc = x == null ? medusa2DryLocation() : { x, y };
+    if (otyp == null) mkobj_at(RANDOM_CLASS, loc.x, loc.y, true);
+    else mksobj_at(otyp, loc.x, loc.y, true, true);
+}
+
+function medusa2ObjectClass(oclass, x, y) {
+    mkobj_at(oclass, MEDUSA2_X + x, MEDUSA2_Y + y, true);
+}
+
+function medusa2ContainedObject(otyp) {
+    medusa2DryLocation();
+    return mksobj(otyp, true, true);
+}
+
+function medusa2Statue(x = null, y = null, ptr = null) {
+    const loc = x == null ? medusa2DryLocation() : { x, y };
+    const obj = mkcorpstat(STATUE, null, ptr, loc.x, loc.y, 8);
+    if (obj && ptr) {
+        obj.spe = CORPSTAT_HISTORIC;
+        obj.male = 1;
+        obj.onamelth = 'Perseus'.length;
+        obj.name = 'Perseus';
+    }
+    if (obj && !ptr) medusa3PopulateRandomStatue(obj);
+    return obj;
+}
+
+function medusa2Trap(kind = null, x = null, y = null) {
+    const loc = x == null ? medusa2DryLocation() : { x, y };
+    let actual = kind;
+    if (actual == null) do { actual = traptype_rnd(); } while (actual === NO_TRAP);
+    const trap = maketrap(loc.x, loc.y, actual);
+    maybeTrapVictim(trap);
+}
+
+function medusa2Monster(id = null, x = null, y = null, mmflags = 0) {
+    const cls = String(id || '').length === 1 ? specialMonsterClassFromChar(id) : null;
+    let ptr = cls ? null : monster_ptr(id);
+    if (!cls && monster_name_needs_find_gender_roll(id, ptr)) rn2(2);
+    induced_align_80();
+    if (cls) ptr = mkclass_aligned(cls, G_NOGEN);
+    const loc = x == null ? medusa2MonsterLocation(ptr) : { x: MEDUSA2_X + x, y: MEDUSA2_Y + y };
+    return makemonSpecialLevelAt(ptr, loc.x, loc.y, mmflags);
+}
+
 function medusa3ApplyLitRegion(x1, y1, x2, y2, lit) {
     for (let y = y1; y <= y2; y++) {
         for (let x = x1; x <= x2; x++) {
@@ -8319,6 +8501,34 @@ function registerMedusa1Lregions(flp, bounds) {
     ];
 }
 
+function registerMedusa2Lregions(flp, bounds) {
+    const downTele = flipRectForBounds({ x1: MEDUSA2_X + 2, y1: MEDUSA2_Y + 3, x2: MEDUSA2_X + 5, y2: MEDUSA2_Y + 16 }, flp,
+        bounds.minx, bounds.miny, bounds.maxx, bounds.maxy);
+    const upTele = flipRectForBounds({ x1: MEDUSA2_X + 61, y1: MEDUSA2_Y + 3, x2: MEDUSA2_X + 72, y2: MEDUSA2_Y + 16 }, flp,
+        bounds.minx, bounds.miny, bounds.maxx, bounds.maxy);
+    const branch = flipRectForBounds({ x1: MEDUSA2_X + 1, y1: MEDUSA2_Y, x2: COLNO - 1, y2: ROWNO - 1 }, flp,
+        bounds.minx, bounds.miny, bounds.maxx, bounds.maxy);
+    const exclude = flipRectForBounds({ x1: MEDUSA2_X + 59, y1: MEDUSA2_Y + 1, x2: MEDUSA2_X + 73, y2: MEDUSA2_Y + 17 }, flp,
+        bounds.minx, bounds.miny, bounds.maxx, bounds.maxy);
+    game._special_lregions = [
+        {
+            rtype: LR_DOWNTELE,
+            inarea: downTele,
+            delarea: { x1: 0, y1: 0, x2: 0, y2: 0 },
+        },
+        {
+            rtype: LR_UPTELE,
+            inarea: upTele,
+            delarea: { x1: 0, y1: 0, x2: 0, y2: 0 },
+        },
+        {
+            rtype: LR_BRANCH,
+            inarea: branch,
+            delarea: exclude,
+        },
+    ];
+}
+
 function loadMedusa1Special() {
     // C ref: dat/medusa-1.lua loaded via sp_lev.c:load_special().
     l_nhcore_init();
@@ -8395,6 +8605,111 @@ function loadMedusa1Special() {
     wallification(1, 0, COLNO - 1, ROWNO - 1);
     const flp = flip_level_rnd(3);
     registerMedusa1Lregions(flp, bounds);
+    fixup_special();
+}
+
+function loadMedusa2Special() {
+    // C ref: dat/medusa-2.lua loaded via sp_lev.c:load_special().
+    l_nhcore_init();
+    rn2(2); // splev_initlev() random lit state for solidfill.
+    medusa2SetTerrain();
+
+    medusa2ApplyLitRegion(0, 0, 74, 19, true);
+    medusa2ApplyLitRegion(2, 3, 5, 16, false);
+    medusa2AddRoom(61, 3, 72, 16, false);
+    medusa2ApplyLitRegion(71, 8, 72, 11, false);
+    medusa2AddRoom(67, 8, 69, 11, true);
+
+    placeSpecialStair(MEDUSA2_X + 4, MEDUSA2_Y + 9, true);
+    placeSpecialStair(MEDUSA2_X + 68, MEDUSA2_Y + 10, false);
+    medusa2SetDoor(71, 7, D_LOCKED);
+
+    for (const [x1, y1, x2, y2] of [
+        [1, 2, 6, 17],
+        [60, 2, 73, 17],
+    ]) {
+        for (let y = y1; y <= y2; y++)
+            for (let x = x1; x <= x2; x++) {
+                const loc = game.level?.at(MEDUSA2_X + x, MEDUSA2_Y + y);
+                if (loc) loc.wall_info |= W_NONDIGGABLE;
+            }
+    }
+
+    medusa2Statue(MEDUSA2_X + 68, MEDUSA2_Y + 10, monster_ptr('KNIGHT'));
+    if (rn2(100) < 25) {
+        const shield = medusa2ContainedObject(SHIELD_OF_REFLECTION);
+        if (shield) {
+            shield.cursed = true;
+            shield.blessed = false;
+            shield.spe = 0;
+        }
+    }
+    if (rn2(100) < 75) {
+        const boots = medusa2ContainedObject(LEVITATION_BOOTS);
+        if (boots) boots.spe = 0;
+    }
+    if (rn2(100) < 50) {
+        const sword = medusa2ContainedObject(SCIMITAR);
+        if (sword) {
+            sword.blessed = true;
+            sword.cursed = false;
+            sword.spe = 2;
+        }
+    }
+    if (rn2(100) < 50) medusa2ContainedObject(SACK);
+
+    for (const [x, y] of [
+        [64, 8], [65, 8], [64, 9], [65, 9],
+        [64, 10], [65, 10], [64, 11], [65, 11],
+    ]) {
+        medusa2Statue(MEDUSA2_X + x, MEDUSA2_Y + y, null);
+    }
+    medusa2Object(BOULDER, MEDUSA2_X + 4, MEDUSA2_Y + 4);
+    medusa2ObjectClass(WAND_CLASS, 52, 9);
+    medusa2Object(BOULDER, MEDUSA2_X + 52, MEDUSA2_Y + 9);
+    for (let i = 0; i < 6; i++) medusa2Object();
+
+    medusa2Trap(MAGIC_TRAP, MEDUSA2_X + 3, MEDUSA2_Y + 12);
+    for (let i = 0; i < 4; i++) medusa2Trap();
+
+    medusa2Monster('MEDUSA', 68, 10, MM_ASLEEP | MM_NOGRP);
+    medusa2Monster('GREMLIN', 2, 14);
+    medusa2Monster('TITAN', 2, 5);
+    medusa2Monster('ELECTRIC_EEL', 10, 13);
+    medusa2Monster('ELECTRIC_EEL', 11, 13);
+    medusa2Monster('ELECTRIC_EEL', 10, 14);
+    medusa2Monster('ELECTRIC_EEL', 11, 14);
+    medusa2Monster('ELECTRIC_EEL', 10, 15);
+    medusa2Monster('ELECTRIC_EEL', 11, 15);
+    medusa2Monster('JELLYFISH', 1, 1);
+    medusa2Monster('JELLYFISH', 0, 8);
+    medusa2Monster('JELLYFISH', 4, 19);
+    medusa2Monster('STONE_GOLEM', 64, 8, MM_ASLEEP);
+    medusa2Monster('STONE_GOLEM', 65, 8, MM_ASLEEP);
+    medusa2Monster('STONE_GOLEM', 64, 9, MM_ASLEEP);
+    medusa2Monster('STONE_GOLEM', 65, 9, MM_ASLEEP);
+    medusa2Monster('COBRA', 64, 10, MM_ASLEEP);
+    medusa2Monster('COBRA', 65, 10, MM_ASLEEP);
+    medusa2Monster('A', 72, 8);
+    medusa2Monster('YELLOW_LIGHT', 72, 11, MM_ASLEEP);
+    for (const [x, y] of [
+        [17, 7], [28, 11], [32, 13], [49, 9], [48, 7],
+        [65, 3], [70, 4], [70, 15], [65, 16],
+    ]) {
+        medusa2Monster(null, x, y);
+    }
+    for (let i = 0; i < 4; i++) medusa2Monster();
+
+    const ext = get_level_extends();
+    const bounds = {
+        minx: Math.max(1, ext.xmin),
+        maxx: Math.min(COLNO - 1, ext.xmax),
+        miny: Math.max(0, ext.ymin),
+        maxy: Math.min(ROWNO - 1, ext.ymax),
+    };
+    wallification(1, 0, COLNO - 1, ROWNO - 1);
+    const flp = flip_level_rnd(3);
+    registerMedusa2Lregions(flp, bounds);
     fixup_special();
 }
 
@@ -9133,6 +9448,274 @@ function loadValleySpecial() {
     fixup_special();
 }
 
+function knoxX(x) { return x + KNOX_X; }
+function knoxY(y) { return y + KNOX_Y; }
+
+function knoxSetTerrain(x, y, ch) {
+    const loc = game.level?.at(knoxX(x), knoxY(y));
+    if (!loc) return;
+    loc.lit = false;
+    switch (ch) {
+    case '.':
+        loc.typ = ROOM;
+        break;
+    case '-':
+        loc.typ = HWALL;
+        break;
+    case '|':
+        loc.typ = VWALL;
+        break;
+    case '}':
+        loc.typ = MOAT;
+        break;
+    case '#':
+        loc.typ = CORR;
+        break;
+    case '+':
+        loc.typ = DOOR;
+        set_door_mask(loc, D_NODOOR);
+        break;
+    case 'S':
+        loc.typ = SDOOR;
+        loc.horizontal = (KNOX_MAP[y]?.[x - 1] === '-') || (KNOX_MAP[y]?.[x + 1] === '-');
+        set_door_mask(loc, D_CLOSED);
+        break;
+    case '\\':
+        loc.typ = THRONE;
+        break;
+    default:
+        loc.typ = STONE;
+        break;
+    }
+}
+
+function knoxApplyLitRegion(x1, y1, x2, y2, lit) {
+    for (let y = y1; y <= y2; y++)
+        for (let x = x1; x <= x2; x++) {
+            const loc = game.level?.at(knoxX(x), knoxY(y));
+            if (loc) loc.lit = !!lit;
+        }
+}
+
+function knoxFloodRoomCells(sx, sy) {
+    const start = { x: knoxX(sx), y: knoxY(sy) };
+    const seen = new Set();
+    const cells = [];
+    const queue = [start];
+    while (queue.length) {
+        const { x, y } = queue.shift();
+        const key = `${x},${y}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const loc = game.level?.at(x, y);
+        if (!loc || !SPACE_POS(loc.typ)) continue;
+        cells.push({ x, y });
+        queue.push({ x: x + 1, y }, { x: x - 1, y }, { x, y: y + 1 }, { x, y: y - 1 });
+    }
+    return cells;
+}
+
+function knoxAddDoorsToRoom(room) {
+    if (!room) return;
+    for (let x = room.lx - 1; x <= room.hx + 1; x++)
+        for (let y = room.ly - 1; y <= room.hy + 1; y++) {
+            const loc = game.level?.at(x, y);
+            if (loc && (IS_DOOR(loc.typ) || loc.typ === SDOOR)) {
+                maybe_add_door_to_room(x, y, room);
+            }
+        }
+}
+
+function knoxAddRoom(x1, y1, x2, y2, lit, rtype, needfill = FILL_NONE, irregular = false, extra = {}) {
+    const cells = irregular ? knoxFloodRoomCells(x1, y1) : [];
+    if (irregular && cells.length) {
+        x1 = Math.min(...cells.map(c => c.x)) - KNOX_X;
+        y1 = Math.min(...cells.map(c => c.y)) - KNOX_Y;
+        x2 = Math.max(...cells.map(c => c.x)) - KNOX_X;
+        y2 = Math.max(...cells.map(c => c.y)) - KNOX_Y;
+    }
+    add_room(knoxX(x1), knoxY(y1), knoxX(x2), knoxY(y2), lit ? 1 : 0, rtype, true);
+    const room = game.level.rooms[(game.level.nroom || 1) - 1];
+    if (!room) return null;
+    room.needfill = needfill;
+    room.irregular = irregular;
+    room.arrival_room = !!extra.arrivalRoom;
+    knoxApplyLitRegion(x1, y1, x2, y2, lit);
+    const rmno = room.roomnoidx + ROOMOFFSET;
+    const markCells = irregular ? cells : [];
+    if (!irregular) {
+        for (let x = room.lx; x <= room.hx; x++)
+            for (let y = room.ly; y <= room.hy; y++) markCells.push({ x, y });
+    }
+    for (const { x, y } of markCells) {
+        const loc = game.level?.at(x, y);
+        if (loc && SPACE_POS(loc.typ)) {
+            loc.roomno = rmno;
+            loc.edge = false;
+        }
+    }
+    knoxAddDoorsToRoom(room);
+    return room;
+}
+
+function knoxSetDoor(x, y, mask) {
+    const loc = game.level?.at(knoxX(x), knoxY(y));
+    if (!loc) return;
+    loc.typ = DOOR;
+    set_door_mask(loc, mask);
+}
+
+function knoxMonster(id, x, y, peaceful = null) {
+    const cls = String(id || '').length === 1 ? castleMonsterClass(id) : null;
+    let ptr = cls ? null : monster_ptr(id);
+    if (!cls && monster_name_needs_find_gender_roll(id, ptr)) rn2(2);
+    induced_align_80();
+    if (cls) ptr = mkclass_aligned(cls, G_NOGEN);
+    const loc = { x: knoxX(x), y: knoxY(y) };
+    if (m_at(loc.x, loc.y)) {
+        const cc = enexto_core(loc.x, loc.y, ptr, GP_CHECKSCARY)
+            || enexto_core(loc.x, loc.y, ptr, 0);
+        if (cc) {
+            loc.x = cc.x;
+            loc.y = cc.y;
+        }
+    }
+    const mon = makemon(ptr, loc.x, loc.y, 0);
+    if (mon && peaceful != null) {
+        mon.mpeaceful = peaceful ? 1 : 0;
+        set_malign_basic(mon);
+    }
+    apply_monster_name_gender(mon, id);
+    return mon;
+}
+
+function knoxObject(otyp, x, y) {
+    return mksobj_at(otyp, knoxX(x), knoxY(y), true, true);
+}
+
+function knoxTrap(kind, x, y) {
+    const trap = maketrap(knoxX(x), knoxY(y), kind);
+    maybeTrapVictim(trap);
+    return trap;
+}
+
+function knoxTreasureSpot(x, y) {
+    mkgold(600 + rn2(301), knoxX(x), knoxY(y));
+    if (rn2(3) === 0) {
+        knoxTrap(rn2(3) === 0 ? SPIKED_PIT : LANDMINE, x, y);
+    }
+}
+
+function registerKnoxLregions(flp, bounds) {
+    const branch = flipRectForBounds({
+        x1: knoxX(8), y1: knoxY(16), x2: knoxX(8), y2: knoxY(16),
+    }, flp, bounds.minx, bounds.miny, bounds.maxx, bounds.maxy);
+    const arrival = flipRectForBounds({
+        x1: knoxX(6), y1: knoxY(15), x2: knoxX(9), y2: knoxY(16),
+    }, flp, bounds.minx, bounds.miny, bounds.maxx, bounds.maxy);
+    game._special_lregions = [
+        { rtype: LR_BRANCH, inarea: branch, delarea: { x1: -1, y1: -1, x2: -1, y2: -1 } },
+        { rtype: LR_UPTELE, inarea: arrival, delarea: { x1: -1, y1: -1, x2: -1, y2: -1 } },
+        { rtype: LR_DOWNTELE, inarea: arrival, delarea: { x1: -1, y1: -1, x2: -1, y2: -1 } },
+    ];
+}
+
+function loadKnoxSpecial() {
+    // C ref: dat/knox.lua loaded through sp_lev.c:load_special().
+    l_nhcore_init();
+    rn2(2); // splev_initlev() random lit state for solidfill.
+    game.level.flags.is_maze_lev = true;
+    game.level.flags.noteleport = true;
+    for (let y = 0; y < ROWNO; y++)
+        for (let x = 1; x < COLNO; x++) {
+            const loc = game.level?.at(x, y);
+            if (loc) {
+                loc.typ = STONE;
+                loc.lit = false;
+            }
+        }
+    for (let y = 0; y < KNOX_MAP.length; y++)
+        for (let x = 0; x < KNOX_MAP[y].length; x++)
+            knoxSetTerrain(x, y, KNOX_MAP[y][x]);
+
+    knoxAddRoom(37, 8, 46, 11, true, COURT, FILL_NORMAL);
+    if (rn2(100) < 50) {
+        knoxMonster('Croesus', 43, 10, false);
+    } else {
+        knoxMonster('Croesus', 43, 9, false);
+        knoxSetTerrain(43, 9, '\\');
+        knoxSetTerrain(43, 10, '.');
+    }
+    if (rn2(100) < 50) {
+        knoxSetTerrain(47, 9, 'S');
+        knoxSetTerrain(47, 10, '|');
+    }
+
+    knoxApplyLitRegion(21, 8, 35, 11, true);
+    for (let y = 8; y <= 11; y++)
+        for (let x = 21; x <= 35; x++)
+            knoxTreasureSpot(x, y);
+
+    if (rn2(100) < 50) {
+        knoxSetTerrain(36, 9, '|');
+        knoxSetTerrain(36, 10, 'S');
+    }
+    knoxApplyLitRegion(19, 6, 21, 6, true);
+    knoxApplyLitRegion(46, 6, 48, 6, true);
+    knoxApplyLitRegion(19, 13, 21, 13, true);
+    knoxApplyLitRegion(46, 13, 48, 13, true);
+    knoxAddRoom(3, 10, 7, 13, true, ZOO, FILL_NORMAL, true);
+    knoxAddRoom(6, 15, 9, 16, false, OROOM, FILL_NONE, false, { arrivalRoom: true });
+    knoxApplyLitRegion(5, 14, 5, 17, false);
+    knoxApplyLitRegion(5, 14, 9, 14, false);
+    knoxAddRoom(62, 3, 71, 4, true, BARRACKS, FILL_NORMAL, true);
+
+    knoxSetDoor(6, 14, D_CLOSED);
+    knoxSetDoor(9, 3, D_CLOSED);
+    knoxSetDoor(63, 5, D_ISOPEN);
+    knoxSetDoor(66, 5, D_ISOPEN);
+    knoxSetDoor(68, 8, D_ISOPEN);
+    knoxSetDoor(8, 11, D_LOCKED);
+    knoxSetDoor(68, 11, D_ISOPEN);
+    knoxSetDoor(63, 14, D_CLOSED);
+    knoxSetDoor(66, 14, D_CLOSED);
+    knoxSetDoor(4, 3, D_CLOSED);
+    knoxSetDoor(4, 9, D_CLOSED);
+
+    for (const [id, x, y] of [
+        ['soldier', 12, 14], ['soldier', 12, 13], ['soldier', 11, 10],
+        ['soldier', 13, 2], ['soldier', 14, 3], ['soldier', 20, 2],
+        ['soldier', 30, 2], ['soldier', 40, 2], ['soldier', 30, 16],
+        ['soldier', 32, 16], ['soldier', 40, 16], ['soldier', 54, 16],
+        ['soldier', 54, 14], ['soldier', 54, 13], ['soldier', 57, 10],
+        ['soldier', 57, 9], ['lieutenant', 15, 8], ['stone giant', 3, 1],
+        ['D', 18, 9], ['D', 49, 10], ['D', 33, 5], ['D', 33, 14],
+        ['giant eel', 17, 8], ['giant eel', 17, 11], ['giant eel', 48, 8],
+        ['giant eel', 48, 11],
+    ]) knoxMonster(id, x, y);
+
+    for (const [otyp, coords] of [
+        [DIAMOND, [[19, 6], [20, 6], [21, 6]]],
+        [EMERALD, [[19, 13], [20, 13], [21, 13]]],
+        [RUBY, [[46, 6], [47, 6], [48, 6]]],
+        [AMETHYST, [[46, 13], [47, 13], [48, 13]]],
+    ]) {
+        for (const [x, y] of coords) knoxObject(otyp, x, y);
+    }
+
+    wallification(1, 0, COLNO - 1, ROWNO - 1);
+    const ext = get_level_extends();
+    const bounds = {
+        minx: Math.max(1, ext.xmin),
+        maxx: Math.min(COLNO - 1, ext.xmax),
+        miny: Math.max(0, ext.ymin),
+        maxy: Math.min(ROWNO - 1, ext.ymax),
+    };
+    const flp = flip_level_rnd(3);
+    registerKnoxLregions(flp, bounds);
+    fixup_special();
+}
+
 function castleLevelRegion(x1, y1, x2, y2) {
     return { x1, y1, x2, y2 };
 }
@@ -9202,6 +9785,7 @@ function fixup_special() {
         place_lregion(0, 0, 0, 0, 0, 0, 0, 0, LR_BRANCH, null);
     }
     if (game._last_special_protofile === 'medusa-1'
+        || game._last_special_protofile === 'medusa-2'
         || game._last_special_protofile === 'medusa-3') medusa3FixupSpecial();
     if (game._last_special_protofile === 'baalz') baalzFixup();
 }
@@ -15133,6 +15717,10 @@ function makemaz_special(slev) {
         loadCastleSpecial();
         return;
     }
+    if (game._last_special_protofile === 'knox') {
+        loadKnoxSpecial();
+        return;
+    }
     if (game._last_special_protofile === 'valley') {
         loadValleySpecial();
         return;
@@ -15237,6 +15825,10 @@ function makemaz_special(slev) {
         loadMedusa1Special();
         return;
     }
+    if (game._last_special_protofile === 'medusa-2') {
+        loadMedusa2Special();
+        return;
+    }
     if (game._last_special_protofile === 'medusa-3') {
         loadMedusa3Special();
         return;
@@ -15273,6 +15865,7 @@ export async function mklev() {
     if (!loadedSpecial) wallification(1, 0, COLNO - 1, ROWNO - 1);
     if (loadedSpecial) link_doors_rooms();
     if (loadedSpecial && (game._last_special_protofile === 'castle'
+        || game._last_special_protofile === 'knox'
         || game._last_special_protofile === 'valley'
         || game._last_special_protofile === 'sanctum'
         || game._last_special_protofile === 'juiblex'
@@ -19056,13 +19649,27 @@ function fill_zoo(croom) {
     let throneX = 0;
     let throneY = 0;
     if (type === COURT) {
-        const pos = { x: 0, y: 0 };
-        let i = 100;
-        do {
-            somexyspace(croom, pos);
-            throneX = pos.x;
-            throneY = pos.y;
-        } while (occupied(throneX, throneY) && --i > 0);
+        let thronePlaced = false;
+        if (game.level?.flags?.is_maze_lev) {
+            for (let tx = croom.lx; tx <= croom.hx && !thronePlaced; tx++)
+                for (let ty = croom.ly; ty <= croom.hy; ty++) {
+                    if (game.level.at(tx, ty)?.typ === THRONE) {
+                        throneX = tx;
+                        throneY = ty;
+                        thronePlaced = true;
+                        break;
+                    }
+                }
+        }
+        if (!thronePlaced) {
+            const pos = { x: 0, y: 0 };
+            let i = 100;
+            do {
+                somexyspace(croom, pos);
+                throneX = pos.x;
+                throneY = pos.y;
+            } while (occupied(throneX, throneY) && --i > 0);
+        }
         mk_zoo_thronemon(throneX, throneY);
     }
     const beehiveQueenX = type === BEEHIVE ? croom.lx + Math.trunc((croom.hx - croom.lx + 1) / 2) : 0;
@@ -19081,6 +19688,7 @@ function fill_zoo(croom) {
                            || (sy === croom.hy && door.y === sy + 1)))) {
                 continue;
             }
+            if (type === COURT && loc?.typ === THRONE) continue;
 
             let mdat = null;
             if (type === COURT) mdat = courtmon();

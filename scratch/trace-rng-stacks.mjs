@@ -164,6 +164,12 @@ async function main() {
             console.log(`  Z@${item.idx} ${JSON.stringify(item)}`);
         }
     }
+    if (wants('bones') && globalThis.__teleportBonesTrace?.length) {
+        console.log('bones trace');
+        for (const item of globalThis.__teleportBonesTrace.filter(inWindow)) {
+            console.log(`  B@${item.idx} ${JSON.stringify(item)}`);
+        }
+    }
     if (wants('alloc') && globalThis.__teleportMonAllocTrace?.length) {
         console.log('mon alloc trace');
         for (const item of globalThis.__teleportMonAllocTrace.filter(inWindow)) {

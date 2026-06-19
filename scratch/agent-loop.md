@@ -13,7 +13,7 @@ and `feature_map.md`.
 ## Current State
 
 - Current branch in this workspace: `main`, ahead of origin.
-- Latest verified repair unit: live `seed0360` monster-generation repair.
+- Latest verified repair unit: live `seed0361` Medusa-2/Fort Ludios repair.
 - Checked-in public corpus is exact: `44/44 S 11405/11405 R 792838/792838 C 0`.
 - Hosted public cache remains `public-session-drift` at
   `40/44 S 10506/10982 R 715024/840358 C 0`; leaderboard fetch failed.
@@ -30,6 +30,39 @@ and `feature_map.md`.
   `frozen/`.
 
 ## Latest Loop Checkpoint
+
+- Latest verified WIP on 2026-06-19:
+  - Live `seed0361-archeologist-tour` now reaches
+    `S 262/294 R 66518/70975` from the prior live Fort Ludios frontier
+    `S 240/294 R 42671/70975`.
+  - Strict sentinel exact:
+    `5/5 S 1063/1063 R 64569/64569 C 0`.
+  - Implementation truth:
+    - `medusa-2` now dispatches through a static upstream-map loader with
+      C-centered `(3,1)` origin, scripted lighting/rooms/stairs/lregions,
+      statue/container/object/trap/monster payload, and final
+      wallification/flip/fixup.
+    - `knox` now dispatches through a Fort Ludios static loader with real
+      court/zoo/barracks/arrival room metadata, roomless treasury lighting,
+      immediate `add_doors_to_room()`-style door links, scripted treasure,
+      traps, monsters, gems, lregions after wallification bounds, and the
+      maze-court scripted-throne `fill_zoo()` path.
+    - Croesus now receives the `PM_CROESUS` two-handed-sword `mitem` through
+      the shared monster-init inventory front door.
+    - Scratch RNG stack tooling can print focused `getbones()` traces to
+      separate bones/prelude drift from later special-level payload drift.
+  - Current live frontier: `seed0361` reaches Archeologist filler generation
+    with first RNG mismatch `FR 66503: rn2(9)=7=>rn2(8)=1`. Expected enters
+    `makemon.c:mkclass_aligned()`, while JS is still in
+    `loadArcheologistFillerSpecial()`/`makecorridors()` door generation.
+    Next work should inspect Arc filler room/corridor generation against
+    `dat/Arc-fila.lua`, `dat/Arc-filb.lua`, and C corridor/join ordering.
+  - First visible screen mismatch remains screen 229's materialize topline
+    missing the C `--More--`; do not let that obscure the later proven RNG
+    frontier unless display work is the selected subsystem target.
+  - Verification covered `node --check` for `js/mklev.js` and scratch trace
+    scripts, focused live `verify`, `sentinel:strict`, `hack:audit`,
+    `memory:lint`, and `git diff --check`.
 
 - Latest verified WIP on 2026-06-19:
   - Live `seed0360-wizard-world-tour` now reaches
@@ -79,39 +112,8 @@ and `feature_map.md`.
   - Next queue: choose the next live-public or hidden-session mismatch from a
     fresh `parity:state`/triage pass; checked-in public corpus is exact.
 
-- Previous verified WIP on 2026-06-19:
-  - Generic override-screen plumbing removal:
-    `seed0361-archeologist-tour` remains exact.
-  - Strict sentinel exact:
-    `5/5 S 1063/1063 R 64569/64569 C 0`.
-  - Full checked-in corpus passed via `bash frozen/score.sh`:
-    `44/44 S 11405/11405 R 792838/792838 C 0`.
-  - Verification also covered `node --check` for `js/cmd.js`,
-    `js/display.js`, `js/jsmain.js`, `js/allmain.js`, and `js/monmove.js`,
-    `git diff --check`, `verify --target seed0361`, `hack:audit`, and
-    `memory:lint`.
-  - Dehack truth:
-    - Production `js/` no longer has generic `_override_screen`,
-      `_override_prev`, or serialized-override display plumbing. Tty windows,
-      terminal-exit screens, prompts, and blocking More frames render through
-      explicit active or latched state.
-    - `hack:audit` now reports only the two fastforward/replay comment hits in
-      forbidden files `js/storage.js` and `js/terminal.js`.
-  - Next queue: no checked-in public mismatch is active; regenerate/inspect
-    divergence inventory and feature-map debt to choose the next general
-    subsystem frontier for hidden-session cleanliness.
-
-- Previous verified WIP on 2026-06-19:
-  - Wizard getbones unlink prompt display state retired the last direct prompt
-    user of generic serialized override state.
-  - Death/quit final disclosure, quest/post-arrival pager More, and loot
-    contents More overrides, terminal-exit screens, read/zap/apply inventory
-    prompt menus, here-command, loot, pay, inventory, potion, throw,
-    inventory-action, wizidentify, and death disclosure menu/window overrides
-    were retired into active or latched state with checked-in corpus and strict
-    sentinels exact.
-  - Full corpus inventory: 44 passing sessions, checked-in public
-    `44/44 S 11405/11405 R 792838/792838 C 0`.
+- Previous dehack and seed0360 completion detail is in git, `feature_map.md`,
+  and `lessons.md`; keep this live checkpoint focused on active frontiers.
 
 - Older checkpoint history lives in git and `feature_map.md`; keep this file
   focused on the active loop state and next queue.

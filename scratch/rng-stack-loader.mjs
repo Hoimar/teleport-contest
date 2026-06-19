@@ -1508,6 +1508,74 @@ function can_attack_after_move_basic`
     if (url.endsWith('/js/mklev.js')) {
         let source = String(result.source);
         source = source.replace(
+            'function getbones() {\n    const flags = game.flags || {};\n',
+            `function getbones() {
+    const flags = game.flags || {};
+    const __getbonesTrace = (phase, extra = {}) => {
+        const idx = globalThis.__teleportRngTraceIndex || 0;
+        const start = globalThis.__teleportApparxyStart ?? -Infinity;
+        const end = globalThis.__teleportApparxyEnd ?? Infinity;
+        if (idx < start || idx > end) return;
+        const __uz = game.u?.uz ? { ...game.u.uz } : null;
+        const __special = game.specialLevels?.find((lev) =>
+            lev?.dlevel?.dnum === __uz?.dnum && lev?.dlevel?.dlevel === __uz?.dlevel) || null;
+        const __dungeon = game.dungeons?.[__uz?.dnum ?? 0] || null;
+        (globalThis.__teleportBonesTrace ||= []).push({
+            idx,
+            phase,
+            uz: __uz,
+            special: __special ? {
+                proto: __special.proto,
+                boneid: __special.boneid,
+                rndlevs: __special.rndlevs,
+            } : null,
+            dungeon: __dungeon ? {
+                name: __dungeon.dname,
+                boneid: __dungeon.boneid,
+                num_dunlevs: __dungeon.num_dunlevs,
+            } : null,
+            debug: !!game.flags?.debug,
+            explore: !!flags.explore,
+            bonesFlag: flags.bones,
+            ...extra,
+        });
+    };
+`
+        );
+        source = source.replace(
+            '    if (flags.explore) return false;\n    if (flags.bones === false) return false;\n    if (rn2(3) && !game.flags?.debug) return false;\n    if (no_bones_level()) return false;\n\n    const key = bones_file_key();\n    const text = key ? vfsReadFile(key) : null;\n    if (!text) return false;\n',
+            `    if (flags.explore) {
+        __getbonesTrace('skip-explore');
+        return false;
+    }
+    if (flags.bones === false) {
+        __getbonesTrace('skip-disabled');
+        return false;
+    }
+    const __roll = rn2(3);
+    __getbonesTrace('roll', { roll: __roll });
+    if (__roll && !game.flags?.debug) {
+        __getbonesTrace('skip-roll', { roll: __roll });
+        return false;
+    }
+    const __noBones = no_bones_level();
+    __getbonesTrace('no-bones-check', { noBones: __noBones });
+    if (__noBones) return false;
+
+    const key = bones_file_key();
+    const text = key ? vfsReadFile(key) : null;
+    __getbonesTrace('file-check', { key, hasText: !!text });
+    if (!text) return false;
+`
+        );
+        source = source.replace(
+            '    const deleted = vfsDeleteFile(key);\n    return ok && deleted;\n',
+            `    const deleted = vfsDeleteFile(key);
+    __getbonesTrace('restore-result', { key, ok, deleted });
+    return ok && deleted;
+`
+        );
+        source = source.replace(
             '    let num = 0;\n    const weights = new Map();\n',
             `    let num = 0;
     const weights = new Map();
