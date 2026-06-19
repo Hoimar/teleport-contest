@@ -1267,6 +1267,10 @@ function pet_combat_hit_topline(line) {
     return /^The (?:kitten|little dog|(?:saddled )?pony) (?:bites|hits|kicks|stings|butts|touches) .+/.test(line || '');
 }
 
+function monster_death_topline(line) {
+    return /^The .+ is (?:killed|destroyed)!$/.test(line || '');
+}
+
 async function append_topline_message(line) {
     game._last_pet_combat_line_deferred = false;
     if (game._pending_message?.startsWith('You start putting on ')) game._pending_message = '';
@@ -1277,6 +1281,15 @@ async function append_topline_message(line) {
                 game._pending_message = `${game._pending_message}  ${line}`;
                 game._last_topline_message = game._pending_message;
                 game._pet_miss_prompt_after_resume = false;
+                if (monster_death_topline(line)) {
+                    // C refs: src/mhitm.c:hitmm()/mdamagem(),
+                    // src/mon.c:monkilled(), win/tty/topl.c:update_topl().
+                    // A visible pet hit can pack its kill line after the
+                    // dismissed tty More without showing a second prompt.
+                    game._more = false;
+                    game._more_dismissals_remaining = 0;
+                    game._pet_combat_more_latched = false;
+                }
                 return;
             }
             if (game._pet_combat_more_latched || pet_combat_hit_topline(game._pending_message)) {

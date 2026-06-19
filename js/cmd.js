@@ -20819,12 +20819,24 @@ async function handleQueuedMore(ch) {
             if (deferredPetDeathCanPack && game._pet_defender_death_pending) {
                 const pending = game._pet_defender_death_pending;
                 game._pet_defender_death_pending = null;
+                game._more = false;
+                game._more_dismissals_remaining = 0;
                 await finish_pet_kill(pending.killer, pending.target);
+                game._more = false;
+                game._more_dismissals_remaining = 0;
+                game._pet_combat_more_latched = false;
                 game._skip_encumbered_debt_after_pet_death_more = true;
                 if (game._resume_movemon_after_mon === pending.target)
                     game._resume_movemon_after_mon = null;
                 if (game._resume_tame_post_distfleeck === pending.target)
                     game._resume_tame_post_distfleeck = null;
+                if (!rest
+                    && !deferredPetDeathNeedsPrompt
+                    && !game._after_more_message
+                    && !game._after_more_needs_prompt
+                    && !game._monster_death_pending
+                    && !game._fatal_monster_attack_paused)
+                    needsPrompt = false;
             }
             const finishedDeferredPetKill = finish_deferred_pet_kill_side_effect();
             const suppressPetKillResume = !!game._pet_kill_suppress_resume_after_death_line;
@@ -25189,6 +25201,7 @@ async function finishLevelTeleportArrival({
     await docrt();
     if (game.u?.uhallucination || game.u?.uprops?.hallucination) see_objects();
     clearUnseenPremappedMimicMemory();
+    await flush_screen(-1);
     // C ref: src/teleport.c:level_tele().  Level teleport schedules this
     // deferred post-message only when flags.verbose is true.
     const suppressEndgameMaterialize = C.In_endgame?.(oldUz)
@@ -28201,10 +28214,10 @@ export async function rhack(key) {
             return;
         }
         if (obj.otyp === WAN_DEATH && ch === '.') {
-            learnWandFromUse(obj);
             // C refs: src/cmd.c:getdir()/confdir(), src/zap.c:zapyourself()
-            // for WAN_DEATH.  Confusion still probes impairment before a
-            // deliberate self direction is honored.
+            // for WAN_DEATH.  Fatal self-zaps never return from done(DIED)
+            // to the learnwand() tail, so the only RNG before bones is the
+            // confused-direction impairment probe.
             if (game.u?.uprops?.confusion || game.u?.uconfusion) rn2(5);
             const self = game.flags?.female ? 'herself' : 'himself';
             game._death_killer_name = `shot ${self} with a death ray`;

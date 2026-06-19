@@ -1950,8 +1950,16 @@ function _buildScreenOutput(options = {}) {
 // ── flush_screen ──
 export async function flush_screen(mode) {
     const fullMap = !!game._full_map_redraw_pending;
+    const blockedByLatchedMore = fullMap && !!game._latched_more_screen;
     game._full_map_redraw_pending = false;
     _buildScreenOutput({ fullMap });
+    if (blockedByLatchedMore) {
+        // C refs: win/tty/topl.c:more(), src/display.c:docrt().
+        // A full redraw requested while a tty More frame is latched must
+        // survive until that frame is dismissed; rendering the old More screen
+        // is not the redraw itself.
+        game._full_map_redraw_pending = true;
+    }
 }
 
 // ── cls ──
