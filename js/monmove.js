@@ -860,7 +860,10 @@ function monster_can_teleport_basic(mtmp) {
 }
 
 function monster_relocation_subject_basic(mtmp, appearmsg) {
-    if (!hero_can_notice_relocated_monster_basic(mtmp)) return 'It';
+    // C ref: src/teleport.c:rloc_to_core().  STRAT_APPEARMSG can force the
+    // relocation message while blind, but Amonnam()/Monnam() still name the
+    // monster only when canspotmon() can identify it.
+    if (!hero_can_spot_monster(mtmp)) return 'It';
     if (mtmp?.isshk && shopkeeper_name(mtmp)) return shopkeeper_name(mtmp);
     const named = named_monster_name(mtmp);
     if (named) return sentence_case(named);
@@ -4612,13 +4615,6 @@ async function show_blocking_monster_message(line) {
     if (!line) return;
     if (game._life_saving_silent_monster_resume) return;
     clear_transient_travel_description_for_monster_line();
-    if (game._monster_topline_stop_after_esc_more
-        && (is_simple_monster_hit_you_line(line) || is_simple_monster_hit_you_chain(line))) {
-        // C refs: win/tty/topl.c:more()/update_topl().  ESC at --More--
-        // leaves the tty message window in STOP mode; ordinary later monster
-        // hit lines update history/state without becoming the visible prompt.
-        return;
-    }
     if (game._nomovemsg === 'You survived that attempt on your life.'
         && game._pending_message === "OK, so you don't die."
         && !game._more
@@ -4626,9 +4622,17 @@ async function show_blocking_monster_message(line) {
         && topline_can_pack_message(game._pending_message, line)) {
         // C refs: src/end.c:savelife(), src/allmain.c:moveloop_core(),
         // win/tty/topl.c:update_topl().  Declining wizard-mode death returns
-        // to the interrupted monster pass; combat lines can keep packing
-        // behind the OK line until the saved-life nomovemsg boundary blocks.
+        // to the interrupted monster pass; the resumed physical tail packs
+        // behind the OK line and then blocks before later monsters advance.
         game._pending_message = `${game._pending_message}  ${line}`;
+        queue_more_prompt();
+        return;
+    }
+    if (game._monster_topline_stop_after_esc_more
+        && (is_simple_monster_hit_you_line(line) || is_simple_monster_hit_you_chain(line))) {
+        // C refs: win/tty/topl.c:more()/update_topl().  ESC at --More--
+        // leaves the tty message window in STOP mode; ordinary later monster
+        // hit lines update history/state without becoming the visible prompt.
         return;
     }
     if (game._nomovemsg === 'You survived that attempt on your life.'
@@ -8151,16 +8155,34 @@ function transfer_stolen_object_to_monster(mtmp, obj) {
     mtmp.inventory.unshift(obj);
 }
 
-export async function finish_deferred_nymph_steal() {
+export async function finish_deferred_nymph_steal(options = {}) {
     const pending = game._deferred_nymph_steal;
     if (!pending) return false;
     game._deferred_nymph_steal = null;
     const mtmp = pending.mtmp || (game.level?.monsters || []).find((mon) => mon.m_id === pending.monId);
     const obj = pending.obj;
     if (!mtmp || !obj || !game.level?.monsters?.includes(mtmp) || (mtmp.mhp ?? 1) <= 0) return true;
+    transfer_stolen_object_to_monster(mtmp, obj);
+    if (options.appendToPending) {
+        const line = nymph_stole_line(mtmp, obj, pending.wornMask || 0, '');
+        // C refs: src/steal.c:steal(), win/tty/topl.c:update_topl().
+        // Revealing a deferred worn-item removal line resumes steal()
+        // immediately, so the final theft line can share that tty More.
+        if (game._pending_message && topline_can_pack_message(game._pending_message, line)) {
+            await append_pline(line);
+        } else if (game._pending_message) {
+            game._after_more_message = game._after_more_message
+                ? `${game._after_more_message}  ${line}`
+                : line;
+            game._after_more_needs_prompt = true;
+            game._monster_topline_deferred = true;
+        } else {
+            await pline(line);
+        }
+        if (options.deferEscapeTail) return true;
+    }
     const wasVisible = hero_can_spot_monster(mtmp);
     const vanishSubject = wasVisible ? monster_subject(mtmp) : '';
-    transfer_stolen_object_to_monster(mtmp, obj);
     const vanished = wasVisible && rloc_basic(mtmp);
     monflee_basic(mtmp, 0, false);
     mhitm_knockback_frontdoor();
@@ -8233,6 +8255,21 @@ async function steal_item_melee_attack(mtmp, state, toHit) {
 
 function append_deferred_physical_attack_line(line) {
     if (!line) return;
+    if (game._nomovemsg === 'You survived that attempt on your life.'
+        && String(game._pending_message || '').startsWith("OK, so you don't die.")
+        && (is_simple_monster_hit_you_line(line) || is_simple_monster_hit_you_chain(line))
+        && topline_can_pack_message(game._pending_message, line)) {
+        // C refs: src/end.c:savelife(), src/mhitu.c:hitmsg(),
+        // win/tty/topl.c:update_topl().  The interrupted monster's remaining
+        // physical rows pack behind the saved-life OK line even when the
+        // fatal-hit More was dismissed with ESC.
+        game._pending_message = `${game._pending_message}  ${line}`;
+        if (!game._more) queue_more_prompt();
+        else game._more_dismissals_remaining = 1;
+        game._last_topline_message = game._pending_message;
+        game._last_topline_can_force_more = false;
+        return;
+    }
     if (game._monster_topline_stop_after_esc_more
         && (is_simple_monster_hit_you_line(line) || is_simple_monster_hit_you_chain(line))) {
         // C refs: win/tty/topl.c:more()/update_topl(), src/mhitu.c:hitmsg().

@@ -1736,8 +1736,17 @@ async function showPendingMonsterDeathMessage() {
     // feasibility RNG.
     if (!lifeSavingAmulet && !deathUsesWizardPrompt()) runPendingDeathBonesCheck();
     if (!game._death_preserve_latched_status) game._latched_status_uhp = 0;
+    const directWizardPrompt = deathUsesWizardPrompt()
+        && game._monster_attack_tail_transient_after_more;
     if (lifeSavingAmulet) {
         await showLifeSavingDeathMessage();
+    } else if (directWizardPrompt) {
+        // C refs: src/end.c:done(), win/tty/topl.c:update_topl().
+        // Transient fatal monster tails resume within the same tty continuation
+        // as the dismissed hit line, so done() advances to the wizard/explore
+        // paranoid query without making "You die..." another blocking More.
+        game._death_prompt_pending = false;
+        await showDeathPrompt();
     } else {
         await pline('You die...');
         if (game._death_shopkeeper_takes_name) {
@@ -3608,6 +3617,15 @@ async function showDeathSaveBonesPrompt() {
     const msg = 'Save bones? [yn] (n)';
     await showPromptLine(msg);
     game._prompt_cursor = [msg.length + 1, 0];
+}
+
+async function continueAcceptedDeathFlow() {
+    const bonesOk = prepareDeathBonesDoneStageBasic();
+    if (bonesOk && deathCanSaveWizardBones()) {
+        await showDeathSaveBonesPrompt();
+    } else {
+        await showDeathDisclosureOrPrompt();
+    }
 }
 
 function deathUsesWizardPrompt() {
@@ -6043,6 +6061,20 @@ async function lookHereAfterMove(opts = {}) {
         deferMoveFloorList();
         return;
     }
+    if (game._pending_message
+        && opts.packFeatureWithPending
+        && feature.line
+        && topline_can_pack_message(game._pending_message, feature.line)) {
+        // C refs: teleport.c:dotele()/teleds(), pickup.c:check_here(),
+        // invent.c:look_here().  A successful !verbose controlled teleport
+        // has no materialize line; its retained getpos description can be the
+        // prefix for the arriving floor-list feature line.
+        showFloorObjectList(objects, feature.line, { pickedSome });
+        game._floor_list_pauses_turn = true;
+        if (!opts.arrivalFloorListNoTurn && !opts.resumeStairArrivalAfterFloorList)
+            game._floor_list_resume_spot_effects_on_dismiss = true;
+        return;
+    }
     if (game._pending_message) {
         // C ref: src/invent.c:look_here().  Multi-object floor menus flush
         // WIN_MESSAGE before display_nhwindow(tmpwin), so an existing movement
@@ -6455,6 +6487,21 @@ function learnWandFromVisibleObjectEffect(wand, obj) {
     wand.dknown = true;
     wand.knownName = true;
     discoverObjectType(wand.otyp);
+}
+
+function learnWandFromUse(wand) {
+    // C ref: src/zap.c:learnwand().  Observable wand effects discover the
+    // type only after the manipulated wand is known as more than generic.
+    if (!wand || wand.oclass !== WAND_CLASS) return;
+    if (knownObjectType(wand.otyp)) {
+        wand.dknown = true;
+        wand.knownName = true;
+        return;
+    }
+    if (!heroIsBlind()) wand.dknown = true;
+    if (wand.dknown === false) return;
+    wand.knownName = true;
+    markObjectTypeKnownNoExercise(wand.otyp);
 }
 
 function polymorphZapHitsObject(obj, wand) {
@@ -12078,6 +12125,7 @@ async function doSwapWeaponCommand() {
         primary.owornmask = 0;
         primary.alternate = true;
     }
+    applyHeroArtifactTouchRng(secondary);
     secondary.alternate = false;
     secondary.owornmask = C.W_WEP;
     secondary.wielded = true;
@@ -17142,6 +17190,7 @@ function rerenderBasicOptionsFromFirstPage() {
 
 const BASIC_OPTIONS_SELECTIONS = [
     {
+        a: 'fruit',
         c: 'price_quotes',
         d: 'autodig',
         e: 'autoopen',
@@ -17185,7 +17234,21 @@ async function handleBasicOptionsMenuKey(ch) {
         }
         return;
     }
+    if (ch === '>' || ch === '\x06') {
+        menu.page = Math.min(1, (menu.page || 0) + 1);
+        renderBasicOptionsMenu();
+        return;
+    }
+    if (ch === '<' || ch === '\x02') {
+        menu.page = Math.max(0, (menu.page || 0) - 1);
+        renderBasicOptionsMenu();
+        return;
+    }
     const name = BASIC_OPTIONS_SELECTIONS[menu.page || 0]?.[ch];
+    if (name === 'fruit') {
+        await beginOptionsFruitPrompt({ returnToBasicOptions: true });
+        return;
+    }
     if (name === 'pickup_types') {
         await beginPickupTypesMenu();
         if (game._pickup_types_menu) {
@@ -17554,9 +17617,10 @@ function rerenderOptionsFromFirstPage() {
     renderSimpleOptionsMenu();
 }
 
-async function beginOptionsFruitPrompt() {
+async function beginOptionsFruitPrompt(options = {}) {
     await redrawAfterFullScreenMenuDismiss();
     game._awaiting_options_fruit = true;
+    game._options_fruit_return_to_basic = !!options.returnToBasicOptions;
     game._options_fruit_input = '';
     const baseRows = serialize_terminal_grid(game.nhDisplay).split('\n');
     while (baseRows.length < C.TERMINAL_ROWS) baseRows.push('');
@@ -17583,18 +17647,30 @@ async function handleOptionsFruitKey(ch) {
             game.flags = game.flags || {};
             game.flags.fruit = text;
         }
+        const returnToBasicOptions = !!game._options_fruit_return_to_basic;
         game._awaiting_options_fruit = false;
+        game._options_fruit_return_to_basic = false;
         game._options_fruit_input = '';
         game._options_fruit_base_screen = null;
         clear_pending_message();
+        if (returnToBasicOptions) {
+            rerenderBasicOptionsFromFirstPage();
+            return;
+        }
         rerenderOptionsFromFirstPage();
         return;
     }
     if (ch === '\x1b') {
+        const returnToBasicOptions = !!game._options_fruit_return_to_basic;
         game._awaiting_options_fruit = false;
+        game._options_fruit_return_to_basic = false;
         game._options_fruit_input = '';
         game._options_fruit_base_screen = null;
         clear_pending_message();
+        if (returnToBasicOptions) {
+            rerenderBasicOptionsFromFirstPage();
+            return;
+        }
         rerenderOptionsFromFirstPage();
         return;
     }
@@ -18327,12 +18403,12 @@ function farlookLocationDescription(x, y) {
     if (mon && !mon.mundetected && cansee(x, y)) return farlookMonsterDescription(mon, x, y);
     const loc = game.level?.at(x, y);
     if (!loc) return 'stone';
-    if (!cansee(x, y) && !loc.seenv
+    if (!cansee(x, y)
         && (!loc.disp_ch || loc.disp_ch === ' ')
         && (!loc.remembered_glyph || loc.remembered_glyph.ch === ' ')) {
-        // C refs: src/getpos.c:auto_describe(), src/pager.c:lookat().
-        // Getpos describes the displayed glyph; unseen blank map cells are
-        // treated as stone even if JS already knows hidden corridor terrain.
+        // C ref: src/pager.c:lookat().  Farlook describes glyph_at(), so a
+        // blank remembered cmap square reports the stone glyph even when the
+        // hidden terrain is already known to be corridor.
         return 'stone';
     }
     if (!getposLocationKnown(x, y)) return 'unexplored area';
@@ -18360,7 +18436,7 @@ function farlookLocationDescription(x, y) {
 }
 
 function farlookBlankStoneGlyph(loc, x, y) {
-    return !!loc && !cansee(x, y) && !loc.seenv
+    return !!loc && !cansee(x, y)
         && (!loc.disp_ch || loc.disp_ch === ' ')
         && (!loc.remembered_glyph || loc.remembered_glyph.ch === ' ');
 }
@@ -18554,6 +18630,7 @@ async function runTeleportArrivalSpotEffects(feature, options = {}) {
             featureLine: feature?.line || '',
             featureAlreadyShown: autopicked,
             arrivalFloorListNoTurn: !!options.arrivalFloorListNoTurn,
+            packFeatureWithPending: !!options.packFeatureWithPending,
         });
     return { autopicked };
 }
@@ -19436,6 +19513,14 @@ async function handleQueuedMore(ch) {
     }
 
     game._pending_more_strict_keys = false;
+    if ((game._more_dismissals_remaining || 0) > 1
+        && game._nomovemsg === 'You survived that attempt on your life.'
+        && String(game._pending_message || '').startsWith("OK, so you don't die.")) {
+        // C refs: src/end.c:savelife(), win/tty/topl.c:more().  The saved-life
+        // OK continuation is a single tty More even if several resumed
+        // physical fragments packed into the visible topline.
+        game._more_dismissals_remaining = 1;
+    }
     game._more_dismissals_remaining--;
     if (game._more_dismissals_remaining <= 0) consumeTutorialEntryUacOverrideDismissal();
     game._monster_more_accepts_any_key = false;
@@ -19511,6 +19596,10 @@ async function handleQueuedMore(ch) {
         game._more = false;
         game._more_dismissals_remaining = 0;
         clear_pending_message();
+        // C ref: win/tty/wintty.c:process_text_window().  Dismissing an
+        // arrival floor text window restores the destination map before the
+        // interrupted stair turn continues.
+        game._full_map_redraw_pending = true;
         await triggerSpotEffectsAtHero();
         if (game._more) {
             game.context.move = 0;
@@ -19536,6 +19625,9 @@ async function handleQueuedMore(ch) {
         game._more = false;
         game._more_dismissals_remaining = 0;
         clear_pending_message();
+        // C ref: win/tty/wintty.c:process_text_window().  A no-turn arrival
+        // floor text window still restores the map when it is dismissed.
+        game._full_map_redraw_pending = true;
         await maybeAutopickupBlockedAtHero();
         game.context.move = 0;
         return true;
@@ -19634,6 +19726,13 @@ async function handleQueuedMore(ch) {
         game.context.move = 1;
         return true;
     } else if (await showPendingMonsterDeathMessage()) {
+    } else if (game._death_continue_after_shopkeeper_more) {
+        game._death_continue_after_shopkeeper_more = false;
+        game._more_dismissals_remaining = 0;
+        game._more = false;
+        await continueAcceptedDeathFlow();
+        game.context.move = 0;
+        return true;
     } else if (game._lava_death_disclosure_pending) {
         game._more_dismissals_remaining = 0;
         game._more = false;
@@ -20111,6 +20210,7 @@ async function handleQueuedMore(ch) {
                 game.context.move = 0;
                 return true;
             }
+            if (await runArrivalFloorLookAfterMore()) return true;
             game.context.move = 0;
             return true;
         }
@@ -20138,6 +20238,13 @@ async function handleQueuedMore(ch) {
         }
         const floorListRestore = game._floor_list_restore_message_after_more || '';
         game._floor_list_restore_message_after_more = '';
+        const floorListWindowDismissed = Array.isArray(game._floor_list_lines);
+        if (floorListWindowDismissed && !pausedFloorListTurn) {
+            // C ref: win/tty/wintty.c:process_text_window().  Floor object
+            // lists are tty text windows; closing one reveals the map even when
+            // no command turn is waiting to resume.
+            game._full_map_redraw_pending = true;
+        }
         clear_pending_message();
         if (game._temple_entry_after_more) {
             const pending = game._temple_entry_after_more;
@@ -20605,6 +20712,15 @@ async function handleQueuedMore(ch) {
                     exercise(A_STR, false); // C ref: src/mthrowu.c:thitu().
             }
             await pline(msg);
+            if (!game._after_more_message && game._deferred_nymph_steal) {
+                // C refs: src/steal.c:steal(), src/uhitm.c:mhitm_ad_adtyp().
+                // After a blocked worn-item removal line is revealed, steal()
+                // continues before the nymph's post-theft escape tail.
+                await finish_deferred_nymph_steal({
+                    appendToPending: true,
+                    deferEscapeTail: true,
+                });
+            }
             if (game._active_more_split_clear_next_physical_status
                 && monsterPhysicalToplineChain(msg)) {
                 // C refs: src/mhitu.c:hitmu(), win/tty/topl.c:more().
@@ -21068,12 +21184,10 @@ async function commitIntrinsicMenuSelection(menu) {
     const selected = menu.rows.filter((row) => row.kind === 'selectable' && row.selected);
     const wasHallucinating = !!(game.u?.uprops?.hallucination || game.u?.uhallucination);
     game._intrinsic_menu = null;
-    game._override_screen = null;
-    game._override_serialized_screen = null;
-    game._override_serialized_cursor = null;
-    game._override_serialized_persistent = false;
-    game._override_cursor = null;
-    game._override_prev = null;
+    // C refs: win/tty/wintty.c:tty_select_menu(), src/wizcmds.c:wiz_intrinsic().
+    // The tty window is dismissed before selected intrinsics emit messages.
+    clearOverrideScreen();
+    await redrawAfterFullScreenMenuDismiss();
     if (!selected.length) {
         return;
     }
@@ -25888,12 +26002,15 @@ export async function rhack(key) {
                 game._death_bones_checked = true;
                 game._death_bones_check_pending = true;
             }
-            const bonesOk = prepareDeathBonesDoneStageBasic();
-            if (bonesOk && deathCanSaveWizardBones()) {
-                await showDeathSaveBonesPrompt();
-            } else {
-                await showDeathDisclosureOrPrompt();
+            if (game._death_shopkeeper_takes_name) {
+                await pline(`${game._death_shopkeeper_takes_name} takes all your possessions.`);
+                game._death_shopkeeper_takes_name = '';
+                queue_more_prompt();
+                game._death_continue_after_shopkeeper_more = true;
+                game.context.move = 0;
+                return;
             }
+            await continueAcceptedDeathFlow();
             game.context.move = 0;
             return;
         }
@@ -25929,6 +26046,7 @@ export async function rhack(key) {
             game._death_bones_done_stage_prepared = false;
             game._death_bones_corpse_prepared = false;
             game._death_bones_ok = false;
+            game._death_shopkeeper_takes_name = '';
             if (game._monster_turn_paused_for_more) {
                 game._resume_turn_tail_after_more = false;
                 game._nomovemsg = 'You survived that attempt on your life.';
@@ -25950,10 +26068,24 @@ export async function rhack(key) {
                     && (game._monster_death_pending || game._after_more_message)) {
                     queue_more_prompt();
                 }
+                if (game._more
+                    && String(game._pending_message || '').startsWith("OK, so you don't die.")) {
+                    // C refs: src/end.c:savelife(), win/tty/topl.c:more().
+                    // The declined-death OK continuation is one blocking tty
+                    // More even when several resumed physical hit fragments
+                    // were packed into that line.
+                    game._more_dismissals_remaining = 1;
+                }
                 if (game._more) game._pending_more_strict_keys = true;
                 game._savelife_resume_active = true;
                 if (game._more) {
-                    game._latched_status_turn = (game.moves || 1) + 1;
+                    // C refs: src/end.c:savelife(), src/mhitu.c:mattacku().
+                    // A transient monster-tail death prompt is still inside
+                    // the current monster turn; ordinary saved-life resumes
+                    // have already crossed the next displayed turn boundary.
+                    game._latched_status_turn = game._monster_attack_tail_transient_after_more
+                        ? (game.moves || 1)
+                        : (game.moves || 1) + 1;
                     game._clear_latched_status_after_more = true;
                     game._monster_turn_paused_for_more = true;
                     game._monster_attack_more_waiting = true;
@@ -26868,7 +27000,7 @@ export async function rhack(key) {
             game._teleport_cursor = null;
             if (teleokBasic(cursor.x, cursor.y, false)) {
                 if (game.flags?.verbose === false) {
-                    await teledsBasic(cursor.x, cursor.y);
+                    await teledsBasic(cursor.x, cursor.y, { packFeatureWithPending: true });
                 } else {
                     clear_pending_message();
                     await teledsBasic(cursor.x, cursor.y, { deferArrivalBehindMore: true });
@@ -27582,18 +27714,8 @@ export async function rhack(key) {
         }
         if (obj === heroSecondaryWeapon()) {
             // C ref: src/wield.c:doswapweapon().  Choosing the alternate
-            // weapon from #wield swaps primary/secondary and prints the old
-            // primary after the new primary's prinv() line.
-            const old = heroWieldedWeapon();
-            setHeroSecondaryWeapon(null);
-            applyHeroArtifactTouchRng(obj);
-            setHeroWieldedWeapon(obj);
-            await pline(`${inventoryListing(obj, { includeWorn: true })}.`);
-            if (old && old !== obj) {
-                setHeroSecondaryWeapon(old);
-                await printInventoryLineAfterCurrentTopline(`${inventoryListing(old, { includeWorn: true })}.`);
-            }
-            game.context.move = 1;
+            // weapon from #wield takes the same tty continuation path as #swap.
+            await doSwapWeaponCommand();
             return;
         }
         const old = heroWieldedWeapon();
@@ -27890,8 +28012,8 @@ export async function rhack(key) {
         if (obj.otyp === WAN_SECRET_DOOR_DETECTION) {
             // C ref: zap.c:zapnodir() -> detect.c:findit().
             exercise(A_WIS, true);
-            obj.knownName = true;
             await pline("You don't find anything.");
+            learnWandFromUse(obj);
             game.context.move = 1;
             return;
         }
@@ -28059,7 +28181,7 @@ export async function rhack(key) {
         const dx = DIR_DX[ch] || 0;
         const dy = DIR_DY[ch] || 0;
         if (obj.otyp === WAN_SLEEP && ch === '.') {
-            obj.knownName = true;
+            learnWandFromUse(obj);
             // C ref: src/zap.c:dozap(), src/zap.c:zapyourself(); self-zaps
             // take the zapyourself branch before weffects exercise handling.
             game._nomul_turns_remaining = rnd(50);
@@ -28069,7 +28191,7 @@ export async function rhack(key) {
             return;
         }
         if (obj.otyp === WAN_DEATH && ch === '.') {
-            obj.knownName = true;
+            learnWandFromUse(obj);
             // C refs: src/cmd.c:getdir()/confdir(), src/zap.c:zapyourself()
             // for WAN_DEATH.  Confusion still probes impairment before a
             // deliberate self direction is honored.
@@ -28091,26 +28213,24 @@ export async function rhack(key) {
             return;
         }
         if (obj.otyp === WAN_POLYMORPH && ch === '.') {
-            obj.knownName = true;
             await finishRandomPolyselfFromWand();
+            learnWandFromUse(obj);
             return;
         }
         exercise(A_WIS, true);
         if (obj.otyp === WAN_DIGGING) {
-            obj.knownName = true;
             obj.chargesKnown = false;
             zapDig(dx, dy);
             exercise(A_WIS, true);
+            if (dx || dy) learnWandFromUse(obj);
         } else if (obj.otyp === WAN_FIRE) {
-            obj.knownName = true;
             await zapFireRayAtHero(dx, dy);
+            learnWandFromUse(obj);
         } else if (obj.otyp === WAN_COLD) {
             await zapColdRay(dx, dy);
             obj.dknown = true;
-            obj.knownName = true;
-            discoverObjectType(obj.otyp);
+            learnWandFromUse(obj);
         } else if (obj.otyp === WAN_SLEEP) {
-            obj.knownName = true;
             if (sleepRayHitsHeroAfterBounce(dx, dy)) {
                 drawRayBeam(dx, dy, 12);
                 await pline('The sleep ray bounces!  The sleep ray hits you!');
@@ -28124,6 +28244,7 @@ export async function rhack(key) {
                 }
                 queue_more_prompt();
             }
+            learnWandFromUse(obj);
         } else if (obj.otyp === WAN_POLYMORPH) {
             await zapPolymorphObjects(obj, DIR_DX[ch] || 0, DIR_DY[ch] || 0);
         }

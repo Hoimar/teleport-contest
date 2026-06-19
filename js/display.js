@@ -308,7 +308,7 @@ function altarColor(loc) {
 
 // ── Terrain to display character + color + DEC flag ──
 export function terrain_glyph(loc, x, y) {
-    const typ = display_wall_type(loc);
+    const typ = display_wall_type(loc, x, y);
     if (rogue_level_display()) {
         switch (typ) {
         case STONE:     return { ch: ' ', color: NO_COLOR, dec: false };
@@ -481,7 +481,7 @@ export function terrain_glyph(loc, x, y) {
     }
 }
 
-function display_wall_type(loc) {
+function display_wall_type(loc, x, y) {
     // C ref: display.c:wall_angle(). For wallification glyphs, NetHack
     // derives the visible wall character from terrain type plus seenv.
     const seenv = (loc.seenv || 0) & 0xff;
@@ -511,7 +511,7 @@ function display_wall_type(loc) {
     case CROSSWALL:
         return display_crosswall_type(loc, seenv);
     case SDOOR:
-        return secret_door_wall_type(loc, seenv);
+        return secret_door_wall_type(loc, x, y, seenv);
     case VWALL:
         switch (mode) {
         case 0:
@@ -579,9 +579,9 @@ function display_corner_type(which, seenv, mode, outer, inner) {
     }
 }
 
-function secret_door_wall_type(loc, seenv) {
+function secret_door_wall_type(loc, x, y, seenv) {
     // SDOOR falls through to the HWALL/VWALL wall-angle cases in C.
-    if (loc.horizontal) {
+    if (secret_door_horizontal(loc, x, y)) {
         const mode = (loc.wall_info || 0) & WM_MASK;
         if (mode === 1) return seenv & (SV3 | SV4 | SV5 | SV6 | SV7) ? HWALL : STONE;
         if (mode === 2) return seenv & (SV0 | SV1 | SV2 | SV3 | SV7) ? HWALL : STONE;
