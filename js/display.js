@@ -1834,6 +1834,8 @@ function activeSerializedTextScreen() {
         return game._loot_menu_screen;
     if (game._herecmd_menu_active && game._herecmd_menu_screen)
         return game._herecmd_menu_screen;
+    if (game._terminal_exit_screen_active && game._terminal_exit_screen)
+        return game._terminal_exit_screen;
     if (game._direction_help_active && game._direction_help_screen)
         return game._direction_help_screen;
     if (game._getpos_help_active && game._getpos_help_screen)
@@ -2016,6 +2018,10 @@ function _buildScreenOutput(options = {}) {
     }
     if (game._herecmd_menu_active && game._herecmd_menu_screen) {
         renderTextScreen(display, game._herecmd_menu_screen, game._herecmd_menu_cursor || null);
+        return;
+    }
+    if (game._terminal_exit_screen_active && game._terminal_exit_screen) {
+        renderTextScreen(display, game._terminal_exit_screen, game._terminal_exit_cursor || null);
         return;
     }
     if (game._direction_help_active && game._direction_help_screen) {

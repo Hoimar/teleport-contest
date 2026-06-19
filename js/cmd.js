@@ -5074,6 +5074,23 @@ function clearInventoryPromptMenuScreen() {
     game._inventory_prompt_menu_letters = null;
 }
 
+function setTerminalExitScreen(screen, cursor) {
+    // C refs: src/save.c:dosave(), src/end.c:done2(), win/tty/wintty.c:tty_exit_nhwindows().
+    installSerializedScreenHook();
+    clearOverrideScreen();
+    game._terminal_exit_screen = screen;
+    game._terminal_exit_cursor = cursor ? [cursor[0], cursor[1]] : null;
+    game._terminal_exit_screen_active = true;
+    if (game.nhDisplay && cursor) {
+        if (typeof game.nhDisplay.setCursor === 'function')
+            game.nhDisplay.setCursor(cursor[0], cursor[1]);
+        else {
+            game.nhDisplay.cursorCol = cursor[0];
+            game.nhDisplay.cursorRow = cursor[1];
+        }
+    }
+}
+
 async function dismissInventoryPromptMenuScreen() {
     clearInventoryPromptMenuScreen();
     clearOverrideScreen();
@@ -27496,7 +27513,7 @@ export async function rhack(key) {
             clear_pending_message();
             game._awaiting_dump_core = false;
             const screen = '\nSince you were in wizard mode, the score list will not be checked.';
-            showOverride(screen, [0, 4]);
+            setTerminalExitScreen(screen, [0, 4]);
             game.program_state = game.program_state || {};
             game.program_state.gameover = true;
             game.context.move = 0;
@@ -29736,7 +29753,7 @@ export async function rhack(key) {
         if (ch === 'y' || ch === 'Y') {
             writeSavedGame();
             const screen = `Be seeing you...${'\n'.repeat(C.TERMINAL_ROWS - 1)}`;
-            showOverride(screen, [0, 1]);
+            setTerminalExitScreen(screen, [0, 1]);
             game._pending_message = 'Be seeing you...';
             game.program_state = game.program_state || {};
             game.program_state.gameover = true;
