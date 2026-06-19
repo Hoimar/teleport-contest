@@ -4932,16 +4932,15 @@ function showDeathInventoryDisclosurePage(index = 0) {
     const lastRow = Math.min(rows.length - 1, Math.max(0, page.length - 1));
     const cursorCol = Math.min(COLNO - 1, (rows[lastRow] || '').length);
     const screen = rows.join('\n');
-    game._death_inventory_disclosure_screen = screen;
-    showOverride(screen, [cursorCol, lastRow]);
+    setDisclosureWindowScreen(screen, [cursorCol, lastRow], 'death-inventory');
     game.context.move = 0;
 }
 
 async function showDeathAttributesPrompt() {
     game._death_attributes_prompt_active = true;
-    game._death_inventory_disclosure_screen = null;
     game._death_inventory_disclosure_pages = null;
     game._death_inventory_disclosure_page = 0;
+    clearDisclosureWindowScreen();
     clearOverrideScreen();
     await redrawAfterFullScreenMenuDismiss();
     const msg = 'Do you want to see your attributes? [ynq] (n)';
@@ -17089,8 +17088,47 @@ function clearLevelTeleportMenuScreen() {
     game._level_teleport_menu_total_pages = 0;
 }
 
-async function handleDisclosureWindowInput() {
+async function handleDisclosureWindowInput(ch) {
     const kind = game._disclosure_window_kind || '';
+    if (kind === 'death-inventory') {
+        const dismiss = ch === ' ' || ch === '\r' || ch === '\n';
+        const pages = Array.isArray(game._death_inventory_disclosure_pages)
+            ? game._death_inventory_disclosure_pages
+            : [];
+        const page = game._death_inventory_disclosure_page || 0;
+        if (dismiss && page + 1 < pages.length) {
+            showDeathInventoryDisclosurePage(page + 1);
+        } else {
+            clearDisclosureWindowScreen();
+            await showDeathAttributesPrompt();
+        }
+        game.context.move = 0;
+        return;
+    }
+    if (kind === 'death-attributes') {
+        const page = game._death_attributes_page || 1;
+        const dismiss = ch === ' ' || ch === '\r' || ch === '\n';
+        if (page === 1 && dismiss && game._death_attributes_page2_screen) {
+            game._death_attributes_page = 2;
+            setDisclosureWindowScreen(
+                game._death_attributes_page2_screen,
+                deathAttributesScreenCursor(game._death_attributes_page2_screen),
+                'death-attributes',
+            );
+        } else if (page === 2 && dismiss && game._death_attributes_page3_screen) {
+            game._death_attributes_page = 3;
+            setDisclosureWindowScreen(
+                game._death_attributes_page3_screen,
+                deathAttributesScreenCursor(game._death_attributes_page3_screen),
+                'death-attributes',
+            );
+        } else {
+            clearDisclosureWindowScreen();
+            await showDeathCreaturesPrompt();
+        }
+        game.context.move = 0;
+        return;
+    }
     clearDisclosureWindowScreen();
     clearOverrideScreen();
     if (kind === 'death-vanquished') {
@@ -23481,19 +23519,30 @@ function showDeathAttributesPage1() {
     game._death_attributes_page1_screen = pages.page1;
     game._death_attributes_page2_screen = pages.page2;
     game._death_attributes_page3_screen = pages.page3 || null;
-    showOverride(pages.page1, [9, C.TERMINAL_ROWS - 1]);
+    game._death_attributes_page = 1;
+    setDisclosureWindowScreen(pages.page1, [9, C.TERMINAL_ROWS - 1], 'death-attributes');
     game.context.move = 0;
 }
 
+function deathAttributesScreenCursor(screen) {
+    return [9, Math.max(0, String(screen || '').split('\n').length - 1)];
+}
+
+function clearDeathAttributesScreens() {
+    game._death_attributes_page1_screen = null;
+    game._death_attributes_page2_screen = null;
+    game._death_attributes_page3_screen = null;
+    game._death_attributes_page = 0;
+}
+
 async function showDeathCreaturesPrompt() {
+    clearDeathAttributesScreens();
+    clearDisclosureWindowScreen();
     if (!vanquishedMonsterEntries().length) {
         await showDeathConductPrompt();
         return;
     }
     game._death_creatures_prompt_active = true;
-    game._death_attributes_page1_screen = null;
-    game._death_attributes_page2_screen = null;
-    game._death_attributes_page3_screen = null;
     clearOverrideScreen();
     await redrawAfterFullScreenMenuDismiss();
     const msg = 'Do you want an account of creatures vanquished? [ynaq] (n)';
@@ -26240,7 +26289,7 @@ export async function rhack(key) {
     }
 
     if (game._disclosure_window_active) {
-        await handleDisclosureWindowInput();
+        await handleDisclosureWindowInput(ch);
         return;
     }
 
@@ -29137,44 +29186,6 @@ export async function rhack(key) {
             const entry = menu?.entries?.find((item) => item.selector === ch);
             if (entry) entry.selected = !entry.selected;
             if (menu) renderPayMenu(menu);
-            game.context.move = 0;
-            return;
-        }
-        if (prev === game._death_inventory_disclosure_screen) {
-            const dismiss = ch === ' ' || ch === '\r' || ch === '\n';
-            const pages = Array.isArray(game._death_inventory_disclosure_pages)
-                ? game._death_inventory_disclosure_pages
-                : [];
-            const page = game._death_inventory_disclosure_page || 0;
-            if (dismiss && page + 1 < pages.length) {
-                showDeathInventoryDisclosurePage(page + 1);
-            } else {
-                await showDeathAttributesPrompt();
-            }
-            game.context.move = 0;
-            return;
-        }
-        if (prev === game._death_attributes_page1_screen) {
-            if ((ch === ' ' || ch === '\r' || ch === '\n') && game._death_attributes_page2_screen) {
-                showOverride(game._death_attributes_page2_screen, [9, Math.max(0, game._death_attributes_page2_screen.split('\n').length - 1)]);
-            } else {
-                await showDeathCreaturesPrompt();
-            }
-            game.context.move = 0;
-            return;
-        }
-        if (prev === game._death_attributes_page2_screen) {
-            if ((ch === ' ' || ch === '\r' || ch === '\n') && game._death_attributes_page3_screen) {
-                showOverride(game._death_attributes_page3_screen, [9, Math.max(0, game._death_attributes_page3_screen.split('\n').length - 1)]);
-                game.context.move = 0;
-                return;
-            }
-            await showDeathCreaturesPrompt();
-            game.context.move = 0;
-            return;
-        }
-        if (prev === game._death_attributes_page3_screen) {
-            await showDeathCreaturesPrompt();
             game.context.move = 0;
             return;
         }

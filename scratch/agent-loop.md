@@ -13,7 +13,7 @@ and `feature_map.md`.
 ## Current State
 
 - Current branch in this workspace: `main`, ahead of origin.
-- Latest verified repair unit: wizidentify-menu active-state retirement.
+- Latest verified repair unit: death disclosure inventory/attributes active-state retirement.
 - Checked-in public corpus is exact: `44/44 S 11405/11405 R 792838/792838 C 0`.
 - Hosted public cache remains `public-session-drift` at
   `40/44 S 10417/10982 R 629747/840358 C 0`; leaderboard fetch failed.
@@ -32,6 +32,28 @@ and `feature_map.md`.
 ## Latest Loop Checkpoint
 
 - Latest verified WIP on 2026-06-19:
+  - Death disclosure inventory/attributes override-state retirement:
+    `seed0030-ten-diverse-deaths` remains exact
+    (`S 1953/1953 R 105529/105529 C 0`) and covers broad death disclosure;
+    focused guards `seed0006`, `seed0007`, `seed0009`, and `seed0103`
+    remained exact.
+  - Strict sentinel exact:
+    `5/5 S 1063/1063 R 64569/64569 C 0`.
+  - `verify --target seed0030-ten-diverse-deaths` passed target, strict
+    sentinels, `hack:audit` (`hard=0 suspicious=11`), and `memory:lint`
+    (`issues=0`).
+  - Full corpus inventory: 44 passing sessions, checked-in public
+    `44/44 S 11405/11405 R 792838/792838 C 0`.
+  - Dehack truth:
+    - End-of-game inventory disclosure and final attributes pages are active
+      disclosure-window state rendered by `display.js`, not generic
+      `_override_prev` screens.
+    - Page/dismissal handling clears active state before the next death
+      disclosure prompt or page chain.
+  - Next queue: remaining hack debt is `hard=0 suspicious=11`, dominated by
+    generic override-screen plumbing plus the forbidden-file replay comments.
+
+- Previous verified WIP on 2026-06-19:
   - Wizidentify-menu override-state retirement:
     `seed4500-knight-coverage` remains exact
     (`S 1814/1814 R 108275/108275 C 0`) and covers the no-unidentified-item
@@ -90,26 +112,6 @@ and `feature_map.md`.
       state rendered by `display.js`, not generic `_override_prev` screens.
     - Page advance, ignored page keys, and final dismissal are owned by
       explicit attributes state.
-  - Next queue: remaining hack debt is `hard=0 suspicious=11`, dominated by
-    generic override-screen plumbing plus the forbidden-file replay comments.
-
-- Previous verified WIP on 2026-06-19:
-  - Discovery-window override-state retirement:
-    `seed0116-wizard-wear-shop` remains exact
-    (`S 127/127 R 12562/12562 C 0`) and covers multi-page discoveries;
-    focused guards `seed0360`, `seed0373`, `seed2200`, `seed0101`, and
-    `seed0700` remained exact.
-  - Strict sentinel exact:
-    `5/5 S 1063/1063 R 64569/64569 C 0`.
-  - `verify --target seed0116-wizard-wear-shop` passed target, strict
-    sentinels, `hack:audit` (`hard=0 suspicious=11`), and `memory:lint`
-    (`issues=0`).
-  - Full corpus inventory: 44 passing sessions, checked-in public
-    `44/44 S 11405/11405 R 792838/792838 C 0`.
-  - Dehack truth:
-    - `\` discoveries pages are active serialized discovery-window state
-      rendered by `display.js`, not generic `_override_prev` screens.
-    - Page advance and dismissal are owned by explicit discovery state.
   - Next queue: remaining hack debt is `hard=0 suspicious=11`, dominated by
     generic override-screen plumbing plus the forbidden-file replay comments.
 
