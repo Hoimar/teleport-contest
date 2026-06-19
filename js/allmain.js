@@ -127,18 +127,37 @@ async function slipOrTripBasic() {
     // evidence reaches them.
     switch (rn2(4)) {
     case 1:
-        await pline('You trip over your own feet.');
+        await fumbleTopline('You trip over your own feet.');
         break;
     case 2:
-        await pline('You slip and nearly fall.');
+        await fumbleTopline('You slip and nearly fall.');
         break;
     case 3:
-        await pline('You flounder.');
+        await fumbleTopline('You flounder.');
         break;
     default:
-        await pline('You stumble.');
+        await fumbleTopline('You stumble.');
         break;
     }
+}
+
+async function fumbleTopline(msg) {
+    // C refs: src/timeout.c:nh_timeout() FUMBLING, win/tty/topl.c:update_topl().
+    // Fumble output is an ordinary pline(); tty packs it behind a prior
+    // same-turn topline such as mhitm.c:noises() when there is room.
+    if (!game._pending_message || game._travel_description_pending) {
+        await pline(msg);
+        return;
+    }
+    if (topline_can_pack_message(game._pending_message, msg)) {
+        await append_pline(msg);
+        return;
+    }
+    queue_more_prompt();
+    game._after_more_message = game._after_more_message
+        ? `${game._after_more_message}  ${msg}`
+        : msg;
+    game._after_more_needs_prompt = false;
 }
 
 async function timeoutFumblingBasic(u) {
@@ -168,9 +187,22 @@ async function timeoutFumblingBasic(u) {
         game._nomul_turns_remaining = Math.max(game._nomul_turns_remaining || 0, 2);
         game._nomul_finish_message = '';
         game._fumble_nomul_pet_inventory_scan = true;
+        if (game._run_tail_turn_active && !hasCloseTamePetForFumble(game, u))
+            game._run_tail_far_pet_fumble_nomul_pending = true;
     }
     if (wornFumblingArmor(game)) u.uprops.fumbling_timeout += rnd(20);
     else u.uprops.fumbling = false;
+}
+
+function hasCloseTamePetForFumble(g, u) {
+    const ux = u?.ux ?? 0;
+    const uy = u?.uy ?? 0;
+    return (g.level?.monsters || []).some((mon) => {
+        if (!mon?.mtame) return false;
+        const dx = (mon.mx ?? ux) - ux;
+        const dy = (mon.my ?? uy) - uy;
+        return dx * dx + dy * dy <= 4;
+    });
 }
 
 async function nhTimeoutBasic() {
@@ -1485,6 +1517,15 @@ export async function newgame() {
         g._more = true;
         g._more_next_message_row = welcome.length + '--More--'.length >= COLNO;
     }
+    // C ref: src/pline.c:vpline() -> src/display.c:flush_screen().
+    // The welcome pager is shown after the startup story text window, so
+    // the map has to be redrawn before the first blocking prompt capture.
+    g._latched_more_screen = null;
+    g._latched_more_cursor = null;
+    g._latched_more_use_pending_topline = false;
+    g._latched_more_keep_until_dismiss = false;
+    g._full_map_redraw_pending = true;
+    await flush_screen(1);
 }
 
 export async function advanceTurn() {
@@ -2699,7 +2740,12 @@ async function continueRunTail(g) {
             g._run_paused_before_encumbered_check = false;
             return false;
         }
-        await advanceTurn();
+        g._run_tail_turn_active = true;
+        try {
+            await advanceTurn();
+        } finally {
+            g._run_tail_turn_active = false;
+        }
         if (g._more) {
             if (g.context?.run) g._run_paused_for_more = true;
             g._run_paused_before_encumbered_check = true;
@@ -2709,12 +2755,37 @@ async function continueRunTail(g) {
             if (g.context?.run) g._run_paused_for_more = true;
             return false;
         }
+        if (!g._more && !g._monster_turn_paused_for_more
+            && g._deferred_move_floor_list && g._pending_message) {
+            // C refs: src/allmain.c:moveloop_core(), src/pickup.c:check_here().
+            // A run/travel floor-list deferred behind the monster turn does
+            // not replace ordinary turn-tail toplines; if fumble or monster
+            // output owns the boundary, the stale movement pile display is
+            // abandoned and the repeated move path continues.
+            g._deferred_move_floor_list = null;
+        }
         if (!g._monster_turn_paused_for_more && await showDeferredMoveFloorList()) {
             if (g.context?.run) g.context.run = null;
             return false;
         }
         if (!await continueRunPostTurnChecks(g)) return false;
+        if (!g.context?.run
+            && g._run_tail_far_pet_fumble_nomul_pending
+            && (g._nomul_turns_remaining || 0) > 0) {
+            // C refs: src/timeout.c:nh_timeout() FUMBLING,
+            // src/allmain.c:moveloop_core(), src/dogmove.c:dog_move().  A
+            // fumble during an automatic run-tail turn can leave negative
+            // multi after the normal post-command nomul slot has already
+            // passed.  When no tame pet is close enough to spend that turn
+            // during immediate fumble handling, spend the remaining helpless
+            // turn before returning to input.
+            g._run_tail_far_pet_fumble_nomul_pending = false;
+            if (!await continueNomulTurns(g, { countCurrentTurn: true })) return false;
+            if (!occupationPending(g)) finish_pending_eaten_corpse();
+            if (!await continueOccupationTurns(g)) return false;
+        }
     }
+    g._run_tail_far_pet_fumble_nomul_pending = false;
     return true;
 }
 
@@ -2971,6 +3042,15 @@ export async function moveloop_core() {
                 }
                 adjustPrayerForceBudgetAfterUninterruptedFirstTurn(g);
                 if (promptPendingPetCombatBeforeDeferredFloorList()) return;
+                if (!g._more && !g._monster_turn_paused_for_more
+                    && g._deferred_move_floor_list && g._pending_message) {
+                    // C refs: src/allmain.c:moveloop_core(), src/pickup.c:check_here().
+                    // A run/travel floor-list deferred behind the monster turn
+                    // does not replace ordinary turn-tail toplines; if fumble
+                    // or monster output owns the input boundary, the stale
+                    // movement pile display is abandoned.
+                    g._deferred_move_floor_list = null;
+                }
                 if (!g._more && !g._monster_turn_paused_for_more
                     && await showDeferredMoveFloorList()) return;
                 if (!await finishDeferredSpellbookStudy(g)) return;

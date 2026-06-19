@@ -210,6 +210,8 @@ export class NethackGame {
                     game._override_serialized_cursor = null;
                 game._override_cursor = null;
                 game._override_screen = null;
+                if (!game._override_serialized_persistent)
+                    game._full_map_redraw_pending = true;
             } else {
                 game._override_prev = null;
             }

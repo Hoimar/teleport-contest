@@ -1,5 +1,48 @@
 export async function load(url, context, nextLoad) {
     const result = await nextLoad(url, context);
+    if (url.endsWith('/js/allmain_turns.js')) {
+        let source = String(result.source);
+        source = source.replace(
+            'export function exercise(index, increase) {\n',
+            `export function exercise(index, increase) {
+    const __exerciseTraceBefore = () => ({
+        idx: globalThis.__teleportRngTraceIndex || 0,
+        index,
+        increase: !!increase,
+        moves: game.moves,
+        before: game.u?.aexe ? [...game.u.aexe] : null,
+        acurr: game.u?.acurr?.a ? [...game.u.acurr.a] : null,
+        hunger: game.u?.uhunger,
+        uhs: game.u?.uhs,
+        uencumber: game.u?.uencumber,
+        props: game.u?.uprops ? { ...game.u.uprops } : null,
+        context: {
+            next_attrib_check: game.context?.next_attrib_check,
+            run: game.context?.run,
+            multi: game.context?.multi,
+        },
+        stack: String(new Error().stack || '')
+            .split('\\n')
+            .slice(2, 8)
+            .map((line) => line.trim().replace((typeof process !== 'undefined' && process.cwd ? process.cwd() : '') + '/', '')),
+    });
+    const __exerciseTrace = globalThis.__teleportExerciseTrace ? __exerciseTraceBefore() : null;
+`
+        );
+        source = source.replace(
+            '        game.u.aexe[index] -= rn2(2);\n    }\n}\n',
+            `        game.u.aexe[index] -= rn2(2);
+    }
+    if (__exerciseTrace) {
+        __exerciseTrace.after = game.u?.aexe ? [...game.u.aexe] : null;
+        __exerciseTrace.rngAfter = globalThis.__teleportRngTraceIndex || 0;
+        (globalThis.__teleportExerciseTraceLog ||= []).push(__exerciseTrace);
+    }
+}
+`
+        );
+        return { ...result, source };
+    }
     if (url.endsWith('/js/track.js')) {
         let source = String(result.source);
         source = source.replace(
@@ -30,6 +73,39 @@ export async function load(url, context, nextLoad) {
         );
         return { ...result, source };
     }
+    if (url.endsWith('/js/display.js')) {
+        let source = String(result.source);
+        source = source.replace(
+            'export function newsym(x, y) {\n',
+            `export function newsym(x, y) {
+    {
+        const __newsymIdx = globalThis.__teleportRngTraceIndex || 0;
+        const __newsymStart = globalThis.__teleportApparxyStart ?? -Infinity;
+        const __newsymEnd = globalThis.__teleportApparxyEnd ?? Infinity;
+        if (__newsymIdx >= __newsymStart && __newsymIdx <= __newsymEnd) {
+            const loc = game.level?.at(x, y);
+            const mon = (game.level?.monsters || []).find((m) => m.mx === x && m.my === y);
+            (globalThis.__teleportNewsymTrace ||= []).push({
+                idx: __newsymIdx,
+                x,
+                y,
+                typ: loc?.typ ?? null,
+                viz: game.viz_array?.[y]?.[x] ?? null,
+                lit: !!loc?.lit,
+                disp: loc ? { ch: loc.disp_ch, color: loc.disp_color, dec: loc.disp_decgfx } : null,
+                remembered: loc?.remembered_glyph || null,
+                mon: mon ? { id: mon.m_id, name: mon.data?.name, mx: mon.mx, my: mon.my } : null,
+                ux: game.u?.ux,
+                uy: game.u?.uy,
+                pending: game._pending_message || '',
+                stack: String(new Error().stack || '').split('\\n').slice(2, 7).map((line) => line.trim().replace((typeof process !== 'undefined' && process.cwd ? process.cwd() : '') + '/', '')),
+            });
+        }
+    }
+`
+        );
+        return { ...result, source };
+    }
     if (url.endsWith('/js/monmove.js')) {
         let source = String(result.source);
         source = source.replace(
@@ -44,6 +120,13 @@ export async function load(url, context, nextLoad) {
         muy: mtmp?.muy,
         ux: game.u?.ux,
         uy: game.u?.uy,
+        uinvis: game.u?.uinvis,
+        Invis: game.u?.Invis,
+        upInvisible: game.u?.uprops?.invisible,
+        upBlind: game.u?.uprops?.blind,
+        upBlinded: game.u?.uprops?.blinded,
+        mcansee: mtmp?.mcansee,
+        mflags1: mtmp?.data?.mflags1,
     });
     const __apparxyTrace = (event) => {
         const idx = globalThis.__teleportRngTraceIndex || 0;
@@ -52,13 +135,58 @@ export async function load(url, context, nextLoad) {
         if (idx >= start && idx <= end) {
             (globalThis.__teleportApparxyTrace ||= []).push({ idx, ...__apparxyCtxBase(), ...event });
         }
-    };`
+    };
+    __apparxyTrace({ phase: 'entry' });`
+        );
+        source = source.replace(
+            `    if (mtmp.mtame || game.u?.ustuck === mtmp || (mx === ux && my === uy)) {
+        mtmp.mux = ux;
+        mtmp.muy = uy;
+        return;
+    }`,
+            `    if (mtmp.mtame || game.u?.ustuck === mtmp || (mx === ux && my === uy)) {
+        __apparxyTrace({
+            phase: 'early-known',
+            mtame: !!mtmp.mtame,
+            stuck: game.u?.ustuck === mtmp,
+            rememberedHero: mx === ux && my === uy,
+        });
+        mtmp.mux = ux;
+        mtmp.muy = uy;
+        return;
+    }`
+        );
+        source = source.replace(
+            `    if (!displ) {
+        mtmp.mux = ux;
+        mtmp.muy = uy;
+        return;
+    }`,
+            `    if (!displ) {
+        __apparxyTrace({ phase: 'no-displ', notseen, notthere, displ });
+        mtmp.mux = ux;
+        mtmp.muy = uy;
+        return;
+    }`
         );
         source = source.replace(
             'const gotu = notseen ? !rn2(3) : notthere ? !rn2(4) : false;',
             `globalThis.__teleportMonsterContext = { ...__apparxyCtxBase(), phase: 'gotu', notseen, notthere, displ };
     const gotu = notseen ? !rn2(3) : notthere ? !rn2(4) : false;
     __apparxyTrace({ phase: 'after-gotu', notseen, notthere, displ, gotu });`
+        );
+        source = source.replace(
+            `    if (gotu) {
+        mtmp.mux = ux;
+        mtmp.muy = uy;
+        return;
+    }`,
+            `    if (gotu) {
+        __apparxyTrace({ phase: 'gotu-known', notseen, notthere, displ });
+        mtmp.mux = ux;
+        mtmp.muy = uy;
+        return;
+    }`
         );
         source = source.replace(
             `        mx = ux - displ + rn2(2 * displ + 1);
@@ -89,6 +217,34 @@ export async function load(url, context, nextLoad) {
             locTyp: game.level?.at(mx, my)?.typ,
         });
         if (!isok(mx, my)) continue;`
+        );
+        source = source.replace(
+            `        if (!seen) continue;
+        mtmp.mux = mx;
+        mtmp.muy = my;
+        return;
+    }
+    mtmp.mux = ux;
+    mtmp.muy = uy;
+}`,
+            `        if (!seen) continue;
+        __apparxyTrace({
+            phase: 'accepted',
+            tryCnt,
+            displ,
+            mx,
+            my,
+            notseen,
+            notthere,
+        });
+        mtmp.mux = mx;
+        mtmp.muy = my;
+        return;
+    }
+    __apparxyTrace({ phase: 'punt', notseen, notthere, displ });
+    mtmp.mux = ux;
+    mtmp.muy = uy;
+}`
         );
         source = source.replace(
             'async function mattacku_basic(mtmp, state) {',
@@ -350,6 +506,118 @@ function can_attack_after_move_basic`
                     const denom = 4 * (candidates.length - j);`
         );
         source = source.replace(
+            '    let chcnt = 0;\n    let moved = false;\n    const jcnt = Math.min(MTSZ, candidates.length - 1, mtmp.mtrack?.length || 0);',
+            `    let chcnt = 0;
+    let moved = false;
+    {
+        const idx = globalThis.__teleportRngTraceIndex || 0;
+        const start = globalThis.__teleportApparxyStart ?? -Infinity;
+        const end = globalThis.__teleportApparxyEnd ?? Infinity;
+        if (idx >= start && idx <= end) {
+            (globalThis.__teleportCandidateTrace ||= []).push({
+                idx,
+                phase: 'm_move-candidates',
+                name: mtmp?.data?.name,
+                mx: mtmp?.mx,
+                my: mtmp?.my,
+                ux: game.u?.ux,
+                uy: game.u?.uy,
+                mux: mtmp?.mux,
+                muy: mtmp?.muy,
+                ggx,
+                ggy,
+                appr,
+                mtrack: (mtmp?.mtrack || []).slice(0, 8),
+                candidates: candidates.map(({ x, y, tunnel }) => {
+                    const loc = game.level?.at(x, y);
+                    const mon = (game.level?.monsters || []).find((m) => m !== mtmp && m.mx === x && m.my === y);
+                    const trap = (game.level?.traps || []).find((t) => t.tx === x && t.ty === y);
+                    return {
+                        x,
+                        y,
+                        tunnel,
+                        typ: loc?.typ,
+                        doormask: loc?.doormask,
+                        roomno: loc?.roomno,
+                        edge: !!loc?.edge,
+                        mon: mon?.data?.name || null,
+                        boulder: !!(game.level?.objects || []).find((o) => o.ox === x && o.oy === y && o.otyp === BOULDER),
+                        trap: trap?.ttyp ?? null,
+                    };
+                }),
+                adjacent: (() => {
+                    const cells = [];
+                    for (let ax = (mtmp?.mx ?? 0) - 1; ax <= (mtmp?.mx ?? 0) + 1; ax++)
+                        for (let ay = (mtmp?.my ?? 0) - 1; ay <= (mtmp?.my ?? 0) + 1; ay++) {
+                            if (ax === mtmp?.mx && ay === mtmp?.my) continue;
+                            const loc = game.level?.at(ax, ay);
+                            const mon = (game.level?.monsters || []).find((m) => m !== mtmp && m.mx === ax && m.my === ay);
+                            const trap = (game.level?.traps || []).find((t) => t.tx === ax && t.ty === ay);
+                            cells.push({
+                                x: ax,
+                                y: ay,
+                                typ: loc?.typ,
+                                doormask: loc?.doormask,
+                                roomno: loc?.roomno,
+                                edge: !!loc?.edge,
+                                mon: mon?.data?.name || null,
+                                boulder: !!(game.level?.objects || []).find((o) => o.ox === ax && o.oy === ay && o.otyp === BOULDER),
+                                trap: trap?.ttyp ?? null,
+                            });
+                        }
+                    return cells;
+                })(),
+            });
+        }
+    }
+    const jcnt = Math.min(MTSZ, candidates.length - 1, mtmp.mtrack?.length || 0);`
+        );
+        source = source.replace(
+            '            || (appr === 0 && !rn2(++chcnt))',
+            `            || (appr === 0 && (() => {
+                const idx = globalThis.__teleportRngTraceIndex || 0;
+                const start = globalThis.__teleportApparxyStart ?? -Infinity;
+                const end = globalThis.__teleportApparxyEnd ?? Infinity;
+                if (idx >= start && idx <= end) {
+                    const loc = game.level?.at(cand.x, cand.y);
+                    const mon = (game.level?.monsters || []).find((m) => m !== mtmp && m.mx === cand.x && m.my === cand.y);
+                    globalThis.__teleportMonsterContext = {
+                        fn: 'm_move_basic',
+                        phase: 'neutral-choice',
+                        name: mtmp?.data?.name,
+                        mx: mtmp?.mx,
+                        my: mtmp?.my,
+                        ux: game.u?.ux,
+                        uy: game.u?.uy,
+                        mux: mtmp?.mux,
+                        muy: mtmp?.muy,
+                        ggx,
+                        ggy,
+                        appr,
+                        candidate: {
+                            x: cand.x,
+                            y: cand.y,
+                            tunnel: cand.tunnel,
+                            typ: loc?.typ,
+                            doormask: loc?.doormask,
+                            roomno: loc?.roomno,
+                            mon: mon?.data?.name || null,
+                        },
+                        chcntBefore: chcnt,
+                        candidates: candidates.map(({ x, y, tunnel }) => ({
+                            x,
+                            y,
+                            tunnel,
+                            typ: game.level?.at(x, y)?.typ,
+                            doormask: game.level?.at(x, y)?.doormask,
+                        })),
+                        mtrack: (mtmp?.mtrack || []).slice(0, 8),
+                    };
+                }
+                return !rn2(++chcnt);
+            })())`
+        );
+        source = source.replace(
             '    if (!candidates.length) return MMOVE_NOTHING;',
             `    {
         const idx = globalThis.__teleportRngTraceIndex || 0;
@@ -608,6 +876,38 @@ function can_attack_after_move_basic`
         if (!mtmp.mtame && __teleportWieldBeforeMove) {`
         );
         source = source.replace(
+            `    if (getitems) {
+        const itemGoal = m_search_items_basic(mtmp, ggx, ggy, appr);`,
+            `    if (getitems) {
+        const __teleportItemSearchBefore = { ggx, ggy, appr };
+        const itemGoal = m_search_items_basic(mtmp, ggx, ggy, appr);
+        {
+            const idx = globalThis.__teleportRngTraceIndex || 0;
+            const start = globalThis.__teleportApparxyStart ?? -Infinity;
+            const end = globalThis.__teleportApparxyEnd ?? Infinity;
+            if (idx >= start && idx <= end) {
+                (globalThis.__teleportDecisionTrace ||= []).push({
+                    idx,
+                    phase: 'after-item-search',
+                    id: mtmp?.m_id,
+                    name: mtmp?.data?.name,
+                    mx: mtmp?.mx,
+                    my: mtmp?.my,
+                    ux: game.u?.ux,
+                    uy: game.u?.uy,
+                    mux: mtmp?.mux,
+                    muy: mtmp?.muy,
+                    before: __teleportItemSearchBefore,
+                    itemGoal,
+                    objects: (game.level?.objects || [])
+                        .filter((obj) => Math.abs((obj.ox ?? -99) - mtmp.mx) <= 5
+                            && Math.abs((obj.oy ?? -99) - mtmp.my) <= 5)
+                        .map((obj) => ({ otyp: obj.otyp, oclass: obj.oclass, ox: obj.ox, oy: obj.oy, quan: obj.quan })),
+                });
+            }
+        }`
+        );
+        source = source.replace(
             `                // C calls distfleeck() again after m_move() returns for ordinary
                 // movement, even when the monster is off-screen.
                 postMoveState = distfleeck(mtmp);`,
@@ -693,6 +993,449 @@ function can_attack_after_move_basic`
         }
     }
     if (!candidates.length && mtmp.data?.mlet === 'S_EEL'`
+        );
+        return { ...result, source };
+    }
+    if (url.endsWith('/js/dog.js')) {
+        let source = String(result.source);
+        const dogRedrawMode = process.env.TRACE_DOG_REDRAW_MODE || '';
+        if (dogRedrawMode === 'no-old' || dogRedrawMode === 'none') {
+            source = source.replace(
+                '    newsym(oldx, oldy);\n',
+                '    // trace-only: suppress ordinary pet old-square redraw\n'
+            );
+        }
+        if (dogRedrawMode === 'no-new' || dogRedrawMode === 'none') {
+            source = source.replace(
+                '        newsym(nix, niy);\n',
+                '        // trace-only: suppress ordinary pet new-square redraw\n'
+            );
+        }
+        source = source.replace(
+            'function pet_goal(mtmp, after, udist, whappr) {\n',
+            `function pet_goal(mtmp, after, udist, whappr) {
+    const __petGoalObj = (obj) => obj ? {
+        otyp: obj.otyp,
+        oclass: obj.oclass,
+        ox: obj.ox,
+        oy: obj.oy,
+        quan: obj.quan,
+        cursed: !!obj.cursed,
+        blessed: !!obj.blessed,
+        worn: obj.owornmask || 0,
+    } : null;
+    const __petGoalTrace = (phase, extra = {}) => {
+        const idx = globalThis.__teleportRngTraceIndex || 0;
+        const start = globalThis.__teleportApparxyStart ?? -Infinity;
+        const end = globalThis.__teleportApparxyEnd ?? Infinity;
+        if (idx >= start && idx <= end) {
+            (globalThis.__teleportPetGoalTrace ||= []).push({
+                idx,
+                phase,
+                name: mtmp?.data?.name,
+                mx: mtmp?.mx,
+                my: mtmp?.my,
+                movement: mtmp?.movement,
+                mflee: !!mtmp?.mflee,
+                ux: game.u?.ux,
+                uy: game.u?.uy,
+                mux: mtmp?.mux,
+                muy: mtmp?.muy,
+                after,
+                udist,
+                whappr,
+                ...extra,
+            });
+        }
+    };
+    const __dogMoveSquareFacts = (x, y, allowHeroTarget = false) => {
+        const loc = game.level?.at(x, y);
+        const target = mon_at(x, y, mtmp);
+        return {
+            x,
+            y,
+            typ: loc?.typ ?? null,
+            doormask: loc?.doormask ?? null,
+            edge: !!loc?.edge,
+            horizontal: !!loc?.horizontal,
+            lit: !!loc?.lit,
+            viz: game.viz_array?.[y]?.[x] ?? null,
+            diagonal: x !== mtmp.mx && y !== mtmp.my,
+            doorBlocksFrom: door_blocks_diagonal(mtmp.mx, mtmp.my),
+            doorBlocksTo: door_blocks_diagonal(x, y),
+            sideA: game.level?.at(mtmp.mx, y)?.typ ?? null,
+            sideB: game.level?.at(x, mtmp.my)?.typ ?? null,
+            heroTarget: pet_candidate_is_hero_target(mtmp, x, y),
+            monster: target ? {
+                id: target.m_id,
+                name: target.data?.name,
+                mtame: !!target.mtame,
+                mpeaceful: !!target.mpeaceful,
+                mx: target.mx,
+                my: target.my,
+            } : null,
+            boulder: is_boulder_at(x, y),
+            cursed: cursed_object_at(x, y),
+            trap: (() => {
+                const trap = trap_at(x, y);
+                return trap ? { ttyp: trap.ttyp, tseen: !!trap.tseen } : null;
+            })(),
+            objects: objects_at(x, y).map((obj) => ({
+                otyp: obj.otyp,
+                cursed: !!obj.cursed,
+                quan: obj.quan,
+            })),
+            canEnter: pet_can_enter_square(mtmp, x, y, {
+                ignoreMonster: !!target,
+                allowHeroTarget,
+            }),
+            canEnterStrict: pet_can_enter_square(mtmp, x, y, { allowHeroTarget }),
+        };
+    };
+`
+        );
+        source = source.replace(
+            '    const dogHasMinvent = !!pet_droppable(mtmp);\n    for (const obj of game.level?.objects || []) {',
+            `    const dogHasMinvent = !!pet_droppable(mtmp);
+    __petGoalTrace('entry', {
+        appr,
+        dogHasMinvent,
+        inMastersSight,
+        heroLoc: loc ? { typ: loc.typ, lit: !!loc.lit } : null,
+        petLoc: petLoc ? { typ: petLoc.typ, lit: !!petLoc.lit } : null,
+        edog: {
+            apport: edog?.apport,
+            hungrytime: edog?.hungrytime,
+            mhpmax_penalty: edog?.mhpmax_penalty,
+            ogoal: edog?.ogoal ? { ...edog.ogoal } : null,
+        },
+        search: { minX, maxX, minY, maxY },
+        floorObjects: (game.level?.objects || [])
+            .filter((obj) => obj && obj.ox >= minX && obj.ox <= maxX && obj.oy >= minY && obj.oy <= maxY)
+            .map(__petGoalObj),
+        inventory: (game.inventory || []).map(__petGoalObj),
+    });
+    for (const obj of game.level?.objects || []) {`
+        );
+        source = source.replace(
+            '        const foodType = dogfood(mtmp, obj);\n        if (foodType > goalType || foodType === UNDEF) continue;',
+            `        const foodType = dogfood(mtmp, obj);
+        __petGoalTrace('floor-dogfood', {
+            obj: __petGoalObj(obj),
+            foodType,
+            goalType,
+            goalX,
+            goalY,
+        });
+        if (foodType > goalType || foodType === UNDEF) continue;`
+        );
+        source = source.replace(
+            '                goalType = foodType;\n            }\n        } else if (goalType === UNDEF && inMastersSight && !dogHasMinvent',
+            `                goalType = foodType;
+                __petGoalTrace('floor-food-goal', {
+                    obj: __petGoalObj(obj),
+                    foodType,
+                    goalType,
+                    goalX,
+                    goalY,
+                });
+            }
+        } else if (goalType === UNDEF && inMastersSight && !dogHasMinvent`
+        );
+        source = source.replace(
+            '            goalType = APPORT;\n        }\n    }\n\n    // C ref: dogmove.c:dog_goal(). Non-apport/non-dogfood goals are ignored',
+            `            goalType = APPORT;
+            __petGoalTrace('floor-apport-goal', {
+                obj: __petGoalObj(obj),
+                goalType,
+                goalX,
+                goalY,
+            });
+        }
+    }
+    __petGoalTrace('after-floor', { goalType, goalX, goalY, appr });
+
+    // C ref: dogmove.c:dog_goal(). Non-apport/non-dogfood goals are ignored`
+        );
+        source = source.replace(
+            '        return { abort: false, gx: goalX, gy: goalY, appr: 1 };\n',
+            `        __petGoalTrace('return-floor-goal', { goalType, goalX, goalY, appr: 1 });
+        return { abort: false, gx: goalX, gy: goalY, appr: 1 };
+`
+        );
+        source = source.replace(
+            '        return { abort: true, gx, gy, appr };\n',
+            `        __petGoalTrace('return-abort-after', { goalType, goalX, goalY, appr, gx, gy });
+        return { abort: true, gx, gy, appr };
+`
+        );
+        source = source.replace(
+            '                for (const obj of game.inventory || []) {\n                    if (typeof obj.otyp !== \'number\') continue;\n                    if (dogfood(mtmp, obj) === DOGFOOD) {',
+            `                __petGoalTrace('inventory-scan-start', { appr, goalType, goalX, goalY });
+                for (const obj of game.inventory || []) {
+                    if (typeof obj.otyp !== 'number') continue;
+                    const __petGoalFoodType = dogfood(mtmp, obj);
+                    __petGoalTrace('inventory-dogfood', {
+                        obj: __petGoalObj(obj),
+                        foodType: __petGoalFoodType,
+                        appr,
+                    });
+                    if (__petGoalFoodType === DOGFOOD) {`
+        );
+        source = source.replace(
+            '    return {\n        abort: false,\n        gx: followX,\n        gy: followY,\n        appr,',
+            `    __petGoalTrace('return-follow', {
+        goalType,
+        goalX,
+        goalY,
+        followX,
+        followY,
+        appr,
+        inMastersSight,
+        ogoal: edog?.ogoal ? { ...edog.ogoal } : null,
+    });
+    return {
+        abort: false,
+        gx: followX,
+        gy: followY,
+        appr,`
+        );
+        source = source.replace(
+            'async function dog_move_after_inventory_core(mtmp, after, udist, edog) {\n',
+            `async function dog_move_after_inventory_core(mtmp, after, udist, edog) {
+    const __dogMoveTrace = (phase, extra = {}) => {
+        const idx = globalThis.__teleportRngTraceIndex || 0;
+        const start = globalThis.__teleportApparxyStart ?? -Infinity;
+        const end = globalThis.__teleportApparxyEnd ?? Infinity;
+        if (idx >= start && idx <= end) {
+            (globalThis.__teleportDogMoveTrace ||= []).push({
+                idx,
+                phase,
+                id: mtmp?.m_id,
+                name: mtmp?.data?.name,
+                mx: mtmp?.mx,
+                my: mtmp?.my,
+                movement: mtmp?.movement,
+                mflee: !!mtmp?.mflee,
+                ux: game.u?.ux,
+                uy: game.u?.uy,
+                after,
+                udist,
+                ...extra,
+            });
+        }
+    };
+    const __dogMoveSquareFacts = (x, y, allowHeroTarget = false) => {
+        const loc = game.level?.at(x, y);
+        const target = mon_at(x, y, mtmp);
+        return {
+            x,
+            y,
+            typ: loc?.typ ?? null,
+            doormask: loc?.doormask ?? null,
+            edge: !!loc?.edge,
+            horizontal: !!loc?.horizontal,
+            lit: !!loc?.lit,
+            viz: game.viz_array?.[y]?.[x] ?? null,
+            diagonal: x !== mtmp.mx && y !== mtmp.my,
+            doorBlocksFrom: door_blocks_diagonal(mtmp.mx, mtmp.my),
+            doorBlocksTo: door_blocks_diagonal(x, y),
+            sideA: game.level?.at(mtmp.mx, y)?.typ ?? null,
+            sideB: game.level?.at(x, mtmp.my)?.typ ?? null,
+            heroTarget: pet_candidate_is_hero_target(mtmp, x, y),
+            monster: target ? {
+                id: target.m_id,
+                name: target.data?.name,
+                mtame: !!target.mtame,
+                mpeaceful: !!target.mpeaceful,
+                mx: target.mx,
+                my: target.my,
+            } : null,
+            boulder: is_boulder_at(x, y),
+            cursed: cursed_object_at(x, y),
+            trap: (() => {
+                const trap = trap_at(x, y);
+                return trap ? { ttyp: trap.ttyp, tseen: !!trap.tseen } : null;
+            })(),
+            objects: objects_at(x, y).map((obj) => ({
+                otyp: obj.otyp,
+                cursed: !!obj.cursed,
+                quan: obj.quan,
+            })),
+            canEnter: pet_can_enter_square(mtmp, x, y, {
+                ignoreMonster: !!target,
+                allowHeroTarget,
+            }),
+            canEnterStrict: pet_can_enter_square(mtmp, x, y, { allowHeroTarget }),
+        };
+    };
+`
+        );
+        source = source.replace(
+            '    const goal = pet_goal(mtmp, after, udist, whappr);\n    if (goal.abort) return 0;\n',
+            `    const goal = pet_goal(mtmp, after, udist, whappr);
+    __dogMoveTrace('goal', { whappr, goal: { ...goal } });
+    if (goal.abort) {
+        __dogMoveTrace('abort', { whappr, goal: { ...goal } });
+        return 0;
+    }
+`
+        );
+        source = source.replace(
+            '    searchCandidates:\n',
+            `    __dogMoveTrace('candidate-count', {
+        uncursedcnt,
+        mfndposcnt,
+        squares: (() => {
+            const items = [];
+            for (let sx = Math.max(1, mtmp.mx - 1); sx <= maxx; sx++) {
+                for (let sy = Math.max(0, mtmp.my - 1); sy <= maxy; sy++) {
+                    if (sx === mtmp.mx && sy === mtmp.my) continue;
+                    items.push(__dogMoveSquareFacts(sx, sy, allowHeroTarget));
+                }
+            }
+            return items;
+        })(),
+    });
+
+    searchCandidates:
+`
+        );
+        source = source.replace(
+            '            const ndist = dist2(nx, ny, goal.gx, goal.gy);\n            const j = (ndist - nidist) * goal.appr;\n',
+            `            const ndist = dist2(nx, ny, goal.gx, goal.gy);
+            const j = (ndist - nidist) * goal.appr;
+            const __dogMoveBefore = { nix, niy, nidist, chcnt };
+            __dogMoveTrace('candidate', {
+                nx,
+                ny,
+                target: target?.data?.name || null,
+                cursedOnCandidate,
+                canReachFood,
+                trap: trap ? { tt: trap.ttyp, tseen: !!trap.tseen } : null,
+                ndist,
+                j,
+                before: __dogMoveBefore,
+                objects: objects_at(nx, ny).map((obj) => ({ otyp: obj.otyp, cursed: !!obj.cursed })),
+            });
+`
+        );
+        source = source.replace(
+            `                attackHeroTarget = isHeroTarget;
+                continue;
+            }
+            if ((j === 0 && !rn2(++chcnt))`,
+            `                attackHeroTarget = isHeroTarget;
+                __dogMoveTrace('forced-select', {
+                    nx,
+                    ny,
+                    ndist,
+                    j,
+                    before: __dogMoveBefore,
+                    afterSelect: { nix, niy, nidist, chcnt },
+                });
+                continue;
+            }
+            if ((j === 0 && !rn2(++chcnt))`
+        );
+        source = source.replace(
+            `                if (j < 0) chcnt = 0;
+            }
+        }
+    }
+`,
+            `                if (j < 0) chcnt = 0;
+                __dogMoveTrace('select', {
+                    nx,
+                    ny,
+                    ndist,
+                    j,
+                    before: __dogMoveBefore,
+                    afterSelect: { nix, niy, nidist, chcnt },
+                });
+            }
+        }
+    }
+`
+        );
+        source = source.replace(
+            `    if (!doEat) pet_ranged_attk(mtmp, false);
+
+    if (attackHeroTarget && (nix !== mtmp.mx || niy !== mtmp.my)) {`,
+            `    __dogMoveTrace('after-candidates', {
+        nix,
+        niy,
+        nidist,
+        chcnt,
+        doEat,
+        moveReluctant,
+        attackHeroTarget,
+    });
+    if (!doEat) pet_ranged_attk(mtmp, false);
+
+    if (attackHeroTarget && (nix !== mtmp.mx || niy !== mtmp.my)) {`
+        );
+        source = source.replace(
+            `        mtmp._dog_conflict_attack_u = true;
+        return 3;
+    }
+
+    if (nix === mtmp.mx && niy === mtmp.my) {`,
+            `        mtmp._dog_conflict_attack_u = true;
+        __dogMoveTrace('attack-hero-target', { nix, niy });
+        return 3;
+    }
+
+    if (nix === mtmp.mx && niy === mtmp.my) {`
+        );
+        source = source.replace(
+            `        // Falling through dog_move() reports MMOVE_MOVED even when no new
+        // square was selected, so post-move trap effects still run.
+        return 1;
+    }
+    const oldx = mtmp.mx;`,
+            `        // Falling through dog_move() reports MMOVE_MOVED even when no new
+        // square was selected, so post-move trap effects still run.
+        __dogMoveTrace('no-move', { nix, niy });
+        return 1;
+    }
+    const oldx = mtmp.mx;`
+        );
+        source = source.replace(
+            `    const wasSeen = hero_can_spot_pet_basic(mtmp);
+    mtmp.mx = nix;
+    mtmp.my = niy;`,
+            `    const wasSeen = hero_can_spot_pet_basic(mtmp);
+    __dogMoveTrace('move', { oldx, oldy, nix, niy, doEat, moveReluctant });
+    mtmp.mx = nix;
+    mtmp.my = niy;`
+        );
+        source = source.replace(
+            'function monster_visible_combat_square(mon) {',
+            `function monster_visible_combat_square(mon) {
+    const __combatIdx = globalThis.__teleportRngTraceIndex || 0;
+    const __combatStart = globalThis.__teleportApparxyStart ?? -Infinity;
+    const __combatEnd = globalThis.__teleportApparxyEnd ?? Infinity;
+    if (__combatIdx >= __combatStart && __combatIdx <= __combatEnd) {
+        (globalThis.__teleportCombatVisibilityTrace ||= []).push({
+            idx: __combatIdx,
+            name: mon?.data?.name,
+            id: mon?.m_id,
+            mx: mon?.mx,
+            my: mon?.my,
+            ux: game.u?.ux,
+            uy: game.u?.uy,
+            viz: game.viz_array?.[mon?.my]?.[mon?.mx] ?? null,
+            cansee: mon ? cansee(mon.mx, mon.my) : false,
+            couldsee: mon ? couldsee(mon.mx, mon.my) : false,
+            minvis: mon?.minvis,
+            mundetected: mon?.mundetected,
+            infravision: !!game.u?.uprops?.infravision,
+            mflags3: mon?.data?.mflags3,
+            pending: game._pending_message || '',
+            stack: String(new Error().stack || '').split('\\n').slice(2, 8).map((line) => line.trim()),
+        });
+    }`
         );
         return { ...result, source };
     }

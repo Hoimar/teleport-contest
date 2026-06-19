@@ -20,6 +20,7 @@ import {
     MAGIC_TRAP, ANTI_MAGIC, POLY_TRAP, VIBRATING_SQUARE, TRAPPED_DOOR, TRAPPED_CHEST,
     M_AP_OBJECT, IS_POOL, IS_WALL,
     SV0, SV1, SV2, SV3, SV4, SV5, SV6, SV7, WM_MASK,
+    WM_C_OUTER, WM_C_INNER, WM_T_LONG, WM_T_BL, WM_T_BR,
     WM_X_TL, WM_X_TR, WM_X_BL, WM_X_BR, WM_X_TLBR, WM_X_BLTR,
     WARNCOUNT, STR18, STR19, def_warnsyms, Is_rogue_level,
     M3_INFRAVISIBLE, In_endgame, Is_astralevel, Is_waterlevel, Is_firelevel,
@@ -484,12 +485,63 @@ function display_wall_type(loc) {
     // C ref: display.c:wall_angle(). For wallification glyphs, NetHack
     // derives the visible wall character from terrain type plus seenv.
     const seenv = (loc.seenv || 0) & 0xff;
-    if (!seenv || (((loc.wall_info || 0) & WM_MASK) && loc.typ !== CROSSWALL)) return loc.typ;
+    const mode = (loc.wall_info || 0) & WM_MASK;
+    if (!seenv) {
+        switch (loc.typ) {
+        case SDOOR:
+        case HWALL:
+        case VWALL:
+        case TLCORNER:
+        case TRCORNER:
+        case BLCORNER:
+        case BRCORNER:
+        case CROSSWALL:
+        case TUWALL:
+        case TDWALL:
+        case TLWALL:
+        case TRWALL:
+            return STONE;
+        default:
+            return loc.typ;
+        }
+    }
     let rotated = seenv;
     let row = null;
     switch (loc.typ) {
     case CROSSWALL:
         return display_crosswall_type(loc, seenv);
+    case SDOOR:
+        return secret_door_wall_type(loc, seenv);
+    case VWALL:
+        switch (mode) {
+        case 0:
+            return VWALL;
+        case 1:
+            return seenv & (SV1 | SV2 | SV3 | SV4 | SV5) ? VWALL : STONE;
+        case 2:
+            return seenv & (SV0 | SV1 | SV5 | SV6 | SV7) ? VWALL : STONE;
+        default:
+            return STONE;
+        }
+    case HWALL:
+        switch (mode) {
+        case 0:
+            return HWALL;
+        case 1:
+            return seenv & (SV3 | SV4 | SV5 | SV6 | SV7) ? HWALL : STONE;
+        case 2:
+            return seenv & (SV0 | SV1 | SV2 | SV3 | SV7) ? HWALL : STONE;
+        default:
+            return STONE;
+        }
+    case TLCORNER:
+        return display_corner_type(TLCORNER, seenv, mode, SV3 | SV4 | SV5, SV4);
+    case TRCORNER:
+        return display_corner_type(TRCORNER, seenv, mode, SV5 | SV6 | SV7, SV6);
+    case BLCORNER:
+        return display_corner_type(BLCORNER, seenv, mode, SV1 | SV2 | SV3, SV2);
+    case BRCORNER:
+        return display_corner_type(BRCORNER, seenv, mode, SV7 | SV0 | SV1, SV0);
     case TDWALL:
         row = [STONE, TLCORNER, TRCORNER, HWALL, TDWALL];
         break;
@@ -509,12 +561,65 @@ function display_wall_type(loc) {
         return loc.typ;
     }
 
-    let col = 0;
-    if (rotated === SV4) col = 1;
-    else if (rotated === SV6) col = 2;
-    else if ((rotated & (SV3 | SV5 | SV7)) || ((rotated & SV4) && (rotated & SV6))) col = 4;
-    else if (rotated & (SV0 | SV1 | SV2)) col = (rotated & (SV4 | SV6)) ? 4 : 3;
+    const col = display_twall_column(rotated, mode);
     return row[col];
+}
+
+function display_corner_type(which, seenv, mode, outer, inner) {
+    // C ref: display.c:wall_angle() set_corner().
+    switch (mode) {
+    case 0:
+        return which;
+    case WM_C_OUTER:
+        return seenv & outer ? which : STONE;
+    case WM_C_INNER:
+        return seenv & ~inner ? which : STONE;
+    default:
+        return STONE;
+    }
+}
+
+function secret_door_wall_type(loc, seenv) {
+    // SDOOR falls through to the HWALL/VWALL wall-angle cases in C.
+    if (loc.horizontal) {
+        const mode = (loc.wall_info || 0) & WM_MASK;
+        if (mode === 1) return seenv & (SV3 | SV4 | SV5 | SV6 | SV7) ? HWALL : STONE;
+        if (mode === 2) return seenv & (SV0 | SV1 | SV2 | SV3 | SV7) ? HWALL : STONE;
+        return HWALL;
+    }
+    const mode = (loc.wall_info || 0) & WM_MASK;
+    if (mode === 1) return seenv & (SV1 | SV2 | SV3 | SV4 | SV5) ? VWALL : STONE;
+    if (mode === 2) return seenv & (SV0 | SV1 | SV5 | SV6 | SV7) ? VWALL : STONE;
+    return VWALL;
+}
+
+function display_twall_column(seenv, mode) {
+    // C ref: display.c:wall_angle(), TDWALL/T*WALL cases after rotation.
+    switch (mode) {
+    case 0:
+        if (seenv === SV4) return 1;
+        if (seenv === SV6) return 2;
+        if ((seenv & (SV3 | SV5 | SV7)) || ((seenv & SV4) && (seenv & SV6))) return 4;
+        if (seenv & (SV0 | SV1 | SV2)) return (seenv & (SV4 | SV6)) ? 4 : 3;
+        return 0;
+    case WM_T_LONG:
+        if ((seenv & (SV3 | SV4)) && !(seenv & (SV5 | SV6 | SV7))) return 1;
+        if ((seenv & (SV6 | SV7)) && !(seenv & (SV3 | SV4 | SV5))) return 2;
+        if ((seenv & SV5) || ((seenv & (SV3 | SV4)) && (seenv & (SV6 | SV7)))) return 4;
+        return 0;
+    case WM_T_BL:
+        if (onlySeenv(seenv, SV4 | SV5)) return 1;
+        if ((seenv & (SV0 | SV1 | SV2 | SV7)) && !(seenv & (SV3 | SV4 | SV5))) return 3;
+        if (onlySeenv(seenv, SV6)) return 0;
+        return 4;
+    case WM_T_BR:
+        if (onlySeenv(seenv, SV5 | SV6)) return 2;
+        if ((seenv & (SV0 | SV1 | SV2 | SV3)) && !(seenv & (SV5 | SV6 | SV7))) return 3;
+        if (onlySeenv(seenv, SV4)) return 0;
+        return 4;
+    default:
+        return 0;
+    }
 }
 
 function onlySeenv(seenv, bits) {
@@ -983,6 +1088,17 @@ export function show_glyph_cell(x, y, ch, color = NO_COLOR, decgfx = false, attr
     loc.gnew = 1;
 }
 
+function write_map_cell(display, x, y, loc, forceBlank = false) {
+    if (!display || !loc) return;
+    const raw = loc.disp_ch ?? ' ';
+    const blank = raw === ' '
+        && (loc.disp_color == null || loc.disp_color === CLR_GRAY || loc.disp_color === NO_COLOR)
+        && !loc.disp_attr;
+    if (blank && !forceBlank) return;
+    const ch = loc.disp_decgfx ? (DEC_TO_UNICODE[raw] || raw) : raw;
+    display.setCell(x - 1, y + 1, ch, loc.disp_color ?? NO_COLOR, loc.disp_attr ?? 0);
+}
+
 const SWALLOW_CHARS = [
     ['/', 'o', '\\'],
     ['│', '@', '│'],
@@ -1255,6 +1371,7 @@ export async function docrt() {
     see_monsters();
     show_premapped_mimics();
     if (game.u?.ux > 0) newsym(game.u.ux, game.u.uy);
+    game._full_map_redraw_pending = true;
 }
 
 // ── Serialize a map row with DEC line-drawing and ANSI colors ──
@@ -1514,6 +1631,10 @@ function _statusLine2() {
     const hp = game._latched_status_uhp != null && (game._more || game._death_prompt_active)
         ? game._latched_status_uhp
         : (u.uhp || 0);
+    const gold = game._latched_status_gold != null
+            && (game._more || game._clear_latched_status_gold_after_more)
+        ? game._latched_status_gold
+        : (game._goldCount || 0);
     const statusAcOverrideActive = game._status_uac_override != null
         && (game._status_uac_override_move == null || game._status_uac_override_move === game.moves);
     const ac = statusAcOverrideActive ? game._status_uac_override : (u.uac ?? 10);
@@ -1526,7 +1647,7 @@ function _statusLine2() {
         : In_endgame(u.uz)
         ? endgame_status_level_desc(u.uz)
         : `Dlvl:${depth(u.uz)}`;
-    return `${levelDesc} ${goldSymbol}:${game._goldCount || 0} HP:${hp}(${u.uhpmax || 0}) Pw:${u.uen || 0}(${u.uenmax || 0}) AC:${ac} ${xp}${turn}${conditionText}`;
+    return `${levelDesc} ${goldSymbol}:${gold} HP:${hp}(${u.uhpmax || 0}) Pw:${u.uen || 0}(${u.uenmax || 0}) AC:${ac} ${xp}${turn}${conditionText}`;
 }
 
 function endgame_status_level_desc(uz) {
@@ -1649,7 +1770,7 @@ function currentLatchedMoreScreen() {
 }
 
 // ── Build screen output ──
-function _buildScreenOutput() {
+function _buildScreenOutput(options = {}) {
     const display = game?.nhDisplay;
     if (!display) return;
     if (game._latched_more_screen) {
@@ -1661,6 +1782,9 @@ function _buildScreenOutput() {
         return;
     }
 
+    const fullMapRedraw = !!options.fullMap
+        || !!game._swallowed_map_active
+        || !!game._swallowed_latched_overlay;
     const floorListActive = Array.isArray(game._floor_list_lines) && game._floor_list_lines.length > 0;
     const toplineResidue = (!game._pending_message && !game._more && !floorListActive)
         ? (game._topline_residue || '')
@@ -1684,7 +1808,12 @@ function _buildScreenOutput() {
 
     // Also write to grid for serialize_terminal_grid
     if (display.grid) {
-        display.clearScreen();
+        if (fullMapRedraw) display.clearScreen();
+        else {
+            display.clearRow(0);
+            display.clearRow(22);
+            display.clearRow(23);
+        }
         // Message line
         const msg = toplineMessage + moreSuffix;
         const pending = game._pending_message || toplineResidue;
@@ -1712,17 +1841,23 @@ function _buildScreenOutput() {
             for (let c = col; c < Math.min(msg.length, display.cols); c++)
                 display.setCell(c, 0, msg[c], NO_COLOR, ATR_INVERSE);
         }
+        if (!floorListActive && !fullMapRedraw && game._floor_list_last_clear) {
+            const { clearCol, clearEnd, rows } = game._floor_list_last_clear;
+            for (let row = 1; row <= Math.min(21, rows || 0); row++)
+                for (let c = clearCol; c < Math.min(display.cols, clearEnd || display.cols); c++)
+                    display.setCell(c, row, ' ', NO_COLOR, 0);
+            game._floor_list_last_clear = null;
+        } else if (!floorListActive) {
+            game._floor_list_last_clear = null;
+        }
         // Map — write characters to grid (DEC → Unicode for browser display)
         if (!game._swallowed_map_active && !game._swallowed_latched_overlay) {
             for (let y = 0; y < ROWNO; y++) {
                 for (let x = 1; x < COLNO; x++) {
                     const loc = game.level?.at(x, y);
-                    if (!loc?.disp_ch) continue;
-                    if (loc.disp_ch === ' '
-                        && (loc.disp_color == null || loc.disp_color === CLR_GRAY || loc.disp_color === NO_COLOR)
-                        && !loc.disp_attr) continue;
-                    const ch = loc.disp_decgfx ? (DEC_TO_UNICODE[loc.disp_ch] || loc.disp_ch) : loc.disp_ch;
-                    display.setCell(x - 1, y + 1, ch, loc.disp_color ?? NO_COLOR, loc.disp_attr ?? 0);
+                    if (!loc) continue;
+                    if (fullMapRedraw || loc.gnew) write_map_cell(display, x, y, loc, !!loc.gnew);
+                    loc.gnew = 0;
                 }
             }
         } else {
@@ -1745,6 +1880,17 @@ function _buildScreenOutput() {
         if (floorListActive) {
             const col = game._floor_list_col ?? 41;
             const clearCol = Math.max(0, col - 1);
+            const maxLineLength = Math.max(0, ...game._floor_list_lines.map((line) => (line || '').length));
+            const moreLength = game._floor_list_show_more !== false ? '--More--'.length : 0;
+            const clearEnd = game._floor_list_clear_to_edge || game._floor_list_show_more !== false
+                ? display.cols
+                : Math.min(display.cols, Math.max(clearCol + 1, col + Math.max(maxLineLength, moreLength) + 1));
+            game._floor_list_last_clear = {
+                clearCol,
+                clearEnd,
+                rows: Math.min(21, game._floor_list_lines.length
+                    + (game._floor_list_show_more !== false ? 1 : 0)),
+            };
             for (let i = 0; i < game._floor_list_lines.length; i++) {
                 const line = game._floor_list_lines[i] || '';
                 const row = i + 1;
@@ -1752,7 +1898,7 @@ function _buildScreenOutput() {
                     && line
                     && line !== '(end)'
                     && !/^(?:[a-z]|\$) [+-] /.test(line);
-                for (let c = clearCol; c < display.cols; c++)
+                for (let c = clearCol; c < clearEnd; c++)
                     display.setCell(c, row, ' ', NO_COLOR, 0);
                 for (let c = 0; c < Math.min(line.length, display.cols - col); c++)
                     display.setCell(col + c, row, line[c], NO_COLOR, inverse ? ATR_INVERSE : 0);
@@ -1760,7 +1906,7 @@ function _buildScreenOutput() {
             if (game._floor_list_show_more !== false) {
                 const more = '--More--';
                 const row = Math.min(21, game._floor_list_lines.length + 1);
-                for (let c = clearCol; c < display.cols; c++)
+                for (let c = clearCol; c < clearEnd; c++)
                     display.setCell(c, row, ' ', NO_COLOR, 0);
                 for (let c = 0; c < more.length; c++)
                     display.setCell(col + c, row, more[c], NO_COLOR, 0);
@@ -1788,7 +1934,9 @@ function _buildScreenOutput() {
 
 // ── flush_screen ──
 export async function flush_screen(mode) {
-    _buildScreenOutput();
+    const fullMap = !!game._full_map_redraw_pending;
+    game._full_map_redraw_pending = false;
+    _buildScreenOutput({ fullMap });
 }
 
 // ── cls ──
@@ -1886,6 +2034,7 @@ function terminalCellWidth(text) {
 }
 
 export function clear_pending_message() {
+    const hadContinuationRow = !!(game._more_next_message_row || game._message_continuation_row);
     game._pending_message = '';
     game._simple_timed_repeat_stop_after_pending = false;
     game._travel_description_pending = false;
@@ -1906,5 +2055,7 @@ export function clear_pending_message() {
     game._floor_list_lines = null;
     game._floor_list_col = null;
     game._floor_list_show_more = true;
+    game._floor_list_clear_to_edge = false;
     game._floor_list_pauses_turn = false;
+    if (hadContinuationRow) game._full_map_redraw_pending = true;
 }

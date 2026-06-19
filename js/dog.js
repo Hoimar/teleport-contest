@@ -4,9 +4,9 @@
 import { game } from './gstate.js';
 import {
     enexto_core, makemon, mkcorpstat, mksobj, monsterPtr, next_ident,
-    place_object, set_malign_basic, u_on_newpos, undead_to_corpse_ptr,
+    place_object, set_malign_basic, stackobj, u_on_newpos, undead_to_corpse_ptr,
 } from './mklev.js';
-import { OBJECT_CLASS, OBJECT_DELAY, OBJECT_NAME } from './object_data.js';
+import { OBJECT_CLASS, OBJECT_DELAY, OBJECT_MATERIAL, OBJECT_NAME } from './object_data.js';
 import { MONSTER_DATA } from './monster_data.js';
 import {
     newsym, pline, queue_more_prompt, flush_screen,
@@ -18,8 +18,8 @@ import {
     A_CHA, ACCFOOD, APPORT, CADAVER, COLNO, DOGFOOD, MANFOOD, POISON, ROWNO, TABU, UNDEF,
     BEAR_TRAP, CORR, D_BROKEN, D_CLOSED, D_LOCKED, D_NODOOR, GP_AVOID_MONPOS, GP_CHECKSCARY,
     HWALL, IS_DOOR, IS_OBSTRUCTED, IS_LAVA, IS_POOL, IS_ROOM, LADDER, MAGIC_PORTAL, MM_EDOG,
-    MTSZ, NO_MINVENT, SPACE_POS, STAIRS,
-    VWALL, W_SADDLE, W_WEP, isok, MGIVENNAME, has_mgivenname, CORPSTAT_INIT,
+    M3_INFRAVISIBLE, MTSZ, NO_MINVENT, SPACE_POS, STAIRS,
+    VWALL, W_ARMS, W_SADDLE, W_WEP, isok, MGIVENNAME, has_mgivenname, CORPSTAT_INIT,
 } from './const.js';
 import { d, rn2, rnd } from './rng.js';
 import { gettrack } from './track.js';
@@ -43,11 +43,52 @@ const M1_ACID = 0x08000000;
 const M1_POIS = 0x10000000;
 const MZ_SMALL = 1;
 const GOLD_PIECE = 438;
+const AXE = 44;
+const BATTLE_AXE = 45;
+const SHORT_SWORD = 46;
+const ELVEN_SHORT_SWORD = 47;
+const ORCISH_SHORT_SWORD = 48;
+const DWARVISH_SHORT_SWORD = 49;
+const SCIMITAR = 50;
+const SILVER_SABER = 51;
+const BROADSWORD = 52;
+const ELVEN_BROADSWORD = 53;
+const LONG_SWORD = 54;
+const TWO_HANDED_SWORD = 55;
+const KATANA = 56;
+const TSURUGI = 57;
+const RUNESWORD = 58;
+const DWARVISH_MATTOCK = 71;
+const SPEAR = 27;
+const ELVEN_SPEAR = 28;
+const ORCISH_SPEAR = 29;
+const DWARVISH_SPEAR = 30;
+const SILVER_SPEAR = 31;
 const ORCISH_DAGGER = 36;
+const SILVER_DAGGER = 37;
+const ELVEN_DAGGER = 35;
+const DAGGER = 34;
+const ATHAME = 38;
+const SCALPEL = 39;
+const KNIFE = 40;
+const WORM_TOOTH = 42;
+const CRYSKNIFE = 43;
 const DART = 24;
 const JAVELIN = 32;
+const TRIDENT = 33;
+const MACE = 73;
+const SILVER_MACE = 74;
+const MORNING_STAR = 75;
+const WAR_HAMMER = 76;
+const CLUB = 77;
+const RUBBER_HOSE = 78;
 const QUARTERSTAFF = 79;
+const AKLYS = 80;
+const FLAIL = 81;
+const BULLWHIP = 82;
 const TRIPE_RATION = 264;
+const PICK_AXE = 259;
+const UNICORN_HORN = 261;
 const FOOD_RATION = 293;
 const BOULDER = 475;
 const CORPSE = 265;
@@ -91,6 +132,8 @@ const BELL_OF_OPENING = 263;
 const CANDELABRUM_OF_INVOCATION = 262;
 const DOG_HUNGRY = 300;
 const M2_STRONG = 0x04000000;
+const M2_WERE = 0x00000004;
+const M2_DEMON = 0x00000100;
 const M2_UNDEAD = 0x00000002;
 const G_FREQ = 0x0007;
 const G_NOCORPSE = 0x0010;
@@ -102,6 +145,21 @@ const MR_ACID = 0x40;
 const MR_STONE = 0x80;
 const MS_LEADER = 36;
 const MS_GUARDIAN = 38;
+const SILVER = 14;
+
+const PET_COUNTER_HTH_WEAPON_ORDER = [
+    TSURUGI, RUNESWORD, DWARVISH_MATTOCK, TWO_HANDED_SWORD, BATTLE_AXE,
+    KATANA, UNICORN_HORN, CRYSKNIFE, TRIDENT, LONG_SWORD, ELVEN_BROADSWORD,
+    BROADSWORD, SCIMITAR, SILVER_SABER, MORNING_STAR, ELVEN_SHORT_SWORD,
+    DWARVISH_SHORT_SWORD, SHORT_SWORD, ORCISH_SHORT_SWORD, SILVER_MACE, MACE,
+    AXE, DWARVISH_SPEAR, SILVER_SPEAR, ELVEN_SPEAR, SPEAR, ORCISH_SPEAR, FLAIL,
+    BULLWHIP, QUARTERSTAFF, JAVELIN, AKLYS, CLUB, PICK_AXE, RUBBER_HOSE,
+    WAR_HAMMER, SILVER_DAGGER, ELVEN_DAGGER, DAGGER, ORCISH_DAGGER, ATHAME,
+    SCALPEL, KNIFE, WORM_TOOTH,
+];
+const PET_COUNTER_BIMANUAL_WEAPONS = new Set([
+    TSURUGI, DWARVISH_MATTOCK, TWO_HANDED_SWORD, BATTLE_AXE, QUARTERSTAFF,
+]);
 
 const OBJECT_WEIGHT_OVERRIDES = new Map([
     [LARGE_BOX, 350],
@@ -904,8 +962,38 @@ function monster_has_weapon_attack(mon) {
     return (mon?.data?.mattk || []).some((attack) => attack?.[0] === 'AT_WEAP');
 }
 
+function monster_hates_silver_basic(mon) {
+    const ptr = mon?.data || {};
+    return !!((ptr.mflags2 ?? 0) & (M2_WERE | M2_DEMON))
+        || ptr.mlet === 'S_VAMPIRE'
+        || ptr.name === 'SHADE'
+        || (ptr.mlet === 'S_IMP' && ptr.name !== 'TENGU');
+}
+
+function monster_can_use_pet_counter_weapon(mon, obj) {
+    if (!obj || OBJECT_CLASS[obj?.otyp] !== WEAPON_CLASS) return false;
+    const ptr = mon?.data || {};
+    const strong = !!((ptr.mflags2 ?? 0) & M2_STRONG);
+    const wearingShield = !!((mon?.misc_worn_check ?? 0) & W_ARMS);
+    if (PET_COUNTER_BIMANUAL_WEAPONS.has(obj.otyp) && (!strong || wearingShield)) return false;
+    if ((OBJECT_MATERIAL[obj.otyp] ?? 0) === SILVER && monster_hates_silver_basic(mon)) return false;
+    return true;
+}
+
 function monster_weapon_candidate(mon) {
-    return (mon?.inventory || []).find((obj) => OBJECT_CLASS[obj?.otyp] === WEAPON_CLASS);
+    // C refs: src/dogmove.c:dog_move(), src/mhitm.c:mattackm(),
+    // src/weapon.c:select_hwep().  Pet-counter AT_WEAP attacks get the same
+    // ordered hand-to-hand selector as ordinary monster weapon checks; ranged
+    // ammo such as darts is not a fallback melee pick.
+    const inventory = mon?.inventory || [];
+    const artifact = inventory.find((obj) =>
+        obj?.oartifact && monster_can_use_pet_counter_weapon(mon, obj));
+    if (artifact) return artifact;
+    for (const otyp of PET_COUNTER_HTH_WEAPON_ORDER) {
+        const obj = inventory.find((candidate) => candidate?.otyp === otyp);
+        if (monster_can_use_pet_counter_weapon(mon, obj)) return obj;
+    }
+    return null;
 }
 
 function monster_weapon_name(obj) {
@@ -963,15 +1051,24 @@ function pet_subject(mtmp) {
 
 function monster_spotted_for_combat(mon) {
     // C ref: src/mhitm.c:mattackm() via cansee()+canspotmon().
-    if (!mon || !cansee(mon.mx, mon.my)) return false;
+    if (!mon) return false;
     if (mon.mundetected || mon._opened_unseen_door) return false;
     if (mon.minvis && !(game.u?.usee_invisible || game.u?.uprops?.see_invisible)) return false;
-    return true;
+    if (cansee(mon.mx, mon.my)) return true;
+    return hero_can_see_with_infravision_basic(mon);
 }
 
 function monster_combat_visible(magr, mdef) {
     // C ref: src/mhitm.c:mattackm().
-    return monster_spotted_for_combat(magr) || monster_spotted_for_combat(mdef);
+    return monster_visible_combat_square(magr) || monster_visible_combat_square(mdef);
+}
+
+function monster_visible_combat_square(mon) {
+    // C ref: src/mhitm.c:mattackm() sets gv.vis with cansee(mon square)
+    // gating canspotmon(); infravision alone is not enough for visible
+    // monster-vs-monster combat feedback.
+    if (!mon) return false;
+    return cansee(mon.mx, mon.my) && monster_spotted_for_combat(mon);
 }
 
 function monster_combat_subject(mon) {
@@ -1028,8 +1125,16 @@ function hero_can_spot_pet_basic(mtmp) {
     if (mtmp.minvis && !(game.u?.usee_invisible || game.u?.uprops?.see_invisible)) return false;
     if (game.u?.ublind || game.u?.uprops?.blind || game.u?.uprops?.blinded) return false;
     if (cansee(mtmp.mx, mtmp.my)) return true;
+    return hero_can_see_with_infravision_basic(mtmp);
+}
+
+function hero_can_see_with_infravision_basic(mtmp) {
+    // C ref: include/display.h:see_with_infrared().
     return !!(game.u?.uprops?.infravision
-        && (mtmp.data?.mflags3 & 0x00000020)
+        && !game.u?.ublind
+        && !game.u?.uprops?.blind
+        && !game.u?.uprops?.blinded
+        && ((mtmp.data?.mflags3 ?? 0) & M3_INFRAVISIBLE)
         && couldsee(mtmp.mx, mtmp.my));
 }
 
@@ -1310,6 +1415,7 @@ function refresh_pet_attack_symbols(mtmp, target) {
 
 function apply_pet_kill_side_effects(mtmp, target, oldx, oldy, targetX, targetY, blockingFrame = true) {
     noteMonsterDied(target);
+    drop_pet_kill_inventory(target);
     if (corpse_chance(target)) make_pet_kill_corpse(target);
     grow_up_from_kill(mtmp, target);
     const monsters = game.level?.monsters || [];
@@ -1319,12 +1425,28 @@ function apply_pet_kill_side_effects(mtmp, target, oldx, oldy, targetX, targetY,
     // returns after mattackm(); it does not step into the defender square as
     // part of the death side effects.
     // C ref: src/mon.c:monkilled()->mondied().  The defender square is
-    // redrawn for removal/corpse placement; the attacker square is not
+    // redrawn for removal/corpse/drop placement; the attacker square is not
     // refreshed just because damage resolved.
     // C ref: src/mon.c:mondead().  Monster death clears a remembered
     // invisible glyph before the final square redraw.
     unmap_invisible_memory(targetX, targetY, { redraw: false });
     newsym(targetX, targetY);
+}
+
+function drop_pet_kill_inventory(mon) {
+    // C ref: src/mon.c:mondead() -> m_detach() -> relobj().  Monster-vs-
+    // monster deaths release minvent before corpse_chance() and corpse
+    // placement, so later dog_goal() scans see the dropped gear in floor order.
+    const inv = mon?.inventory || [];
+    for (const obj of inv) {
+        if (!obj) continue;
+        obj.owornmask = 0;
+        stackobj(place_object(obj, mon.mx, mon.my));
+    }
+    if (mon) {
+        mon.inventory = [];
+        mon.mw = null;
+    }
 }
 
 export function finish_deferred_pet_kill_side_effect() {
@@ -2245,6 +2367,7 @@ async function dog_move_after_inventory_core(mtmp, after, udist, edog) {
     let eatObj = null;
     let moveReluctant = false;
     let attackHeroTarget = false;
+    let fumbleForcedMove = false;
 
     for (let nx = Math.max(1, mtmp.mx - 1); nx <= maxx; nx++) {
         for (let ny = Math.max(0, mtmp.my - 1); ny <= maxy; ny++) {
@@ -2341,6 +2464,7 @@ async function dog_move_after_inventory_core(mtmp, after, udist, edog) {
                 nidist = ndist;
                 moveReluctant = cursedOnCandidate;
                 attackHeroTarget = isHeroTarget;
+                fumbleForcedMove = true;
                 continue;
             }
             if ((j === 0 && !rn2(++chcnt))
@@ -2364,6 +2488,24 @@ async function dog_move_after_inventory_core(mtmp, after, udist, edog) {
         // hero inside dog_move() and report MMOVE_DONE; they do not relocate.
         mtmp._dog_conflict_attack_u = true;
         return 3;
+    }
+
+    const fumbleFollowupMotionSuppressed = game._fumble_nomul_pet_followup_motion_suppressed_id === mtmp.m_id
+        && dist2(mtmp.mx, mtmp.my, game.u?.ux ?? mtmp.mx, game.u?.uy ?? mtmp.my) <= 4;
+    if ((goal.fumbleDoorlessIngress || fumbleFollowupMotionSuppressed)
+        && !fumbleForcedMove && !doEat) {
+        // C refs: src/timeout.c:nh_timeout() FUMBLING,
+        // src/dogmove.c:dog_goal()/dog_move().  The delayed close-follow
+        // pass preserves the hidden inventory/candidate RNG, and its immediate
+        // same-pet follow-up does not apply an ordinary neutral close-follow
+        // relocation.  Doorway ingress remains an explicit forced move above.
+        nix = mtmp.mx;
+        niy = mtmp.my;
+        if (goal.fumbleDoorlessIngress) {
+            game._fumble_nomul_pet_followup_motion_suppressed_id = mtmp.m_id;
+        } else {
+            game._fumble_nomul_pet_followup_motion_suppressed_id = null;
+        }
     }
 
     if (nix === mtmp.mx && niy === mtmp.my) {

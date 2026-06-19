@@ -26,13 +26,18 @@ import {
     CROSSWALL, TUWALL, TDWALL, TLWALL, TRWALL,
     D_NODOOR, D_BROKEN, D_CLOSED, D_ISOPEN, D_LOCKED, D_TRAPPED, D_SECRET,
     OROOM, VAULT, THEMEROOM, COURT, BARRACKS, ZOO, LEPREHALL, SHOPBASE, DELPHI, MORGUE, TEMPLE, SWAMP, BEEHIVE, COCKNEST, ANTHOLE,
-    CANDLESHOP, TOOLSHOP, FOODSHOP, BOOKSHOP, FODDERSHOP,
+    CANDLESHOP, TOOLSHOP, FOODSHOP, BOOKSHOP, FODDERSHOP, WANDSHOP,
     ROOMOFFSET, MAXNROFROOMS, SHARED,
     SDOOR, SCORR, IRONBARS, TREE, FOUNTAIN, SINK, ALTAR, GRAVE,
     DIR_N, DIR_S, DIR_E, DIR_W, DIR_180,
-    IS_WALL, IS_STWALL, IS_DOOR, IS_OBSTRUCTED, IS_FURNITURE, IS_POOL, IS_LAVA, IS_ROOM,
+    IS_WALL, IS_STWALL, IS_DOOR, IS_SDOOR, IS_OBSTRUCTED, IS_FURNITURE, IS_POOL, IS_LAVA, IS_ROOM,
     ACCESSIBLE,
-    SPACE_POS, ZAP_POS, isok, W_NONDIGGABLE, W_NORTH, W_SOUTH, W_EAST, W_WEST, W_ANY, FILL_NORMAL, FILL_NONE, FILL_LVFLAGS,
+    SPACE_POS, ZAP_POS, isok, W_NONDIGGABLE,
+    WM_MASK, WM_W_LEFT, WM_W_RIGHT, WM_W_TOP, WM_W_BOTTOM,
+    WM_T_LONG, WM_T_BL, WM_T_BR,
+    WM_X_TL, WM_X_TR, WM_X_BL, WM_X_BR, WM_X_TLBR, WM_X_BLTR,
+    WM_C_OUTER, WM_C_INNER,
+    W_NORTH, W_SOUTH, W_EAST, W_WEST, W_ANY, FILL_NORMAL, FILL_NONE, FILL_LVFLAGS,
     DRY, WET, HOT, SOLID, ANY_LOC, NO_LOC_WARN, SPACELOC,
     ICE, MOAT, POOL, WATER, LAVAPOOL, LAVAWALL, DBWALL, DRAWBRIDGE_UP, THRONE,
     A_LAWFUL, A_NEUTRAL, A_CHAOTIC, A_NONE, Align2amask, Amask2align, AM_SHRINE, ALL_TRAPS,
@@ -3404,9 +3409,51 @@ function race_hatemask() {
     return game.urace?.hatemask ?? race_masks().hate;
 }
 
+function race_selfmask() {
+    return game.urace?.selfmask ?? race_masks().self;
+}
+
+function hero_is_dwarf_or_gnome_race() {
+    const race = game.urace?.name || game.urace?.adj || game._nhopts?.race || 'human';
+    return race === 'dwarf' || race === 'dwarven'
+        || race === 'gnome' || race === 'gnomish';
+}
+
+function maybe_mines_same_race_special_monster(ptr) {
+    // C ref: src/sp_lev.c:create_monster().  Mines special levels sometimes
+    // discard a scripted same-race dwarf/gnome monster and fall back to a
+    // random makemon(NULL) result.
+    if (In_mines(game.u?.uz) && ptr && (ptr.mflags2 & race_selfmask())
+        && hero_is_dwarf_or_gnome_race() && rn2(3)) {
+        return null;
+    }
+    return ptr;
+}
+
+function room_for_no(roomno) {
+    const idx = (roomno ?? 0) - ROOMOFFSET;
+    if (idx < 0) return null;
+    const rooms = game.level?.rooms || [];
+    if (idx < MAXNROFROOMS) return rooms[idx] || null;
+    const visit = (room) => {
+        if (!room) return null;
+        if (room.roomnoidx === idx) return room;
+        for (const subroom of room.sbrooms || []) {
+            const found = visit(subroom);
+            if (found) return found;
+        }
+        return null;
+    };
+    for (const room of rooms) {
+        const found = visit(room);
+        if (found) return found;
+    }
+    return null;
+}
+
 function room_type_at(x, y) {
-    const roomno = (game.level?.at(x, y)?.roomno ?? 0) - ROOMOFFSET;
-    return roomno >= 0 ? game.level?.rooms?.[roomno]?.rtype : 0;
+    const roomno = game.level?.at(x, y)?.roomno ?? 0;
+    return room_for_no(roomno)?.rtype ?? 0;
 }
 
 function set_mimic_sym(mon) {
@@ -5201,6 +5248,7 @@ function createSpecialMonsterRef(croom, ref, opts = {}) {
     if (!cls && monster_name_needs_find_gender_roll(ref, ptr)) scriptedFemale = !!rn2(2);
     induced_align_80();
     if (cls) ptr = mkclass_aligned(cls, G_NOGEN);
+    ptr = maybe_mines_same_race_special_monster(ptr);
     const loc = specialRoomMonsterLocation(croom, ptr, opts.relx ?? -1, opts.rely ?? -1);
     if (!loc) return null;
     if (m_at(loc.x, loc.y)) {
@@ -5312,6 +5360,110 @@ function loadMinetown2Special() {
         createSpecialDoor(inner, 'locked', W_WEST);
         createSpecialMonsterRef(inner, 'gnome lord');
     });
+
+    for (let i = 0; i < 4; i++) createSpecialMonsterRef(town, 'watchman', { peaceful: true });
+    createSpecialMonsterRef(town, 'watch captain', { peaceful: true });
+
+    room = buildSpecialRoom({ rtype: OROOM });
+    if (room) createSpecialStair(room, true);
+
+    room = buildSpecialRoom({ rtype: OROOM });
+    if (room) {
+        createSpecialStair(room, false);
+        createSpecialTrap(room);
+        createSpecialMonsterRef(room, 'gnome');
+        createSpecialMonsterRef(room, 'gnome');
+    }
+
+    room = buildSpecialRoom({ rtype: OROOM });
+    if (room) createSpecialMonsterRef(room, 'dwarf');
+
+    room = buildSpecialRoom({ rtype: OROOM });
+    if (room) {
+        createSpecialTrap(room);
+        createSpecialMonsterRef(room, 'gnome');
+    }
+
+    makecorridors();
+    wallification(1, 0, COLNO - 1, ROWNO - 1);
+    flip_level_rnd(3);
+}
+
+function loadMinetown3Special() {
+    // C ref: dat/minetn-3.lua "Alley Town" loaded via sp_lev.c:lspo_room().
+    l_nhcore_init();
+    game.level.flags.is_maze_lev = false;
+    game.level.flags.has_town = true;
+    game.level.flags.mines_walls = true;
+
+    const town = buildSpecialRoom({
+        x: 3, y: 3, xal: SPLEV_CENTER, yal: SPLEV_CENTER,
+        w: 31, h: 15, rtype: OROOM, lit: 1,
+    });
+    if (!town) return;
+
+    const fountain = (rx, ry) => {
+        const loc = specialRoomLocation(town, rx, ry);
+        const tile = game.level?.at(loc.x, loc.y);
+        if (tile) tile.typ = FOUNTAIN;
+    };
+    const roomWithDoor = (spec, state, wall, contents = null) => {
+        const room = buildSpecialRoom({ rtype: OROOM, ...spec }, town);
+        if (room) {
+            createSpecialDoor(room, state, wall);
+            if (contents) contents(room);
+        }
+        return room;
+    };
+
+    fountain(1, 6);
+    fountain(29, 13);
+
+    roomWithDoor({ x: 2, y: 2, w: 2, h: 2 }, 'closed', W_SOUTH);
+    let room = buildSpecialRoom({ rtype: TOOLSHOP, chance: 30, lit: 1, x: 5, y: 3, w: 2, h: 3 }, town);
+    if (room) createSpecialDoor(room, 'closed', W_SOUTH);
+
+    roomWithDoor({ x: 2, y: 10, w: 2, h: 3 }, 'locked', W_NORTH,
+        inner => createSpecialMonsterRef(inner, 'G'));
+    roomWithDoor({ x: 5, y: 9, w: 2, h: 2 }, 'closed', W_NORTH);
+
+    const temple = buildSpecialRoom({ rtype: TEMPLE, lit: 1, x: 10, y: 2, w: 3, h: 4 }, town);
+    if (temple) {
+        createSpecialDoor(temple, 'closed', W_EAST);
+        const altarLoc = specialRoomLocation(temple, 1, 1);
+        const altar = game.level?.at(altarLoc.x, altarLoc.y);
+        if (altar) {
+            const amask = Align2amask(game.splev_align?.[0] ?? A_NONE) | AM_SHRINE;
+            altar.typ = ALTAR;
+            altar.flags = amask;
+            altar.altarmask = amask;
+        }
+        priestini(temple);
+        createSpecialMonsterRef(temple, 'gnomish wizard');
+        createSpecialMonsterRef(temple, 'gnomish wizard');
+    }
+
+    roomWithDoor({ x: 11, y: 7, w: 2, h: 2 }, 'closed', W_WEST);
+    room = buildSpecialRoom({ rtype: SHOPBASE, lit: 1, x: 10, y: 10, w: 3, h: 3 }, town);
+    if (room) createSpecialDoor(room, 'closed', W_WEST);
+    roomWithDoor({ x: 14, y: 8, w: 2, h: 2 }, 'locked', W_NORTH,
+        inner => createSpecialMonsterRef(inner, 'G'));
+    roomWithDoor({ x: 14, y: 11, w: 2, h: 2 }, 'closed', W_SOUTH);
+
+    room = buildSpecialRoom({ rtype: TOOLSHOP, chance: 40, lit: 1, x: 17, y: 10, w: 3, h: 3 }, town);
+    if (room) createSpecialDoor(room, 'closed', W_NORTH);
+    roomWithDoor({ x: 21, y: 11, w: 2, h: 2 }, 'locked', W_EAST,
+        inner => createSpecialMonsterRef(inner, 'G'));
+
+    room = buildSpecialRoom({ rtype: minetownFoodShopType(), chance: 90, lit: 1, x: 26, y: 8, w: 3, h: 2 }, town);
+    if (room) createSpecialDoor(room, 'closed', W_WEST);
+    roomWithDoor({ x: 16, y: 2, w: 2, h: 2 }, 'closed', W_WEST);
+    roomWithDoor({ x: 19, y: 2, w: 2, h: 2 }, 'closed', W_NORTH);
+
+    room = buildSpecialRoom({ rtype: WANDSHOP, chance: 30, lit: 1, x: 19, y: 5, w: 3, h: 2 }, town);
+    if (room) createSpecialDoor(room, 'closed', W_WEST);
+    room = buildSpecialRoom({ rtype: CANDLESHOP, lit: 1, x: 25, y: 2, w: 3, h: 3 }, town);
+    if (room) createSpecialDoor(room, 'closed', W_SOUTH);
 
     for (let i = 0; i < 4; i++) createSpecialMonsterRef(town, 'watchman', { peaceful: true });
     createSpecialMonsterRef(town, 'watch captain', { peaceful: true });
@@ -14605,6 +14757,10 @@ function makemaz_special(slev) {
         loadMinetown2Special();
         return;
     }
+    if (game._last_special_protofile === 'minetn-3') {
+        loadMinetown3Special();
+        return;
+    }
     if (game._last_special_protofile === 'minetn-4') {
         loadMinetown4Special();
         return;
@@ -14773,6 +14929,7 @@ export async function mklev() {
         || game._last_special_protofile === 'sanctum'
         || game._last_special_protofile === 'orcus'
         || game._last_special_protofile === 'minetn-2'
+        || game._last_special_protofile === 'minetn-3'
         || game._last_special_protofile === 'minetn-4'
         || game._last_special_protofile === 'minetn-5'
         || game._last_special_protofile === 'wizard1'
@@ -15410,6 +15567,7 @@ function minefill_monster(ref) {
         if (monster_name_needs_find_gender_roll(ref, ptr)) scriptedFemale = !!rn2(2);
         induced_align_80();
     }
+    ptr = maybe_mines_same_race_special_monster(ptr);
     let loc = special_level_dry_location();
     if (m_at(loc.x, loc.y)) {
         loc = enexto_core(loc.x, loc.y, ptr, GP_CHECKSCARY)
@@ -18362,14 +18520,13 @@ function shkinit(shopIndex, sroom) {
         shk.mpeaceful = 1;
         shk.msleeping = 0;
         set_malign_basic(shk);
-        const roomIndex = game.level.rooms.indexOf(sroom);
         const door = sroom?.doorct ? game.level?.doors?.[sroom.fdoor] : null;
         // C ref: shknam.c:shkinit().  Movement needs the shopkeeper's
         // usual inside-door square (`shk`) and shop door (`shd`) even before
         // full billing/customer state exists.
         shk.mextra = shk.mextra || {};
         shk.mextra.eshk = {
-            shoproom: roomIndex >= 0 ? roomIndex + ROOMOFFSET : 0,
+            shoproom: roomnoFor(sroom),
             shoptype: sroom.rtype,
             shoplevel: { ...(game.u?.uz || { dnum: 0, dlevel: 1 }) },
             shknam: '',
@@ -18963,6 +19120,124 @@ function wallification(x1, y1, x2, y2) {
     fix_wall_spines(x1, y1, x2, y2);
 }
 
+function check_wall_state_pos(x, y, which) {
+    if (!isok(x, y)) return which;
+    const type = game.level?.at(x, y)?.typ ?? STONE;
+    if (IS_STWALL(type) || type === CORR || type === SCORR || IS_SDOOR(type)) {
+        return which;
+    }
+    return 0;
+}
+
+function more_than_one_wall_mode(a, b, c) {
+    return (a && (b || c)) || (b && (a || c)) || (c && (a || b));
+}
+
+function set_twall_mode(x0, y0, x1, y1, x2, y2, x3, y3) {
+    // C ref: src/display.c:set_twall().
+    const is1 = check_wall_state_pos(x1, y1, WM_T_LONG);
+    const is2 = check_wall_state_pos(x2, y2, WM_T_BL);
+    const is3 = check_wall_state_pos(x3, y3, WM_T_BR);
+    return more_than_one_wall_mode(is1, is2, is3) ? 0 : is1 + is2 + is3;
+}
+
+function set_straight_wall_mode(x, y, horiz) {
+    // C ref: src/display.c:set_wall().
+    const is1 = horiz
+        ? check_wall_state_pos(x, y - 1, WM_W_TOP)
+        : check_wall_state_pos(x - 1, y, WM_W_LEFT);
+    const is2 = horiz
+        ? check_wall_state_pos(x, y + 1, WM_W_BOTTOM)
+        : check_wall_state_pos(x + 1, y, WM_W_RIGHT);
+    return more_than_one_wall_mode(is1, is2, 0) ? 0 : is1 + is2;
+}
+
+function set_corner_wall_mode(x1, y1, x2, y2, x3, y3, x4, y4) {
+    // C ref: src/display.c:set_corn().
+    const is1 = check_wall_state_pos(x1, y1, 1);
+    const is2 = check_wall_state_pos(x2, y2, 1);
+    const is3 = check_wall_state_pos(x3, y3, 1);
+    const is4 = check_wall_state_pos(x4, y4, 1);
+    if (is4) return WM_C_INNER;
+    if (is1 && is2 && is3) return WM_C_OUTER;
+    return 0;
+}
+
+function set_crosswall_mode(x, y) {
+    // C ref: src/display.c:set_crosswall().
+    const is1 = check_wall_state_pos(x - 1, y - 1, 1);
+    const is2 = check_wall_state_pos(x + 1, y - 1, 1);
+    const is3 = check_wall_state_pos(x + 1, y + 1, 1);
+    const is4 = check_wall_state_pos(x - 1, y + 1, 1);
+    let wmode = is1 + is2 + is3 + is4;
+    if (wmode > 1) {
+        if (is1 && is3 && (is2 + is4 === 0)) {
+            wmode = WM_X_TLBR;
+        } else if (is2 && is4 && (is1 + is3 === 0)) {
+            wmode = WM_X_BLTR;
+        } else {
+            wmode = 0;
+        }
+    } else if (is1) {
+        wmode = WM_X_TL;
+    } else if (is2) {
+        wmode = WM_X_TR;
+    } else if (is3) {
+        wmode = WM_X_BR;
+    } else if (is4) {
+        wmode = WM_X_BL;
+    }
+    return wmode;
+}
+
+function xy_set_wall_state(x, y) {
+    // C ref: src/display.c:xy_set_wall_state().
+    const loc = game.level?.at(x, y);
+    if (!loc) return;
+    let wmode = -1;
+    switch (loc.typ) {
+    case SDOOR:
+        wmode = set_straight_wall_mode(x, y, !!loc.horizontal);
+        break;
+    case VWALL:
+        wmode = set_straight_wall_mode(x, y, false);
+        break;
+    case HWALL:
+        wmode = set_straight_wall_mode(x, y, true);
+        break;
+    case TDWALL:
+        wmode = set_twall_mode(x, y, x, y - 1, x - 1, y + 1, x + 1, y + 1);
+        break;
+    case TUWALL:
+        wmode = set_twall_mode(x, y, x, y + 1, x + 1, y - 1, x - 1, y - 1);
+        break;
+    case TLWALL:
+        wmode = set_twall_mode(x, y, x + 1, y, x - 1, y - 1, x - 1, y + 1);
+        break;
+    case TRWALL:
+        wmode = set_twall_mode(x, y, x - 1, y, x + 1, y + 1, x + 1, y - 1);
+        break;
+    case TLCORNER:
+        wmode = set_corner_wall_mode(x - 1, y - 1, x, y - 1, x - 1, y, x + 1, y + 1);
+        break;
+    case TRCORNER:
+        wmode = set_corner_wall_mode(x, y - 1, x + 1, y - 1, x + 1, y, x - 1, y + 1);
+        break;
+    case BLCORNER:
+        wmode = set_corner_wall_mode(x, y + 1, x - 1, y + 1, x - 1, y, x + 1, y - 1);
+        break;
+    case BRCORNER:
+        wmode = set_corner_wall_mode(x + 1, y, x + 1, y + 1, x, y + 1, x - 1, y - 1);
+        break;
+    case CROSSWALL:
+        wmode = set_crosswall_mode(x, y);
+        break;
+    default:
+        return;
+    }
+    loc.wall_info = ((loc.wall_info || 0) & ~WM_MASK) | wmode;
+}
+
 // ============================================================
 // Fill ordinary room
 // ============================================================
@@ -19425,7 +19700,13 @@ function bound_digging() {
         }
 }
 
-function set_wall_state() { /* no-op for contest */ }
+function set_wall_state() {
+    // C ref: src/display.c:set_wall_state().
+    if (!game.level) return;
+    for (let x = 0; x < COLNO; x++)
+        for (let y = 0; y < ROWNO; y++)
+            xy_set_wall_state(x, y);
+}
 
 function level_finalize_topology() {
     bound_digging();

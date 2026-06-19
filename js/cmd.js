@@ -503,8 +503,10 @@ const CHAIN_MAIL = 128;
 const LEATHER_GLOVES = 159;
 const GAUNTLETS_OF_POWER = 161;
 const GAUNTLETS_OF_DEXTERITY = 162;
+const MZ_SMALL = 1;
 const MZ_HUMAN = 2;
 const MZ_LARGE = 3;
+const M2_ROCKTHROW = 0x08000000;
 const M2_GREEDY = 0x10000000;
 const M2_JEWELS = 0x20000000;
 const M2_COLLECT = 0x40000000;
@@ -2914,10 +2916,11 @@ function writeWithLetters() {
 
 function wieldLetters() {
     ensureInventoryLetters();
-    return (game.inventory || [])
+    return (game.inventory || []).slice()
         // C refs: include/objects.h:WEPTOOL(), src/invent.c:allow_category().
         // Pick-axes and other weapon-tools are offered by the wield prompt.
         .filter((obj) => obj?.oclass === WEAPON_CLASS || isWeaponTool(obj))
+        .sort((a, b) => String(a?.invlet || '').localeCompare(String(b?.invlet || '')))
         .map((obj) => obj.invlet)
         .join('');
 }
@@ -5879,12 +5882,14 @@ function clearPendingLookHereResume() {
     game._resume_look_here_after_more = false;
     game._resume_teleport_arrival_after_more = false;
     game._resume_look_here_feature_line_after_more = '';
+    game._resume_look_here_picked_some_after_more = false;
     game._resume_teleport_arrival_pickup_messages_after_more = null;
 }
 
 async function lookHereAfterMove(opts = {}) {
     clearPendingLookHereResume();
     const pickedSome = !!opts.featureAlreadyShown
+        || !!opts.pickedSome
         || !!game._look_here_picked_some;
     game._look_here_picked_some = false;
     const u = game.u;
@@ -5894,7 +5899,11 @@ async function lookHereAfterMove(opts = {}) {
     const explicitFeatureLine = typeof opts.featureLine === 'string';
     const feature = explicitFeatureLine
         ? { line: opts.featureLine, blocks: false }
-        : opts.featureAlreadyShown ? { line: '', blocks: false } : lookHereFeature();
+        : opts.featureAlreadyShown ? { line: '', blocks: false }
+            // C refs: src/pickup.c:check_here(), src/invent.c:look_here().
+            // Movement floor look uses dfeature_at(); with objects present,
+            // ordinary doorways/open doors pack before the object sentence.
+            : lookHereFeature({ includeOrdinaryDoors: true });
     if (!countableObjects.length) {
         // C refs: hack.c:spoteffects(), pickup.c:pickup(), engrave.c:read_engr_at().
         const engravingText = engravingVisibleText(engravingAt(u.ux, u.uy));
@@ -6045,6 +6054,7 @@ async function lookHereAfterMove(opts = {}) {
         // topline blocks first instead of being replaced by the menu overlay.
         game._resume_look_here_after_more = true;
         game._resume_look_here_feature_line_after_more = feature.line || '';
+        game._resume_look_here_picked_some_after_more = pickedSome;
         game._look_here_pauses_turn = true;
         if (game.context?.run) game.context.run = null;
         queue_more_prompt();
@@ -8647,7 +8657,23 @@ async function triggerTrapAtHero() {
 
 function roomForNo(roomno) {
     const idx = (roomno ?? 0) - C.ROOMOFFSET;
-    return idx >= 0 ? game.level?.rooms?.[idx] : null;
+    if (idx < 0) return null;
+    const rooms = game.level?.rooms || [];
+    if (idx < C.MAXNROFROOMS) return rooms[idx] || null;
+    const visit = (room) => {
+        if (!room) return null;
+        if (room.roomnoidx === idx) return room;
+        for (const subroom of room.sbrooms || []) {
+            const found = visit(subroom);
+            if (found) return found;
+        }
+        return null;
+    };
+    for (const room of rooms) {
+        const found = visit(room);
+        if (found) return found;
+    }
+    return null;
 }
 
 function isShopRoomNo(roomno) {
@@ -9616,6 +9642,7 @@ function refreshPickupMenu() {
     game._floor_list_lines = lines;
     game._floor_list_col = 41;
     game._floor_list_show_more = false;
+    game._floor_list_clear_to_edge = true;
     game._prompt_cursor = [47, lines.length];
 }
 
@@ -9630,7 +9657,11 @@ async function finishPickupMenu() {
     game._pickup_menu = null;
     game._floor_list_lines = null;
     game._floor_list_show_more = true;
+    game._floor_list_clear_to_edge = false;
     game._prompt_cursor = null;
+    // C ref: src/pickup.c:query_objlist() destroys the menu window before
+    // pickup result messages are shown, restoring the playfield underneath.
+    game._full_map_redraw_pending = true;
     const selected = (menu?.entries || []).filter(entry => entry.selected && entry.obj).map(entry => entry.obj);
     if (!selected.length) {
         game.context.move = 0;
@@ -10896,18 +10927,149 @@ async function showDipFountainConfirm(obj) {
     game.context.move = 0;
 }
 
-function dryupFountainAfterDip() {
+function roomContainsTownBasic(room, x, y, roomno) {
+    if (!room) return false;
+    if (room.irregular) {
+        const loc = game.level?.at(x, y);
+        return !!loc && !loc.edge && loc.roomno === roomno;
+    }
+    return x >= room.lx - 1 && x <= room.hx + 1
+        && y >= room.ly - 1 && y <= room.hy + 1;
+}
+
+function inTownBasic(x, y) {
+    // C ref: src/hack.c:in_town().
+    if (!game.level?.flags?.has_town) return false;
+    let hasSubrooms = false;
+    const rooms = game.level?.rooms || [];
+    for (let i = 0; i < rooms.length; i++) {
+        const room = rooms[i];
+        if (!room?.nsubrooms) continue;
+        hasSubrooms = true;
+        if (roomContainsTownBasic(room, x, y, i + C.ROOMOFFSET)) return true;
+    }
+    return !hasSubrooms;
+}
+
+function isWatchMonster(mon) {
+    return mon?.data?.name === 'WATCHMAN' || mon?.data?.name === 'WATCH_CAPTAIN';
+}
+
+function amonnamBasic(mon) {
+    if (C.has_mgivenname(mon)) return sentenceStart(monsterName(mon));
+    const name = monsterName(mon);
+    return `${sentenceStart(indefiniteArticle(name))} ${name}`;
+}
+
+function watchmanFountainWarningMessages() {
+    // C ref: src/fountain.c:watchman_warn_fountain().
+    const watchman = (game.level?.monsters || []).find((mon) =>
+        mon && !mon.dead && isWatchMonster(mon) && mon.mpeaceful && couldsee(mon.mx, mon.my));
+    if (!watchman) return ['The flow reduces to a trickle.'];
+    return [`${amonnamBasic(watchman)} yells:`, '"Hey, stop using that fountain!"'];
+}
+
+function dryupFountainAfterDipMessages() {
     // C ref: src/fountain.c:dryup().
     const loc = game.level?.at(game.u?.ux, game.u?.uy);
-    if (loc?.typ !== C.FOUNTAIN) return '';
-    if (rn2(3)) return '';
+    if (loc?.typ !== C.FOUNTAIN) return [];
+    if (rn2(3) && !loc.fountainWarned) return [];
+    if (inTownBasic(game.u?.ux ?? 0, game.u?.uy ?? 0) && !loc.fountainWarned) {
+        loc.fountainWarned = true;
+        return watchmanFountainWarningMessages();
+    }
     loc.typ = C.ROOM;
     loc.flags = 0;
     loc.blessedftn = 0;
     if (game.level?.flags)
         game.level.flags.nfountains = Math.max(0, (game.level.flags.nfountains || 0) - 1);
     newsym(game.u.ux, game.u.uy);
-    return 'The fountain dries up!';
+    return cansee(game.u?.ux ?? 0, game.u?.uy ?? 0) ? ['The fountain dries up!'] : [];
+}
+
+function dryupFountainAfterDip() {
+    return dryupFountainAfterDipMessages()[0] || '';
+}
+
+async function emitFountainMessagesAfterCurrent(messages, opts = {}) {
+    const lines = (messages || []).filter(Boolean);
+    if (!lines.length) return;
+    const [first, ...rest] = lines;
+    if (game._pending_message && topline_can_pack_message(game._pending_message, first)) {
+        await append_pline(first);
+    } else if (game._pending_message) {
+        queue_more_prompt();
+        game._more_message_queue = [
+            { text: first, more: rest.length > 0, move: !!opts.moveOnLast && !rest.length },
+            ...rest.map((text, idx) => ({
+                text,
+                more: idx < rest.length - 1,
+                move: !!opts.moveOnLast && idx === rest.length - 1,
+            })),
+            ...(game._more_message_queue || []),
+        ];
+        return;
+    } else {
+        await pline(first);
+    }
+    if (rest.length) {
+        queue_more_prompt();
+        game._more_message_queue = [
+            ...(game._more_message_queue || []),
+            ...rest.map((text, idx) => ({
+                text,
+                more: idx < rest.length - 1,
+                move: !!opts.moveOnLast && idx === rest.length - 1,
+            })),
+        ];
+    }
+}
+
+function somegoldBasic(money) {
+    // C ref: src/steal.c:somegold().
+    const igold = Math.max(0, Math.trunc(money || 0));
+    if (igold < 50) return igold;
+    if (igold < 100) return rn1(igold - 25 + 1, 25);
+    if (igold < 500) return rn1(igold - 50 + 1, 50);
+    if (igold < 1000) return rn1(igold - 100 + 1, 100);
+    if (igold < 5000) return rn1(igold - 500 + 1, 500);
+    if (igold < 10000) return rn1(igold - 1000 + 1, 1000);
+    return rn1(igold - 5000 + 1, 5000);
+}
+
+function loseSomeGoldInFountain() {
+    // C ref: src/fountain.c:dipfountain() case 28.
+    const money = heroGoldAmount();
+    if (money <= 10) return false;
+    const loss = Math.max(0, Math.trunc(somegoldBasic(money) / 10));
+    if (!loss) return false;
+    const target = Math.max(0, money - loss);
+    const carried = (game.inventory || []).find((obj) => obj?.otyp === GOLD_PIECE || obj?.oclass === COIN_CLASS);
+    if (carried) {
+        carried.quan = target;
+        if (target <= 0)
+            game.inventory = (game.inventory || []).filter((obj) => obj !== carried);
+    }
+    game._goldCount = target;
+    return true;
+}
+
+async function finishFountainBathAfterMore() {
+    game._fountain_bath_after_more = false;
+    game._more = false;
+    game._more_dismissals_remaining = 0;
+    clear_pending_message();
+    const oldGold = heroGoldAmount();
+    if (loseSomeGoldInFountain()) {
+        game._latched_status_gold = oldGold;
+        game._clear_latched_status_gold_after_more = true;
+        await pline('You lost some of your gold in the fountain!');
+        const loc = game.level?.at(game.u?.ux, game.u?.uy);
+        if (loc) loc.fountainLooted = false;
+        exercise(A_WIS, false);
+    }
+    await emitFountainMessagesAfterCurrent(dryupFountainAfterDipMessages(), { moveOnLast: true });
+    game.context.move = game._more ? 0 : 1;
 }
 
 function waterDamageRustForDip(obj) {
@@ -11131,11 +11293,7 @@ async function waterDemonFromFountain() {
 async function finishFountainWishDryupAfterWish() {
     if (!game._fountain_wish_dryup_after_wish) return false;
     game._fountain_wish_dryup_after_wish = false;
-    const dryupMsg = dryupFountainAfterDip();
-    if (dryupMsg) {
-        if (game._pending_message) await append_pline(dryupMsg);
-        else await pline(dryupMsg);
-    }
+    await emitFountainMessagesAfterCurrent(dryupFountainAfterDipMessages());
     return true;
 }
 
@@ -11152,8 +11310,7 @@ async function finishFountainDetectAfterMore() {
     clear_pending_message();
     await docrt();
     exercise(A_WIS, true);
-    const dryupMsg = dryupFountainAfterDip();
-    if (dryupMsg) await pline(dryupMsg);
+    await emitFountainMessagesAfterCurrent(dryupFountainAfterDipMessages());
     game.context.move = 1;
 }
 
@@ -11223,11 +11380,7 @@ async function drinkFountain() {
             break;
         }
     }
-    const dryupMsg = dryupFountainAfterDip();
-    if (dryupMsg) {
-        if (game._pending_message) await append_pline(dryupMsg);
-        else await pline(dryupMsg);
-    }
+    await emitFountainMessagesAfterCurrent(dryupFountainAfterDipMessages());
     game.context.move = 1;
 }
 
@@ -11237,7 +11390,8 @@ async function dipFountainEffect(obj) {
     let msg = waterDamage.message || '';
     if (waterDamage.result === 'destroyed'
         || (waterDamage.result !== 'nothing' && !rn2(2))) {
-        return msg;
+        if (msg) await pline(msg);
+        return;
     }
     switch (rnd(30)) {
     case 16:
@@ -11258,23 +11412,69 @@ async function dipFountainEffect(obj) {
             msg = 'A feeling of loss comes over you.';
         }
         break;
+    case 21:
+        if (msg) {
+            await pline(msg);
+            msg = '';
+        }
+        if (await waterDemonFromFountain()) return;
+        break;
     case 22:
+        if (msg) {
+            await pline(msg);
+            msg = '';
+        }
         await waterNymphFromFountain();
         break;
+    case 23:
+        if (msg) {
+            await pline(msg);
+            msg = '';
+        }
+        await waterSnakesFromFountain();
+        break;
+    case 24: {
+        const loc = game.level?.at(game.u?.ux, game.u?.uy);
+        if (!loc?.fountainLooted) {
+            if (msg) {
+                await pline(msg);
+                msg = '';
+            }
+            await findFountainGem(loc);
+            break;
+        }
+        await dogushforth(false);
+        msg = '';
+        break;
+    }
     case 25:
+        if (msg) {
+            await pline(msg);
+            msg = '';
+        }
         await dogushforth(false);
         break;
+    case 26:
+        msg = 'A strange tingling runs up your arm.';
+        break;
+    case 27:
+        msg = 'You feel a sudden chill.';
+        break;
+    case 28:
+        if (msg) await pline(msg);
+        await emitFountainMessagesAfterCurrent(['An urge to take a bath overwhelms you.']);
+        if (heroGoldAmount() > 10) {
+            game._fountain_bath_after_more = true;
+            queue_more_prompt();
+            return;
+        }
+        break;
     default:
-        msg = 'Nothing seems to happen.';
+        if (waterDamage.result === 'nothing') msg = 'Nothing seems to happen.';
         break;
     }
-    const dryupMsg = dryupFountainAfterDip();
-    if (dryupMsg && game._pending_message) {
-        await append_pline(dryupMsg);
-        return '';
-    }
-    if (dryupMsg && msg) return `${msg}  ${dryupMsg}`;
-    return msg || dryupMsg;
+    if (msg) await emitFountainMessagesAfterCurrent([msg]);
+    await emitFountainMessagesAfterCurrent(dryupFountainAfterDipMessages());
 }
 
 async function doDipCommand() {
@@ -13160,9 +13360,17 @@ function latchStatusAttrsForMoreFrame() {
 }
 
 function clearLatchedStatusAttrsAfterMore() {
-    if (!game._clear_latched_status_attrs_after_more) return;
-    game._clear_latched_status_attrs_after_more = false;
-    game._latched_status_attrs = null;
+    if (game._clear_latched_status_attrs_after_more) {
+        game._clear_latched_status_attrs_after_more = false;
+        game._latched_status_attrs = null;
+    }
+}
+
+function clearLatchedStatusGoldAfterMore() {
+    if (game._clear_latched_status_gold_after_more) {
+        game._clear_latched_status_gold_after_more = false;
+        game._latched_status_gold = null;
+    }
 }
 
 function loseExperienceLevelBasic() {
@@ -13385,6 +13593,24 @@ function heroCantSqueezeThruReason() {
     if (heroInventoryWeightTotalForSqueeze() > C.WT_TOOMUCH_DIAGONAL) return 2;
     if (heroInSokobanBasic()) return 3;
     return 0;
+}
+
+function heroCanMoveOntoBoulderBasic(sx, sy) {
+    // C ref: src/hack.c:could_move_onto_boulder().  Travel may route to a
+    // boulder square; run-mode DO_MOVE still stops before pushing unless the
+    // hero can occupy that boulder square.
+    if (heroPassesWallsBasic()) return true;
+    if (game.u?.usteed) return false;
+    const ptr = heroPolyPtrForBodySize();
+    if ((ptr?.mflags2 ?? 0) & M2_ROCKTHROW) {
+        const dx = game.u?.dx || 0;
+        const dy = game.u?.dy || 0;
+        if (!dx || !dy) return true;
+        return !(C.IS_OBSTRUCTED(game.level?.at(game.u?.ux, sy)?.typ)
+            && C.IS_OBSTRUCTED(game.level?.at(sx, game.u?.uy)?.typ));
+    }
+    if ((ptr?.msize ?? MZ_HUMAN) < MZ_SMALL) return true;
+    return !game.inventory?.length;
 }
 
 function tightDiagonalSqueezeReason(x, y, dx, dy) {
@@ -13643,6 +13869,16 @@ function repositionFloorObjectToTop(obj, x, y) {
 }
 
 async function tryPushBoulder(boulder, sx, sy, dx, dy) {
+    if (game.context?.run && runModeValue(game.context.run) >= 2
+        && !(game.u?.ublind || game.u?.uprops?.blind)
+        && !(game.u?.uhallucination || game.u?.uprops?.hallucination)
+        && !heroCanMoveOntoBoulderBasic(sx, sy)) {
+        // C ref: src/hack.c:test_move(DO_MOVE).  Running/traveling stops
+        // before an ordinary boulder instead of pushing it.
+        if (game.flags?.mention_walls) await pline('A boulder blocks your path.');
+        game.context.move = 0;
+        return false;
+    }
     const rx = sx + dx;
     const ry = sy + dy;
     if (boulderDestinationBlocked(rx, ry)) {
@@ -13735,6 +13971,14 @@ function farlookMonsterDescription(mon, x, y) {
 
 function monnam(mon) {
     const name = monsterHitName(mon);
+    return name.replace(/^./, c => c.toUpperCase());
+}
+
+function yMonnam(mon) {
+    // C ref: src/do_name.c:YMonnam().  Tame monsters use y_monnam() ("Your
+    // little dog" or a given name); non-tame peaceful monsters still use the
+    // ordinary "The <monster>" form without the "peaceful" adjective.
+    const name = mon?.mtame ? monsterSwapName(mon) : monsterHitName(mon);
     return name.replace(/^./, c => c.toUpperCase());
 }
 
@@ -14542,6 +14786,46 @@ async function kickDoor(x, y, loc) {
     }
 }
 
+async function kickMonsterBasic(mon, x, y) {
+    // C refs: src/dokick.c:maybe_kick_monster()/kick_monster()/kickdmg().
+    // This is the ordinary unpolymorphed monster-kick front door.  Kicking an
+    // unseen monster is force-fight, so attack_checks() does not stop at the
+    // remembered invisible marker.
+    if (!mon) return false;
+    gethungry();
+    mon.msleeping = 0;
+    mon.mstrategy = (mon.mstrategy || 0) & ~C.STRAT_WAITMASK;
+    if (!mon.mpeaceful) mon.mpeaceful = false;
+    await pline(`You kick ${monsterHitName(mon)}.`);
+
+    const clumsy = !!(game.u?.uprops?.fumbling || game.u?.ufumbling);
+    const big = (mon.data?.msize ?? C.MZ_HUMAN) >= C.MZ_LARGE;
+    if (!rn2(clumsy ? 3 : 4)
+        && (clumsy || !big)
+        && mon.mcansee !== 0
+        && !mon.mtrapped
+        && !monsterHelpless(mon)
+        && (mon.data?.mmove ?? 0) >= 12) {
+        // Full block/jump/teleport evasion is still broader kick backlog.
+        // The C gate still owns this RNG point even when it does not fire.
+    }
+
+    let damage = Math.trunc((currentFormulaStrength() + currentAttr(A_DEX) + currentAttr(A_CON)) / 15);
+    if (clumsy) damage = Math.trunc(damage / 2);
+    if (damage > 0) {
+        damage = rnd(damage);
+        exercise(A_DEX, true);
+        if (typeof mon.mhp === 'number') {
+            mon.mhp -= damage;
+            if (mon.mhp <= 0) await heroKilledMonster(mon);
+        }
+    }
+    if ((mon.mhp ?? 1) > 0 && !mon.mcan) rn2(3);
+    if (!heroCanSpotMonsterForHit(mon) && mon.mx === x && mon.my === y)
+        mapInvisibleBasic(x, y);
+    return true;
+}
+
 async function kickDirection(ch) {
     // C ref: dokick.c:dokick(), dokick.c:kick_nondoor().
     const dx = DIR_DX[ch] || 0;
@@ -14564,9 +14848,10 @@ async function kickDirection(ch) {
         return;
     }
     const loc = game.level?.at(x, y);
-    if (mon_at(x, y)) {
-        game.context.move = 0;
-        await pline('You kick at empty space.');
+    const mon = mon_at(x, y);
+    if (mon) {
+        await kickMonsterBasic(mon, x, y);
+        game.context.move = 1;
         return;
     }
     if (loc?.typ === DOOR) {
@@ -14600,13 +14885,39 @@ async function tryAutoOpenDoor(x, y) {
     return true;
 }
 
+function mayAutoOpenDoorFromMove() {
+    const u = game.u || {};
+    const uprops = u.uprops || {};
+    // C ref: src/hack.c:test_move().  Ordinary movement only routes a closed
+    // door through doopen_indir() when autoopen is enabled and the hero is not
+    // running, confused, stunned, or fumbling.
+    if (game.context?.run) return false;
+    if (game.flags?.autoopen === false) return false;
+    if (uprops.confusion || u.uconfusion) return false;
+    if (uprops.stunned || u.ustunned) return false;
+    if (uprops.fumbling || (Number(uprops.fumbling_timeout) || 0) > 0) return false;
+    return true;
+}
+
+function shouldBumpPainfullyIntoDoor() {
+    const u = game.u || {};
+    const uprops = u.uprops || {};
+    // C ref: src/hack.c:test_move().  A straight move into a closed door uses
+    // the painful bump branch when the hero is blind, stunned, clumsy, or
+    // fumbling.
+    return !!(uprops.blind || u.ublind
+        || uprops.stunned || u.ustunned
+        || currentAttr(A_DEX) < 10
+        || uprops.fumbling || (Number(uprops.fumbling_timeout) || 0) > 0);
+}
+
 async function bumpClosedDoor(dx, dy) {
     if (dx && dy) {
         if (game.flags?.mention_walls) await pline("You can't move diagonally into an intact doorway.");
         game.context.move = 0;
         return false;
     }
-    if (currentAttr(A_DEX) < 10) {
+    if (shouldBumpPainfullyIntoDoor()) {
         await pline('Ouch!  You bump into a door.');
         exercise(A_DEX, false);
         if (game.context?.run) game._run_stop_after_move = true;
@@ -14619,13 +14930,21 @@ async function bumpClosedDoor(dx, dy) {
 }
 
 function runShouldStopAfterMove(source, target, run = game.context?.run) {
-    if (hostileMonsterNearHeroForRunStop(run)) return true;
+    // C ref: src/allmain.c:moveloop_core() calls src/hack.c:lookaround()
+    // before the next repeated domove(), after the completed move's monster
+    // turn and timeout tail.  Immediate post-move run stops are terrain and
+    // feature exits only; visible-monster stopping belongs to
+    // runShouldStopBeforeRepeatMove().
     // C ref: hack.c:lookaround().  Travel (`context.travel`, run mode 8)
     // does not stop just because the chosen path crosses a doorway or leaves
     // a corridor; findtravelpath()/lookaround() own travel continuation.
     if (run?.travel) return false;
     if ([C.FOUNTAIN, C.SINK, C.ALTAR, C.THRONE, C.GRAVE].includes(target?.typ)) return true;
-    return target?.typ === DOOR || (source?.typ === CORR && target?.typ === C.ROOM);
+    // C ref: src/hack.c:lookaround().  Shift-direction run mode 1 treats
+    // ROOM as uninteresting terrain; it can leave a corridor without stopping
+    // unless another lookaround condition fires.
+    return target?.typ === DOOR
+        || (runModeValue(run) !== 1 && source?.typ === CORR && target?.typ === C.ROOM);
 }
 
 function runStepIsOpen(x, y) {
@@ -14722,25 +15041,88 @@ function maybeTurnCorridorRun(run) {
     }
 }
 
+function shouldAvoidKnownTrapForRun(x, y, msg) {
+    const trap = seenTrapAt(x, y);
+    if (!trap || trap.ttyp === C.VIBRATING_SQUARE) return false;
+    if (msg && game.flags?.mention_walls) {
+        // C ref: src/hack.c:avoid_moving_on_trap().
+        // The full trap name list is not needed by current callers; the stop
+        // itself is what clears the repeated movement before the next domove().
+        game.context.move = 0;
+    }
+    return true;
+}
+
+function shouldAvoidKnownLiquidForRun(x, y, msg) {
+    const loc = game.level?.at(x, y);
+    const here = game.level?.at(game.u?.ux, game.u?.uy);
+    if (!loc || !here || !(C.IS_POOL(loc.typ) || C.IS_LAVA(loc.typ)) || !loc.seenv) return false;
+    const u = game.u || {};
+    const inAir = !!(u.uprops?.levitation || u.uprops?.flying);
+    const knownWaterWalking = !!u.uprops?.water_walking;
+    const knownLavaWalking = !!u.uprops?.lava_walking;
+    const safeTransition = (loc.typ === here.typ
+            || (runModeValue(game.context?.run) < 2 && (!C.IS_LAVA(loc.typ) || inAir))
+            || game.context?.run?.travel)
+        && (inAir || knownLavaWalking || (C.IS_POOL(loc.typ) && knownWaterWalking))
+        && !(C.IS_WATERWALL?.(loc.typ) || loc.typ === C.LAVAWALL);
+    if (safeTransition) return false;
+    if (msg && game.flags?.mention_walls) game.context.move = 0;
+    return true;
+}
+
+function runModeValue(run) {
+    if (!run) return 0;
+    if (typeof run.mode === 'number') return run.mode;
+    return run.travel ? 8 : 0;
+}
+
+function runVectorDx(run) {
+    return run?.dx ?? game.u?.dx ?? 0;
+}
+
+function runVectorDy(run) {
+    return run?.dy ?? game.u?.dy ?? 0;
+}
+
 async function runShouldStopBeforeRepeatMove(run) {
     // C refs: allmain.c:moveloop_core(), hack.c:lookaround().  Repeated
     // rushes stop before a closed door; shifted run mode 1 treats it as a
     // corridor candidate and can still bump into it via domove_core().
-    if (!run || run.travel || run.mode === 1) return false;
+    if (!run || run.mode === 1) return false;
     if (game.u?.ublind || game.u?.uprops?.blind) return false;
     const u = game.u;
     if (!u) return false;
     for (let nx = u.ux - 1; nx <= u.ux + 1; nx++) {
         for (let ny = u.uy - 1; ny <= u.uy + 1; ny++) {
             if (nx === u.ux && ny === u.uy) continue;
-            if (nx === u.ux - run.dx && ny === u.uy - run.dy) continue;
+            if (!C.isok(nx, ny)) continue;
+            const rdx = runVectorDx(run), rdy = runVectorDy(run);
+            const infront = nx === u.ux + rdx && ny === u.uy + rdy;
+            const mon = mon_at(nx, ny);
+            if (mon && heroCanSpotMonsterForHit(mon)) {
+                if ((runModeValue(run) !== 1 && !isSafeMonster(mon))
+                    || (infront && !run.travel)) {
+                    game.context.move = 0;
+                    return true;
+                }
+            }
+            if (shouldAvoidKnownTrapForRun(nx, ny, infront && runModeValue(run) > 1)
+                && infront && runModeValue(run) !== 1)
+                return true;
+            if (nx === u.ux - rdx && ny === u.uy - rdy) continue;
             const loc = game.level?.at(nx, ny);
             const closedDoor = loc?.typ === DOOR && !!(loc.doormask & (D_CLOSED | D_LOCKED));
-            if (!closedDoor) continue;
-            if (nx !== u.ux && ny !== u.uy) continue;
-            if (game.flags?.mention_walls) await pline('You stop in front of the door.');
-            game.context.move = 0;
-            return true;
+            if (closedDoor) {
+                if (nx !== u.ux && ny !== u.uy) continue;
+                if (runModeValue(run) !== 1 && !run.travel) {
+                    if (game.flags?.mention_walls) await pline('You stop in front of the door.');
+                    game.context.move = 0;
+                    return true;
+                }
+                continue;
+            }
+            if (infront && shouldAvoidKnownLiquidForRun(nx, ny, true)) return true;
         }
     }
     return false;
@@ -14760,11 +15142,11 @@ function hostileMonsterNearHeroForRunStop(run = game.context?.run) {
                 // side monsters are ignored until they block or attack.
                 const infront = x === u.ux + run.dx && y === u.uy + run.dy;
                 if (!infront) continue;
-                if (cansee(x, y)) return true;
+                if (heroCanSpotMonsterForHit(mon)) return true;
                 continue;
             }
             if (mon.mpeaceful || mon.mtame || monsterHasNoAttacks(mon)) continue;
-            if (cansee(x, y)) return true;
+            if (heroCanSpotMonsterForHit(mon)) return true;
         }
     }
     return false;
@@ -15111,7 +15493,7 @@ async function swapWithSafeMonster(mon, x, y) {
             mon.mflee = true;
             mon.mfleetim = Math.max(mon.mfleetim || 0, fleetime === 1 ? 2 : fleetime);
         }
-        await pline(`You stop.  ${monsterSwapName(mon).replace(/^your /, 'Your ')} is in the way!`);
+        await pline(`You stop.  ${yMonnam(mon)} is in the way!`);
         game.context.run = null;
         return;
     }
@@ -15148,8 +15530,15 @@ async function swapWithSafeMonster(mon, x, y) {
 
 async function heroMeleeAttack(mon) {
     gethungry();
-    exercise(A_DEX, true);
+    // C refs: src/uhitm.c:attack(), src/uhitm.c:hitum().  Every melee
+    // attempt exercises Strength; Dexterity is credited only after a hit.
+    exercise(A_STR, true);
     const primary = heroWieldedWeapon();
+    if (game._hero_unweapon) {
+        game._hero_unweapon = false;
+        if (!primary) await pline('You begin bashing monsters with your bare hands.');
+        else await pline(`You begin bashing monsters with ${inventoryObjectName(primary)}.`);
+    }
     await maybeCheckCaitiff(mon);
     const toHit = heroMeleeToHit(mon, primary);
     const dieroll = rnd(20);
@@ -18271,6 +18660,15 @@ function travelSeenOrKnown(x, y) {
     return !!(loc.seenv || loc.remembered_glyph || (loc.disp_ch && loc.disp_ch !== ' ') || couldsee(x, y));
 }
 
+function travelPathCellKnown(x, y) {
+    const loc = game.level?.at(x, y);
+    if (!loc) return false;
+    // C ref: src/hack.c:findtravelpath().  Cursor targeting can describe
+    // remembered glyphs, but pathfinding only expands cells that have seenv
+    // or are currently visible to an unblind hero.
+    return !!(loc.seenv || (!(game.u?.ublind || game.u?.uprops?.blind) && couldsee(x, y)));
+}
+
 function travelFeatureStairAt(x, y) {
     for (let st = game.stairs; st; st = st.next)
         if (st.sx === x && st.sy === y) return st;
@@ -18440,7 +18838,12 @@ function travelMoveAllowed(x, y, dx, dy) {
     const ny = y + dy;
     if (nx < 1 || nx >= COLNO || ny < 0 || ny >= ROWNO) return false;
     if (blocksMove(nx, ny)) return false;
-    if (sobj_at_basic(BOULDER, nx, ny)) return false;
+    if (!travelBoulderAllowed(x, y, nx, ny)) return false;
+    // C ref: src/hack.c:test_move(TEST_TRAV).  Travel pathfinding refuses
+    // known traps and unsafe known liquid; the player can still step there
+    // manually after travel stops.
+    if (shouldAvoidKnownTrapForTravel(nx, ny)) return false;
+    if (shouldAvoidKnownLiquidForTravel(nx, ny)) return false;
     if (dx && dy) {
         const source = game.level?.at(x, y);
         const target = game.level?.at(nx, ny);
@@ -18453,27 +18856,102 @@ function travelMoveAllowed(x, y, dx, dy) {
     return true;
 }
 
-function findTravelStepToKnownTarget(target) {
+function heroHasTravelBoulderBypassToolBasic() {
+    return (game.inventory || []).some((obj) =>
+        obj?.otyp === PICK_AXE || obj?.otyp === DWARVISH_MATTOCK || obj?.otyp === WAN_DIGGING);
+}
+
+function travelBoulderAllowed(x, y, nx, ny) {
+    // C ref: src/hack.c:test_move(TEST_TRAV).  Travel avoids boulders in
+    // Sokoban, but otherwise may path to one boulder square and let the real
+    // movement attempt stop or push according to DO_MOVE rules.
+    if (!sobj_at_basic(BOULDER, nx, ny)) return true;
+    if (heroInSokobanBasic()) return false;
+    if (sobj_at_basic(BOULDER, x, y)
+        && !heroCanMoveOntoBoulderBasic(x, y)
+        && !heroHasTravelBoulderBypassToolBasic()) return false;
+    return true;
+}
+
+function travelDelayedSource(x, y) {
+    const loc = game.level?.at(x, y);
+    if (loc?.typ === DOOR && (loc.doormask & (D_CLOSED | D_LOCKED))) return true;
+    return !!sobj_at_basic(BOULDER, x, y);
+}
+
+function shouldAvoidKnownTrapForTravel(x, y) {
+    const trap = seenTrapAt(x, y);
+    return !!trap && trap.ttyp !== C.VIBRATING_SQUARE;
+}
+
+function shouldAvoidKnownLiquidForTravel(x, y) {
+    const loc = game.level?.at(x, y);
+    if (!loc?.seenv || !(C.IS_POOL(loc.typ) || C.IS_LAVA(loc.typ))) return false;
+    const u = game.u || {};
+    if (u.uprops?.levitation || u.uprops?.flying) return false;
+    if (C.IS_POOL(loc.typ) && u.uprops?.water_walking) return false;
+    if (C.IS_LAVA(loc.typ) && u.uprops?.lava_walking && C.IS_LAVA(game.level?.at(u.ux, u.uy)?.typ)) return false;
+    return true;
+}
+
+function travelRunMap(run) {
+    if (!run) return null;
+    if (!run._travelmap) run._travelmap = new Set();
+    return run._travelmap;
+}
+
+function findTravelStepToKnownTarget(target, run = game.context?.run) {
     const u = game.u;
     if (!u || !target) return false;
     if (u.ux === target.x && u.uy === target.y) return null;
 
-    const seen = new Set([`${target.x},${target.y}`]);
-    const queue = [{ x: target.x, y: target.y }];
-    for (let qi = 0; qi < queue.length && qi < COLNO * ROWNO; qi++) {
-        const here = queue[qi];
+    const bestRadius = new Map([[`${target.x},${target.y}`, 0]]);
+    const queue = [{ x: target.x, y: target.y, radius: 0, order: 0 }];
+    let order = 1;
+    let bestStep = null;
+    for (let qi = 0; queue.length && qi < COLNO * ROWNO; qi++) {
+        queue.sort((a, b) => (a.radius - b.radius) || (a.order - b.order));
+        const here = queue.shift();
+        if (bestStep && (here.radius > bestStep.radius
+            || (here.radius === bestStep.radius && here.order > bestStep.order))) break;
+        const delayed = travelDelayedSource(here.x, here.y);
         for (const [dx, dy] of TRAVEL_DIRS_ORD) {
             const nx = here.x + dx;
             const ny = here.y + dy;
             if (!travelMoveAllowed(here.x, here.y, dx, dy)) continue;
+            const nextRadius = here.radius + (delayed ? 3 : 1);
             if (nx === u.ux && ny === u.uy) {
-                return { dx: here.x - u.ux, dy: here.y - u.uy };
+                const candidateOrder = order++;
+                if (!bestStep || nextRadius < bestStep.radius
+                    || (nextRadius === bestStep.radius && candidateOrder < bestStep.order)) {
+                    bestStep = {
+                        x: here.x,
+                        y: here.y,
+                        radius: nextRadius,
+                        order: candidateOrder,
+                    };
+                }
+                continue;
             }
             const key = `${nx},${ny}`;
-            if (seen.has(key) || !travelSeenOrKnown(nx, ny)) continue;
-            seen.add(key);
-            queue.push({ x: nx, y: ny });
+            if (!travelPathCellKnown(nx, ny)) continue;
+            if ((bestRadius.get(key) ?? Infinity) <= nextRadius) continue;
+            bestRadius.set(key, nextRadius);
+            queue.push({ x: nx, y: ny, radius: nextRadius, order: order++ });
         }
+    }
+    if (bestStep) {
+        const travelmap = travelRunMap(run);
+        const key = `${bestStep.x},${bestStep.y}`;
+        if (travelmap?.has(key)) {
+            run._travel_stop_message = 'You stop, unsure which way to go.';
+            run._travel_stop_after_step = true;
+        } else if (bestStep.x === target.x && bestStep.y === target.y) {
+            run._travel_stop_after_step = true;
+            game._travel_cached_target = null;
+        }
+        travelmap?.add(`${u.ux},${u.uy}`);
+        return { dx: bestStep.x - u.ux, dy: bestStep.y - u.uy };
     }
     return null;
 }
@@ -18495,7 +18973,7 @@ function guessTravelGoal(target) {
             const nx = here.x + dx;
             const ny = here.y + dy;
             const key = `${nx},${ny}`;
-            if (seen.has(key) || !travelMoveAllowed(here.x, here.y, dx, dy) || !travelSeenOrKnown(nx, ny)) continue;
+            if (seen.has(key) || !travelMoveAllowed(here.x, here.y, dx, dy) || !travelPathCellKnown(nx, ny)) continue;
             seen.add(key);
             travel.set(key, here.radius + 1);
             queue.push({ x: nx, y: ny, radius: here.radius + 1 });
@@ -18533,7 +19011,8 @@ function guessTravelGoal(target) {
 }
 
 function findTravelStep(target) {
-    const direct = findTravelStepToKnownTarget(target);
+    const run = game.context?.run;
+    const direct = findTravelStepToKnownTarget(target, run);
     if (direct) return direct;
     const guess = guessTravelGoal(target);
     if (!guess) return direct;
@@ -18542,14 +19021,20 @@ function findTravelStep(target) {
         const dy = Math.sign((target?.y ?? game.u.uy) - game.u.uy);
         return travelMoveAllowed(game.u.ux, game.u.uy, dx, dy) ? { dx, dy } : direct;
     }
-    return findTravelStepToKnownTarget(guess) || direct;
+    return findTravelStepToKnownTarget(guess, run) || direct;
 }
 
 async function beginTravelRunToCachedTarget() {
     const target = game._travel_cached_target;
     if (!target) return false;
     game._run_stop_after_move = false;
-    game.context.run = { travel: true, target: { x: target.x, y: target.y }, steps: 0 };
+    game.context.run = {
+        travel: true,
+        target: { x: target.x, y: target.y },
+        steps: 0,
+        initialAttempt: true,
+        _travelmap: new Set(),
+    };
     return continueRunStep();
 }
 
@@ -18755,6 +19240,8 @@ async function showNextStartupPreambleMessage() {
     game._more_dismissals_remaining = 0;
     game._startup_preamble_more_active = needsMore;
     game._startup_preamble_done_waiting_tutorial = hasTutorialPrompt;
+    game._full_map_redraw_pending = true;
+    await flush_screen(1);
     game.context.move = 0;
     return true;
 }
@@ -19261,6 +19748,10 @@ async function handleQueuedMore(ch) {
             await finishFountainDetectAfterMore();
             return true;
         }
+        if (game._fountain_bath_after_more) {
+            await finishFountainBathAfterMore();
+            return true;
+        }
         if (await showNextStartupPreambleMessage()) return true;
         if (await showNextOptionsMessageOrPrompt()) return true;
         if (await promptAutounlockDoorAfterMore()) return true;
@@ -19637,9 +20128,14 @@ async function handleQueuedMore(ch) {
             game._resume_teleport_arrival_after_more = false;
             const featureLine = game._resume_look_here_feature_line_after_more || '';
             game._resume_look_here_feature_line_after_more = '';
+            const pickedSome = !!game._resume_look_here_picked_some_after_more;
+            game._resume_look_here_picked_some_after_more = false;
             const arrivalEffects = teleportArrival
                 ? await runTeleportArrivalSpotEffects({ line: featureLine })
-                : (await lookHereAfterMove(featureLine ? { featureLine } : {}), null);
+                : (await lookHereAfterMove({
+                    ...(featureLine ? { featureLine } : {}),
+                    pickedSome,
+                }), null);
             if (game._more && game._deferred_blind_floor_list) {
                 game.context.move = 0;
                 return true;
@@ -19983,6 +20479,8 @@ async function handleQueuedMore(ch) {
                     return true;
                 }
             }
+            if (!game._after_more_message && game._deferred_monster_trap_effect)
+                await finish_deferred_monster_trap_effect();
             if (game._after_more_message) {
                 const ordinaryMonsterToplineDeferred = !!game._monster_topline_deferred;
                 const split = afterMoreSplit;
@@ -20412,6 +20910,9 @@ async function handleQueuedMore(ch) {
         game._deferred_move_floor_list_resume_turn_tail = false;
         game._resume_floor_list_turn = false;
         game._floor_list_resume_spot_effects_on_dismiss = false;
+        // C ref: win/tty/wintty.c:process_text_window().  Closing the floor
+        // text window restores the map before deferred spot effects continue.
+        game._full_map_redraw_pending = true;
         await triggerSpotEffectsAtHero();
         if (!game._more) finishPendingMoveSmudge();
         if (resumeStairArrival && !game._more) {
@@ -22335,6 +22836,7 @@ async function enterTutorialAfterPrompt() {
 }
 
 async function showTutorialPrompt(invalidChoice = false) {
+    game._full_map_redraw_pending = true;
     await flush_screen(1);
     const display = game.nhDisplay;
     if (!display?.terminal?.serialize) return;
@@ -24796,6 +25298,9 @@ export async function rhack(key) {
 
     let ch = String.fromCharCode(key);
 
+    if (!game._more && !(game._more_message_queue || []).length)
+        clearLatchedStatusGoldAfterMore();
+
     if (game._arrival_topline_absorbs_next_key && !game._more) {
         game._arrival_topline_absorbs_next_key = false;
         clear_pending_message();
@@ -24883,6 +25388,7 @@ export async function rhack(key) {
             game._terrain_view_active = false;
             clear_pending_message();
             clearOverrideScreen();
+            await redrawAfterFullScreenMenuDismiss();
         }
         game.context.move = 0;
         return;
@@ -25001,6 +25507,8 @@ export async function rhack(key) {
                 game._awaiting_travel_cursor = false;
                 game._awaiting_travel_prompt = true;
             }
+            game._full_map_redraw_pending = true;
+            await flush_screen(1);
         } else {
             setTravelTipCursor();
         }
@@ -26243,6 +26751,7 @@ export async function rhack(key) {
             // Valid cursor descriptions remain visible until movement output
             // replaces them; only getpos error lines are cleared.
             if (clearGetposError) clear_pending_message();
+            else if (!transientTravelDescription) clear_pending_message();
             game._travel_description_pending = transientTravelDescription;
             const startedTravel = await beginTravelRunToCachedTarget();
             if (clearGetposError && !startedTravel && pendingBeforeTravel) await pline(pendingBeforeTravel);
@@ -26852,14 +27361,16 @@ export async function rhack(key) {
         const obj = game._awaiting_dip_fountain_confirm;
         game._awaiting_dip_fountain_confirm = null;
         if (ch === 'y' || ch === 'Y') {
-            const msg = await dipFountainEffect(obj);
-            if (msg) {
-                clear_pending_message();
-                await pline(msg);
-            } else {
-                game._prompt_cursor = null;
+            const oldPrompt = game._pending_message || '';
+            clear_pending_message();
+            await dipFountainEffect(obj);
+            if (!game._pending_message && !game._more && oldPrompt) {
+                game._pending_message = oldPrompt;
+                game._last_topline_message = oldPrompt;
+                game._pending_message_wrap_cols = 0;
             }
-            game.context.move = 1;
+            if (!game._pending_message) game._prompt_cursor = null;
+            game.context.move = game._more ? 0 : 1;
             return;
         }
         clear_pending_message();
@@ -28221,6 +28732,8 @@ export async function rhack(key) {
         && !showStartupTutorial) {
         game._startup_preamble_done_waiting_tutorial = false;
         clear_pending_message();
+        game._full_map_redraw_pending = true;
+        await flush_screen(1);
         game.context.move = 0;
         return;
     }
@@ -28792,10 +29305,23 @@ export async function continueRunStep() {
     maybeTurnCorridorRun(run);
     let step = run.travel ? findTravelStep(run.target) : { dx: run.dx, dy: run.dy };
     if (!step) {
+        if (run.travel && run.initialAttempt) {
+            // C refs: src/cmd.c:dotravel(), src/hack.c:domove_core().
+            // dotravel() is a time command even when findtravelpath() cannot
+            // supply a unit direction; the failed attempt still reaches the
+            // ordinary turn tail with the cursor-description topline intact.
+            run.initialAttempt = false;
+            game.context.run = null;
+            game.context.move = 1;
+            game.context.mv = 1;
+            return true;
+        }
         game.context.run = null;
         game.context.move = 0;
         return false;
     }
+    const initialTravelAttempt = !!(run.travel && run.initialAttempt);
+    run.initialAttempt = false;
     if (run.travel) {
         // C ref: hack.c:findtravelpath()/domove().  Travel chooses a path,
         // but each domove attempt receives a unit direction.
@@ -28803,19 +29329,23 @@ export async function continueRunStep() {
     }
     game.context.move = 0;
     game.context.mv = 1;
+    if (run._travel_stop_message) {
+        await pline(run._travel_stop_message);
+        run._travel_stop_message = '';
+    }
     const moved = await withCommandNopick(!!run.nopick, () => domove(step.dx, step.dy));
     if (run.travel) setTravelMapCursor();
-    game.context.move = moved ? 1 : 0;
+    game.context.move = (moved || initialTravelAttempt) ? 1 : 0;
     if (run.travel && game.u?.ux === run.target.x && game.u?.uy === run.target.y) {
         game._travel_cached_target = null;
         game.context.run = null;
         return moved;
     }
-    if (!moved || game._run_stop_after_move) {
+    if (!moved || game._run_stop_after_move || run._travel_stop_after_step) {
         game.context.run = null;
         game._run_stop_after_move = false;
     }
-    return moved;
+    return moved || initialTravelAttempt;
 }
 
 function uMaybeImpaired() {
@@ -28928,13 +29458,15 @@ export async function domove(dx, dy) {
     }
 
     if (target?.typ === DOOR && (target.doormask & (D_CLOSED | D_LOCKED))) {
-        if (game.context?.run) return bumpClosedDoor(dx, dy);
-        if (target.doormask & D_LOCKED) {
-            // C ref: lock.c:doopen_indir().  Auto-open reaches the locked-door
-            // branch before deciding whether autounlock should prompt.
-            return reportLockedDoorAndMaybeAutounlock(newx, newy);
+        if (mayAutoOpenDoorFromMove()) {
+            if (target.doormask & D_LOCKED) {
+                // C ref: src/hack.c:test_move() -> src/lock.c:doopen_indir().
+                // Auto-open reaches the locked-door branch before deciding
+                // whether autounlock should prompt.
+                return reportLockedDoorAndMaybeAutounlock(newx, newy);
+            }
+            if (await tryAutoOpenDoor(newx, newy)) return false;
         }
-        if (await tryAutoOpenDoor(newx, newy)) return false;
         return bumpClosedDoor(dx, dy);
     }
 
@@ -28953,7 +29485,7 @@ export async function domove(dx, dy) {
             await swapWithSafeMonster(mon, newx, newy);
             return true;
         }
-        if (game.context?.run && cansee(newx, newy)) {
+        if (game.context?.run && heroCanSpotMonsterForHit(mon)) {
             // C ref: hack.c:domove_core().  Running into a visible non-safe
             // monster stops the run instead of performing a melee attack.
             game.context.move = 0;
@@ -28967,6 +29499,7 @@ export async function domove(dx, dy) {
             // performing the melee hit; force-fight is the explicit attack path.
             await pline("Wait!  There's something there you can't see!");
             mapInvisibleBasic(newx, newy);
+            game.context.run = null;
             return true;
         }
         await attackMonster(mon);
