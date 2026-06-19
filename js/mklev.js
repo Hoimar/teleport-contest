@@ -19,6 +19,7 @@ import {
 import { getObjectColor, getObjectMaterial } from './o_init.js';
 import { MONSTER_DATA } from './monster_data.js';
 import { m_dowear_basic } from './mon_wear.js';
+import { noteMonsterBorn, monsterGenocided, monsterGone } from './monstats.js';
 import { CLR_CYAN, CLR_GRAY, NO_COLOR } from './terminal.js';
 import {
     COLNO, ROWNO, STONE, ROOM, CORR, DOOR, STAIRS, LADDER, AIR, CLOUD,
@@ -471,6 +472,16 @@ const NASTY_MONSTER_NAMES = [
     'YELLOW_DRAGON', 'GUARDIAN_NAGA', 'FIRE_GIANT',
     'ALEAX', 'COUATL', 'HORNED_DEVIL', 'BARBED_DEVIL',
 ];
+const NASTY_NAME_ALIASES = new Map([
+    ['VAMPIRE_LEADER', 'VAMPIRE_LORD'],
+    ['ELF_NOBLE', 'ELF_LORD'],
+    ['ELVEN_MONARCH', 'ELVENKING'],
+    ['OGRE_TYRANT', 'OGRE_KING'],
+]);
+const NASTY_BIG_TO_LITTLE = new Map([
+    ['ARCH_LICH', 'MASTER_LICH'],
+    ['MASTER_MIND_FLAYER', 'MIND_FLAYER'],
+]);
 
 // Direction deltas
 const xdir = [-1, -1, 0, 1, 1, 1, 0, -1];
@@ -2217,6 +2228,7 @@ function temperature_shift(ptr) {
 function uncommon_monster(ptr) {
     if (!ptr) return true;
     if (ptr.geno & (G_NOGEN | G_UNIQ)) return true;
+    if (monsterGone(ptr)) return true;
     if (Inhell()) return (ptr.maligntyp ?? 0) > 0 || !!(ptr.geno & G_NOHELL);
     return !!(ptr.geno & G_HELL);
 }
@@ -2302,8 +2314,9 @@ function montoostrong(ptr, maxmlev) {
     return (ptr?.difficulty ?? 0) > maxmlev;
 }
 
-function mk_gen_ok(ptr, _mv_mask, gn_mask) {
+function mk_gen_ok(ptr, mv_mask, gn_mask) {
     if (!ptr) return false;
+    if (mv_mask && monsterGone(ptr)) return false;
     if (ptr.geno & gn_mask) return false;
     return !PLACEHOLDER_MONSTERS.has(ptr.name);
 }
@@ -2458,19 +2471,36 @@ function pick_vamp_shape_for(mon) {
     return null;
 }
 
+function nasty_name_ptr_for(name) {
+    return monsterPtr(NASTY_NAME_ALIASES.get(name) || name);
+}
+
 function big_to_little_shape_ptr(ptr) {
     if (!ptr) return null;
-    const mapped = ({
-        ARCH_LICH: 'MASTER_LICH',
-        MASTER_MIND_FLAYER: 'MIND_FLAYER',
-    })[ptr.name];
+    const mapped = NASTY_BIG_TO_LITTLE.get(ptr.name);
     return mapped ? monsterPtr(mapped) : ptr;
 }
 
+function juvenile_shape_ptr(ptr) {
+    const name = String(ptr?.name || '').toLowerCase().replace(/_/g, ' ');
+    return name.startsWith('baby ') || name.endsWith(' hatchling')
+        || name.endsWith(' pup') || name.endsWith(' cub');
+}
+
 function pick_nasty_for(difcap = 0) {
-    let ptr = monsterPtr(NASTY_MONSTER_NAMES[rn2(NASTY_MONSTER_NAMES.length)]);
+    // C ref: src/wizard.c:pick_nasty().
+    let ptr = nasty_name_ptr_for(NASTY_MONSTER_NAMES[rn2(NASTY_MONSTER_NAMES.length)]);
     if (!ptr) return null;
-    if (difcap > 0 && ptr.difficulty >= difcap) ptr = big_to_little_shape_ptr(ptr);
+    if (Is_rogue_level(game.u?.uz) && !uppercase_monsym_for(ptr)) {
+        ptr = nasty_name_ptr_for(NASTY_MONSTER_NAMES[rn2(NASTY_MONSTER_NAMES.length)]) || ptr;
+    }
+    let alt = ptr;
+    if (monsterGenocided(ptr)
+        || (difcap > 0 && ptr.difficulty >= difcap)
+        || (ptr.geno & (Inhell() ? G_NOHELL : G_HELL))) {
+        alt = big_to_little_shape_ptr(ptr);
+    }
+    if (alt && alt !== ptr && !monsterGenocided(alt) && !juvenile_shape_ptr(alt)) ptr = alt;
     return ptr;
 }
 
@@ -3678,6 +3708,7 @@ export function makemon(mdat, x, y, mmflags = 0) {
             && ((tryct === 1 && mon_throws_rocks_for(ptr) && isSokobanLevel())
                 || !goodpos(x, y, gpflags, ptr)));
     }
+    noteMonsterBorn(ptr, !(mmflags & MM_NOCOUNTBIRTH));
     const m_id = next_ident();
     const monState = newmonhp_state_for(ptr);
     const female = init_mon_gender_for(ptr);

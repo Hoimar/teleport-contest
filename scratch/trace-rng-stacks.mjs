@@ -152,6 +152,18 @@ async function main() {
             console.log(`  R@${item.idx} ${JSON.stringify(item)}`);
         }
     }
+    if (wants('mkclass') && globalThis.__teleportMkclassTrace?.length) {
+        console.log('mkclass trace');
+        for (const item of globalThis.__teleportMkclassTrace.filter(inWindow)) {
+            console.log(`  K@${item.idx} ${JSON.stringify(item)}`);
+        }
+    }
+    if (wants('zoo') && globalThis.__teleportZooTrace?.length) {
+        console.log('zoo trace');
+        for (const item of globalThis.__teleportZooTrace.filter(inWindow)) {
+            console.log(`  Z@${item.idx} ${JSON.stringify(item)}`);
+        }
+    }
     if (wants('alloc') && globalThis.__teleportMonAllocTrace?.length) {
         console.log('mon alloc trace');
         for (const item of globalThis.__teleportMonAllocTrace.filter(inWindow)) {

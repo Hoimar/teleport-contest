@@ -1508,6 +1508,71 @@ function can_attack_after_move_basic`
     if (url.endsWith('/js/mklev.js')) {
         let source = String(result.source);
         source = source.replace(
+            '    let num = 0;\n    const weights = new Map();\n',
+            `    let num = 0;
+    const weights = new Map();
+    const __mkclassTraceItems = [];
+    const __mkclassTrace = (phase, extra = {}) => {
+        const idx = globalThis.__teleportRngTraceIndex || 0;
+        const start = globalThis.__teleportApparxyStart ?? -Infinity;
+        const end = globalThis.__teleportApparxyEnd ?? Infinity;
+        if (idx < start || idx > end) return;
+        (globalThis.__teleportMkclassTrace ||= []).push({
+            idx,
+            phase,
+            mlet,
+            spc,
+            atyp,
+            maxmlev,
+            moves: game.moves,
+            uz: game.u?.uz ? { ...game.u.uz } : null,
+            ulevel: game.u?.ulevel,
+            zlevel: level_difficulty(),
+            inhell: Inhell(),
+            special: currentSpecialLevel()?.proto || null,
+            ...extra,
+            stack: String(new Error().stack || '')
+                .split('\\n')
+                .slice(2, 8)
+                .map((line) => line.trim().replace((typeof process !== 'undefined' && process.cwd ? process.cwd() : '') + '/', '')),
+        });
+    };
+`
+        );
+        source = source.replace(
+            '            const weight = k + 1 - (adj_lev_for(ptr) > ((game.u?.ulevel ?? 1) * 2) ? 1 : 0);\n            weights.set(ptr, weight);\n            num += weight;\n',
+            `            const __adjLev = adj_lev_for(ptr);
+            const __biasThreshold = (game.u?.ulevel ?? 1) * 2;
+            const weight = k + 1 - (__adjLev > __biasThreshold ? 1 : 0);
+            __mkclassTraceItems.push({
+                name: ptr.name,
+                mlevel: ptr.mlevel,
+                difficulty: ptr.difficulty,
+                geno: ptr.geno,
+                k,
+                adjLev: __adjLev,
+                biasThreshold: __biasThreshold,
+                biased: __adjLev > __biasThreshold,
+                weight,
+                numBefore: num,
+                numAfter: num + weight,
+            });
+            weights.set(ptr, weight);
+            num += weight;
+`
+        );
+        source = source.replace(
+            '    if (!num) return null;\n\n    let pick = rnd(num);\n',
+            `    if (!num) {
+        __mkclassTrace('empty', { entries: __mkclassTraceItems });
+        return null;
+    }
+
+    __mkclassTrace('pick', { num, entries: __mkclassTraceItems });
+    let pick = rnd(num);
+`
+        );
+        source = source.replace(
             'function rndmonst_adj(minadj = 0, maxadj = 0) {',
             `function rndmonst_adj(minadj = 0, maxadj = 0) {
     const __rndmonstTrace = (phase, extra = {}) => {
@@ -1529,6 +1594,57 @@ function can_attack_after_move_basic`
             ...extra,
         });
     };`
+        );
+        source = source.replace(
+            '            let mdat = null;\n',
+            `            {
+                const idx = globalThis.__teleportRngTraceIndex || 0;
+                const start = globalThis.__teleportApparxyStart ?? -Infinity;
+                const end = globalThis.__teleportApparxyEnd ?? Infinity;
+                if (idx >= start && idx <= end) {
+                    const mons = game.level?.monsters || [];
+                    const objs = game.level?.objects || [];
+                    (globalThis.__teleportZooTrace ||= []).push({
+                        idx,
+                        phase: 'cell',
+                        type,
+                        sx,
+                        sy,
+                        loc: loc ? { typ: loc.typ, roomno: loc.roomno, edge: loc.edge } : null,
+                        occupied: !!m_at(sx, sy),
+                        monster: mons.find(m => m.mx === sx && m.my === sy)?.data?.name || null,
+                        existingGold: objs.find(o => o.otyp === GOLD_PIECE && o.ox === sx && o.oy === sy)?.quan || 0,
+                        goldlim,
+                        door: door ? { x: door.x, y: door.y } : null,
+                    });
+                }
+            }
+            let mdat = null;
+`
+        );
+        source = source.replace(
+            '            makemon(mdat, sx, sy, MM_ASLEEP | MM_NOGRP);\n',
+            `            {
+                const idx = globalThis.__teleportRngTraceIndex || 0;
+                const start = globalThis.__teleportApparxyStart ?? -Infinity;
+                const end = globalThis.__teleportApparxyEnd ?? Infinity;
+                const beforeCount = game.level?.monsters?.length || 0;
+                const made = makemon(mdat, sx, sy, MM_ASLEEP | MM_NOGRP);
+                if (idx >= start && idx <= end) {
+                    (globalThis.__teleportZooTrace ||= []).push({
+                        idx: globalThis.__teleportRngTraceIndex || idx,
+                        phase: 'makemon',
+                        type,
+                        sx,
+                        sy,
+                        requested: mdat?.name || null,
+                        made: made?.data?.name || null,
+                        beforeCount,
+                        afterCount: game.level?.monsters?.length || 0,
+                    });
+                }
+            }
+`
         );
         source = source.replace(
             `    const zlevel = level_difficulty();

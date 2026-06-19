@@ -13,7 +13,7 @@ and `feature_map.md`.
 ## Current State
 
 - Current branch in this workspace: `main`, ahead of origin.
-- Latest verified repair unit: `seed0360` special-level completion.
+- Latest verified repair unit: live `seed0360` monster-generation repair.
 - Checked-in public corpus is exact: `44/44 S 11405/11405 R 792838/792838 C 0`.
 - Hosted public cache remains `public-session-drift` at
   `40/44 S 10506/10982 R 715024/840358 C 0`; leaderboard fetch failed.
@@ -30,6 +30,34 @@ and `feature_map.md`.
   `frozen/`.
 
 ## Latest Loop Checkpoint
+
+- Latest verified WIP on 2026-06-19:
+  - Live `seed0360-wizard-world-tour` now reaches
+    `S 298/618 R 102204/133910` from the prior live frontier
+    `S 280/618 R 91652/133910`.
+  - Checked-in `seed0360` remains exact:
+    `S 833/833 R 120639/120639 C 0`.
+  - Strict sentinel exact:
+    `5/5 S 1063/1063 R 64569/64569 C 0`.
+  - Full checked-in corpus remains exact:
+    `44/44 S 11405/11405 R 792838/792838 C 0`.
+  - Implementation truth:
+    - `makemon()` now records `mvitals[].born`/`G_EXTINCT` through the
+      C-shaped `propagate()` birth limit path, so random-monster and class
+      generation skip extinct species unless the caller uses `G_IGNORE`.
+    - Initial shapeshifter `pick_nasty()` now resolves C enum-name nasties
+      such as `PM_ELVEN_MONARCH` through generated JS monster names and
+      applies the C demotion/genocide/out-of-place checks.
+    - Scratch RNG stack tooling can print focused `mkclass` and `fill_zoo`
+      traces for live-session frontier work.
+  - Current live frontier: seed0360 late special-room `fill_zoo()`/gold
+    creation at `FR 102039` (`rnd(2)`/`rn2(210)` order). A broad deferred
+    `mkgold(rn1(...))` helper was rejected because it regressed checked-in
+    Sokoban evidence at `FR 42526`; next work should reconcile placement,
+    occupancy, or session-provenance before changing this ordering.
+  - Verification covered `node --check` for `js/mklev.js` and
+    `js/monstats.js`, focused live/checked-in `verify`, `sentinel:strict`,
+    and the full checked-in public corpus.
 
 - Latest verified WIP on 2026-06-19:
   - `seed0360-wizard-world-tour` special-level completion:
