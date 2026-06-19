@@ -296,6 +296,29 @@ function startupScaffoldHeroState(roleName) {
     };
 }
 
+function captureStartupVisibleState(g) {
+    return {
+        hp: g.u.uhp,
+        hpmax: g.u.uhpmax,
+        pw: g.u.uen,
+        pwmax: g.u.uenmax,
+        ac: g.u.uac,
+        attrs: g.u.acurr?.a?.slice() || null,
+        maxes: g.u.amax?.a?.slice() || null,
+    };
+}
+
+function restoreStartupVisibleState(g, state) {
+    if (!state) return;
+    g.u.uhp = state.hp;
+    g.u.uhpmax = state.hpmax;
+    g.u.uen = state.pw;
+    g.u.uenmax = state.pwmax;
+    g.u.uac = state.ac;
+    if (state.attrs) g.u.acurr = { a: state.attrs.slice() };
+    if (state.maxes) g.u.amax = { a: state.maxes.slice() };
+}
+
 function isSimpleMonsterHitYouLine(line) {
     return /^[A-Z][^!]* (?:hits(?: again)?|bites|stings|kicks|butts|touches you|misses|just misses)!$/.test(line || '');
 }
@@ -1224,7 +1247,7 @@ function restoreLegacyPagerLowerMapRows(display) {
 function drawQuestIntroOverlay(alignName) {
     const g = game;
     const display = g.nhDisplay;
-    if (!display || g._seed === 2 || g.iflags?.wc_splash_screen === false
+    if (!display || g.iflags?.wc_splash_screen === false
         || g.flags?.legacy === false
         || !findRole(g._nhopts?.role)) return false;
     const god = roleGod(g.urole, alignName);
@@ -1321,73 +1344,11 @@ function applyStartupSpellPowerFloor() {
 
 export async function player_selection() {
     const g = game;
-    // We just override screens and consume keys to match seed0002 start
-    const steps = [
-        "\n\n\n\nNetHack, Copyright 1985-2026\n\x1b[9CBy Stichting Mathematisch Centrum and M. Stephenson.\n\x1b[9CVersion 5.0.0 MacOS, built May  2 2026 12:00:00.\n\x1b[9CSee license for details.\n\n\n\n\nWho are you?",
-        "\n\n\n\nNetHack, Copyright 1985-2026\n\x1b[9CBy Stichting Mathematisch Centrum and M. Stephenson.\n\x1b[9CVersion 5.0.0 MacOS, built May  2 2026 12:00:00.\n\x1b[9CSee license for details.\n\n\n\n\nWho are you? D",
-        "\n\n\n\nNetHack, Copyright 1985-2026\n\x1b[9CBy Stichting Mathematisch Centrum and M. Stephenson.\n\x1b[9CVersion 5.0.0 MacOS, built May  2 2026 12:00:00.\n\x1b[9CSee license for details.\n\n\n\n\nWho are you? Da",
-        "\n\n\n\nNetHack, Copyright 1985-2026\n\x1b[9CBy Stichting Mathematisch Centrum and M. Stephenson.\n\x1b[9CVersion 5.0.0 MacOS, built May  2 2026 12:00:00.\n\x1b[9CSee license for details.\n\n\n\n\nWho are you? Dav",
-        "\n\n\n\nNetHack, Copyright 1985-2026\n\x1b[9CBy Stichting Mathematisch Centrum and M. Stephenson.\n\x1b[9CVersion 5.0.0 MacOS, built May  2 2026 12:00:00.\n\x1b[9CSee license for details.\n\n\n\n\nWho are you? Davi",
-        "\n\n\n\nNetHack, Copyright 1985-2026\n\x1b[9CBy Stichting Mathematisch Centrum and M. Stephenson.\n\x1b[9CVersion 5.0.0 MacOS, built May  2 2026 12:00:00.\n\x1b[9CSee license for details.\n\n\n\n\nWho are you? David",
-        "Shall I pick character's race, role, gender and alignment for you? [ynaq]\n\n\n\nNetHack, Copyright 1985-2026\n\x1b[9CBy Stichting Mathematisch Centrum and M. Stephenson.\n\x1b[9CVersion 5.0.0 MacOS, built May  2 2026 12:00:00.\n\x1b[9CSee license for details.\n\n\n\n\nWho are you? David",
-        "\x1b[41C\x1b[7mIs this ok? [ynaq]\x1b[0m\n\n\x1b[41CDavid the neutral male human Healer\n\nNetHack, Copyright 1985-2026\x1b[13Cy * Yes; start game\n\x1b[9CBy Stichting Mathematisch Centr n - No; choose role again\n\x1b[9CVersion 5.0.0 MacOS, built May  a - Not yet; choose another name\n\x1b[9CSee license for details.\x1b[8Cq - Quit\n\x1b[41C(end)\n\n\n\nWho are you? David",
-        "\x1b[22CIt is written in the Book of Hermes:\n\n\x1b[26CAfter the Creation, the cruel god Moloch rebelled\n\x1b[26Cagainst the authority of Marduk the Creator.\n\x1b[26CMoloch stole from Marduk the most powerful of all\n\x1b[26Cthe artifacts of the gods, the Amulet of Yendor,\n\x1b[26Cand he hid it in the dark cavities of Gehennom, the\n\x1b[26CUnder World, where he now lurks, and bides his time.\n\n\x1b[22CYour god Hermes seeks to possess the Amulet, and with it\n\x1b[22Cto gain deserved ascendance over the other gods.\n\n\x1b[22CYou, a newly trained Rhizotomist, have been heralded\n\x1b[22Cfrom birth as the instrument of Hermes.  You are destined\n\x1b[22Cto recover the Amulet for your deity, or die in the\n\x1b[22Cattempt.  Your hour of destiny has come.  For the sake\n\x1b[22Cof us all:  Go bravely with Hermes!\n\x1b[22C--More--\n\n\n\n\nDavid the Rhizotomist\x1b[10CSt:8 Dx:7 Co:14 In:11 Wi:18 Ch:17 Neutral\nDlvl:1 $:1218 HP:13(13) Pw:3(3) AC:0 Xp:1",
-        "Hello David, welcome to NetHack!  You are a neutral male human Healer.--More--\n\n\n\n\n\n\n\n\x1b[45C\x0elqqqqqqqqqqk\x0f\n\x1b[45C\x0ex~~~~\x0f!\x0e~~~~~~\x0f\n\x1b[45C\x0e~~~\x1b[33m\x0f(\x1b[39m\x0e~~~~~~~x\x0f\n\x1b[45C\x0ex~~~~~~~~~~x\x0f\n\x1b[45C\x0ex~~~~~~\x1b[97m\x0f?\x1b[39m\x0e~~~x\x0f\n\x1b[45C\x0ex~~~~\x1b[97m\x0f@\x1b[39m\x0e~~~\x1b[96m\x0f/\x1b[39m\x0e~~\x0f\n\x1b[45C\x0ex~~~~\x1b[97m\x0fd\x1b[39m\x0e~~~~~x\x0f\n\x1b[45C\x0emqqqqqqqqqqj\x0f\n\n\n\n\n\n\nDavid the Rhizotomist\x1b[10CSt:8 Dx:7 Co:14 In:11 Wi:18 Ch:17 Neutral\nDlvl:1 $:1218 HP:13(13) Pw:5(5) AC:8 Xp:1",
-        "\x1b[21C\x1b[7mDo you want a tutorial?\x1b[0m\n\n\x1b[21Cy - Yes, do a tutorial\n\x1b[21Cn - No, just start play\n\n\x1b[21CPut \"OPTIONS=!tutorial\" in .nethackrc to skip this query.\n\x1b[21C(end)\n\n\x1b[45C\x0elqqqqqqqqqqk\x0f\n\x1b[45C\x0ex~~~~\x0f!\x0e~~~~~~\x0f\n\x1b[45C\x0e~~~\x1b[33m\x0f(\x1b[39m\x0e~~~~~~~x\x0f\n\x1b[45C\x0ex~~~~~~~~~~x\x0f\n\x1b[45C\x0ex~~~~~~\x1b[97m\x0f?\x1b[39m\x0e~~~x\x0f\n\x1b[45C\x0ex~~~~\x1b[97m\x0f@\x1b[39m\x0e~~~\x1b[96m\x0f/\x1b[39m\x0e~~\x0f\n\x1b[45C\x0ex~~~~\x1b[97m\x0fd\x1b[39m\x0e~~~~~x\x0f\n\x1b[45C\x0emqqqqqqqqqqj\x0f\n\n\n\n\n\n\nDavid the Rhizotomist\x1b[10CSt:8 Dx:7 Co:14 In:11 Wi:18 Ch:17 Neutral\nDlvl:1 $:1218 HP:13(13) Pw:5(5) AC:8 Xp:1"
-    ];
     // C refs: src/role.c:plnamesuffix(), src/role.c:genl_player_setup(),
     // win/tty/wintty.c:tty_askname().  Incomplete startup options ask for a
     // name first, then run the role/race/gender/alignment selection menus.
-    if (g._seed !== 2) {
-        if (!g._nhopts?.name) await promptForPlayerName();
-        if (!fullyConfiguredCharacter()) await askStartupAutoPick();
-        return;
-    }
-
-    // We only need to run this for seed 2.
-    // Cursor positions for each step
-    const cursors = [
-        [13, 12], [14, 12], [15, 12], [16, 12], [17, 12], [18, 12],
-        [74, 0], [47, 8], [30, 17], [78, 0]
-    ];
-
-    // We can just consume 10 keys
-    for(let i=0; i<10; i++) {
-        g._override_screen = steps[i];
-        g._override_cursor = [cursors[i][0], cursors[i][1], 1];
-        if (g.nhDisplay) {
-            g.nhDisplay.cursorCol = cursors[i][0];
-            g.nhDisplay.cursorRow = cursors[i][1];
-        }
-        await flush_screen(1);
-
-        if (i === 7) {
-            // C ref: pick_role etc.
-            rn2(13); // pick_role
-            rn2(2);  // pick_race
-            rn2(2);  // pick_gend
-            rn2(1);  // pick_align
-        }
-
-        await nhgetch();
-    }
-    
-    // Set step 10 override to be captured by the main game loop's first nhgetch()
-    g._override_screen = steps[10];
-    g._override_cursor = [27, 6, 1];
-    if (g.nhDisplay) {
-        g.nhDisplay.cursorCol = 27;
-        g.nhDisplay.cursorRow = 6;
-    }
-    g._nhopts = {
-        ...(g._nhopts || {}),
-        name: 'David',
-        role: 'Healer',
-        race: 'human',
-        gender: 'male',
-        align: 'neutral',
-    };
-    g.plname = 'David';
+    if (!g._nhopts?.name) await promptForPlayerName();
+    if (!fullyConfiguredCharacter()) await askStartupAutoPick();
 }
 
 export async function newgame() {
@@ -1472,10 +1433,12 @@ export async function newgame() {
     // makedog() run with svm.moves == 0; inventory initialization then starts
     // ordinary play at turn 1.
     g.moves = 1;
+    let startupScaffoldLegacyState = null;
     if (startupScaffold) {
         u_init_role_inventory();
         apply_startup_role_state();
         postInventoryStartupRng();
+        startupScaffoldLegacyState = captureStartupVisibleState(g);
         g.u.uhp = scaffoldState.hp;
         g.u.uhpmax = scaffoldState.hp;
         g.u.uen = scaffoldState.pw;
@@ -1500,9 +1463,13 @@ export async function newgame() {
     await cls();
     await docrt();
     await flush_screen(1);
+    const startupScaffoldFinalState = startupScaffold ? captureStartupVisibleState(g) : null;
+    if (startupScaffold && g.flags?.legacy !== false)
+        restoreStartupVisibleState(g, startupScaffoldLegacyState);
     await bot();
     await flush_screen(1);
     drawQuestIntroOverlay(alignName);
+    restoreStartupVisibleState(g, startupScaffoldFinalState);
     if (!startupScaffold) applyStartupSpellPowerFloor();
     if (!startupScaffold && g.flags?.legacy !== false) {
         // C applies starting inventory wear/find_ac side effects after the
@@ -1524,7 +1491,7 @@ export async function newgame() {
     await pline(welcome);
     const welcomeHasFollowup = !g.tutorial_set_in_config
         || (g._startup_preamble_messages || []).length > 0;
-    if (!startupScaffold && welcomeHasFollowup) {
+    if (welcomeHasFollowup) {
         g._more = true;
         g._more_next_message_row = welcome.length + '--More--'.length >= COLNO;
     }
