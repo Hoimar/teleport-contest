@@ -1835,6 +1835,10 @@ function _buildScreenOutput(options = {}) {
         renderOverrideScreen(display, currentLatchedMoreScreen());
         return;
     }
+    if (game._startup_legacy_pager_active && game._startup_legacy_pager_screen) {
+        renderTextScreen(display, game._startup_legacy_pager_screen, game._startup_legacy_pager_cursor || null);
+        return;
+    }
     if (game._tutorial_prompt_active && game._tutorial_prompt_screen) {
         renderTextScreen(display, game._tutorial_prompt_screen, game._tutorial_prompt_cursor || null);
         return;

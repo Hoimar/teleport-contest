@@ -23051,6 +23051,31 @@ async function handleTutorialPromptInput(ch) {
     game.context.move = 0;
 }
 
+function startupLegacyPagerDismissKey(ch) {
+    return ch === ' ' || ch === '\r' || ch === '\n' || ch === '\x1b';
+}
+
+function clearStartupLegacyPagerState() {
+    game._startup_legacy_pager_active = false;
+    game._startup_legacy_pager_screen = null;
+    game._startup_legacy_pager_cursor = null;
+    game._full_map_redraw_pending = true;
+}
+
+function handleStartupLegacyPagerInput(ch) {
+    if (game._more && !startupLegacyPagerDismissKey(ch)) {
+        game.context.move = 0;
+        return;
+    }
+    clearStartupLegacyPagerState();
+    if (game._deferred_startup_uac != null) {
+        game.u.uac = game._deferred_startup_uac;
+        game._deferred_startup_uac = null;
+        apply_deferred_startup_wear();
+    }
+    game.context.move = 0;
+}
+
 async function showPromptLine(text, options = {}) {
     await pline(text);
     const cursorPad = options.trailingInputSpace ? 1 : 0;
@@ -25647,12 +25672,17 @@ export async function rhack(key) {
         return;
     }
 
-    if (await handleQueuedMore(ch)) return;
-
     if (game._tutorial_prompt_active) {
         await handleTutorialPromptInput(ch);
         return;
     }
+
+    if (game._startup_legacy_pager_active) {
+        handleStartupLegacyPagerInput(ch);
+        return;
+    }
+
+    if (await handleQueuedMore(ch)) return;
 
     if (game._awaiting_quest_leader_align_adjust) {
         game._awaiting_quest_leader_align_adjust = false;

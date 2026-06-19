@@ -1252,8 +1252,9 @@ function drawQuestIntroOverlay(alignName) {
         if (!startupPrimaryDecgraphics()) restoreLegacyPagerLowerMapRows(display);
     }
     for (const [col, row, text] of lines) display.putstr(col, row, text, NO_COLOR, 0);
-    g._override_screen = serialize_terminal_grid(display);
-    g._override_cursor = [left + 8, 17, 1];
+    g._startup_legacy_pager_screen = serialize_terminal_grid(display);
+    g._startup_legacy_pager_cursor = [left + 8, 17, 1];
+    g._startup_legacy_pager_active = true;
     return true;
 }
 
@@ -2639,7 +2640,7 @@ async function refreshHallucinationDisplayAtInputBoundary(g) {
     // C tty menus read their selection inside select_menu(); while the menu
     // window is active, moveloop_core() has not resumed for the Hallucination
     // input-boundary redraw.
-    if (g._override_screen || g._tutorial_prompt_active) return;
+    if (g._override_screen || g._startup_legacy_pager_active || g._tutorial_prompt_active) return;
     if (!(g.u?.uhallucination || g.u?.uprops?.hallucination)) return;
     if (g.u?.uswallow && g.u?.ustuck && g._swallowed_map_active) {
         // C ref: allmain.c:moveloop_core() once-per-player-input Hallucination
