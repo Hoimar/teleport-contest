@@ -17030,6 +17030,39 @@ function attributesWindowCursor(screen) {
     return [9, Math.max(0, String(screen || '').split('\n').length - 1)];
 }
 
+function setLevelTeleportMenuScreen(menu) {
+    installSerializedScreenHook();
+    clearOverrideScreen();
+    const cursor = levelTeleportMenuCursor(menu?.screen || '');
+    game._level_teleport_menu_screen = menu?.screen || '';
+    game._level_teleport_menu_choices = menu?.choices || {};
+    game._level_teleport_menu_cursor = cursor;
+    game._level_teleport_menu_page = menu?.pageIndex || 0;
+    game._level_teleport_menu_total_pages = menu?.totalPages || 1;
+    game._level_teleport_menu_active = true;
+    if (game.nhDisplay) {
+        if (typeof game.nhDisplay.setCursor === 'function')
+            game.nhDisplay.setCursor(cursor[0], cursor[1]);
+        else {
+            game.nhDisplay.cursorCol = cursor[0];
+            game.nhDisplay.cursorRow = cursor[1];
+        }
+    }
+}
+
+function showLevelTeleportMenuPage(pageIndex) {
+    setLevelTeleportMenuScreen(renderLevelTeleportPage(pageIndex));
+}
+
+function clearLevelTeleportMenuScreen() {
+    game._level_teleport_menu_active = false;
+    game._level_teleport_menu_screen = null;
+    game._level_teleport_menu_choices = null;
+    game._level_teleport_menu_cursor = null;
+    game._level_teleport_menu_page = 0;
+    game._level_teleport_menu_total_pages = 0;
+}
+
 async function handleDisclosureWindowInput() {
     const kind = game._disclosure_window_kind || '';
     clearDisclosureWindowScreen();
@@ -17127,6 +17160,55 @@ async function handleAttributesWindowInput(key) {
         clearOverrideScreen();
         await redrawAfterFullScreenMenuDismiss();
     }
+    game.context.move = 0;
+}
+
+async function dismissLevelTeleportMenu() {
+    clearLevelTeleportMenuScreen();
+    clearOverrideScreen();
+    await redrawAfterFullScreenMenuDismiss();
+    game.context.move = 0;
+}
+
+async function handleLevelTeleportMenuInput(ch) {
+    // C ref: src/teleport.c:level_tele() -> src/dungeon.c:print_dungeon(TRUE).
+    const page = game._level_teleport_menu_page || 0;
+    const totalPages = game._level_teleport_menu_total_pages || 1;
+    const target = game._level_teleport_menu_choices?.[ch];
+    if (target) {
+        await dismissLevelTeleportMenu();
+        await scheduleLevelTeleportFromMenu(target);
+        return;
+    }
+
+    if ((ch === ' ' || ch === C.MENU_NEXT_PAGE) && page + 1 < totalPages) {
+        showLevelTeleportMenuPage(page + 1);
+        game.context.move = 0;
+        return;
+    }
+    if (ch === C.MENU_PREVIOUS_PAGE && page > 0) {
+        showLevelTeleportMenuPage(page - 1);
+        game.context.move = 0;
+        return;
+    }
+    if (ch === '^' && page > 0) {
+        showLevelTeleportMenuPage(0);
+        game.context.move = 0;
+        return;
+    }
+    if (ch === '|' && page + 1 < totalPages) {
+        showLevelTeleportMenuPage(totalPages - 1);
+        game.context.move = 0;
+        return;
+    }
+
+    if (ch === '\x1b' || ch === '\r' || ch === '\n'
+        || (ch === ' ' && page + 1 >= totalPages)) {
+        await dismissLevelTeleportMenu();
+        return;
+    }
+
+    showLevelTeleportMenuPage(page);
     game.context.move = 0;
 }
 
@@ -25143,14 +25225,6 @@ function buildLevelTeleportMenu() {
     return renderLevelTeleportPage(0);
 }
 
-function buildLevelTeleportMenuPage2() {
-    return renderLevelTeleportPage(1);
-}
-
-function buildLevelTeleportMenuPage3() {
-    return renderLevelTeleportPage(2);
-}
-
 function appendLevelchangeTopline(line, msg) {
     if (!line) return msg;
     const candidate = `${line}  ${msg}`;
@@ -26161,6 +26235,11 @@ export async function rhack(key) {
 
     if (game._attributes_window_active) {
         await handleAttributesWindowInput(key);
+        return;
+    }
+
+    if (game._level_teleport_menu_active) {
+        await handleLevelTeleportMenuInput(ch);
         return;
     }
 
@@ -27858,10 +27937,7 @@ export async function rhack(key) {
                 game._awaiting_level_teleport = false;
                 game._level_teleport_help_pending = false;
                 game._level_teleport_input = '';
-                const menu = buildLevelTeleportMenu();
-                game._level_teleport_menu_screen = menu.screen;
-                game._level_teleport_menu_choices = menu.choices;
-                showOverride(menu.screen, levelTeleportMenuCursor(menu.screen));
+                setLevelTeleportMenuScreen(buildLevelTeleportMenu());
             }
             game.context.move = 0;
             return;
@@ -29068,51 +29144,6 @@ export async function rhack(key) {
         }
         if (prev === game._death_attributes_page3_screen) {
             await showDeathCreaturesPrompt();
-            game.context.move = 0;
-            return;
-        }
-        if (prev === game._level_teleport_menu_screen) {
-            if (ch === ' ') {
-                const menu = buildLevelTeleportMenuPage2();
-                game._level_teleport_menu_page2_screen = menu.screen;
-                game._level_teleport_menu_page2_choices = menu.choices;
-                showOverride(menu.screen, levelTeleportMenuCursor(menu.screen));
-                game.context.move = 0;
-                return;
-            }
-            const target = game._level_teleport_menu_choices?.[ch];
-            if (target) {
-                await redrawAfterFullScreenMenuDismiss();
-                await scheduleLevelTeleportFromMenu(target);
-            }
-            game.context.move = 0;
-            return;
-        }
-        if (prev === game._level_teleport_menu_page2_screen) {
-            if (ch === ' ') {
-                const menu = buildLevelTeleportMenuPage3();
-                if (menu.pageIndex < menu.totalPages) {
-                    game._level_teleport_menu_page3_screen = menu.screen;
-                    game._level_teleport_menu_page3_choices = menu.choices;
-                    showOverride(menu.screen, levelTeleportMenuCursor(menu.screen));
-                }
-                game.context.move = 0;
-                return;
-            }
-            const target = game._level_teleport_menu_page2_choices?.[ch];
-            if (target) {
-                await redrawAfterFullScreenMenuDismiss();
-                await scheduleLevelTeleportFromMenu(target);
-            }
-            game.context.move = 0;
-            return;
-        }
-        if (prev === game._level_teleport_menu_page3_screen) {
-            const target = game._level_teleport_menu_page3_choices?.[ch];
-            if (target) {
-                await redrawAfterFullScreenMenuDismiss();
-                await scheduleLevelTeleportFromMenu(target);
-            }
             game.context.move = 0;
             return;
         }
