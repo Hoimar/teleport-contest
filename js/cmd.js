@@ -16844,6 +16844,28 @@ function clearLookWindowScreen({ redraw = false } = {}) {
     if (redraw) game._full_map_redraw_pending = true;
 }
 
+function setTravelTipScreen(screen, cursor = [16, 8]) {
+    installSerializedScreenHook();
+    clearOverrideScreen();
+    game._travel_tip_screen = screen;
+    game._travel_tip_screen_cursor = cursor ? [cursor[0], cursor[1]] : null;
+    game._travel_tip_screen_active = true;
+    if (game.nhDisplay && cursor) {
+        if (typeof game.nhDisplay.setCursor === 'function')
+            game.nhDisplay.setCursor(cursor[0], cursor[1]);
+        else {
+            game.nhDisplay.cursorCol = cursor[0];
+            game.nhDisplay.cursorRow = cursor[1];
+        }
+    }
+}
+
+function clearTravelTipScreen() {
+    game._travel_tip_screen_active = false;
+    game._travel_tip_screen = null;
+    game._travel_tip_screen_cursor = null;
+}
+
 function currentFruitName() {
     return String(game.flags?.fruit || 'slime mold');
 }
@@ -17798,8 +17820,7 @@ function showTravelTipOverScreen(baseScreen) {
     while (lines.length < C.TERMINAL_ROWS) lines.push('');
     for (let row = 0; row <= 8; row++) lines[row] = '';
     for (const [row, text] of TRAVEL_TIP_ROWS) lines[row] = `\x1b[10C${text}`;
-    showSerializedOverride(lines.slice(0, C.TERMINAL_ROWS).join('\n'), [16, 8]);
-    game._override_serialized_persistent = true;
+    setTravelTipScreen(lines.slice(0, C.TERMINAL_ROWS).join('\n'), [16, 8]);
 }
 
 async function showTravelTipScreen(baseScreen = null) {
@@ -17818,9 +17839,8 @@ async function showTravelTipScreen(baseScreen = null) {
     for (const [row, text] of TRAVEL_TIP_ROWS) {
         display.putstr(10, row, text, NO_COLOR, 0);
     }
-    const screen = serialize_terminal_grid(display);
-    showSerializedOverride(screen, [16, 8]);
-    game._override_serialized_persistent = true;
+    const screen = serializeBaseTerminalGrid(display);
+    setTravelTipScreen(screen, [16, 8]);
 }
 
 async function showLookAtMenu() {
@@ -25913,7 +25933,7 @@ export async function rhack(key) {
             const quickFarlook = kind === 'farlook' && !!game._farlook_after_tip_quick;
             game._farlook_after_tip_quick = false;
             game._travel_tip_active = false;
-            clearOverrideScreen();
+            clearTravelTipScreen();
             if (kind === 'farlook') {
                 if (quickFarlook) {
                     game._awaiting_farlook_prompt = true;
