@@ -1,8 +1,8 @@
 // allmain.js — Main game loop.
 // C ref: allmain.c — newgame, moveloop, moveloop_core.
 //
-// Seed-scoped startup scaffolding still covers unported selection screens and
-// visible initial-state results. Real mklev.js handles level generation.
+// Startup selection and initial hero state run through the live JS port for
+// current evidence. Real mklev.js handles level generation.
 
 import { game } from './gstate.js';
 import { rn2, rnd } from './rng.js';
@@ -47,7 +47,6 @@ import {
     A_DEX, A_INT, A_STR, A_WIS, COLNO, D_BROKEN, D_CLOSED, D_ISOPEN, D_LOCKED,
     D_NODOOR, DOOR, NORMAL_SPEED, W_TOOL,
 } from './const.js';
-const STARTUP_SCAFFOLD_SEEDS = new Set([2, 8000]);
 
 const SPEED_BOOTS = 166;
 const GAUNTLETS_OF_FUMBLING = 160;
@@ -270,53 +269,6 @@ async function nhTimeoutBasic() {
         }
     }
     for (const { x, y } of expire_corpse_timeouts()) newsym(x, y);
-}
-
-function startupScaffoldForCurrentSeed() {
-    return STARTUP_SCAFFOLD_SEEDS.has(game._seed);
-}
-
-function startupScaffoldHeroState(roleName) {
-    // The startup scaffold has already consumed the C attribute RNG; keep
-    // only the resulting state here until
-    // init_attr()/vary_init_attr() can run live for these paths.
-    if (roleName === 'Healer') {
-        return {
-            hp: 13,
-            pw: 5,
-            ac: 8,
-            attrs: [8, 11, 18, 7, 14, 17],
-        };
-    }
-    return {
-        hp: 10,
-        pw: 2,
-        ac: 10,
-        attrs: [9, 11, 16, 14, 12, 16],
-    };
-}
-
-function captureStartupVisibleState(g) {
-    return {
-        hp: g.u.uhp,
-        hpmax: g.u.uhpmax,
-        pw: g.u.uen,
-        pwmax: g.u.uenmax,
-        ac: g.u.uac,
-        attrs: g.u.acurr?.a?.slice() || null,
-        maxes: g.u.amax?.a?.slice() || null,
-    };
-}
-
-function restoreStartupVisibleState(g, state) {
-    if (!state) return;
-    g.u.uhp = state.hp;
-    g.u.uhpmax = state.hpmax;
-    g.u.uen = state.pw;
-    g.u.uenmax = state.pwmax;
-    g.u.uac = state.ac;
-    if (state.attrs) g.u.acurr = { a: state.attrs.slice() };
-    if (state.maxes) g.u.amax = { a: state.maxes.slice() };
 }
 
 function isSimpleMonsterHitYouLine(line) {
@@ -1356,8 +1308,6 @@ export async function newgame() {
     initrack();
     await player_selection();
 
-    const startupScaffold = startupScaffoldForCurrentSeed();
-
     // Real pre-mklev startup phases mutate object descriptions, dungeon
     // topology, and baseline hero misc state before level generation.
     init_objects();
@@ -1391,25 +1341,23 @@ export async function newgame() {
     // Structural phase consumes RNG for rooms/corridors/doors/stairs
     await mklev();
 
-    // Startup scaffold state. Contestants: port init_attr() and
-    // starting role state fully enough to retire this result fixture.
+    // Initial hero shell. C fills the visible HP/Pw/AC/attributes later in
+    // u_init_inventory_attrs(), after mklev() and makedog().
     g.u.ulevel = 1;
     g.u.uexp = 0;
     const align = startupAlign();
     const alignName = align.name;
-    const scaffoldState = startupScaffoldHeroState(startupRole()?.name?.m);
-    g.u.uhp = scaffoldState.hp;
-    g.u.uhpmax = scaffoldState.hp;
-    g.u.uen = scaffoldState.pw;
-    g.u.uenmax = scaffoldState.pw;
-    g.u.uac = scaffoldState.ac;
-    // Attribute storage follows C order: Str, Int, Wis, Dex, Con, Cha.
-    const startupAttrs = scaffoldState.attrs;
-    g.u.acurr = { a: startupAttrs.slice() };
-    g.u.amax = { a: startupAttrs.slice() };
     g.urole = startupRole();
     g.urace = startupRace();
     g.flags.female = startupFemale();
+    g.u.uhp = g._initialHp ?? 10;
+    g.u.uhpmax = g.u.uhp;
+    g.u.uen = g._initialPower ?? 2;
+    g.u.uenmax = g.u.uen;
+    g.u.uac = 10;
+    // Attribute storage follows C order: Str, Int, Wis, Dex, Con, Cha.
+    g.u.acurr = { a: [0, 0, 0, 0, 0, 0] };
+    g.u.amax = { a: [0, 0, 0, 0, 0, 0] };
     // C refs: src/attrib.c:newhp(), include/you.h:Role.initrecord.
     g.u.ualign = { type: align.value, record: g.urole?.initrecord ?? 10 };
     const startupRoleName = g.flags?.female ? (g.urole.name.f || g.urole.name.m) : g.urole.name.m;
@@ -1433,27 +1381,12 @@ export async function newgame() {
     // makedog() run with svm.moves == 0; inventory initialization then starts
     // ordinary play at turn 1.
     g.moves = 1;
-    let startupScaffoldLegacyState = null;
-    if (startupScaffold) {
-        u_init_role_inventory();
-        apply_startup_role_state();
-        postInventoryStartupRng();
-        startupScaffoldLegacyState = captureStartupVisibleState(g);
-        g.u.uhp = scaffoldState.hp;
-        g.u.uhpmax = scaffoldState.hp;
-        g.u.uen = scaffoldState.pw;
-        g.u.uenmax = scaffoldState.pw;
-        g.u.uac = scaffoldState.ac;
-        g.u.acurr = { a: startupAttrs.slice() };
-        g.u.amax = { a: startupAttrs.slice() };
-    } else {
-        u_init_role_inventory();
-        apply_startup_role_state();
-        postInventoryStartupRng();
-        if (g.flags?.legacy === false) {
-            // C ref: u_init.c:u_init_skills_discoveries() -> do_wear.c:find_ac().
-            g.u.uac = calculated_armor_class();
-        }
+    u_init_role_inventory();
+    apply_startup_role_state();
+    postInventoryStartupRng();
+    if (g.flags?.legacy === false) {
+        // C ref: u_init.c:u_init_skills_discoveries() -> do_wear.c:find_ac().
+        g.u.uac = calculated_armor_class();
     }
 
     // Initial display
@@ -1463,15 +1396,11 @@ export async function newgame() {
     await cls();
     await docrt();
     await flush_screen(1);
-    const startupScaffoldFinalState = startupScaffold ? captureStartupVisibleState(g) : null;
-    if (startupScaffold && g.flags?.legacy !== false)
-        restoreStartupVisibleState(g, startupScaffoldLegacyState);
     await bot();
     await flush_screen(1);
     drawQuestIntroOverlay(alignName);
-    restoreStartupVisibleState(g, startupScaffoldFinalState);
-    if (!startupScaffold) applyStartupSpellPowerFloor();
-    if (!startupScaffold && g.flags?.legacy !== false) {
+    applyStartupSpellPowerFloor();
+    if (g.flags?.legacy !== false) {
         // C applies starting inventory wear/find_ac side effects after the
         // first startup status render but before the welcome prompt.
         const startupAc = calculated_armor_class();

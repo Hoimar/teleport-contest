@@ -14,30 +14,30 @@ and `feature_map.md`.
 
 - Current branch in this workspace: `main`, ahead of origin.
 - Latest verified repair unit:
-  - Seed0002 startup screen-table retirement:
+  - Startup visible-state fixture retirement:
     `seed0002-healer-reflection-drummer` remains exact
     (`S 595/595 R 27158/27158 C 0`), `seed8000-tourist-starter` remains
     exact (`S 23/23 R 3130/3130 C 0`), and checked-in public remains
     `44/44 S 11405/11405 R 792838/792838 C 0`.
   - Strict sentinels exact: `5/5 S 1063/1063 R 64569/64569 C 0`.
   - `verify --target seed0002-healer-reflection-drummer` passed target
-    expectations, strict sentinels, `hack:audit` (`hard=0 suspicious=30`), and
+    expectations, strict sentinels, `hack:audit` (`hard=0 suspicious=16`), and
     `memory:lint` (`issues=0`).
   - Focused guards exact: `seed0002-healer-reflection-drummer`,
-    `seed8000-tourist-starter`, `seed0360-wizard-world-tour`,
-    `seed0361-archeologist-tour`, and `seed5006-tourist-stress-disaster`.
+    `seed8000-tourist-starter`, `seed0077-rogue-chargen`, and
+    `seed0900-tourist-explore-actions`.
   - Full corpus inventory after the dehack: 44 passing sessions.
-  - Local parity refresh after the dehack is checked-in public
+  - Local parity refresh after the audit/comment cleanup was checked-in public
     `44/44 S 11405/11405 R 792838/792838 C 0`; cached hosted public remains
     `public-session-drift` at `40/44 S 10417/10982 R 629747/840358 C 0`;
     leaderboard fetch failed.
   - Implementation:
-    - Seed0002 now uses the generic tty askname, autopick prompt, random-pick,
-      and confirmation helpers instead of a static screen array.
-    - The legacy pager is drawn live and uses a temporary pre-final startup
-      status snapshot before the welcome frame restores final visible state.
-    - Generated fastforward tables remain deleted; remaining startup debt is
-      initial HP/Pw/AC/attribute result scaffolding.
+    - Seed0002 and seed8000 now use the shared live startup HP/Pw/AC/attribute
+      result path after `u_init_role_inventory()`/`apply_startup_role_state()`.
+    - The seed gate, hardcoded Healer/Tourist visible states, and
+      startup-state capture/restore fixture are deleted from `js/allmain.js`.
+    - `makedog()` still observes zeroed pre-inventory attributes for
+      `edog.apport`, matching C ordering.
   - Remaining checked-in public misses after the refresh: none.
 - Scratch trace/checkpoint files are agent-toolkit state and may be committed
   when useful; keep production parity and scratch-tool commits coherent.
@@ -47,21 +47,21 @@ and `feature_map.md`.
   hosted cache differs from checked-in sessions, and leaderboard state remains
   secondary until refreshed.
 - Current sentinel regression classification: none; strict sentinel is exact.
-- Hack audit remains `hard=0 suspicious=30`; `memory:lint` reports
+- Hack audit remains `hard=0 suspicious=16`; `memory:lint` reports
   `issues=0`. Production `js/` has no intentional debug I/O or imports from
   `frozen/`.
 
 ## Latest Loop Checkpoint
 
 - Latest verified WIP on 2026-06-19:
-  - Seed0002 startup screen-table retirement:
+  - Startup visible-state fixture retirement:
     `seed0002-healer-reflection-drummer` remains exact
     (`S 595/595 R 27158/27158 C 0`) and `seed8000-tourist-starter`
     remains exact (`S 23/23 R 3130/3130 C 0`).
   - Strict sentinel exact:
     `5/5 S 1063/1063 R 64569/64569 C 0`.
   - `verify --target seed0002-healer-reflection-drummer` passed target,
-    strict sentinels, `hack:audit` (`hard=0 suspicious=30`), and
+    strict sentinels, `hack:audit` (`hard=0 suspicious=16`), and
     `memory:lint` (`issues=0`).
   - Full corpus inventory: 44 passing sessions, checked-in public
     `44/44 S 11405/11405 R 792838/792838 C 0`.
@@ -70,12 +70,12 @@ and `feature_map.md`.
     cached hosted public `40/44 S 10417/10982 R 629747/840358 C 0`;
     hosted cache remains `public-session-drift`, leaderboard fetch failed.
   - Dehack truth:
-    - Seed0002 startup selection should flow through generic tty askname and
-      autopick helpers; no static startup screen table is needed.
-    - Remaining startup scaffold debt is visible initial HP/Pw/AC/attribute
-      result state plus generic override-screen plumbing.
-  - Next queue: remaining hack debt is `hard=0 suspicious=30`, dominated by
-    generic override-screen plumbing and replay/harness comments.
+    - Seed-backed startup should flow through generic tty askname/autopick,
+      live role inventory, live startup attributes, and ordinary AC deferral.
+    - No visible initial HP/Pw/AC/attribute fixture remains for seed0002 or
+      seed8000; generic override-screen plumbing remains visible debt.
+  - Next queue: remaining hack debt is `hard=0 suspicious=16`, dominated by
+    generic override-screen plumbing plus the forbidden-file replay comments.
 
 - Previous verified WIP on 2026-06-19:
   - `seed5006-tourist-stress-disaster`: restored exact parity:
