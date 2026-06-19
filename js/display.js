@@ -1835,6 +1835,10 @@ function _buildScreenOutput(options = {}) {
         renderOverrideScreen(display, currentLatchedMoreScreen());
         return;
     }
+    if (game._tutorial_prompt_active && game._tutorial_prompt_screen) {
+        renderTextScreen(display, game._tutorial_prompt_screen, game._tutorial_prompt_cursor || null);
+        return;
+    }
     if (game._override_screen) {
         renderOverrideScreen(display, game._override_screen);
         return;

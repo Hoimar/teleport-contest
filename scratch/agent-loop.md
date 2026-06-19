@@ -13,38 +13,10 @@ and `feature_map.md`.
 ## Current State
 
 - Current branch in this workspace: `main`, ahead of origin.
-- Latest verified repair unit:
-  - Startup visible-state fixture retirement:
-    `seed0002-healer-reflection-drummer` remains exact
-    (`S 595/595 R 27158/27158 C 0`), `seed8000-tourist-starter` remains
-    exact (`S 23/23 R 3130/3130 C 0`), and checked-in public remains
-    `44/44 S 11405/11405 R 792838/792838 C 0`.
-  - Strict sentinels exact: `5/5 S 1063/1063 R 64569/64569 C 0`.
-  - `verify --target seed0361-archeologist-tour` passed target
-    expectations, strict sentinels, `hack:audit` (`hard=0 suspicious=12`), and
-    `memory:lint` (`issues=0`).
-  - Focused guards exact: `seed0002-healer-reflection-drummer`,
-    `seed8000-tourist-starter`, `seed0077-rogue-chargen`,
-    `seed0102-ranger-name-cancel`, `seed0116-wizard-wear-shop`,
-    `seed0361-archeologist-tour`, and `seed0900-tourist-explore-actions`.
-  - Full corpus inventory after the dehack: 44 passing sessions.
-  - Local parity refresh after the audit/comment cleanup was checked-in public
-    `44/44 S 11405/11405 R 792838/792838 C 0`; cached hosted public remains
-    `public-session-drift` at `40/44 S 10417/10982 R 629747/840358 C 0`;
-    leaderboard fetch failed.
-  - Implementation:
-    - Seed0002 and seed8000 now use the shared live startup HP/Pw/AC/attribute
-      result path after `u_init_role_inventory()`/`apply_startup_role_state()`.
-    - The seed gate, hardcoded Healer/Tourist visible states, and
-      startup-state capture/restore fixture are deleted from `js/allmain.js`.
-    - Startup askname/autopick/confirmation screens render directly into the
-      tty grid via `renderTextScreen()` before `nhgetch()`, so they no longer
-      use gameplay override-screen state.
-    - Serialized tty text-window override state and the terminal serialize hook
-      now live in `display.js`, not duplicated in command/monster modules.
-    - `makedog()` still observes zeroed pre-inventory attributes for
-      `edog.apport`, matching C ordering.
-  - Remaining checked-in public misses after the refresh: none.
+- Latest verified repair unit: tutorial prompt override-state retirement.
+- Checked-in public corpus is exact: `44/44 S 11405/11405 R 792838/792838 C 0`.
+- Hosted public cache remains `public-session-drift` at
+  `40/44 S 10417/10982 R 629747/840358 C 0`; leaderboard fetch failed.
 - Scratch trace/checkpoint files are agent-toolkit state and may be committed
   when useful; keep production parity and scratch-tool commits coherent.
 - Strict sentinels are exact:
@@ -60,6 +32,32 @@ and `feature_map.md`.
 ## Latest Loop Checkpoint
 
 - Latest verified WIP on 2026-06-19:
+  - Tutorial prompt override-state retirement:
+    `seed0009-swimmer-mforce` remains exact
+    (`S 73/73 R 3713/3713 C 0`) and covers the `y` tutorial-entry
+    branch; focused guards for invalid selector redraw/swallow behavior
+    (`seed0103`, `seed0116`, `seed1150`, `seed2600`), hallucination overlap
+    (`seed0383`, `seed0399`), and legacy/startup map overlays (`seed0002`,
+    `seed0360`, `seed0361`) remained exact.
+  - Strict sentinel exact:
+    `5/5 S 1063/1063 R 64569/64569 C 0`.
+  - `verify --target seed0009-swimmer-mforce` passed target,
+    strict sentinels, `hack:audit` (`hard=0 suspicious=12`), and
+    `memory:lint` (`issues=0`).
+  - Full corpus inventory: 44 passing sessions, checked-in public
+    `44/44 S 11405/11405 R 792838/792838 C 0`.
+  - Dehack truth:
+    - The post-welcome tutorial prompt is now dedicated prompt/menu state
+      rendered by `display.js` while active, not a case inside
+      `_override_prev`.
+    - Dismissing the prompt requests a full map redraw so serialized menu rows
+      do not leak into the following ordinary map frame.
+    - Hallucination input-boundary refresh treats the active tutorial prompt
+      like a C tty `select_menu()` window.
+  - Next queue: remaining hack debt is `hard=0 suspicious=12`, dominated by
+    generic override-screen plumbing plus the forbidden-file replay comments.
+
+- Previous verified WIP on 2026-06-19:
   - Startup visible-state fixture retirement:
     `seed0002-healer-reflection-drummer` remains exact
     (`S 595/595 R 27158/27158 C 0`) and `seed8000-tourist-starter`

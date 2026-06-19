@@ -22985,6 +22985,8 @@ async function enterTutorialAfterPrompt() {
 }
 
 async function showTutorialPrompt(invalidChoice = false) {
+    game._tutorial_prompt_active = false;
+    game._tutorial_prompt_cursor = null;
     game._full_map_redraw_pending = true;
     await flush_screen(1);
     const display = game.nhDisplay;
@@ -23006,9 +23008,47 @@ async function showTutorialPrompt(invalidChoice = false) {
     }
 
     const screen = serialize_terminal_grid(display);
+    const cursor = invalidChoice ? [27, 7, 1] : [27, 6, 1];
     game._tutorial_prompt_screen = screen;
+    game._tutorial_prompt_cursor = cursor;
+    game._tutorial_prompt_active = true;
     game._tutorial_prompt_done = true;
-    showOverride(screen, invalidChoice ? [27, 7] : [27, 6]);
+}
+
+function clearTutorialPromptState() {
+    game._tutorial_prompt_active = false;
+    game._tutorial_prompt_screen = null;
+    game._tutorial_prompt_cursor = null;
+    game._full_map_redraw_pending = true;
+}
+
+async function handleTutorialPromptInput(ch) {
+    if (ch === 'n' || ch === '\x1b') {
+        clear_pending_message();
+        clearTutorialPromptState();
+        game._tutorial_answered = true;
+        game._startup_preamble_done_waiting_tutorial = false;
+        game._startup_preamble_more_active = false;
+        game.context.move = 0;
+        return;
+    }
+    if (ch === 'y') {
+        clear_pending_message();
+        clearTutorialPromptState();
+        game._tutorial_answered = true;
+        game._startup_preamble_done_waiting_tutorial = false;
+        game._startup_preamble_more_active = false;
+        game.context.move = 0;
+        await enterTutorialAfterPrompt();
+        return;
+    }
+    // C ref: options.c:ask_do_tutorial() + win/tty/wintty.c:tty_select_menu().
+    // The menu loop returns with no selection for space/enter, causing
+    // ask_do_tutorial() to rebuild the menu with the extra guidance line.
+    // Other invalid selector keys are swallowed by the tty menu and leave the
+    // original menu/cursor in place.
+    await showTutorialPrompt(ch === ' ' || ch === '\r' || ch === '\n');
+    game.context.move = 0;
 }
 
 async function showPromptLine(text, options = {}) {
@@ -25608,6 +25648,11 @@ export async function rhack(key) {
     }
 
     if (await handleQueuedMore(ch)) return;
+
+    if (game._tutorial_prompt_active) {
+        await handleTutorialPromptInput(ch);
+        return;
+    }
 
     if (game._awaiting_quest_leader_align_adjust) {
         game._awaiting_quest_leader_align_adjust = false;
@@ -28427,35 +28472,6 @@ export async function rhack(key) {
     if (game._override_prev) {
         const prev = game._override_prev;
         game._override_prev = null;
-        const tutorialOverride = prev === game._tutorial_prompt_screen
-            || (typeof prev === 'string' && prev.includes('Do you want a tutorial?'));
-        if (tutorialOverride) {
-            if (ch === 'n' || ch === '\x1b') {
-                clear_pending_message();
-                game._tutorial_answered = true;
-                game._startup_preamble_done_waiting_tutorial = false;
-                game._startup_preamble_more_active = false;
-                game.context.move = 0;
-                return;
-            }
-            if (ch === 'y') {
-                clear_pending_message();
-                game._tutorial_answered = true;
-                game._startup_preamble_done_waiting_tutorial = false;
-                game._startup_preamble_more_active = false;
-                game.context.move = 0;
-                await enterTutorialAfterPrompt();
-                return;
-            }
-            // C ref: options.c:ask_do_tutorial() + win/tty/wintty.c:tty_select_menu().
-            // The menu loop returns with no selection for space/enter, causing
-            // ask_do_tutorial() to rebuild the menu with the extra guidance
-            // line. Other invalid selector keys are swallowed by the tty menu
-            // and leave the original menu/cursor in place.
-            await showTutorialPrompt(ch === ' ' || ch === '\r' || ch === '\n');
-            game.context.move = 0;
-            return;
-        }
         if (game._more && ch !== ' ' && ch !== '\r' && ch !== '\n' && ch !== '\x1b') {
             // C ref: win/tty/topl.c:more(); a latched More override ignores
             // non-dismissal keys instead of treating them as menu input.
