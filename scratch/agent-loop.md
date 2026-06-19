@@ -13,7 +13,7 @@ and `feature_map.md`.
 ## Current State
 
 - Current branch in this workspace: `main`, ahead of origin.
-- Latest verified repair unit: help menu/text active-state retirement.
+- Latest verified repair unit: direction/getpos help active-state retirement.
 - Checked-in public corpus is exact: `44/44 S 11405/11405 R 792838/792838 C 0`.
 - Hosted public cache remains `public-session-drift` at
   `40/44 S 10417/10982 R 629747/840358 C 0`; leaderboard fetch failed.
@@ -32,6 +32,27 @@ and `feature_map.md`.
 ## Latest Loop Checkpoint
 
 - Latest verified WIP on 2026-06-19:
+  - Direction/getpos help override-state retirement:
+    `seed0360-wizard-world-tour` remains exact
+    (`S 833/833 R 120639/120639 C 0`) and covers getpos help dismissal;
+    invalid-direction sentinel `seed0002`, broad direction/getpos guard
+    `seed4500`, and help/farlook guard `seed2200` remained exact.
+  - Strict sentinel exact:
+    `5/5 S 1063/1063 R 64569/64569 C 0`.
+  - `verify --target seed0360-wizard-world-tour` passed target,
+    strict sentinels, `hack:audit` (`hard=0 suspicious=11`), and
+    `memory:lint` (`issues=0`).
+  - Full corpus inventory: 44 passing sessions, checked-in public
+    `44/44 S 11405/11405 R 792838/792838 C 0`.
+  - Dehack truth:
+    - Cmdassist invalid-direction help and getpos help are active serialized
+      `dmore()` screens rendered by `display.js`, not generic overrides.
+    - Dismissal clears More state and redraws the map at dismissal time before
+      follow-up `Never mind.` text or the restored getpos cursor prompt.
+  - Next queue: remaining hack debt is `hard=0 suspicious=11`, dominated by
+    generic override-screen plumbing plus the forbidden-file replay comments.
+
+- Previous verified WIP on 2026-06-19:
   - Help menu/text override-state retirement:
     `seed4500-knight-coverage` remains exact
     (`S 1814/1814 R 108275/108275 C 0`) and covers `?` -> `e`

@@ -7608,10 +7608,7 @@ async function handleLootDirection(ch) {
         if (ch === '\x1b' || ch === 'q') {
             await pline('Never mind.');
         } else if (game.iflags?.cmdassist !== false) {
-            game._direction_help_screen = INVALID_DIRECTION_HELP_SCREEN;
-            game._direction_help_after_more_message = 'Never mind.';
-            showSerializedOverride(INVALID_DIRECTION_HELP_SCREEN, [8, 23]);
-            queue_more_prompt();
+            showDirectionHelpScreen('Never mind.');
         } else {
             await pline('Never mind.');
         }
@@ -12688,10 +12685,7 @@ async function handleUntrapDirection(ch) {
         game.context.move = 0;
         if (ch === '\x1b' || ch === 'q') return;
         if (game.iflags?.cmdassist !== false) {
-            game._direction_help_screen = INVALID_DIRECTION_HELP_SCREEN;
-            game._direction_help_after_more_message = '';
-            showSerializedOverride(INVALID_DIRECTION_HELP_SCREEN, [8, 23]);
-            queue_more_prompt();
+            showDirectionHelpScreen();
         } else {
             await pline('What a strange direction!');
         }
@@ -16320,6 +16314,25 @@ const GETPOS_HELP_LINES = [
     "Use '#' to toggle automatic description.",
     "Type a '.' when you are at the right place.",
 ];
+
+function clearDirectionHelpScreen() {
+    game._direction_help_active = false;
+    game._direction_help_screen = '';
+    game._direction_help_cursor = null;
+}
+
+function showDirectionHelpScreen(afterMoreMessage = '') {
+    // C refs: cmd.c:getdir()/getdir_help(); tty displays this as a blocking
+    // text window with dmore(), not as ordinary command dispatch.
+    game._direction_help_screen = INVALID_DIRECTION_HELP_SCREEN;
+    game._direction_help_cursor = [8, C.TERMINAL_ROWS - 1];
+    game._direction_help_active = true;
+    game._direction_help_after_more_message = afterMoreMessage;
+    installSerializedScreenHook();
+    game._full_map_redraw_pending = true;
+    queue_more_prompt();
+}
+
 const LOOKUP_DATA = new Map([
     // C ref: dat/data.base:fountain.
     ['fountain', [
@@ -18043,8 +18056,11 @@ async function showGetposHelpScreen(kind = 'travel') {
     display.setCursor(18, 16);
     const screen = serialize_terminal_grid(display);
     game._getpos_help_screen = screen;
+    game._getpos_help_cursor = [18, 16];
+    game._getpos_help_active = true;
     game._getpos_help_after_more = kind;
-    showSerializedOverride(screen, [18, 16]);
+    installSerializedScreenHook();
+    game._full_map_redraw_pending = true;
     queue_more_prompt();
 }
 
@@ -18154,8 +18170,15 @@ function showLookEngravingList(all = false) {
 }
 
 async function resumeGetposAfterHelp(kind) {
+    game._getpos_help_active = false;
     game._getpos_help_screen = '';
+    game._getpos_help_cursor = null;
     game._getpos_help_after_more = '';
+    game._more = false;
+    game._more_dismissals_remaining = 0;
+    clear_pending_message();
+    game._full_map_redraw_pending = true;
+    await flush_screen(1);
     if (kind === 'travel') {
         const cursor = currentTravelCursor();
         await showPromptLine('Move cursor to the desired destination:');
@@ -19510,14 +19533,6 @@ async function handleQueuedMore(ch) {
         && game._preserve_more_base_for_next_monster_message
         && game._latched_more_screen;
     if (!moreDismissKey) {
-        if (game._direction_help_screen) {
-            showSerializedOverride(game._direction_help_screen, [8, 23]);
-            game._override_prev = null;
-        }
-        if (game._getpos_help_screen) {
-            showSerializedOverride(game._getpos_help_screen, [18, 16]);
-            game._override_prev = null;
-        }
         game.context.move = 0;
         return true;
     }
@@ -20371,9 +20386,14 @@ async function handleQueuedMore(ch) {
         }
         game._hallucination_warning_rng_active = false;
         if (await runArrivalFloorLookAfterMore()) return true;
-        if (game._direction_help_screen) {
-            game._direction_help_screen = '';
+        if (game._direction_help_active || game._direction_help_screen) {
+            clearDirectionHelpScreen();
             game._override_prev = null;
+            game._more = false;
+            game._more_dismissals_remaining = 0;
+            clear_pending_message();
+            game._full_map_redraw_pending = true;
+            await flush_screen(1);
         }
         if (game._direction_help_after_more_message) {
             const msg = game._direction_help_after_more_message;
@@ -26849,10 +26869,7 @@ export async function rhack(key) {
         if (!'hykulnjb<>.'.includes(ch)) {
             game.context.move = 0;
             if (game.iflags?.cmdassist !== false) {
-                game._direction_help_screen = INVALID_DIRECTION_HELP_SCREEN;
-                game._direction_help_after_more_message = '';
-                showSerializedOverride(INVALID_DIRECTION_HELP_SCREEN, [8, 23]);
-                queue_more_prompt();
+                showDirectionHelpScreen();
             } else {
                 await pline('What a strange direction!');
             }
@@ -28198,10 +28215,7 @@ export async function rhack(key) {
         if (!'hykulnjb<>.'.includes(ch)) {
             game.context.move = 0;
             if (game.iflags?.cmdassist !== false) {
-                game._direction_help_screen = INVALID_DIRECTION_HELP_SCREEN;
-                game._direction_help_after_more_message = '';
-                showSerializedOverride(INVALID_DIRECTION_HELP_SCREEN, [8, 23]);
-                queue_more_prompt();
+                showDirectionHelpScreen();
             } else {
                 await pline('What a strange direction!');
             }
@@ -28229,10 +28243,7 @@ export async function rhack(key) {
                 return;
             }
             if (game.iflags?.cmdassist !== false) {
-                game._direction_help_screen = INVALID_DIRECTION_HELP_SCREEN;
-                game._direction_help_after_more_message = opening ? 'Never mind.' : '';
-                showSerializedOverride(INVALID_DIRECTION_HELP_SCREEN, [8, 23]);
-                queue_more_prompt();
+                showDirectionHelpScreen(opening ? 'Never mind.' : '');
             } else {
                 await pline('What a strange direction!');
             }
@@ -28289,10 +28300,7 @@ export async function rhack(key) {
         if (!'hykulnjb<>.'.includes(ch)) {
             game.context.move = 0;
             if (game.iflags?.cmdassist !== false) {
-                game._direction_help_screen = INVALID_DIRECTION_HELP_SCREEN;
-                game._direction_help_after_more_message = '';
-                showSerializedOverride(INVALID_DIRECTION_HELP_SCREEN, [8, 23]);
-                queue_more_prompt();
+                showDirectionHelpScreen();
             } else {
                 await pline('What a strange direction!');
             }
