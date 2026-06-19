@@ -13,7 +13,7 @@ and `feature_map.md`.
 ## Current State
 
 - Current branch in this workspace: `main`, ahead of origin.
-- Latest verified repair unit: intrinsic-menu active-state retirement.
+- Latest verified repair unit: name-menu active-state retirement.
 - Checked-in public corpus is exact: `44/44 S 11405/11405 R 792838/792838 C 0`.
 - Hosted public cache remains `public-session-drift` at
   `40/44 S 10417/10982 R 629747/840358 C 0`; leaderboard fetch failed.
@@ -32,6 +32,27 @@ and `feature_map.md`.
 ## Latest Loop Checkpoint
 
 - Latest verified WIP on 2026-06-19:
+  - Name-menu override-state retirement:
+    `seed0102-ranger-name-cancel` remains exact
+    (`S 25/25 R 4485/4485 C 0`) and covers `#name` menu cancel;
+    `seed0106-priest-extcmd-sweep` remained exact
+    (`S 267/267 R 4194/4194 C 0`).
+  - Strict sentinel exact:
+    `5/5 S 1063/1063 R 64569/64569 C 0`.
+  - `verify --target seed0102-ranger-name-cancel` passed target, strict
+    sentinels, `hack:audit` (`hard=0 suspicious=11`), and `memory:lint`
+    (`issues=0`).
+  - Full corpus inventory: 44 passing sessions, checked-in public
+    `44/44 S 11405/11405 R 792838/792838 C 0`.
+  - Dehack truth:
+    - `#name` target chooser is active serialized name-menu state rendered by
+      `display.js`, not a generic `_override_prev` screen.
+    - Selection/cancel clears the active screen before the redraw and before
+      annotation or inventory naming prompts.
+  - Next queue: remaining hack debt is `hard=0 suspicious=11`, dominated by
+    generic override-screen plumbing plus the forbidden-file replay comments.
+
+- Previous verified WIP on 2026-06-19:
   - Intrinsic-menu override-state retirement:
     `seed4500-knight-coverage` remains exact
     (`S 1814/1814 R 108275/108275 C 0`) and covers `#wizintrinsic`;
@@ -90,27 +111,6 @@ and `feature_map.md`.
       active serialized terrain-window states rendered by `display.js`.
     - Installing terrain active state clears stale generic override state, and
       selector ESC cancellation requests a map redraw before the next capture.
-  - Next queue: remaining hack debt is `hard=0 suspicious=11`, dominated by
-    generic override-screen plumbing plus the forbidden-file replay comments.
-
-- Previous verified WIP on 2026-06-19:
-  - Travel-tip override-state retirement:
-    `seed0101-ranger-quiver-throw-travel-engrave` remains exact
-    (`S 27/27 R 2371/2371 C 0`) and covers travel tip dismissal; focused
-    guards `seed0013`, `seed0360`, `seed0361`, and `seed4500` remained exact
-    for terrain/farlook/travel handoffs.
-  - Strict sentinel exact:
-    `5/5 S 1063/1063 R 64569/64569 C 0`.
-  - `verify --target seed0101-ranger-quiver-throw-travel-engrave` passed
-    target, strict sentinels, `hack:audit` (`hard=0 suspicious=11`), and
-    `memory:lint` (`issues=0`).
-  - Full corpus inventory: 44 passing sessions, checked-in public
-    `44/44 S 11405/11405 R 792838/792838 C 0`.
-  - Dehack truth:
-    - Shared farlook/travel/terrain getpos tips are active serialized screens
-      rendered by `display.js`, not generic overrides.
-    - Installing a travel tip clears stale persistent terrain-view override
-      state so the active tip screen takes serializer priority.
   - Next queue: remaining hack debt is `hard=0 suspicious=11`, dominated by
     generic override-screen plumbing plus the forbidden-file replay comments.
 

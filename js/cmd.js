@@ -12756,8 +12756,7 @@ function showNameCommandMenu() {
         display.putstr(col, row, text, NO_COLOR, inverse ? ATR_INVERSE : 0);
     }
     const screen = serialize_terminal_grid(display);
-    game._name_menu_screen = screen;
-    showOverride(screen, [col + '(end)'.length + 1, 8]);
+    setNameMenuScreen(screen, [col + '(end)'.length + 1, 8]);
 }
 
 async function beginWizardWishPrompt() {
@@ -16932,6 +16931,28 @@ function clearIntrinsicMenuScreen() {
     game._intrinsic_menu_cursor = null;
 }
 
+function setNameMenuScreen(screen, cursor) {
+    installSerializedScreenHook();
+    clearOverrideScreen();
+    game._name_menu_screen = screen;
+    game._name_menu_cursor = cursor ? [cursor[0], cursor[1]] : null;
+    game._name_menu_active = true;
+    if (game.nhDisplay && cursor) {
+        if (typeof game.nhDisplay.setCursor === 'function')
+            game.nhDisplay.setCursor(cursor[0], cursor[1]);
+        else {
+            game.nhDisplay.cursorCol = cursor[0];
+            game.nhDisplay.cursorRow = cursor[1];
+        }
+    }
+}
+
+function clearNameMenuScreen() {
+    game._name_menu_active = false;
+    game._name_menu_screen = null;
+    game._name_menu_cursor = null;
+}
+
 async function handleDisclosureWindowInput() {
     const kind = game._disclosure_window_kind || '';
     clearDisclosureWindowScreen();
@@ -16950,6 +16971,15 @@ async function handleDisclosureWindowInput() {
     }
     await redrawAfterFullScreenMenuDismiss();
     game.context.move = 0;
+}
+
+async function handleNameMenuInput(ch) {
+    clearNameMenuScreen();
+    clearOverrideScreen();
+    await redrawAfterFullScreenMenuDismiss();
+    if (ch === 'a') await beginAnnotatePrompt();
+    else if (ch === 'i' || ch === 'y') await beginNameInventoryPrompt();
+    else game.context.move = 0;
 }
 
 function currentFruitName() {
@@ -25966,6 +25996,11 @@ export async function rhack(key) {
         return;
     }
 
+    if (game._name_menu_active) {
+        await handleNameMenuInput(ch);
+        return;
+    }
+
     if (game._tutorial_prompt_active) {
         await handleTutorialPromptInput(ch);
         return;
@@ -29109,15 +29144,6 @@ export async function rhack(key) {
             game.context.move = 0;
             return;
         }
-        if (prev === game._name_menu_screen) {
-            game._name_menu_screen = null;
-            clearOverrideScreen();
-            await redrawAfterFullScreenMenuDismiss();
-            if (ch === 'a') await beginAnnotatePrompt();
-            else if (ch === 'i' || ch === 'y') await beginNameInventoryPrompt();
-            else game.context.move = 0;
-            return;
-        }
         if (prev === game._enhance_skills_screen) {
             await handleEnhanceSelection(ch);
             return;
@@ -29129,7 +29155,6 @@ export async function rhack(key) {
             || prev === game._attributes_page3_screen) {
             game._look_data_screen = null;
             game._look_list_screen = null;
-            game._name_menu_screen = null;
             game._enhance_skills_screen = null;
             game._attributes_page1_screen = null;
             game._attributes_page2_screen = null;
