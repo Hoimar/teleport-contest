@@ -170,6 +170,12 @@ async function main() {
             console.log(`  B@${item.idx} ${JSON.stringify(item)}`);
         }
     }
+    if (wants('corridor') && globalThis.__teleportCorridorTrace?.length) {
+        console.log('corridor trace');
+        for (const item of globalThis.__teleportCorridorTrace.filter(inWindow)) {
+            console.log(`  J@${item.idx} ${JSON.stringify(item)}`);
+        }
+    }
     if (wants('alloc') && globalThis.__teleportMonAllocTrace?.length) {
         console.log('mon alloc trace');
         for (const item of globalThis.__teleportMonAllocTrace.filter(inWindow)) {

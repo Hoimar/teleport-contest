@@ -135,7 +135,7 @@ Treat screen totals as lagging evidence of subsystem progress, not as the optimi
 |---|---|---|---|---|
 | Room generation (random room count/size/pos) | `mkmaze.c`, `mkroom.c` | `js/mklev.js` | 🟡 | Produces correct room count for seed8000/seed0002, and ordinary non-special `mklev()` now runs the final full-map wallification pass after `makelevel()` so late room wall/corner topology matches current seed0002 stair-descent evidence. Verify other seeds. |
 | Corridor generation | `mkmaze.c:makecorridors()` | `js/mklev.js` | 🟡 | Connected but exact corridor paths may differ from C for non-tested seeds. |
-| Door placement | `mkmaze.c:makedoor()` | `js/mklev.js` | 🟡 | `dosdoor()` now keeps JS `flags` and `doormask` synchronized to mirror C's alias, fixing closed-door rendering/movement state exposed by `seed0116`. |
+| Door placement | `mkmaze.c:makedoor()`, `mklev.c:dosdoor()` | `js/mklev.js` | 🟡 | `dosdoor()` now keeps JS `flags` and `doormask` synchronized to mirror C's alias, fixing closed-door rendering/movement state exposed by `seed0116`. Generated trapped doors can also become door mimics through the C `mkclass(S_MIMIC)` and `set_mimic_sym()` path when the depth and mimic-extinction gates allow it. |
 | Stair generation (down stairs) | `mklev.c:generate_stairs()` | `js/mklev.js:generate_stairs()` | 🟡 | Down stairs generated. |
 | Stair generation (up stairs, dlvl≥2) | `mklev.c:generate_stairs()` | `js/mklev.js:generate_stairs()` | 🟡 | Correctly skipped on dlvl 1. |
 | Branch entrance placement (Mines etc.) | `mklev.c:place_lregion()` | `js/mklev.js:place_lregion()` | 🟡 | `place_lregion()`/`bad_location()` accepts ROOM, AIR, or corridor-on-maze targets like upstream; `end1_up: true` remains hardcoded for seed8000. Verify with other seeds. |

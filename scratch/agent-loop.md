@@ -33,30 +33,22 @@ and `feature_map.md`.
 
 - Latest verified WIP on 2026-06-19:
   - Live `seed0361-archeologist-tour` now reaches
-    `S 262/294 R 66518/70975` from the prior live Fort Ludios frontier
-    `S 240/294 R 42671/70975`.
+    `S 270/294 R 70827/70975` from the prior live Arc filler frontier
+    `S 262/294 R 66518/70975`.
   - Strict sentinel exact:
     `5/5 S 1063/1063 R 64569/64569 C 0`.
   - Implementation truth:
-    - `medusa-2` now dispatches through a static upstream-map loader with
-      C-centered `(3,1)` origin, scripted lighting/rooms/stairs/lregions,
-      statue/container/object/trap/monster payload, and final
-      wallification/flip/fixup.
-    - `knox` now dispatches through a Fort Ludios static loader with real
-      court/zoo/barracks/arrival room metadata, roomless treasury lighting,
-      immediate `add_doors_to_room()`-style door links, scripted treasure,
-      traps, monsters, gems, lregions after wallification bounds, and the
-      maze-court scripted-throne `fill_zoo()` path.
-    - Croesus now receives the `PM_CROESUS` two-handed-sword `mitem` through
-      the shared monster-init inventory front door.
-    - Scratch RNG stack tooling can print focused `getbones()` traces to
-      separate bones/prelude drift from later special-level payload drift.
-  - Current live frontier: `seed0361` reaches Archeologist filler generation
-    with first RNG mismatch `FR 66503: rn2(9)=7=>rn2(8)=1`. Expected enters
-    `makemon.c:mkclass_aligned()`, while JS is still in
-    `loadArcheologistFillerSpecial()`/`makecorridors()` door generation.
-    Next work should inspect Arc filler room/corridor generation against
-    `dat/Arc-fila.lua`, `dat/Arc-filb.lua`, and C corridor/join ordering.
+    - Random `dosdoor()` now mirrors the C trapped-door mimic branch:
+      after `D_TRAPPED` and the deep-level `rn2(5)` gate, it leaves the
+      trap alone if all mimics are gone, otherwise sets `D_NODOOR`, creates
+      `makemon(mkclass(S_MIMIC, 0), x, y)`, and calls `set_mimic_sym()` again.
+    - Scratch RNG stack tooling can print focused `getbones()` and corridor
+      join/door-decision traces for live-session frontier work.
+  - Current live frontier: after Arc filler generation and level teleport
+    region placement, expected reaches `mon_arrive(dog.c:475)` at
+    `FR 70827: rn2(2)=0`, while JS is still retrying
+    `place_lregion(mkmaze.c:396)` with `rn2(79)=2`. Next work should inspect
+    special-level lregion bounds/exclusions and arrival placement/retry state.
   - First visible screen mismatch remains screen 229's materialize topline
     missing the C `--More--`; do not let that obscure the later proven RNG
     frontier unless display work is the selected subsystem target.

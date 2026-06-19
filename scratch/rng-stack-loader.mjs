@@ -1576,6 +1576,75 @@ function can_attack_after_move_basic`
 `
         );
         source = source.replace(
+            'function join(a, b, nxcor) {\n    const g = game;\n',
+            `function join(a, b, nxcor) {
+    const g = game;
+    const __corrTrace = (phase, extra = {}) => {
+        const idx = globalThis.__teleportRngTraceIndex || 0;
+        const start = globalThis.__teleportApparxyStart ?? -Infinity;
+        const end = globalThis.__teleportApparxyEnd ?? Infinity;
+        if (idx < start || idx > end) return;
+        const __locInfo = (x, y) => {
+            const loc = game.level?.at(x, y);
+            return loc ? {
+                x, y,
+                typ: loc.typ,
+                roomno: loc.roomno,
+                edge: !!loc.edge,
+                flags: loc.flags,
+                doormask: loc.doormask,
+                lit: !!loc.lit,
+            } : { x, y, missing: true };
+        };
+        (globalThis.__teleportCorridorTrace ||= []).push({
+            idx,
+            phase,
+            a,
+            b,
+            nxcor,
+            nroom: game.level?.nroom,
+            smeq: game.smeq ? game.smeq.slice(0, game.level?.nroom || 0) : [],
+            ...extra,
+            locs: (extra.locs || []).map(([x, y]) => __locInfo(x, y)),
+        });
+    };
+`
+        );
+        source = source.replace(
+            '    const dig_result = dig_corridor(org, dest, npoints, nxcor, ftyp, STONE);\n    if ((npoints.v > 0) && (okdoor(xx, yy) || !nxcor))\n        dodoor(xx, yy, croom);\n    if (!dig_result) return;\n    if (okdoor(tt.x, tt.y) || !nxcor)\n        dodoor(tt.x, tt.y, troom);\n',
+            `    const dig_result = dig_corridor(org, dest, npoints, nxcor, ftyp, STONE);
+    const __originOk = okdoor(xx, yy);
+    __corrTrace('post-dig', {
+        croom: croom ? { lx: croom.lx, hx: croom.hx, ly: croom.ly, hy: croom.hy, roomnoidx: croom.roomnoidx, doorct: croom.doorct, fdoor: croom.fdoor, needjoining: croom.needjoining } : null,
+        troom: troom ? { lx: troom.lx, hx: troom.hx, ly: troom.ly, hy: troom.hy, roomnoidx: troom.roomnoidx, doorct: troom.doorct, fdoor: troom.fdoor, needjoining: troom.needjoining } : null,
+        dx, dy, xx, yy, tx, ty,
+        org: { ...org },
+        dest: { ...dest },
+        npoints: npoints.v,
+        dig_result,
+        originOk: __originOk,
+        locs: [[xx, yy], [xx + dx, yy + dy], [tt.x, tt.y], [tx, ty]],
+    });
+    if ((npoints.v > 0) && (__originOk || !nxcor)) {
+        __corrTrace('door-origin', { x: xx, y: yy, locs: [[xx, yy]] });
+        dodoor(xx, yy, croom);
+    }
+    if (!dig_result) {
+        __corrTrace('dig-failed-return', { locs: [[xx, yy], [tt.x, tt.y]] });
+        return;
+    }
+    const __destOk = okdoor(tt.x, tt.y);
+    __corrTrace('before-dest-door', {
+        destOk: __destOk,
+        locs: [[xx, yy], [tt.x, tt.y], [tt.x - dx, tt.y - dy], [tx, ty]],
+    });
+    if (__destOk || !nxcor) {
+        __corrTrace('door-dest', { x: tt.x, y: tt.y, locs: [[tt.x, tt.y]] });
+        dodoor(tt.x, tt.y, troom);
+    }
+`
+        );
+        source = source.replace(
             '    let num = 0;\n    const weights = new Map();\n',
             `    let num = 0;
     const weights = new Map();

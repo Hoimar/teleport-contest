@@ -18628,7 +18628,13 @@ function dosdoor(x, y, aroom, type) {
         if (rogue_level_active()) set_door_mask(loc, D_NODOOR);
         if (loc.flags & D_TRAPPED) {
             if (level_difficulty() >= 9 && !rn2(5)) {
-                set_door_mask(loc, D_NODOOR);
+                const mimicsGone = ['SMALL_MIMIC', 'LARGE_MIMIC', 'GIANT_MIMIC']
+                    .every(name => monsterGone(monsterPtr(name)));
+                if (!mimicsGone) {
+                    set_door_mask(loc, D_NODOOR);
+                    const mon = makemon(mkclass_aligned('S_MIMIC', 0), x, y, 0);
+                    if (mon) set_mimic_sym(mon);
+                }
             }
         }
     } else {
