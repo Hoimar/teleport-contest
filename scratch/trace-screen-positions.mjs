@@ -81,6 +81,8 @@ game._preNhgetchHook = async () => {
         const actualCursor = nhGame.getCursors().at(-1) || null;
         const probedCells = cells.map(({ x, y }) => {
             const loc = game.level?.at(x, y);
+            const trap = (game.level?.traps || []).find((t) => t.tx === x && t.ty === y) || null;
+            const objects = (game.level?.objects || []).filter((obj) => obj.ox === x && obj.oy === y);
             return {
                 x,
                 y,
@@ -93,8 +95,16 @@ game._preNhgetchHook = async () => {
                 couldsee: couldsee(x, y),
                 disp: loc?.disp_ch || '',
                 mem: loc?.remembered_glyph || null,
+                trap: trap ? { typ: trap.ttyp, seen: !!trap.tseen } : null,
+                objects: objects.map((obj) => ({ otyp: obj.otyp, oclass: obj.oclass, quan: obj.quan || 1 })),
             };
         });
+        const traps = (game.level?.traps || [])
+            .map((trap) => ({ x: trap.tx, y: trap.ty, typ: trap.ttyp, seen: !!trap.tseen }));
+        const objects = (game.level?.objects || [])
+            .map((obj) => ({ x: obj.ox, y: obj.oy, otyp: obj.otyp, oclass: obj.oclass, quan: obj.quan || 1 }));
+        const stairs = (game.level?.stairs || [])
+            .map((st) => ({ x: st.sx, y: st.sy, up: !!st.up }));
         const monsters = (game.level?.monsters || [])
             .filter((mon) => !ids || ids.has(mon.m_id))
             .map((mon, index) => ({
@@ -142,6 +152,9 @@ game._preNhgetchHook = async () => {
             cursorExpected: expected.cursor ?? null,
             cursorActual: actualCursor,
             cells: probedCells,
+            traps,
+            objects,
+            stairs,
             monsters,
         }));
     }

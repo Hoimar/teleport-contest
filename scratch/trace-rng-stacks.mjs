@@ -52,6 +52,8 @@ async function main() {
     globalThis.__teleportRngStackTrace = true;
     globalThis.__teleportRngTrace = [];
     globalThis.__teleportRngTraceIndex = 0;
+    globalThis.__teleportBigrmTrace = true;
+    globalThis.__teleportBigrmMonsterTrace = [];
     globalThis.__teleportApparxyTrace = [];
     globalThis.__teleportExerciseTrace = true;
     globalThis.__teleportExerciseTraceLog = [];
@@ -186,6 +188,12 @@ async function main() {
         console.log('mon alloc trace');
         for (const item of globalThis.__teleportMonAllocTrace.filter(inWindow)) {
             console.log(`  A@${item.idx} ${JSON.stringify(item)}`);
+        }
+    }
+    if (wants('bigrm') && globalThis.__teleportBigrmMonsterTrace?.length) {
+        console.log('bigrm monster trace');
+        for (const item of globalThis.__teleportBigrmMonsterTrace.filter(inWindow)) {
+            console.log(`  BM@${item.idx} ${JSON.stringify(item)}`);
         }
     }
     if (wants('advance') && globalThis.__teleportAdvanceTrace?.length) {

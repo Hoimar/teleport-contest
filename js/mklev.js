@@ -4318,6 +4318,29 @@ export function save_bones_snapshot(extra = {}, options = {}) {
     }));
 }
 
+const BIGRM_1_MAP = [
+    '---------------------------------------------------------------------------',
+    '|.........................................................................|',
+    '|.........................................................................|',
+    '|.........................................................................|',
+    '|.........................................................................|',
+    '|.........................................................................|',
+    '|.........................................................................|',
+    '|.........................................................................|',
+    '|.........................................................................|',
+    '|.........................................................................|',
+    '|.........................................................................|',
+    '|.........................................................................|',
+    '|.........................................................................|',
+    '|.........................................................................|',
+    '|.........................................................................|',
+    '|.........................................................................|',
+    '|.........................................................................|',
+    '---------------------------------------------------------------------------',
+];
+const BIGRM_1_XSTART = 3;
+const BIGRM_1_YSTART = 3;
+
 const BIGRM_12_MAP = [
     '                                                                           ',
     '         .......................           .......................         ',
@@ -5084,6 +5107,10 @@ const SOKO_LEVELS = {
 
 function bigrm12TerrainAt(x, y) {
     return BIGRM_12_MAP[y]?.[x] || ' ';
+}
+
+function bigrm1TerrainAt(x, y) {
+    return BIGRM_1_MAP[y]?.[x] || ' ';
 }
 
 function bigrm2TerrainAt(x, y) {
@@ -6596,6 +6623,37 @@ function bigrm12GetFloorLocation() {
     return { x: x + BIGRM_12_XSTART, y: y + BIGRM_12_YSTART };
 }
 
+function bigrm1Location(ok) {
+    let x, y, loc;
+    let tries = 0;
+    do {
+        x = rn2(75);
+        y = rn2(18);
+        loc = game.level?.at(x + BIGRM_1_XSTART, y + BIGRM_1_YSTART);
+        if (loc && ok(loc, x + BIGRM_1_XSTART, y + BIGRM_1_YSTART)) {
+            return { x: x + BIGRM_1_XSTART, y: y + BIGRM_1_YSTART };
+        }
+    } while (++tries < 100);
+
+    for (x = 0; x < 75; x++)
+        for (y = 0; y < 18; y++) {
+            loc = game.level?.at(x + BIGRM_1_XSTART, y + BIGRM_1_YSTART);
+            if (loc && ok(loc, x + BIGRM_1_XSTART, y + BIGRM_1_YSTART)) {
+                return { x: x + BIGRM_1_XSTART, y: y + BIGRM_1_YSTART };
+            }
+        }
+    return { x: BIGRM_1_XSTART, y: BIGRM_1_YSTART };
+}
+
+function bigrm1GetStairLocation() {
+    // C ref: sp_lev.c:l_create_stairway() uses good_stair_loc().
+    return bigrm1Location((loc) => loc.typ === ROOM || loc.typ === CORR || loc.typ === ICE);
+}
+
+function bigrm1GetDryLocation() {
+    return bigrm1Location((loc, x, y) => SPACE_POS(loc.typ) && !sobj_at(BOULDER, x, y));
+}
+
 function bigrm2GetFloorLocation() {
     let x, y;
     do {
@@ -6915,6 +6973,119 @@ function loadBigrm12Special() {
     for (let i = 0; i < 28; i++) {
         rn2(3); // induced_align() for random monsters on special levels
         const loc = bigrm12GetFloorLocation();
+        makemonSpecialLevelAt(null, loc.x, loc.y, 0);
+    }
+}
+
+function loadBigrm1Terrain() {
+    for (let y = 0; y < BIGRM_1_MAP.length; y++) {
+        for (let x = 0; x < BIGRM_1_MAP[y].length; x++) {
+            const loc = game.level.at(x + BIGRM_1_XSTART, y + BIGRM_1_YSTART);
+            if (!loc) continue;
+            loc.typ = bigrmTerrainType(BIGRM_1_MAP[y][x]);
+        }
+    }
+    game.level.flags.is_maze_lev = true;
+}
+
+function setBigrm1Terrain(x, y, ch) {
+    const loc = game.level?.at(x + BIGRM_1_XSTART, y + BIGRM_1_YSTART);
+    if (loc) loc.typ = bigrmTerrainType(ch);
+}
+
+function setBigrm1Line(x1, y1, x2, y2, ch) {
+    const dx = Math.sign(x2 - x1);
+    const dy = Math.sign(y2 - y1);
+    let x = x1, y = y1;
+    while (true) {
+        setBigrm1Terrain(x, y, ch);
+        if (x === x2 && y === y2) break;
+        x += dx;
+        y += dy;
+    }
+}
+
+function setBigrm1Rect(x1, y1, x2, y2, ch) {
+    setBigrm1Line(x1, y1, x2, y1, ch);
+    setBigrm1Line(x1, y2, x2, y2, ch);
+    setBigrm1Line(x1, y1, x1, y2, ch);
+    setBigrm1Line(x2, y1, x2, y2, ch);
+}
+
+function fillBigrm1Rect(x1, y1, x2, y2, ch) {
+    for (let y = y1; y <= y2; y++)
+        for (let x = x1; x <= x2; x++)
+            setBigrm1Terrain(x, y, ch);
+}
+
+function lightBigrm1Interior() {
+    // C refs: nhlsel.c:selection.fillrect()/area() first translates these
+    // coordinates through the current map origin; sp_lev.c:lspo_region()
+    // grows lit selections by W_ANY before setting levl[].lit.
+    for (let y = 0; y <= 17; y++)
+        for (let x = 0; x <= 74; x++) {
+            const loc = game.level?.at(x + BIGRM_1_XSTART, y + BIGRM_1_YSTART);
+            if (loc) loc.lit = true;
+        }
+}
+
+function maybeBigrm1TerrainPattern() {
+    // C ref: dat/bigrm-1.lua percent(80), then math.random(1,5) and
+    // math.random(0,5) choose one optional terrain pattern.
+    if (rn2(100) >= 80) return;
+    const terrains = ['-', 'F', 'L', 'T', 'C'];
+    const terrain = terrains[rn2(terrains.length)];
+    const choice = rn2(6);
+    if (choice === 0) {
+        setBigrm1Line(10, 8, 65, 8, terrain);
+    } else if (choice === 1) {
+        setBigrm1Line(15, 4, 15, 13, terrain);
+        setBigrm1Line(59, 4, 59, 13, terrain);
+    } else if (choice === 2) {
+        setBigrm1Line(10, 8, 64, 8, terrain);
+        setBigrm1Line(37, 3, 37, 14, terrain);
+    } else if (choice === 3) {
+        setBigrm1Rect(4, 4, 70, 13, terrain);
+        setBigrm1Line(25, 4, 50, 4, '.');
+        setBigrm1Line(25, 13, 50, 13, '.');
+    } else if (choice === 4) {
+        fillBigrm1Rect(5, 5, 69, 12, terrain);
+        for (let i = 0; i <= 7; i++) {
+            const x = 6 + i * 8;
+            const y = 5 + (i % 2);
+            fillBigrm1Rect(x, y, x + 6, y + 6, '.');
+        }
+    }
+}
+
+function loadBigrm1Special() {
+    // C ref: dat/bigrm-1.lua loaded through mkmaze.c:makemaz().
+    loadBigrm1Terrain();
+    l_nhcore_init();
+    rn2(2); // splev_initlev flip state for des.level_flags("noflip")
+    maybeBigrm1TerrainPattern();
+    lightBigrm1Interior();
+
+    let loc = bigrm1GetStairLocation();
+    placeSpecialStair(loc.x, loc.y, true);
+    loc = bigrm1GetStairLocation();
+    placeSpecialStair(loc.x, loc.y, false);
+    markBigroomNonDiggable();
+
+    for (let i = 0; i < 15; i++) {
+        loc = bigrm1GetDryLocation();
+        mkobj_at(RANDOM_CLASS, loc.x, loc.y, true);
+    }
+    for (let i = 0; i < 6; i++) {
+        loc = bigrm1GetDryLocation();
+        let kind;
+        do { kind = traptype_rnd(); } while (kind === NO_TRAP);
+        const trap = maketrap(loc.x, loc.y, kind);
+        maybeTrapVictim(trap, { spiderOnWeb: false });
+    }
+    for (let i = 0; i < 28; i++) {
+        rn2(3);
+        loc = bigrm1GetDryLocation();
         makemonSpecialLevelAt(null, loc.x, loc.y, 0);
     }
 }
@@ -15617,6 +15788,15 @@ function makemaz_special(slev) {
     } else {
         game._last_special_protofile = proto;
     }
+    if (game._last_special_protofile === 'bigrm-1') {
+        loadBigrm1Special();
+        wallification(1, 0, COLNO - 1, ROWNO - 1);
+        // C refs: src/sp_lev.c:load_special(), src/mkmaze.c:fixup_special().
+        // Generic special-level fixup places an implicit branch region on
+        // branch levels when the Lua file did not place one explicitly.
+        fixup_special();
+        return;
+    }
     if (game._last_special_protofile === 'bigrm-12') {
         loadBigrm12Special();
         // C ref: sp_lev.c:lspo_final_map_cleanup() runs final
@@ -17861,6 +18041,32 @@ function applyTeleportationHubFill(croom) {
     }
 }
 
+const MASSACRE_CORPSE_NAMES = [
+    'apprentice', 'warrior', 'ninja', 'thug',
+    'hunter', 'acolyte', 'abbot', 'page',
+    'attendant', 'neanderthal', 'chieftain',
+    'student', 'wizard', 'valkyrie', 'tourist',
+    'samurai', 'rogue', 'ranger', 'priestess',
+    'priest', 'monk', 'knight', 'healer',
+    'cavewoman', 'caveman', 'barbarian',
+    'archeologist',
+];
+
+function applyMassacreFill(croom) {
+    // C ref: dat/themerms.lua "Massacre".
+    let idx = rn2(MASSACRE_CORPSE_NAMES.length);
+    let n = 0;
+    // C ref: dat/nhlib.lua:d() uses Lua math.random per die, so the trace is
+    // five rn2(5) calls rather than src/rnd.c:d(5,5).
+    for (let die = 0; die < 5; die++) n += rn2(5) + 1;
+    for (let i = 0; i < n; i++) {
+        if (rn2(100) < 10) idx = rn2(MASSACRE_CORPSE_NAMES.length);
+        const loc = specialRoomLocation(croom);
+        const corpse = mksobj_at(CORPSE, loc.x, loc.y, true, false);
+        set_corpsenm_restart(corpse, MASSACRE_CORPSE_NAMES[idx]);
+    }
+}
+
 function addStaticGasCloudSelection(points, damage = 0) {
     if (!points.length) return;
     game.level.gasClouds = game.level.gasClouds || [];
@@ -17872,17 +18078,8 @@ function applyCloudRoomFill(croom) {
     // C refs: dat/themerms.lua "Cloud room",
     // sp_lev.c:create_monster(), region.c:create_gas_cloud_selection().
     const points = roomSelectionPoints(croom);
-    const ptr = monsterPtr('FOG_CLOUD');
     for (let i = 0, n = Math.floor(points.length / 4); i < n; i++) {
-        let loc = specialRoomMonsterLocation(croom, ptr);
-        if (!loc) continue;
-        if (m_at(loc.x, loc.y)) {
-            loc = enexto_core(loc.x, loc.y, ptr, GP_CHECKSCARY)
-                || enexto_core(loc.x, loc.y, ptr, 0)
-                || loc;
-        }
-        if (croom && !inside_room(croom, loc.x, loc.y)) continue;
-        makemon(ptr, loc.x, loc.y, MM_ASLEEP);
+        createSpecialMonsterRef(croom, 'fog cloud', { mmflags: MM_ASLEEP });
     }
     addStaticGasCloudSelection(points, 0);
 }
@@ -17919,6 +18116,10 @@ function apply_themeroom_fill(croom) {
     }
     if (fill === 'Teleportation hub') {
         applyTeleportationHubFill(croom);
+        return;
+    }
+    if (fill === 'Massacre') {
+        applyMassacreFill(croom);
         return;
     }
     if (fill === 'Storeroom') {

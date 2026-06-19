@@ -1984,6 +1984,26 @@ const CC_INCL_CENTER`
         if (__mazeWalkEvent) __mazeWalkEvent.chosen = dir;
         let pos = mazeMove(x, y, dir);`
         );
+        source = source.replace(
+            '    if (game.level?.monsters) game.level.monsters.unshift(mon);\n',
+            `    if (game.level?.monsters) game.level.monsters.unshift(mon);
+    if (globalThis.__teleportBigrmTrace && game._last_special_protofile === 'bigrm-1') {
+        (globalThis.__teleportBigrmMonsterTrace ||= []).push({
+            idx: globalThis.__teleportRngTraceIndex || 0,
+            event: 'makemon',
+            name: ptr?.name,
+            x,
+            y,
+            id: m_id,
+            mmflags,
+            noGroup: !!(mmflags & MM_NOGRP),
+            peaceful: !!peaceful,
+            asleep: !!mon.msleeping,
+            invisible: !!mon.minvis,
+        });
+    }
+`
+        );
         return { ...result, source };
     }
     if (!url.endsWith('/js/rng.js')) return result;

@@ -415,6 +415,13 @@ function migrated_wielded_object(migrating, inventory) {
         && obj.otyp === migrating.mw.otyp) || { ...migrating.mw };
 }
 
+function monster_at_xy(x, y) {
+    const monsters = game.level?.monsters || [];
+    return monsters.find((mon) => mon.mx === x && mon.my === y)
+        || monsters.find((mon) => (mon.wsegs || []).some((seg) => seg.wx === x && seg.wy === y))
+        || null;
+}
+
 function arrive_with_hero(migrating) {
     game._migrating_pet = null;
     if (!migrating) return null;
@@ -422,7 +429,11 @@ function arrive_with_hero(migrating) {
     if (!pet) return null;
     if (migrating.mtame) game.pet_type = pet;
 
-    const exact = !rn2(migrating.mtame ? 10 : migrating.mpeaceful ? 5 : 2);
+    // C ref: src/dog.c:mon_arrive(With_you).  A follower only rolls the
+    // exact-arrival chance when the hero square is not already occupied by an
+    // earlier arrival or resident monster; otherwise it goes through mnexto().
+    const exact = !monster_at_xy(game.u.ux, game.u.uy)
+        && !rn2(migrating.mtame ? 10 : migrating.mpeaceful ? 5 : 2);
     let x = game.u.ux;
     let y = game.u.uy;
     if (!exact) {

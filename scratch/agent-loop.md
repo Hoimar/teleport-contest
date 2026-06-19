@@ -13,12 +13,11 @@ and `feature_map.md`.
 ## Current State
 
 - Current branch in this workspace: `main`, ahead of origin.
-- Latest verified repair unit: live/checked-in `seed5002` first-move
-  wizard-death and fire self-zap tombstone completion.
+- Latest verified repair unit: live/checked-in `seed0367` Priest quest tour
+  completion.
 - Checked-in public corpus is exact: `44/44 S 11405/11405 R 792838/792838 C 0`.
-- Last refreshed hosted public cache remained `public-session-drift` at
-  `41/44 S 10584/10982 R 762022/840358 C 0` before the focused seed5002
-  live-target repair; refresh after committing. Leaderboard fetch failed.
+- Last refreshed hosted public cache is `public-session-drift` at
+  `43/44 S 10662/10982 R 808652/840358 C 0`; leaderboard fetch still fails.
 - Scratch trace/checkpoint files are agent-toolkit state and may be committed
   when useful; keep production parity and scratch-tool commits coherent.
 - Strict sentinels are exact:
@@ -27,13 +26,54 @@ and `feature_map.md`.
   hosted cache differs from checked-in sessions, and leaderboard state remains
   secondary until refreshed.
 - Current sentinel regression classification: none; strict sentinel is exact.
-- Hack audit remains `hard=0 suspicious=2`; `memory:lint` reports
-  `issues=0`. Production `js/` has no intentional debug I/O or imports from
-  `frozen/`.
+- Hack audit remains `hard=0 suspicious=2`. Production `js/` has no intentional
+  debug I/O or imports from `frozen/`.
 
 ## Latest Loop Checkpoint
 
 - Latest verified WIP on 2026-06-19:
+  - Live `.cache` `seed0367-priest-quest-tour` is exact:
+    `S 309/309 R 67217/67217 C 0`, from the prior live frontier
+    `S 235/309 R 20587/67217` and later `S 273/309 R 47450/67217`.
+  - Checked-in `seed0367-priest-quest-tour` remains exact:
+    `S 324/324 R 50125/50125 C 0`.
+  - Focused guards remain exact for checked-in `seed0360`
+    (`S 833/833 R 120639/120639 C 0`) and `seed0373`
+    (`S 124/124 R 35386/35386 C 0`). The live cached `seed0360`
+    still shows hosted/public cache drift at `S 298/618 R 102204/133910`.
+  - Strict sentinel exact:
+    `5/5 S 1063/1063 R 64569/64569 C 0`.
+  - Implementation truth:
+    - `dog.c:mon_arrive(With_you)` only rolls exact follower arrival when the
+      hero square is not already monster-occupied; otherwise the follower takes
+      the adjacent `mnexto()` path.
+    - Bigroom-1 is a real Lua special slice at `(3,3)`: it loads terrain,
+      optional terrain patterns, lit-region growth, stairs, objects, traps,
+      random monsters, then final wallification and `mkmaze.c:fixup_special()`
+      for implicit branch lregions.
+    - `invent.c:look_here()` prints the dungeon-feature line before a one-object
+      sentence, so arrival feature text can pack behind `You materialize...`
+      even when the object sentence must wait behind `--More--`.
+    - `themerms.lua` Cloud rooms create each fog cloud through the scripted
+      monster path before picking its location; Massacre rooms use Lua `d(5,5)`
+      as five individual `rn2(5)` dice before placing role corpses.
+    - `cmd.c:do_run()/do_rush()` make `G`/`g` silent movement prefixes and
+      reject non-movement follow-ups with the prefix error; `getobj("zap",
+      zap_ok)` no-candidate wording is `You don't have anything to zap.`
+  - Regression classification: none for checked-in sessions or strict sentinels.
+    The live `seed0360` result is classified as pre-existing hosted/public cache
+    drift because checked-in `seed0360` verifies exact.
+  - Verification covered `node --check js/cmd.js`, focused live/checked-in
+    `seed0367`, checked-in `seed0360` and `seed0373`, live cached `seed0360`
+    classification, `sentinel:strict`, and verify-embedded `hack:audit` /
+    `memory:lint`.
+  - Full checked-in corpus remains exact via `bash frozen/score.sh`:
+    `44/44 S 11405/11405 R 792838/792838 C 0`.
+  - Refreshed parity state classifies hosted public as `public-session-drift`:
+    `43/44 S 10662/10982 R 808652/840358 C 0`; leaderboard fetch still fails.
+  - Next queue: choose the next hosted-public or hidden-session mismatch.
+
+- Previous verified WIP on 2026-06-19:
   - Live `.cache` `seed5002-wizard-coverage-pair` is exact:
     `S 297/297 R 12214/12214 C 0`, from the prior live frontier
     `S 293/297 R 12214/12214`.
@@ -63,45 +103,9 @@ and `feature_map.md`.
     remaining hosted-public frontiers before this repair were `seed0360` and
     `seed0367`.
 
-- Latest verified WIP on 2026-06-19:
-  - Live `.cache` `seed0361-archeologist-tour` is exact:
-    `S 294/294 R 70975/70975 C 0`.
-  - Checked-in `seed0361-archeologist-tour` remains exact:
-    `S 366/366 R 53865/53865 C 0`.
-  - Focused guards remain exact:
-    `seed0360` `S 833/833 R 120639/120639 C 0`,
-    `seed0373` `S 124/124 R 35386/35386 C 0`, and
-    `seed4500` `S 1814/1814 R 108275/108275 C 0`.
-  - Strict sentinel exact:
-    `5/5 S 1063/1063 R 64569/64569 C 0`.
-  - Implementation truth:
-    - Fort Ludios/Knox arrival now follows `do.c:goto_level()`: first entry,
-      and revisits while Croesus lives, wake non-dead monsters and print the
-      high-security/alarm toplines.
-    - Fort Ludios status and wall color now follow `botl.c:describe_level()`
-      and `display.c` Knox wall glyphs, so the status reads `Fort Ludios` and
-      Knox walls render yellow.
-    - Fort Ludios scripted doors now preserve existing `SDOOR` terrain like
-      `sp_lev.c:sel_set_door()` instead of revealing secret doors as `DOOR`.
-    - One-line post-arrival quest text now uses `questpgr.c:deliver_by_pline()`;
-      it blocks only when later arrival work such as `pickup(1)/look_here()`
-      cannot pack after it.
-    - Scratch RNG stack tooling can now print focused `getbones()`, corridor,
-      and lregion traces for live-session frontier work.
-  - Regression classification: an intermediate broad one-line quest pline
-    change regressed checked-in `seed0361` at screen 340; the final boundary
-    fix restores both checked-in and live variants to exact parity.
-  - Verification covered `node --check` for `js/cmd.js`, `js/display.js`,
-    `js/mklev.js`, and scratch trace scripts; focused live/checked-in
-    `seed0361` verifies; guards `seed0360`, `seed0373`, and `seed4500`
-    verify; the full checked-in public corpus passes via
-    `bash frozen/score.sh` (`44/44`); `sentinel:strict`, `hack:audit`,
-    `memory:lint`, and `git diff --check` are clean.
-  - Next queue: refresh `parity:state -- --refresh-live` after committing and
-    choose the next live-public or hidden-session mismatch.
-
-- Previous dehack and seed0360 completion detail is in git, `feature_map.md`,
-  and `lessons.md`; keep this live checkpoint focused on active frontiers.
+- Previous seed0361, seed5002, dehack, and seed0360 completion detail is in git,
+  `feature_map.md`, and `lessons.md`; keep this live checkpoint focused on
+  active frontiers.
 
 - Older checkpoint history lives in git and `feature_map.md`; keep this file
   focused on the active loop state and next queue.

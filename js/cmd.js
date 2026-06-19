@@ -6151,6 +6151,22 @@ async function lookHereAfterMove(opts = {}) {
             return;
         }
         if (game._pending_message && !topline_can_pack_message(game._pending_message, line)) {
+            if (feature.line && topline_can_pack_message(game._pending_message, feature.line)) {
+                // C refs: pickup.c:check_here(), invent.c:look_here(),
+                // win/tty/topl.c:update_topl().  The dungeon feature is
+                // printed before the one-object sentence; it can still pack
+                // behind the prior topline even when the object sentence cannot.
+                await append_pline(feature.line);
+                game._deferred_floor_look_after_more = {
+                    line,
+                    overflow: line.length >= (game.nhDisplay?.cols || COLNO),
+                    move: !opts.arrivalFloorListNoTurn,
+                };
+                if (game.context?.run) game.context.run = null;
+                queue_more_prompt();
+                game.context.move = 0;
+                return;
+            }
             // C refs: src/pickup.c:check_here(), src/invent.c:look_here(),
             // win/tty/topl.c:update_topl().  A floor-object sentence which
             // cannot pack behind a prior topline blocks on the prior line
@@ -10846,6 +10862,12 @@ function runDirectionForKey(ch) {
     return RUN_KEY[ch] || null;
 }
 
+function runPrefixModeForKey(ch) {
+    if (ch === 'g') return 2;
+    if (ch === 'G') return 3;
+    return 0;
+}
+
 async function withCommandNopick(enabled, action) {
     if (!enabled) return action();
     game.context = game.context || {};
@@ -10875,6 +10897,22 @@ async function startRunDirection(dir, mode, opts = {}) {
         game.context.run = null;
         game._run_stop_after_move = false;
     }
+}
+
+async function rejectRunCommandPrefix(ch, prefix) {
+    const prefixKey = prefix?.key || 'G';
+    const prefixMode = runPrefixModeForKey(ch);
+    if (prefixMode) {
+        // C ref: src/cmd.c:do_run()/do_rush().  A second run/rush prefix
+        // cancels the pending prefixed movement and reports the second prefix.
+        await pline(prefixMode === 3
+            ? 'Double run prefix, canceled.'
+            : 'Double rush prefix, canceled.');
+    } else {
+        const suffix = (ch === '<' || ch === '>') ? ' other than up or down' : '';
+        await pline(`The '${prefixKey}' prefix should be followed by a movement command${suffix}.`);
+    }
+    game.context.move = 0;
 }
 
 function hasWoundedLegs() {
@@ -20068,9 +20106,12 @@ async function runArrivalFloorLookAfterMore() {
     game._arrival_floor_look_after_more = false;
     const noTurnFloorList = !!game._arrival_floor_list_no_turn_pending;
     game._arrival_floor_list_no_turn_pending = false;
+    const featureAlreadyShown = !!game._arrival_floor_feature_already_shown_pending;
+    game._arrival_floor_feature_already_shown_pending = false;
     await lookHereAfterMove({
         arrivalFloorListNoTurn: noTurnFloorList,
         resumeStairArrivalAfterFloorList: !noTurnFloorList,
+        featureAlreadyShown,
     });
     if (game._more && game._deferred_blind_floor_list) {
         game.context.move = 0;
@@ -22450,7 +22491,7 @@ async function showInventoryPromptAgain(kind) {
             await showPromptLine(`What do you want to zap? [${letters} or ?*] `);
         } else {
             game._awaiting_zap_item = false;
-            await pline('You have nothing to zap.');
+            await pline("You don't have anything to zap.");
         }
     } else if (kind === 'apply') {
         game._awaiting_apply_item = true;
@@ -26571,9 +26612,10 @@ async function finishLevelTeleportArrival({
     const arrivalObjects = arrivalObjectsAtHero();
     const countableArrivalObjects = arrivalObjects.filter((obj) => obj !== game.uchain);
     const arrivalFloorLookSpendsTurn = !!options?.atStairs || !!options?.spendsTurn || !!game.context?.move;
-    const deferArrivalFloorLook = () => {
+    const deferArrivalFloorLook = (opts = {}) => {
         game._arrival_floor_look_after_more = true;
         game._arrival_floor_list_no_turn_pending = !arrivalFloorLookSpendsTurn;
+        game._arrival_floor_feature_already_shown_pending = !!opts.featureAlreadyShown;
     };
     if (!countableArrivalObjects.length) {
         // C ref: pickup.c:check_here().  The hero's chain alone does not
@@ -26585,7 +26627,17 @@ async function finishLevelTeleportArrival({
             if (topline_can_pack_message(game._pending_message, line)) {
                 await append_pline(line);
             } else {
-                deferArrivalFloorLook();
+                let featureAlreadyShown = false;
+                const feature = lookHereFeature({ includeOrdinaryDoors: true });
+                if (feature.line && topline_can_pack_message(game._pending_message, feature.line)) {
+                    // C refs: do.c:goto_level(), pickup.c:check_here(),
+                    // invent.c:look_here().  look_here() prints the dfeature
+                    // before the one-object sentence; the dfeature may pack
+                    // behind the materialize line even when the object cannot.
+                    await append_pline(feature.line);
+                    featureAlreadyShown = true;
+                }
+                deferArrivalFloorLook({ featureAlreadyShown });
                 queue_more_prompt();
             }
         } else {
@@ -26599,7 +26651,24 @@ async function finishLevelTeleportArrival({
             showFloorObjectList(arrivalObjects);
         }
     } else if (game._more && arrivalObjects.length > 0) {
-        deferArrivalFloorLook();
+        let featureAlreadyShown = false;
+        const pileLimit = Number.isFinite(Number(game.flags?.pile_limit))
+            ? Math.trunc(Number(game.flags.pile_limit))
+            : 5;
+        if (countableArrivalObjects.length === 1
+            || (pileLimit > 0 && countableArrivalObjects.length >= pileLimit)) {
+            const feature = lookHereFeature({ includeOrdinaryDoors: true });
+            if (feature.line && game._pending_message
+                && topline_can_pack_message(game._pending_message, feature.line)) {
+                // C refs: do.c:goto_level(), pickup.c:check_here(),
+                // invent.c:look_here().  Level-arrival pickup still emits the
+                // dfeature line before the one-object/pile summary even when an
+                // earlier materialize topline is already blocking for tty More.
+                await append_pline(feature.line);
+                featureAlreadyShown = true;
+            }
+        }
+        deferArrivalFloorLook({ featureAlreadyShown });
     }
     game.context.mv = 1;
 }
@@ -29836,6 +29905,34 @@ export async function rhack(key) {
     ch = applyCommandBinding(ch);
     const redrawCommand = ch === '\x12' || ch === '\x0c';
     if (!redrawCommand) game._redraw_resumes_run = null;
+    const runCommandPrefix = game._run_command_prefix || null;
+
+    if (runCommandPrefix && ch === '\x1b') {
+        game._run_command_prefix = null;
+        game.context.move = 0;
+        return;
+    }
+    if (runCommandPrefix && ch === 'm') {
+        // C refs: src/cmd.c:do_run()/do_rush()/do_reqmenu(),
+        // set_move_cmd().  `m` can follow a run/rush prefix and then marks the
+        // eventual movement as no-pickup without replacing the run mode.
+        game._run_command_prefix = { ...runCommandPrefix, nopick: true };
+        game.context.move = 0;
+        return;
+    }
+    if (runCommandPrefix) {
+        game._run_command_prefix = null;
+        if (isMovementKey(ch)) {
+            await startRunDirection(ch, runCommandPrefix.mode, {
+                nopick: !!(runCommandPrefix.nopick || forceCommandPrefix),
+            });
+        } else {
+            // C ref: src/cmd.c:rhack().  `g`/`G` are prefix commands, so a
+            // non-movement followup is rejected rather than dispatched.
+            await rejectRunCommandPrefix(ch, runCommandPrefix);
+        }
+        return;
+    }
 
     if (redrawCommand) {
         // C refs: cmd.c:cmdlist[]/bind_key(); display.c:doredraw()/docrt_flags().
@@ -29884,6 +29981,15 @@ export async function rhack(key) {
     } else if (runDirectionForKey(ch)) {
         const dir = runDirectionForKey(ch);
         await startRunDirection(dir, 1, { nopick: forceCommandPrefix });
+    } else if (runPrefixModeForKey(ch)) {
+        // C ref: src/cmd.c:do_run()/do_rush().  `G`/`g` are silent movement
+        // prefixes; command dispatch waits for the following movement key.
+        game._run_command_prefix = {
+            key: ch,
+            mode: runPrefixModeForKey(ch),
+            nopick: !!forceCommandPrefix,
+        };
+        game.context.move = 0;
     } else if (ch === 'F') {
         game.context.move = 0;
         game._forcefight_pending = true;
@@ -30237,7 +30343,7 @@ export async function rhack(key) {
             await showPromptLine(`What do you want to zap? [${letters} or ?*] `);
             game._awaiting_zap_item = true;
         } else {
-            await pline('You have nothing to zap.');
+            await pline("You don't have anything to zap.");
         }
     } else if (ch === 't') {
         game.context.move = 0;
