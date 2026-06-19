@@ -13,7 +13,7 @@ and `feature_map.md`.
 ## Current State
 
 - Current branch in this workspace: `main`, ahead of origin.
-- Latest verified repair unit: quest/post-arrival pager More override-state retirement.
+- Latest verified repair unit: death/quit final disclosure display-state retirement.
 - Checked-in public corpus is exact: `44/44 S 11405/11405 R 792838/792838 C 0`.
 - Hosted public cache remains `public-session-drift` at
   `40/44 S 10417/10982 R 629747/840358 C 0`; leaderboard fetch failed.
@@ -32,23 +32,24 @@ and `feature_map.md`.
 ## Latest Loop Checkpoint
 
 - Latest verified WIP on 2026-06-19:
-  - Quest/post-arrival pager More override-state retirement:
-    `seed0361-archeologist-tour`, `seed0373-barbarian-quest-tour`, and
-    `seed0360-wizard-world-tour` remain exact.
+  - Death/quit final disclosure display-state retirement:
+    `seed0030-ten-diverse-deaths`, `seed0006-wizard-quit-disclose`,
+    `seed0007-rogue-snake-swamp`, `seed0103-knight-ride-pony`, and
+    `seed0398-wizard-wandpoly-pile` remain exact.
   - Strict sentinel exact:
     `5/5 S 1063/1063 R 64569/64569 C 0`.
   - Full checked-in corpus passed via `bash frozen/score.sh`:
     `44/44 S 11405/11405 R 792838/792838 C 0`.
   - Verification also covered `node --check js/cmd.js`, `git diff --check`,
-    and the focused `verify --target` guard set above; `seed0361`,
-    `seed0373`, and `seed0360` each passed strict sentinels, hack audit, and
-    memory lint through `verify-change`.
+    and the focused `verify --target` guard set above.
   - Dehack truth:
-    - Quest leader and post-arrival pager More frames already own explicit
-      latched-More state, so they no longer also install a generic serialized
-      override screen.
-  - Next queue: remaining serialized override users are death/tombstone/top-ten
-    disclosure and the wizard bones unlink prompt; hack audit remains
+    - Tombstone, quit, and blank final-disclosure More frames are tty More
+      frames with latched screen/cursor state, not persistent generic override
+      screens.
+    - Final death top-ten and wizard/explore no-score-list output are terminal
+      exit screens rendered by active terminal-exit display state.
+  - Next queue: remaining direct serialized override user is the wizard bones
+    unlink prompt, plus generic override fallback/plumbing; hack audit remains
     `hard=0 suspicious=11`.
 
 - Previous verified WIP on 2026-06-19:

@@ -4013,8 +4013,11 @@ async function showDeathDisclosure() {
     clear_pending_message();
     game._more = true;
     game._more_dismissals_remaining = 1;
-    showSerializedOverride(deathTombstoneScreen(), [8, 23]);
-    game._override_serialized_persistent = true;
+    clearOverrideScreen();
+    game._latched_more_screen = deathTombstoneScreen();
+    game._latched_more_cursor = [8, 23, 1];
+    game._latched_more_keep_until_dismiss = true;
+    game._latched_more_use_pending_topline = false;
     game.context.move = 0;
 }
 
@@ -4048,8 +4051,11 @@ async function showQuitDisclosure() {
     clear_pending_message();
     game._more = true;
     game._more_dismissals_remaining = 1;
-    showSerializedOverride(quitDisclosureScreen(), [8, 23]);
-    game._override_serialized_persistent = true;
+    clearOverrideScreen();
+    game._latched_more_screen = quitDisclosureScreen();
+    game._latched_more_cursor = [8, 23, 1];
+    game._latched_more_keep_until_dismiss = true;
+    game._latched_more_use_pending_topline = false;
     game.context.move = 0;
 }
 
@@ -20439,9 +20445,8 @@ async function handleQueuedMore(ch) {
         else await showDeathDisclosureOrPrompt();
     } else if (game._quit_disclosure_active) {
         game._quit_disclosure_active = false;
-        game._override_serialized_persistent = false;
         const screen = deathTopTenScreen();
-        showSerializedOverride(screen, [0, Math.max(0, screen.split('\n').length)]);
+        setTerminalExitScreen(screen, [0, Math.max(0, screen.split('\n').length)]);
         game.program_state = game.program_state || {};
         game.program_state.gameover = true;
         game.context.move = 0;
@@ -20450,15 +20455,14 @@ async function handleQueuedMore(ch) {
         game._more_dismissals_remaining = 0;
         game._more = false;
         game._death_blank_more_active = false;
-        game._override_serialized_persistent = false;
         if (game.wizard || game.flags?.debug || game.flags?.explore) {
             // C ref: src/topten.c:topten().  Debug/explore games report that
             // the score list is skipped instead of showing ranked entries.
             const mode = (game.wizard || game.flags?.debug) ? 'wizard' : 'discover';
-            showSerializedOverride(`\nSince you were in ${mode} mode, the score list will not be checked.`, [0, 2]);
+            setTerminalExitScreen(`\nSince you were in ${mode} mode, the score list will not be checked.`, [0, 2]);
         } else {
             const screen = deathTopTenScreen();
-            showSerializedOverride(screen, deathTopTenCursor(screen));
+            setTerminalExitScreen(screen, deathTopTenCursor(screen));
         }
         game.program_state = game.program_state || {};
         game.program_state.gameover = true;
@@ -20469,8 +20473,11 @@ async function handleQueuedMore(ch) {
         game._death_blank_more_active = true;
         game._more = true;
         game._more_dismissals_remaining = 1;
-        showSerializedOverride(deathBlankMoreScreen(), [8, 23]);
-        game._override_serialized_persistent = true;
+        clearOverrideScreen();
+        game._latched_more_screen = deathBlankMoreScreen();
+        game._latched_more_cursor = [8, 23, 1];
+        game._latched_more_keep_until_dismiss = true;
+        game._latched_more_use_pending_topline = false;
         game.context.move = 0;
         return true;
     } else if (game._more_dismissals_remaining <= 0) {
