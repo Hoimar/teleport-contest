@@ -25,7 +25,7 @@ import {
     WM_X_TL, WM_X_TR, WM_X_BL, WM_X_BR, WM_X_TLBR, WM_X_BLTR,
     WARNCOUNT, STR18, STR19, def_warnsyms, Is_rogue_level,
     M3_INFRAVISIBLE, In_endgame, Is_astralevel, Is_waterlevel, Is_firelevel,
-    Is_airlevel, Is_earthlevel,
+    Is_airlevel, Is_earthlevel, Is_knox_level,
     SATIATED, NOT_HUNGRY, HUNGRY, WEAK, FAINTING, FAINTED, STARVED,
 } from './const.js';
 import { depth, distmin, dist2 } from './hacklib.js';
@@ -368,6 +368,7 @@ export function terrain_glyph(loc, x, y) {
     }
     const wallColor = (game.level?.flags?.red_walls || hell_level_display())
         ? CLR_RED
+        : Is_knox_level(game.u?.uz) ? CLR_YELLOW
         : game.level?.flags?.sokoban_rules ? (primary_decgraphics() ? CLR_BLUE : NO_COLOR)
             : game.level?.flags?.mines_walls ? CLR_BROWN : NO_COLOR;
     if (!primary_decgraphics()) {
@@ -1691,7 +1692,9 @@ function _statusLine2() {
     const ac = statusAcOverrideActive ? game._status_uac_override : (u.uac ?? 10);
     const goldSymbol = rogue_level_display() ? '*' : '$';
     // C ref: botl.c:describe_level().
-    const levelDesc = game.dungeons?.[u.uz?.dnum]?.dname === 'The Tutorial'
+    const levelDesc = Is_knox_level(u.uz)
+        ? (game.dungeons?.[u.uz?.dnum]?.dname || 'Fort Ludios')
+        : game.dungeons?.[u.uz?.dnum]?.dname === 'The Tutorial'
         ? `Tutorial:${u.uz?.dlevel || 1}`
         : game.quest_dnum != null && u.uz?.dnum === game.quest_dnum
         ? `Home ${u.uz?.dlevel || 1}`

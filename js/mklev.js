@@ -9561,7 +9561,10 @@ function knoxAddRoom(x1, y1, x2, y2, lit, rtype, needfill = FILL_NONE, irregular
 function knoxSetDoor(x, y, mask) {
     const loc = game.level?.at(knoxX(x), knoxY(y));
     if (!loc) return;
-    loc.typ = DOOR;
+    // C ref: sp_lev.c:sel_set_door().  A scripted door placed on an
+    // existing secret-door map cell keeps SDOOR terrain and only updates
+    // doormask; otherwise the location becomes a normal door.
+    if (!IS_DOOR(loc.typ) && loc.typ !== SDOOR) loc.typ = DOOR;
     set_door_mask(loc, mask);
 }
 

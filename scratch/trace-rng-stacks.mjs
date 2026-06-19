@@ -176,6 +176,12 @@ async function main() {
             console.log(`  J@${item.idx} ${JSON.stringify(item)}`);
         }
     }
+    if (wants('lregion') && globalThis.__teleportLregionTrace?.length) {
+        console.log('lregion trace');
+        for (const item of globalThis.__teleportLregionTrace.filter(inWindow)) {
+            console.log(`  L@${item.idx} ${JSON.stringify(item)}`);
+        }
+    }
     if (wants('alloc') && globalThis.__teleportMonAllocTrace?.length) {
         console.log('mon alloc trace');
         for (const item of globalThis.__teleportMonAllocTrace.filter(inWindow)) {

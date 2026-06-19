@@ -24349,6 +24349,20 @@ function temperatureMessageQueueItems(tempMessage) {
     return [{ text: tempMessage.line, more: false, packAfter: tempMessage.afterMore || '' }];
 }
 
+function arrivalObjectsAtHero() {
+    return (game.level?.objects || [])
+        .filter((obj) => obj.ox === game.u?.ux && obj.oy === game.u?.uy && obj.otyp !== GOLD_PIECE);
+}
+
+function postArrivalPlineNeedsFloorLookMore(message, arrivalObjects) {
+    const countableArrivalObjects = (arrivalObjects || []).filter((obj) => obj !== game.uchain);
+    if (!message || !countableArrivalObjects.length) return false;
+    if ((arrivalObjects || []).length > 1) return true;
+    const obj = arrivalObjects[0];
+    const preview = inventoryObjectName({ ...obj }, { includePrice: true, observe: false });
+    return !topline_can_pack_message(message, `You see here ${preview}.`);
+}
+
 function normalizeArrivalMessageQueue(items) {
     for (let i = 0; i < items.length - 1; i++)
         items[i].more = true;
@@ -24464,6 +24478,22 @@ function queueSpecialArrivalMessage(items) {
     if (!msg) return;
     game._special_arrival_message = '';
     items.push({ text: msg, more: false });
+}
+
+function queueFortLudiosAlarm(items, restoredLevel) {
+    // C ref: do.c:goto_level().  Fort Ludios wakes the level and raises its
+    // alarm on first creation, and on revisits while Croesus still lives.
+    if (!C.Is_knox_level?.(game.u?.uz)) return;
+    const croesusAlive = (game.level?.monsters || [])
+        .some((mon) => !mon?.dead && String(mon?.data?.name || mon?.name || '').toUpperCase() === 'CROESUS');
+    if (restoredLevel && !croesusAlive) return;
+    for (const mon of game.level?.monsters || [])
+        if (mon && !mon.dead) mon.msleeping = 0;
+    items.push({
+        text: 'You have penetrated a high security area!',
+        more: false,
+        packAfter: 'An alarm sounds!',
+    });
 }
 
 async function applyLevelArrivalFumaroles() {
@@ -25158,10 +25188,11 @@ function consumeQuestLuaShuffle(item) {
     item.questLuaShuffle = false;
 }
 
-async function queuePostArrivalPline(raw) {
+async function queuePostArrivalPline(raw, options = {}) {
     const item = postArrivalItem(raw);
     const message = item.text;
     if (!message) return false;
+    const blockAfterDelivery = !!options.blockAfterDelivery;
     // C ref: src/questpgr.c:com_pager_core()/deliver_by_pline().  Default
     // one-line quest text is ordinary topline text; a More prompt only comes
     // from normal topline overflow or later arrival work such as look_here().
@@ -25169,7 +25200,7 @@ async function queuePostArrivalPline(raw) {
         if (!game._more) queue_more_prompt();
         game._more_message_queue = [
             ...(game._more_message_queue || []),
-            { text: message, more: false, questLuaShuffle: !!item.questLuaShuffle },
+            { text: message, more: blockAfterDelivery, questLuaShuffle: !!item.questLuaShuffle },
         ];
         return true;
     }
@@ -25177,17 +25208,19 @@ async function queuePostArrivalPline(raw) {
         if (topline_can_pack_message(game._pending_message, message)) {
             consumeQuestLuaShuffle(item);
             await append_pline(message);
+            if (blockAfterDelivery) queue_more_prompt();
         } else {
             queue_more_prompt();
             game._more_message_queue = [
                 ...(game._more_message_queue || []),
-                { text: message, more: false, questLuaShuffle: !!item.questLuaShuffle },
+                { text: message, more: blockAfterDelivery, questLuaShuffle: !!item.questLuaShuffle },
             ];
         }
         return true;
     }
     consumeQuestLuaShuffle(item);
     await pline(message);
+    if (blockAfterDelivery) queue_more_prompt();
     return true;
 }
 
@@ -25460,7 +25493,9 @@ async function queuePostArrivalPager(raw, options = {}) {
     const text = item.text;
     if (!text) return false;
     if (!text.includes('\n') && options.plineOnly)
-        return queuePostArrivalPline(item);
+        return queuePostArrivalPline(item, {
+            blockAfterDelivery: !!options.blockAfterDelivery,
+        });
     if (!game._pending_message && !game._more && !(game._more_message_queue || []).length) {
         consumeQuestLuaShuffle(item);
         const { screen, cursor } = postArrivalPagerDisplay(text);
@@ -26457,8 +26492,13 @@ async function finishLevelTeleportArrival({
     const questStartText = questStartPagerText(oldUz);
     const questGoalText = questStartText || locatePagerText ? null : questGoalPagerText(oldUz);
     const postArrivalQuestText = questStartText || locatePagerItem || questGoalText;
+    const postArrivalQuestLine = postArrivalQuestText
+        ? String(postArrivalQuestText.text ?? postArrivalQuestText)
+        : '';
+    const preQuestArrivalObjects = arrivalObjectsAtHero();
     const hasPostArrivalPager = await queuePostArrivalPager(postArrivalQuestText, {
-        plineOnly: !!locatePagerText && !String(locatePagerText).includes('\n'),
+        plineOnly: !!postArrivalQuestLine && !postArrivalQuestLine.includes('\n'),
+        blockAfterDelivery: postArrivalPlineNeedsFloorLookMore(postArrivalQuestLine, preQuestArrivalObjects),
     });
     if (hasPostArrivalPager && materializeLine
         && game._pending_message === materializeLine && !game._more) {
@@ -26472,6 +26512,7 @@ async function finishLevelTeleportArrival({
     const arrivalQueue = [];
     queueEndgameResurrectionMessages(arrivalQueue, oldUz);
     queueSpecialArrivalMessage(arrivalQueue);
+    queueFortLudiosAlarm(arrivalQueue, restoredLevel);
     queueQuestPortalArrivalMessages(arrivalQueue, oldUz);
     const tempMessage = temperatureChangeAfterLevelChange(prevTemperature, wasInHell);
     if (tempMessage?.line && hasPostArrivalPager) game._post_arrival_temp_message = tempMessage;
@@ -26496,8 +26537,7 @@ async function finishLevelTeleportArrival({
     // C ref: do.c:goto_level() runs pickup(1) after the deferred
     // materialize pline; if arrival lands on visible floor objects, the
     // pending object listing forces the materialize line to block first.
-    const arrivalObjects = (game.level?.objects || [])
-        .filter((obj) => obj.ox === game.u?.ux && obj.oy === game.u?.uy && obj.otyp !== GOLD_PIECE);
+    const arrivalObjects = arrivalObjectsAtHero();
     const countableArrivalObjects = arrivalObjects.filter((obj) => obj !== game.uchain);
     const arrivalFloorLookSpendsTurn = !!options?.atStairs || !!options?.spendsTurn || !!game.context?.move;
     const deferArrivalFloorLook = () => {

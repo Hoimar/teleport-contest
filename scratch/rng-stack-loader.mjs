@@ -1543,6 +1543,115 @@ function can_attack_after_move_basic`
 `
         );
         source = source.replace(
+            'function put_lregion_here(x, y, nlx, nly, nhx, nhy, rtype, oneshot, lev) {\n',
+            `function __teleportLregionTrace(phase, x, y, nlx, nly, nhx, nhy, rtype, oneshot, lev, extra = {}) {
+    const idx = globalThis.__teleportRngTraceIndex || 0;
+    const start = globalThis.__teleportApparxyStart ?? -Infinity;
+    const end = globalThis.__teleportApparxyEnd ?? Infinity;
+    if (idx < start || idx > end) return;
+    const loc = game.level?.at(x, y);
+    const mons = game.level?.monsters || [];
+    const objs = game.level?.objects || [];
+    const traps = game.level?.traps || [];
+    const mon = m_at(x, y);
+    const trap = traps.find((t) => t.tx === x && t.ty === y) || null;
+    const terrainOk = !!loc && (loc.typ === ROOM || loc.typ === AIR
+        || (loc.typ === CORR && game.level?.flags?.is_maze_lev));
+    let occ = null;
+    try {
+        occ = occupied(x, y);
+    } catch {
+        occ = null;
+    }
+    (globalThis.__teleportLregionTrace ||= []).push({
+        idx,
+        phase,
+        x,
+        y,
+        nlx,
+        nly,
+        nhx,
+        nhy,
+        rtype,
+        oneshot: !!oneshot,
+        lev: lev ? { ...lev } : null,
+        uz: game.u?.uz ? { ...game.u.uz } : null,
+        special: typeof currentSpecialLevel === 'function' ? currentSpecialLevel()?.proto || null : null,
+        lastSpecialProtofile: game._last_special_protofile || null,
+        levelFlags: game.level?.flags ? { ...game.level.flags } : null,
+        hero: { x: game.u?.ux, y: game.u?.uy },
+        loc: loc ? {
+            typ: loc.typ,
+            roomno: loc.roomno,
+            edge: !!loc.edge,
+            doormask: loc.doormask,
+            flags: loc.flags,
+            lit: !!loc.lit,
+            horizontal: !!loc.horizontal,
+        } : null,
+        terrainOk,
+        occupied: occ,
+        inNoArea: within_bounded_area(x, y, nlx, nly, nhx, nhy),
+        trap: trap ? { ttyp: trap.ttyp, tx: trap.tx, ty: trap.ty, tseen: trap.tseen, once: trap.once } : null,
+        monster: mon ? {
+            name: mon.data?.name,
+            mx: mon.mx,
+            my: mon.my,
+            m_id: mon.m_id,
+            mtame: !!mon.mtame,
+            mpeaceful: !!mon.mpeaceful,
+            mtrapped: !!mon.mtrapped,
+        } : null,
+        objects: objs
+            .filter((o) => o.ox === x && o.oy === y)
+            .map((o) => ({ otyp: o.otyp, quan: o.quan, spe: o.spe, oclass: o.oclass })),
+        monsterCount: mons.length,
+        trapCount: traps.length,
+        ...extra,
+        stack: String(new Error().stack || '')
+            .split('\\n')
+            .slice(2, 8)
+            .map((line) => line.trim().replace((typeof process !== 'undefined' && process.cwd ? process.cwd() : '') + '/', '')),
+    });
+}
+
+function put_lregion_here(x, y, nlx, nly, nhx, nhy, rtype, oneshot, lev) {
+`
+        );
+        source = source.replace(
+            '    if (bad_location(x, y, nlx, nly, nhx, nhy)) return false;\n    if ((rtype === LR_TELE || rtype === LR_UPTELE || rtype === LR_DOWNTELE) && m_at(x, y)) {\n        return !!oneshot;\n    }\n',
+            `    const __lregionBad = bad_location(x, y, nlx, nly, nhx, nhy);
+    __teleportLregionTrace('candidate', x, y, nlx, nly, nhx, nhy, rtype, oneshot, lev, {
+        badLocation: __lregionBad,
+    });
+    if (__lregionBad) {
+        __teleportLregionTrace('reject-bad-location', x, y, nlx, nly, nhx, nhy, rtype, oneshot, lev, {
+            badLocation: __lregionBad,
+        });
+        return false;
+    }
+    const __lregionMonster = (rtype === LR_TELE || rtype === LR_UPTELE || rtype === LR_DOWNTELE)
+        ? m_at(x, y)
+        : null;
+    if (__lregionMonster) {
+        __teleportLregionTrace(oneshot ? 'accept-monster-oneshot' : 'reject-monster', x, y, nlx, nly, nhx, nhy, rtype, oneshot, lev, {
+            badLocation: false,
+        });
+        return !!oneshot;
+    }
+`
+        );
+        source = source.replace(
+            '    return true;\n}\n\nconst CC_INCL_CENTER',
+            `    __teleportLregionTrace('accept', x, y, nlx, nly, nhx, nhy, rtype, oneshot, lev, {
+        badLocation: false,
+    });
+    return true;
+}
+
+const CC_INCL_CENTER`
+        );
+        source = source.replace(
             '    if (flags.explore) return false;\n    if (flags.bones === false) return false;\n    if (rn2(3) && !game.flags?.debug) return false;\n    if (no_bones_level()) return false;\n\n    const key = bones_file_key();\n    const text = key ? vfsReadFile(key) : null;\n    if (!text) return false;\n',
             `    if (flags.explore) {
         __getbonesTrace('skip-explore');

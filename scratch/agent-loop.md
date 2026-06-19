@@ -13,7 +13,8 @@ and `feature_map.md`.
 ## Current State
 
 - Current branch in this workspace: `main`, ahead of origin.
-- Latest verified repair unit: live `seed0361` Medusa-2/Fort Ludios repair.
+- Latest verified repair unit: live/checked-in `seed0361` Fort Ludios and
+  quest-arrival completion.
 - Checked-in public corpus is exact: `44/44 S 11405/11405 R 792838/792838 C 0`.
 - Hosted public cache remains `public-session-drift` at
   `40/44 S 10506/10982 R 715024/840358 C 0`; leaderboard fetch failed.
@@ -32,29 +33,41 @@ and `feature_map.md`.
 ## Latest Loop Checkpoint
 
 - Latest verified WIP on 2026-06-19:
-  - Live `seed0361-archeologist-tour` now reaches
-    `S 270/294 R 70827/70975` from the prior live Arc filler frontier
-    `S 262/294 R 66518/70975`.
+  - Live `.cache` `seed0361-archeologist-tour` is exact:
+    `S 294/294 R 70975/70975 C 0`.
+  - Checked-in `seed0361-archeologist-tour` remains exact:
+    `S 366/366 R 53865/53865 C 0`.
+  - Focused guards remain exact:
+    `seed0360` `S 833/833 R 120639/120639 C 0`,
+    `seed0373` `S 124/124 R 35386/35386 C 0`, and
+    `seed4500` `S 1814/1814 R 108275/108275 C 0`.
   - Strict sentinel exact:
     `5/5 S 1063/1063 R 64569/64569 C 0`.
   - Implementation truth:
-    - Random `dosdoor()` now mirrors the C trapped-door mimic branch:
-      after `D_TRAPPED` and the deep-level `rn2(5)` gate, it leaves the
-      trap alone if all mimics are gone, otherwise sets `D_NODOOR`, creates
-      `makemon(mkclass(S_MIMIC, 0), x, y)`, and calls `set_mimic_sym()` again.
-    - Scratch RNG stack tooling can print focused `getbones()` and corridor
-      join/door-decision traces for live-session frontier work.
-  - Current live frontier: after Arc filler generation and level teleport
-    region placement, expected reaches `mon_arrive(dog.c:475)` at
-    `FR 70827: rn2(2)=0`, while JS is still retrying
-    `place_lregion(mkmaze.c:396)` with `rn2(79)=2`. Next work should inspect
-    special-level lregion bounds/exclusions and arrival placement/retry state.
-  - First visible screen mismatch remains screen 229's materialize topline
-    missing the C `--More--`; do not let that obscure the later proven RNG
-    frontier unless display work is the selected subsystem target.
-  - Verification covered `node --check` for `js/mklev.js` and scratch trace
-    scripts, focused live `verify`, `sentinel:strict`, `hack:audit`,
-    `memory:lint`, and `git diff --check`.
+    - Fort Ludios/Knox arrival now follows `do.c:goto_level()`: first entry,
+      and revisits while Croesus lives, wake non-dead monsters and print the
+      high-security/alarm toplines.
+    - Fort Ludios status and wall color now follow `botl.c:describe_level()`
+      and `display.c` Knox wall glyphs, so the status reads `Fort Ludios` and
+      Knox walls render yellow.
+    - Fort Ludios scripted doors now preserve existing `SDOOR` terrain like
+      `sp_lev.c:sel_set_door()` instead of revealing secret doors as `DOOR`.
+    - One-line post-arrival quest text now uses `questpgr.c:deliver_by_pline()`;
+      it blocks only when later arrival work such as `pickup(1)/look_here()`
+      cannot pack after it.
+    - Scratch RNG stack tooling can now print focused `getbones()`, corridor,
+      and lregion traces for live-session frontier work.
+  - Regression classification: an intermediate broad one-line quest pline
+    change regressed checked-in `seed0361` at screen 340; the final boundary
+    fix restores both checked-in and live variants to exact parity.
+  - Verification covered `node --check` for `js/cmd.js`, `js/display.js`,
+    `js/mklev.js`, and scratch trace scripts; focused live/checked-in
+    `seed0361` verifies; guards `seed0360`, `seed0373`, and `seed4500`
+    verify; the full checked-in public corpus passes via
+    `bash frozen/score.sh` (`44/44`); `sentinel:strict`, `hack:audit`,
+    `memory:lint`, and `git diff --check` are clean.
+  - Next queue: refresh `parity:state -- --refresh-live` after committing and
+    choose the next live-public or hidden-session mismatch.
 
 - Latest verified WIP on 2026-06-19:
   - Live `seed0360-wizard-world-tour` now reaches
