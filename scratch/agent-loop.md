@@ -14,14 +14,14 @@ and `feature_map.md`.
 
 - Current branch in this workspace: `main`, ahead of origin.
 - Latest verified repair unit:
-  - Startup pre-`mklev` replay retirement:
+  - Startup fastforward module retirement:
     `seed8000-tourist-starter` remains exact
     (`S 23/23 R 3130/3130 C 0`), `seed0002-healer-reflection-drummer`
     remains exact (`S 595/595 R 27158/27158 C 0`), and checked-in public
     remains `44/44 S 11405/11405 R 792838/792838 C 0`.
   - Strict sentinels exact: `5/5 S 1063/1063 R 64569/64569 C 0`.
   - `verify --target seed8000-tourist-starter` passed target expectations,
-    strict sentinels, `hack:audit` (`hard=0 suspicious=41`), and
+    strict sentinels, `hack:audit` (`hard=0 suspicious=33`), and
     `memory:lint` (`issues=0`).
   - Focused guards exact: `seed0002-healer-reflection-drummer`,
     `seed8000-tourist-starter`, `seed0360-wizard-world-tour`,
@@ -35,8 +35,10 @@ and `feature_map.md`.
     - Replay-backed seed0002/seed8000 starts now run live `init_objects()`,
       role pre-Lua RNG, `init_dungeons()`, and `u_init_misc_rng()` before
       `mklev()`.
-    - Generated fastforward modules now retain only the post-`mklev`
-      `u_init_inventory_attrs()`/attribute/preamble tail.
+    - They also run live `u_init_role_inventory()`, `apply_startup_role_state()`,
+      and post-inventory startup RNG before restoring the explicit visible
+      HP/Pw/AC/attribute scaffold.
+    - Generated `js/fastforward*.js` RNG tables were deleted.
   - Remaining checked-in public misses after the refresh: none.
 - Scratch trace/checkpoint files are agent-toolkit state and may be committed
   when useful; keep production parity and scratch-tool commits coherent.
@@ -46,21 +48,21 @@ and `feature_map.md`.
   hosted cache differs from checked-in sessions, and leaderboard state remains
   secondary until refreshed.
 - Current sentinel regression classification: none; strict sentinel is exact.
-- Hack audit remains `hard=0 suspicious=41`; `memory:lint` reports
+- Hack audit remains `hard=0 suspicious=33`; `memory:lint` reports
   `issues=0`. Production `js/` has no intentional debug I/O or imports from
   `frozen/`.
 
 ## Latest Loop Checkpoint
 
 - Latest verified WIP on 2026-06-19:
-  - Startup pre-`mklev` replay retirement: `seed8000-tourist-starter`
+  - Startup fastforward module retirement: `seed8000-tourist-starter`
     remains exact (`S 23/23 R 3130/3130 C 0`) and
     `seed0002-healer-reflection-drummer` remains exact
     (`S 595/595 R 27158/27158 C 0`).
   - Strict sentinel exact:
     `5/5 S 1063/1063 R 64569/64569 C 0`.
   - `verify --target seed8000-tourist-starter` passed target,
-    strict sentinels, `hack:audit` (`hard=0 suspicious=41`), and
+    strict sentinels, `hack:audit` (`hard=0 suspicious=33`), and
     `memory:lint` (`issues=0`).
   - Full corpus inventory: 44 passing sessions, checked-in public
     `44/44 S 11405/11405 R 792838/792838 C 0`.
@@ -70,12 +72,12 @@ and `feature_map.md`.
     hosted cache remains `public-session-drift`, leaderboard fetch failed.
   - Dehack truth:
     - Replay-backed starts should share live `init_objects()`,
-      `init_dungeons()`, and `u_init_misc_rng()` before `mklev()`.
-    - Remaining generated fastforward debt is post-`mklev`
-      `u_init_inventory_attrs()`/attribute/preamble state, plus startup
-      override-screen scaffolding.
-  - Next queue: remaining hack debt is `hard=0 suspicious=41`, dominated by
-    startup replay tails and override-screen scaffolding.
+      `init_dungeons()`, `u_init_misc_rng()`, role inventory, role state, and
+      post-inventory startup RNG.
+    - Remaining startup scaffold debt is visible initial HP/Pw/AC/attribute
+      result state plus override-screen scaffolding, not generated RNG tables.
+  - Next queue: remaining hack debt is `hard=0 suspicious=33`, dominated by
+    override-screen scaffolding and generic replay/harness comments.
 
 - Previous verified WIP on 2026-06-19:
   - `seed5006-tourist-stress-disaster`: restored exact parity:

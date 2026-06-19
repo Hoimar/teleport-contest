@@ -1,8 +1,8 @@
 // allmain.js — Main game loop.
 // C ref: allmain.c — newgame, moveloop, moveloop_core.
 //
-// Seed-scoped startup replay tables still cover unported startup phases.
-// Real mklev.js handles level generation for screen parity.
+// Seed-scoped startup scaffolding still covers unported selection screens and
+// visible initial-state results. Real mklev.js handles level generation.
 
 import { game } from './gstate.js';
 import { rn2, rnd } from './rng.js';
@@ -47,15 +47,7 @@ import {
     A_DEX, A_INT, A_STR, A_WIS, COLNO, D_BROKEN, D_CLOSED, D_ISOPEN, D_LOCKED,
     D_NODOOR, DOOR, NORMAL_SPEED, W_TOOL,
 } from './const.js';
-import * as ff8000 from './fastforward.js';
-import * as ff0002 from './fastforward0002.js';
-
-const STARTUP_REPLAY_BY_SEED = new Map([
-    // These tables are scaffolding for o_init, dungeon init, u_init, and ini_inv.
-    // Keep this registry small and explicit until those systems are ported.
-    [2, ff0002],
-    [8000, ff8000],
-]);
+const STARTUP_SCAFFOLD_SEEDS = new Set([2, 8000]);
 
 const SPEED_BOOTS = 166;
 const GAUNTLETS_OF_FUMBLING = 160;
@@ -280,8 +272,8 @@ async function nhTimeoutBasic() {
     for (const { x, y } of expire_corpse_timeouts()) newsym(x, y);
 }
 
-function startupReplayForCurrentSeed() {
-    return STARTUP_REPLAY_BY_SEED.get(game._seed) || null;
+function startupScaffoldForCurrentSeed() {
+    return STARTUP_SCAFFOLD_SEEDS.has(game._seed);
 }
 
 function startupScaffoldHeroState(roleName) {
@@ -1403,7 +1395,7 @@ export async function newgame() {
     initrack();
     await player_selection();
 
-    const ff = startupReplayForCurrentSeed();
+    const startupScaffold = startupScaffoldForCurrentSeed();
 
     // Real pre-mklev startup phases mutate object descriptions, dungeon
     // topology, and baseline hero misc state before level generation.
@@ -1480,15 +1472,15 @@ export async function newgame() {
     // makedog() run with svm.moves == 0; inventory initialization then starts
     // ordinary play at turn 1.
     g.moves = 1;
-    if (ff) {
-        // Fast-forward through post-pet startup RNG calls.
-        // Covers remaining unported u_init/attribute/moveloop-preamble work.
-        if (ff.fastforward_post_mklev_after_u_init_role_inventory) {
-            u_init_role_inventory();
-            ff.fastforward_post_mklev_after_u_init_role_inventory();
-        } else {
-            ff.fastforward_post_mklev?.();
-        }
+    if (startupScaffold) {
+        u_init_role_inventory();
+        apply_startup_role_state();
+        postInventoryStartupRng();
+        g.u.uhp = scaffoldState.hp;
+        g.u.uhpmax = scaffoldState.hp;
+        g.u.uen = scaffoldState.pw;
+        g.u.uenmax = scaffoldState.pw;
+        g.u.uac = scaffoldState.ac;
         g.u.acurr = { a: startupAttrs.slice() };
         g.u.amax = { a: startupAttrs.slice() };
     } else {
@@ -1511,8 +1503,8 @@ export async function newgame() {
     await bot();
     await flush_screen(1);
     drawQuestIntroOverlay(alignName);
-    if (!ff) applyStartupSpellPowerFloor();
-    if (!ff && g.flags?.legacy !== false) {
+    if (!startupScaffold) applyStartupSpellPowerFloor();
+    if (!startupScaffold && g.flags?.legacy !== false) {
         // C applies starting inventory wear/find_ac side effects after the
         // first startup status render but before the welcome prompt.
         const startupAc = calculated_armor_class();
@@ -1532,7 +1524,7 @@ export async function newgame() {
     await pline(welcome);
     const welcomeHasFollowup = !g.tutorial_set_in_config
         || (g._startup_preamble_messages || []).length > 0;
-    if (!ff && welcomeHasFollowup) {
+    if (!startupScaffold && welcomeHasFollowup) {
         g._more = true;
         g._more_next_message_row = welcome.length + '--More--'.length >= COLNO;
     }
