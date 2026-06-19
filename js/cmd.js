@@ -21830,9 +21830,39 @@ async function showInventoryMenu() {
     const lastText = lines[lastRow]?.text || '';
     const cursorCol = menuCol + lastText.length + (lastText === '(end)' ? 1 : 0);
     const screen = serialize_terminal_grid(display);
-    game._inventory_menu_screen = screen;
-    game._inventory_menu_cursor = [Math.min(cursorCol, COLNO - 1), lastRow];
-    showOverride(screen, game._inventory_menu_cursor);
+    setInventoryMenuScreen(screen, [Math.min(cursorCol, COLNO - 1), lastRow], 1);
+}
+
+function setInventoryMenuScreen(screen, cursor, page = 1) {
+    installSerializedScreenHook();
+    clearOverrideScreen();
+    game._inventory_menu_active = true;
+    game._inventory_menu_page = page;
+    if (page === 2) {
+        game._inventory_menu_page2_screen = screen;
+        game._inventory_menu_page2_cursor = cursor ? [cursor[0], cursor[1]] : null;
+    } else {
+        game._inventory_menu_screen = screen;
+        game._inventory_menu_cursor = cursor ? [cursor[0], cursor[1]] : null;
+    }
+    if (game.nhDisplay && cursor) {
+        if (typeof game.nhDisplay.setCursor === 'function')
+            game.nhDisplay.setCursor(cursor[0], cursor[1]);
+        else {
+            game.nhDisplay.cursorCol = cursor[0];
+            game.nhDisplay.cursorRow = cursor[1];
+        }
+    }
+}
+
+function clearInventoryMenuScreen() {
+    game._inventory_menu_active = false;
+    game._inventory_menu_page = 0;
+    game._inventory_menu_screen = null;
+    game._inventory_menu_page2_screen = null;
+    game._inventory_menu_page2_lines = null;
+    game._inventory_menu_cursor = null;
+    game._inventory_menu_page2_cursor = null;
 }
 
 function buildThrowInventoryMenuLines(showAll = false) {
@@ -22014,6 +22044,7 @@ function showInventoryMenuPage2() {
     const display = game.nhDisplay;
     const lines = game._inventory_menu_page2_lines || [];
     if (!display?.putstr || !lines.length) return false;
+    game._inventory_menu_active = false;
     const displayRows = display.rows || display.terminal?.rows || 24;
     const menuCol = 1;
     for (let row = 0; row < displayRows; row++) {
@@ -22027,10 +22058,64 @@ function showInventoryMenuPage2() {
     const lastText = lines[lastRow]?.text || '';
     const cursorCol = menuCol + lastText.length;
     const screen = serialize_terminal_grid(display);
-    game._inventory_menu_page2_screen = screen;
-    game._inventory_menu_page2_cursor = [Math.min(cursorCol, COLNO - 1), lastRow];
-    showOverride(screen, game._inventory_menu_page2_cursor);
+    setInventoryMenuScreen(screen, [Math.min(cursorCol, COLNO - 1), lastRow], 2);
     return true;
+}
+
+async function handleInventoryLookupMenuInput(ch) {
+    game._look_inventory_lookup_active = false;
+    clearInventoryMenuScreen();
+    clearOverrideScreen();
+    if (ch === '\x1b' || ch === ' ' || ch === '\r' || ch === '\n') {
+        await redrawAfterFullScreenMenuDismiss();
+        game.context.move = 0;
+        return;
+    }
+    const idx = inventoryIndexForLetter(ch);
+    const obj = idx >= 0 ? game.inventory?.[idx] : null;
+    const lines = LOOKUP_DATA.get(baseObjectName(obj).toLowerCase());
+    if (lines) {
+        await redrawAfterFullScreenMenuDismiss();
+        await showLookupDataOverlay(lines);
+    }
+    else {
+        await redrawAfterFullScreenMenuDismiss();
+        await pline("You don't have any information on those things.");
+    }
+    game.context.move = 0;
+}
+
+async function handleInventoryMenuInput(ch) {
+    const page = game._inventory_menu_page || 1;
+    if (game._look_inventory_lookup_active) {
+        await handleInventoryLookupMenuInput(ch);
+        return;
+    }
+    if (page === 2) {
+        clearInventoryMenuScreen();
+        clearOverrideScreen();
+        await redrawAfterFullScreenMenuDismiss();
+        game.context.move = 0;
+        return;
+    }
+    if (ch === ' ' && game._inventory_menu_page2_lines?.length) {
+        showInventoryMenuPage2();
+        game.context.move = 0;
+        return;
+    }
+    const idx = inventoryIndexForLetter(ch);
+    const obj = idx >= 0 ? game.inventory?.[idx] : null;
+    if (obj) {
+        clearInventoryMenuScreen();
+        clearOverrideScreen();
+        await redrawAfterFullScreenMenuDismiss();
+        await showInventoryActionMenu(obj);
+    } else if (ch === '\x1b' || ch === ' ' || ch === '\r' || ch === '\n') {
+        clearInventoryMenuScreen();
+        clearOverrideScreen();
+        await redrawAfterFullScreenMenuDismiss();
+    }
+    game.context.move = 0;
 }
 
 function buildPotionMenuLines() {
@@ -28543,6 +28628,11 @@ export async function rhack(key) {
         return;
     }
 
+    if (game._inventory_menu_active) {
+        await handleInventoryMenuInput(ch);
+        return;
+    }
+
     if (game._awaiting_drink_item) {
         clear_pending_message();
         if (ch === '?' || ch === '*') {
@@ -29381,60 +29471,6 @@ export async function rhack(key) {
             const entry = menu?.entries?.find((item) => item.selector === ch);
             if (entry) entry.selected = !entry.selected;
             if (menu) renderPayMenu(menu);
-            game.context.move = 0;
-            return;
-        }
-        if (game._look_inventory_lookup_active && prev === game._inventory_menu_screen) {
-            game._look_inventory_lookup_active = false;
-            game._inventory_menu_screen = null;
-            game._inventory_menu_page2_lines = null;
-            game._inventory_menu_cursor = null;
-            if (ch === '\x1b' || ch === ' ' || ch === '\r' || ch === '\n') {
-                await redrawAfterFullScreenMenuDismiss();
-                game.context.move = 0;
-                return;
-            }
-            const idx = inventoryIndexForLetter(ch);
-            const obj = idx >= 0 ? game.inventory?.[idx] : null;
-            const lines = LOOKUP_DATA.get(baseObjectName(obj).toLowerCase());
-            if (lines) await showLookupDataOverlay(lines);
-            else {
-                await redrawAfterFullScreenMenuDismiss();
-                await pline("You don't have any information on those things.");
-            }
-            game.context.move = 0;
-            return;
-        }
-        if (prev === game._inventory_menu_screen) {
-            if (ch === ' ' && game._inventory_menu_page2_lines?.length) {
-                showInventoryMenuPage2();
-                game.context.move = 0;
-                return;
-            }
-            const idx = inventoryIndexForLetter(ch);
-            const obj = idx >= 0 ? game.inventory?.[idx] : null;
-            if (obj) await showInventoryActionMenu(obj);
-            else if (ch === '\x1b' || ch === ' ' || ch === '\r' || ch === '\n') {
-                game._inventory_menu_screen = null;
-                game._inventory_menu_page2_lines = null;
-                game._inventory_menu_cursor = null;
-                await redrawAfterFullScreenMenuDismiss();
-            } else {
-                const cursor = game._inventory_menu_cursor
-                    ? [game._inventory_menu_cursor[0], game._inventory_menu_cursor[1]]
-                    : null;
-                showOverride(prev, cursor);
-            }
-            game.context.move = 0;
-            return;
-        }
-        if (prev === game._inventory_menu_page2_screen) {
-            game._inventory_menu_screen = null;
-            game._inventory_menu_page2_screen = null;
-            game._inventory_menu_page2_lines = null;
-            game._inventory_menu_cursor = null;
-            game._inventory_menu_page2_cursor = null;
-            await redrawAfterFullScreenMenuDismiss();
             game.context.move = 0;
             return;
         }
