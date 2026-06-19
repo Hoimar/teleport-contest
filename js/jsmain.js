@@ -21,7 +21,7 @@ import { hasSavedGame, restoreSavedGameIntoCurrentState } from './save_restore.j
 import { l_nhcore_init } from './mklev.js';
 
 // ── NethackGame ──
-// Wraps a single game session with replay infrastructure.
+// Wraps a single game session with queued-input infrastructure.
 export class NethackGame {
     constructor(opts = {}) {
         this._seed = opts.seed || 0;
@@ -264,13 +264,13 @@ function createMemoryStorage() {
 
 // ── Per-segment runner — the contest contract ──
 //
-// The judge calls this once per segment. Input is a clean replay
+// The judge calls this once per segment. Input is a clean segment
 // descriptor with up to five fields (NO recorded answers):
 //
 //   { seed: number,        // PRNG seed
 //     datetime: string,    // fixed datetime "YYYYMMDDHHMMSS"
 //     nethackrc: string,   // game-options rc text
-//     moves: string,       // raw key sequence to replay from launch
+//     moves: string,       // raw key sequence to run from launch
 //     storage: object }    // Web-Storage-shaped (getItem/setItem/...)
 //                          //   handle for cross-segment persistence —
 //                          //   shared across all segments of a

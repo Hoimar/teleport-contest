@@ -5892,7 +5892,7 @@ function clearPendingLookHereResume() {
     // C refs: src/hack.c:spoteffects(), src/pickup.c:pickup(),
     // src/invent.c:look_here().  Once a real look_here() path runs, any
     // older tty-More resume marker for look_here has been consumed; leaving it
-    // armed can replay the same floor list after a later unrelated More.
+    // armed can show the same floor list after a later unrelated More.
     game._resume_look_here_after_more = false;
     game._resume_teleport_arrival_after_more = false;
     game._resume_look_here_feature_line_after_more = '';
@@ -19572,7 +19572,7 @@ async function handleQueuedMore(ch) {
         // C refs: src/end.c:savelife(), src/allmain.c:moveloop_core().
         // The displayed OK+monster-hit More has already applied that hit's
         // damage.  Dismissing it resumes the interrupted monster scan; do not
-        // let stale deferred attack state replay a tail before the scan resumes.
+        // let stale deferred attack state duplicate a tail before the scan resumes.
         game._deferred_monster_physical_attack = null;
         game._more = false;
         game._more_dismissals_remaining = 0;
@@ -29101,7 +29101,7 @@ export async function rhack(key) {
     } else if (key === 10 || key === 13) {
         // C refs: cmd.c:reset_commands(), cmd.c:do_rush_south().  Line-feed is
         // C('j'), bound to rush mode 3 rather than shifted run mode 1.  Tty
-        // Enter can arrive as carriage return in replay input.
+        // Enter can arrive as carriage return in queued input.
         await startRunDirection('j', 3, { nopick: forceCommandPrefix });
     } else if (runDirectionForKey(ch)) {
         const dir = runDirectionForKey(ch);
