@@ -11811,9 +11811,11 @@ function showOverviewScreen(options = {}) {
         display.putstr(textCol + (line.indent || 0), row, line.text, NO_COLOR, attr);
     }
     const screen = serialize_terminal_grid(display);
-    game._overview_screen = screen;
-    game._death_overview_screen_active = !!options.death;
-    showOverride(screen, [textCol + '(end)'.length + 1, lines.length - 1]);
+    setDisclosureWindowScreen(
+        screen,
+        [textCol + '(end)'.length + 1, lines.length - 1],
+        options.death ? 'death-overview' : 'overview',
+    );
     game.context.move = 0;
 }
 
@@ -11949,9 +11951,7 @@ function showConductScreen(options = {}) {
     const display = game.nhDisplay;
     if (!display?.putstr) return;
     const rendered = renderTtyMenuTextWindow(conductLines(options), { minWindowWidth: 39 });
-    game._conduct_screen = rendered.screen;
-    game._death_conduct_screen_active = !!options.death;
-    showOverride(rendered.screen, rendered.cursor);
+    setDisclosureWindowScreen(rendered.screen, rendered.cursor, options.death ? 'death-conduct' : 'conduct');
     game.context.move = 0;
 }
 
@@ -11989,9 +11989,7 @@ function showVanquishedScreen(options = {}) {
     }
     const rendered = renderTtyMenuTextWindow(lines, { minWindowWidth: 39 });
     const screen = rendered.screen;
-    game._vanquished_screen = screen;
-    game._death_vanquished_screen_active = !!options.death;
-    showOverride(screen, rendered.cursor);
+    setDisclosureWindowScreen(screen, rendered.cursor, options.death ? 'death-vanquished' : 'vanquished');
     game.context.move = 0;
 }
 
@@ -16886,6 +16884,50 @@ function clearTerrainWindowScreen({ redraw = false } = {}) {
     game._terrain_window_screen = null;
     game._terrain_window_cursor = null;
     if (redraw) game._full_map_redraw_pending = true;
+}
+
+function setDisclosureWindowScreen(screen, cursor, kind) {
+    installSerializedScreenHook();
+    clearOverrideScreen();
+    game._disclosure_window_screen = screen;
+    game._disclosure_window_cursor = cursor ? [cursor[0], cursor[1]] : null;
+    game._disclosure_window_kind = kind || 'disclosure';
+    game._disclosure_window_active = true;
+    if (game.nhDisplay && cursor) {
+        if (typeof game.nhDisplay.setCursor === 'function')
+            game.nhDisplay.setCursor(cursor[0], cursor[1]);
+        else {
+            game.nhDisplay.cursorCol = cursor[0];
+            game.nhDisplay.cursorRow = cursor[1];
+        }
+    }
+}
+
+function clearDisclosureWindowScreen() {
+    game._disclosure_window_active = false;
+    game._disclosure_window_screen = null;
+    game._disclosure_window_cursor = null;
+    game._disclosure_window_kind = '';
+}
+
+async function handleDisclosureWindowInput() {
+    const kind = game._disclosure_window_kind || '';
+    clearDisclosureWindowScreen();
+    clearOverrideScreen();
+    if (kind === 'death-vanquished') {
+        await showDeathConductPrompt();
+        return;
+    }
+    if (kind === 'death-conduct') {
+        await showDeathOverviewPrompt();
+        return;
+    }
+    if (kind === 'death-overview') {
+        await showDeathDisclosure();
+        return;
+    }
+    await redrawAfterFullScreenMenuDismiss();
+    game.context.move = 0;
 }
 
 function currentFruitName() {
@@ -23155,8 +23197,7 @@ async function showDeathCreaturesPrompt() {
 async function showDeathConductPrompt() {
     // C ref: src/end.c:disclose().
     game._death_conduct_prompt_active = true;
-    game._death_vanquished_screen_active = false;
-    game._vanquished_screen = null;
+    clearDisclosureWindowScreen();
     clearOverrideScreen();
     await redrawAfterFullScreenMenuDismiss();
     const msg = 'Do you want to see your conduct? [ynq] (n)';
@@ -23168,8 +23209,7 @@ async function showDeathConductPrompt() {
 async function showDeathOverviewPrompt() {
     // C ref: src/end.c:disclose().
     game._death_overview_prompt_active = true;
-    game._death_conduct_screen_active = false;
-    game._conduct_screen = null;
+    clearDisclosureWindowScreen();
     clearOverrideScreen();
     await redrawAfterFullScreenMenuDismiss();
     const msg = 'Do you want to see the dungeon overview? [ynq] (n)';
@@ -25896,6 +25936,11 @@ export async function rhack(key) {
             await flush_screen(1);
         }
         game.context.move = 0;
+        return;
+    }
+
+    if (game._disclosure_window_active) {
+        await handleDisclosureWindowInput();
         return;
     }
 
@@ -29054,35 +29099,8 @@ export async function rhack(key) {
             await handleEnhanceSelection(ch);
             return;
         }
-        if (prev === game._vanquished_screen && game._death_vanquished_screen_active) {
-            game._death_vanquished_screen_active = false;
-            game._vanquished_screen = null;
-            clearOverrideScreen();
-            await showDeathConductPrompt();
-            game.context.move = 0;
-            return;
-        }
-        if (prev === game._conduct_screen && game._death_conduct_screen_active) {
-            game._death_conduct_screen_active = false;
-            game._conduct_screen = null;
-            clearOverrideScreen();
-            await showDeathOverviewPrompt();
-            game.context.move = 0;
-            return;
-        }
-        if (prev === game._overview_screen && game._death_overview_screen_active) {
-            game._death_overview_screen_active = false;
-            game._overview_screen = null;
-            clearOverrideScreen();
-            await showDeathDisclosure();
-            game.context.move = 0;
-            return;
-        }
         if (prev === game._look_data_screen
             || prev === game._look_list_screen
-            || prev === game._overview_screen
-            || prev === game._conduct_screen
-            || prev === game._vanquished_screen
             || (prev === game._attributes_page1_screen && key !== 32 && key !== 13)
             || prev === game._attributes_page2_screen
             || prev === game._attributes_page3_screen) {
@@ -29090,9 +29108,6 @@ export async function rhack(key) {
             game._look_list_screen = null;
             game._name_menu_screen = null;
             game._enhance_skills_screen = null;
-            game._overview_screen = null;
-            game._conduct_screen = null;
-            game._vanquished_screen = null;
             game._attributes_page1_screen = null;
             game._attributes_page2_screen = null;
             game._attributes_page3_screen = null;

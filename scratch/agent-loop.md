@@ -13,7 +13,7 @@ and `feature_map.md`.
 ## Current State
 
 - Current branch in this workspace: `main`, ahead of origin.
-- Latest verified repair unit: terrain-window active-state retirement.
+- Latest verified repair unit: disclosure-window active-state retirement.
 - Checked-in public corpus is exact: `44/44 S 11405/11405 R 792838/792838 C 0`.
 - Hosted public cache remains `public-session-drift` at
   `40/44 S 10417/10982 R 629747/840358 C 0`; leaderboard fetch failed.
@@ -32,6 +32,27 @@ and `feature_map.md`.
 ## Latest Loop Checkpoint
 
 - Latest verified WIP on 2026-06-19:
+  - Disclosure-window override-state retirement:
+    `seed0106-priest-extcmd-sweep` remains exact
+    (`S 267/267 R 4194/4194 C 0`) for `#conduct`, `#overview`, and
+    `#vanquished`; death-disclosure guards `seed0030` and `seed0006`
+    remained exact.
+  - Strict sentinel exact:
+    `5/5 S 1063/1063 R 64569/64569 C 0`.
+  - `verify --target seed0106-priest-extcmd-sweep` passed target, strict
+    sentinels, `hack:audit` (`hard=0 suspicious=11`), and `memory:lint`
+    (`issues=0`).
+  - Full corpus inventory: 44 passing sessions, checked-in public
+    `44/44 S 11405/11405 R 792838/792838 C 0`.
+  - Dehack truth:
+    - `#conduct`, `#vanquished`, and `#overview` are active serialized
+      disclosure-window states rendered by `display.js`.
+    - Final disclosure chaining uses the active window kind instead of
+      generic `_override_prev`.
+  - Next queue: remaining hack debt is `hard=0 suspicious=11`, dominated by
+    generic override-screen plumbing plus the forbidden-file replay comments.
+
+- Previous verified WIP on 2026-06-19:
   - Terrain-window override-state retirement:
     `seed0106-priest-extcmd-sweep` remains exact
     (`S 267/267 R 4194/4194 C 0`) and covers terrain selector ESC
@@ -91,28 +112,6 @@ and `feature_map.md`.
       look tty-window states rendered by `display.js`.
     - Dismissal is owned by explicit look state and a full tty redraw, not
       generic `_override_prev`.
-  - Next queue: remaining hack debt is `hard=0 suspicious=11`, dominated by
-    generic override-screen plumbing plus the forbidden-file replay comments.
-
-- Previous verified WIP on 2026-06-19:
-  - Option-window override-state retirement:
-    `seed4500-knight-coverage` remains exact
-    (`S 1814/1814 R 108275/108275 C 0`) and covers basic options plus
-    fruit prompt; focused guards `seed0006`, `seed0007`, and `seed0014`
-    remained exact for basic/full options and pickup-types.
-  - Strict sentinel exact:
-    `5/5 S 1063/1063 R 64569/64569 C 0`.
-  - `verify --target seed4500-knight-coverage` passed target,
-    strict sentinels, `hack:audit` (`hard=0 suspicious=11`), and
-    `memory:lint` (`issues=0`).
-  - Full corpus inventory: 44 passing sessions, checked-in public
-    `44/44 S 11405/11405 R 792838/792838 C 0`.
-  - Dehack truth:
-    - `O`/`m-O`, pickup-types, and option fruit prompts are active
-      serialized option tty-window states rendered by `display.js`.
-    - Option overlays that rebuild from the terminal grid serialize through
-      the base terminal serializer so the active serialize hook cannot return
-      a stale previous option screen.
   - Next queue: remaining hack debt is `hard=0 suspicious=11`, dominated by
     generic override-screen plumbing plus the forbidden-file replay comments.
 
