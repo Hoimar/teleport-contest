@@ -19466,6 +19466,7 @@ async function handleQueuedMore(ch) {
     game._latched_more_screen = null;
     game._latched_more_cursor = null;
     game._latched_more_keep_until_dismiss = false;
+    game._latched_more_use_pending_topline = false;
     if (game._amulet_wish_prompt_after_more && game._more_dismissals_remaining <= 0)
         return await beginAmuletWishPromptAfterMore();
     if (!(game._monster_death_pending && game._after_more_projectile_clear_after_prompt))
@@ -19727,6 +19728,7 @@ async function handleQueuedMore(ch) {
             game._more_dismissals_remaining = 0;
             clear_pending_message();
             clearOverrideScreen();
+            await redrawAfterFullScreenMenuDismiss();
             if (questLeaderAction === 'leader-followup' && questLeaderNeedsDebugAlignAdjust()) {
                 await pline(questLeaderDebugAlignMessage());
                 queue_more_prompt();
@@ -19804,6 +19806,7 @@ async function handleQueuedMore(ch) {
         if (game._post_arrival_pager_active) {
             game._post_arrival_pager_active = false;
             clearOverrideScreen();
+            await redrawAfterFullScreenMenuDismiss();
             const tempMessage = game._post_arrival_temp_message;
             game._post_arrival_temp_message = null;
             game._more = false;

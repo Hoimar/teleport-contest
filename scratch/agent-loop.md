@@ -14,27 +14,28 @@ and `feature_map.md`.
 
 - Current branch in this workspace: `main`, ahead of origin.
 - Latest verified repair unit:
-  - `seed0009-swimmer-mforce` is exact:
-    `S 73/73 R 3713/3713 C 0` (pre-fix baseline was
-    `S 36/73 R 3713/3713 C 0`, one Tutorial secret-door glyph orientation
-    mismatch repeated through later frames).
+  - `seed0361-archeologist-tour` is exact:
+    `S 366/366 R 53865/53865 C 0` (pre-fix WIP baseline was
+    `S 356/366 R 53865/53865 C 0`, stale full-screen quest pager rows with
+    RNG already exact).
   - Strict sentinels exact: `5/5 S 1063/1063 R 64569/64569 C 0`.
-  - `verify --target seed0009-swimmer-mforce` passed target
+  - `verify --target seed0361-archeologist-tour` passed target
     expectations, strict sentinels, `hack:audit` (`hard=0 suspicious=47`),
     and `memory:lint` (`issues=0`). Focused guards also kept
-    `seed0014-dequa-fountain-explore`, `seed0360-wizard-world-tour`, and
-    `seed2600-wizard-custom-binds` exact.
+    `seed0360-wizard-world-tour`, `seed0373-barbarian-quest-tour`,
+    `seed0108-wizard-extcmd-wishlist`, and
+    `seed5002-wizard-coverage-pair` exact.
   - Local parity refresh after the repair is checked-in public
-    `38/44 S 9590/11405 R 604772/792838 C 0`; cached hosted public remains
-    `public-session-drift` at `35/44 S 8704/10982 R 472995/840358 C 0`;
-    leaderboard was skipped in the full local scan.
-  - Implementation: Tutorial `des.map()` secret doors run C's neighbor
-    orientation pass after all terrain exists, so hidden `S` cells render as
-    the correct wall direction (`C refs: src/sp_lev.c:set_door_orientation(),
-    dat/tut-1.lua`).
-  - Remaining checked-in misses after the refresh: 6 public sessions remain
-    non-exact; choose the next frontier from `npm run parity:state -- --full`
-    or `scratch/divergence-inventory.md` rather than from older checkpoint rows.
+    `41/44 S 9735/11405 R 724556/792838 C 0`; cached hosted public remains
+    `public-session-drift` at `37/44 S 8747/10982 R 561465/840358 C 0`;
+    leaderboard fetch failed in the live refresh.
+  - Implementation: full-screen quest text-window dismissal now repaints the
+    playfield before follow-up quest toplines/prompts and post-arrival
+    continuations (`C refs: win/tty/wintty.c:erase_menu_or_text(),
+    quest.c:chat_with_leader(), quest.c:on_start(), quest.c:on_goal(),
+    questpgr.c:qt_pager()`).
+  - Remaining checked-in misses after the refresh: `seed0399-wizard-hallu-actions`,
+    `seed4500-knight-coverage`, and `seed5006-tourist-stress-disaster`.
 - Previous committed repair unit:
   - Commit `47297f2` restored `seed0361-archeologist-tour` from WIP
     `S 204/366 R 4519/53865` to exact
@@ -68,6 +69,33 @@ and `feature_map.md`.
 ## Latest Loop Checkpoint
 
 - Latest verified WIP on 2026-06-19:
+  - `seed0361-archeologist-tour`: restored exact parity after the full-screen
+    quest pager redraw repair:
+    `S 366/366 R 53865/53865 C 0` (pre-fix WIP baseline was
+    `S 356/366 R 53865/53865 C 0`).
+  - Strict sentinel exact:
+    `5/5 S 1063/1063 R 64569/64569 C 0`.
+  - `verify --target seed0361-archeologist-tour` passed target expectations,
+    strict sentinels, `hack:audit` (`hard=0 suspicious=47`), and
+    `memory:lint` (`issues=0`).
+  - Focused guards exact: `seed0360-wizard-world-tour`,
+    `seed0373-barbarian-quest-tour`, `seed0108-wizard-extcmd-wishlist`, and
+    `seed5002-wizard-coverage-pair`.
+  - Local parity refresh:
+    checked-in public `41/44 S 9735/11405 R 724556/792838 C 0`;
+    cached hosted public `37/44 S 8747/10982 R 561465/840358 C 0`;
+    hosted cache remains `public-session-drift`, leaderboard fetch failed.
+  - Subsystem truth:
+    - `win/tty/wintty.c:erase_menu_or_text()` redraws the playfield after
+      full-screen quest text windows, so JS must run the same redraw before
+      follow-up `chat_with_leader()` toplines/prompts and post-arrival
+      `on_start()`/`on_goal()` continuations.
+    - Generic More dismissal must also clear the latched pending-topline mode
+      bit so a later full-screen latch cannot inherit stale row-0 rewriting.
+  - Next checked-in queue: `seed0399-wizard-hallu-actions`,
+    `seed4500-knight-coverage`, and `seed5006-tourist-stress-disaster`.
+
+- Previous verified WIP on 2026-06-19:
   - `seed0108-wizard-extcmd-wishlist`: restored exact parity after the
     force-lock start-More repair:
     `S 303/303 R 16958/16958 C 0` (pre-fix WIP baseline was
