@@ -1788,6 +1788,8 @@ function activeSerializedTextScreen() {
         return game._help_text_screen;
     if (game._options_window_active && game._options_window_screen)
         return game._options_window_screen;
+    if (game._look_window_active && game._look_window_screen)
+        return game._look_window_screen;
     if (game._direction_help_active && game._direction_help_screen)
         return game._direction_help_screen;
     if (game._getpos_help_active && game._getpos_help_screen)
@@ -1882,6 +1884,10 @@ function _buildScreenOutput(options = {}) {
     }
     if (game._options_window_active && game._options_window_screen) {
         renderTextScreen(display, game._options_window_screen, game._options_window_cursor || null);
+        return;
+    }
+    if (game._look_window_active && game._look_window_screen) {
+        renderTextScreen(display, game._look_window_screen, game._look_window_cursor || null);
         return;
     }
     if (game._direction_help_active && game._direction_help_screen) {

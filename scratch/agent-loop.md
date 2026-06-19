@@ -13,7 +13,7 @@ and `feature_map.md`.
 ## Current State
 
 - Current branch in this workspace: `main`, ahead of origin.
-- Latest verified repair unit: option-window active-state retirement.
+- Latest verified repair unit: look-window active-state retirement.
 - Checked-in public corpus is exact: `44/44 S 11405/11405 R 792838/792838 C 0`.
 - Hosted public cache remains `public-session-drift` at
   `40/44 S 10417/10982 R 629747/840358 C 0`; leaderboard fetch failed.
@@ -32,6 +32,27 @@ and `feature_map.md`.
 ## Latest Loop Checkpoint
 
 - Latest verified WIP on 2026-06-19:
+  - Look-window override-state retirement:
+    `seed2200-wizard-quaff-zap-read` remains exact
+    (`S 230/230 R 3018/3018 C 0`) and covers help/lookup windows;
+    focused guards `seed0360`, `seed0383`, and `seed4500` remained exact
+    for look/farlook/menu handoffs.
+  - Strict sentinel exact:
+    `5/5 S 1063/1063 R 64569/64569 C 0`.
+  - `verify --target seed2200-wizard-quaff-zap-read` passed target,
+    strict sentinels, `hack:audit` (`hard=0 suspicious=11`), and
+    `memory:lint` (`issues=0`).
+  - Full corpus inventory: 44 passing sessions, checked-in public
+    `44/44 S 11405/11405 R 792838/792838 C 0`.
+  - Dehack truth:
+    - The look-at chooser and lookup data/list windows are active serialized
+      look tty-window states rendered by `display.js`.
+    - Dismissal is owned by explicit look state and a full tty redraw, not
+      generic `_override_prev`.
+  - Next queue: remaining hack debt is `hard=0 suspicious=11`, dominated by
+    generic override-screen plumbing plus the forbidden-file replay comments.
+
+- Previous verified WIP on 2026-06-19:
   - Option-window override-state retirement:
     `seed4500-knight-coverage` remains exact
     (`S 1814/1814 R 108275/108275 C 0`) and covers basic options plus
@@ -92,28 +113,6 @@ and `feature_map.md`.
       `display.js`, not generic `_override_prev` cases.
     - The nested `?` -> `e` `dowhatis()` path still runs the full
       `erase_menu_or_text()` redraw before drawing its corner overlay.
-  - Next queue: remaining hack debt is `hard=0 suspicious=11`, dominated by
-    generic override-screen plumbing plus the forbidden-file replay comments.
-
-- Previous verified WIP on 2026-06-19:
-  - Spell menu override-state retirement:
-    `seed0383-wizard-hallucinate` remains exact
-    (`S 219/219 R 16915/16915 C 0`) and covers active spell view under
-    hallucination; focused guards for cast/view menus (`seed0501`,
-    `seed0116`, `seed0200`) remained exact.
-  - Strict sentinel exact:
-    `5/5 S 1063/1063 R 64569/64569 C 0`.
-  - `verify --target seed0383-wizard-hallucinate` passed target,
-    strict sentinels, `hack:audit` (`hard=0 suspicious=11`), and
-    `memory:lint` (`issues=0`).
-  - Full corpus inventory: 44 passing sessions, checked-in public
-    `44/44 S 11405/11405 R 792838/792838 C 0`.
-  - Dehack truth:
-    - `+` known-spell view and `Z` cast-spell selection are active tty states
-      rendered by `display.js`, not generic `_override_prev` cases.
-    - The shared serialized-screen hook preserves styled menu header spaces
-      for active full-screen tty states; cast selection redraws before spell
-      effects, while invalid view selectors keep the menu active.
   - Next queue: remaining hack debt is `hard=0 suspicious=11`, dominated by
     generic override-screen plumbing plus the forbidden-file replay comments.
 

@@ -16803,7 +16803,7 @@ function setOptionsWindowScreen(screen, cursor) {
     }
 }
 
-function serializeOptionsWindowGrid(display = game.nhDisplay) {
+function serializeBaseTerminalGrid(display = game.nhDisplay) {
     const term = display?.terminal || display;
     if (typeof term?._teleportSerializeBase === 'function')
         return term._teleportSerializeBase();
@@ -16814,6 +16814,33 @@ function clearOptionsWindowScreen({ redraw = false } = {}) {
     game._options_window_active = false;
     game._options_window_screen = null;
     game._options_window_cursor = null;
+    if (redraw) game._full_map_redraw_pending = true;
+}
+
+function setLookWindowScreen(screen, cursor, kind) {
+    installSerializedScreenHook();
+    game._look_window_screen = screen;
+    game._look_window_cursor = cursor ? [cursor[0], cursor[1]] : null;
+    game._look_window_kind = kind || 'window';
+    game._look_window_active = true;
+    if (game.nhDisplay && cursor) {
+        if (typeof game.nhDisplay.setCursor === 'function')
+            game.nhDisplay.setCursor(cursor[0], cursor[1]);
+        else {
+            game.nhDisplay.cursorCol = cursor[0];
+            game.nhDisplay.cursorRow = cursor[1];
+        }
+    }
+}
+
+function clearLookWindowScreen({ redraw = false } = {}) {
+    game._look_window_active = false;
+    game._look_window_screen = null;
+    game._look_window_cursor = null;
+    game._look_window_kind = '';
+    game._look_menu_active = false;
+    game._look_data_active = false;
+    game._look_list_active = false;
     if (redraw) game._full_map_redraw_pending = true;
 }
 
@@ -16923,7 +16950,7 @@ function renderPickupTypesMenu() {
         if (!rows[row]) continue;
         display.putstr(col, row, rows[row], NO_COLOR, row === 0 ? ATR_INVERSE : 0);
     }
-    setOptionsWindowScreen(serializeOptionsWindowGrid(display), [col + '(end)'.length + 1, 21]);
+    setOptionsWindowScreen(serializeBaseTerminalGrid(display), [col + '(end)'.length + 1, 21]);
 }
 
 async function beginPickupTypesMenu() {
@@ -17635,7 +17662,7 @@ async function beginOptionsFruitPrompt(options = {}) {
     game._awaiting_options_fruit = true;
     game._options_fruit_return_to_basic = !!options.returnToBasicOptions;
     game._options_fruit_input = '';
-    const baseRows = serializeOptionsWindowGrid(game.nhDisplay).split('\n');
+    const baseRows = serializeBaseTerminalGrid(game.nhDisplay).split('\n');
     while (baseRows.length < C.TERMINAL_ROWS) baseRows.push('');
     baseRows[22] = '';
     baseRows[23] = '';
@@ -17823,9 +17850,9 @@ async function showLookAtMenu() {
     ];
     for (const [row, col, text] of rows)
         display.putstr(col, row, text, NO_COLOR, row === 0 ? ATR_INVERSE : 0);
-    const screen = serialize_terminal_grid(display);
-    showSerializedOverride(screen, [46, 14]);
-    game._override_serialized_persistent = true;
+    const screen = serializeBaseTerminalGrid(display);
+    setLookWindowScreen(screen, [46, 14], 'menu');
+    game._look_menu_active = true;
 }
 
 async function showHelpMenu() {
@@ -18075,6 +18102,17 @@ async function handleHelpTextInput(ch) {
     game.context.move = 0;
 }
 
+async function handleLookWindowInput(ch) {
+    if (!game._look_data_active && !game._look_list_active) return false;
+    void ch;
+    game._look_data_screen = null;
+    game._look_list_screen = null;
+    clearLookWindowScreen();
+    await redrawAfterFullScreenMenuDismiss();
+    game.context.move = 0;
+    return true;
+}
+
 async function showGetposHelpScreen(kind = 'travel') {
     // C ref: getpos.c:getpos_help(). Tty menu overlays the current map from
     // column 10 onward and blocks on a More prompt before returning to getpos.
@@ -18118,9 +18156,10 @@ async function showLookupDataOverlay(lines) {
     const moreRow = Math.min(lines.length, C.TERMINAL_ROWS - 1);
     for (let c = col; c < COLNO; c++) display.setCell(c, moreRow, ' ', NO_COLOR, 0);
     display.putstr(col, moreRow, '--More--', NO_COLOR, 0);
-    const screen = serialize_terminal_grid(display);
+    const screen = serializeBaseTerminalGrid(display);
     game._look_data_screen = screen;
-    showSerializedOverride(screen, [Math.min(col + '--More--'.length, COLNO - 1), moreRow]);
+    game._look_data_active = true;
+    setLookWindowScreen(screen, [Math.min(col + '--More--'.length, COLNO - 1), moreRow], 'data');
 }
 
 function lookCoord(x, y) {
@@ -18147,7 +18186,8 @@ function showLookListScreen(lines) {
     rows[C.TERMINAL_ROWS - 1] = '--More--';
     const screen = rows.join('\n');
     game._look_list_screen = screen;
-    showSerializedOverride(screen, [8, C.TERMINAL_ROWS - 1]);
+    game._look_list_active = true;
+    setLookWindowScreen(screen, [8, C.TERMINAL_ROWS - 1], 'list');
 }
 
 function visibleLookObjects() {
@@ -25842,6 +25882,8 @@ export async function rhack(key) {
         return;
     }
 
+    if (await handleLookWindowInput(ch)) return;
+
     if (await handleQueuedMore(ch)) return;
 
     if (game._awaiting_quest_leader_align_adjust) {
@@ -25916,7 +25958,8 @@ export async function rhack(key) {
     }
 
     if (game._awaiting_lookat_menu) {
-        clearOverrideScreen();
+        clearLookWindowScreen();
+        game._look_menu_active = false;
         game._awaiting_lookat_menu = false;
         // C ref: win/tty/wintty.c:erase_menu_or_text().  The look-at chooser
         // is a corner overlay; erase it back to the saved map before the
