@@ -1405,20 +1405,12 @@ export async function newgame() {
 
     const ff = startupReplayForCurrentSeed();
 
-    // Fast-forward through pre-mklev startup RNG calls.
-    // Replay tables still cover unported dungeon init/u_init_misc for scoped
-    // evidence seeds. Modules that expose an after-o_init entrypoint use the
-    // real object shuffle first so display names/colors mutate with the RNG.
-    if (ff?.fastforward_pre_mklev_after_o_init) {
-        init_objects();
-        ff.fastforward_pre_mklev_after_o_init();
-    } else if (ff) ff.fastforward_pre_mklev?.();
-    else {
-        init_objects();
-        preLuaRoleInitRng();
-        init_dungeons();
-        u_init_misc_rng();
-    }
+    // Real pre-mklev startup phases mutate object descriptions, dungeon
+    // topology, and baseline hero misc state before level generation.
+    init_objects();
+    preLuaRoleInitRng();
+    init_dungeons();
+    u_init_misc_rng();
 
     // C ref: allmain.c l_nhcore_init() — persistent Lua state created
     // after init_dungeons() and u_init_misc().
@@ -1433,9 +1425,9 @@ export async function newgame() {
     if (g.u.xray_range == null) g.u.xray_range = -1;
     g.u.uz = { dnum: 0, dlevel: 1 };
     g.flags = g.flags || {};
-    // Branch placement scaffolding. The exact dungeon init still lives in
-    // fastforward_pre_mklev; keep enough topology for later level generation
-    // to recognize the dungeon-exit and Mines-entrance branch levels.
+    // Branch placement fallback for paths that have not initialized full
+    // dungeon topology; generated levels still need the dungeon exit and Mines
+    // branch shape for branch predicates.
     if (!g.branches) g.branches = [
         { end1: { dnum: 0, dlevel: 1 }, end2: { dnum: 7, dlevel: 1 }, end1_up: true },
         { end1: { dnum: 0, dlevel: 2 }, end2: { dnum: 2, dlevel: 1 }, end1_up: false },

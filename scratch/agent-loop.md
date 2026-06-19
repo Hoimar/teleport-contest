@@ -14,32 +14,29 @@ and `feature_map.md`.
 
 - Current branch in this workspace: `main`, ahead of origin.
 - Latest verified repair unit:
-  - Startup scaffold dehack after public-corpus completion:
-    `seed0002-healer-reflection-drummer` remains exact
-    (`S 595/595 R 27158/27158 C 0`) and checked-in public remains
-    `44/44 S 11405/11405 R 792838/792838 C 0`.
+  - Startup pre-`mklev` replay retirement:
+    `seed8000-tourist-starter` remains exact
+    (`S 23/23 R 3130/3130 C 0`), `seed0002-healer-reflection-drummer`
+    remains exact (`S 595/595 R 27158/27158 C 0`), and checked-in public
+    remains `44/44 S 11405/11405 R 792838/792838 C 0`.
   - Strict sentinels exact: `5/5 S 1063/1063 R 64569/64569 C 0`.
-  - `verify --target seed0002-healer-reflection-drummer` passed target
-    expectations, strict sentinels, `hack:audit` (`hard=0 suspicious=43`),
-    and `memory:lint` (`issues=0`).
-  - Startup-focused guards exact: `seed8000-tourist-starter`,
-    `seed0077-rogue-chargen`, `seed0101-ranger-quiver-throw-travel-engrave`,
-    `seed0102-ranger-name-cancel`,
-    `seed0013-friday13-save-then-fullmoon-restore`,
-    `seed0016-healer-newmoon-eat-zap`, `seed0017-samurai-altar-pray`,
-    `seed0106-priest-extcmd-sweep`, `seed0360-wizard-world-tour`,
+  - `verify --target seed8000-tourist-starter` passed target expectations,
+    strict sentinels, `hack:audit` (`hard=0 suspicious=41`), and
+    `memory:lint` (`issues=0`).
+  - Focused guards exact: `seed0002-healer-reflection-drummer`,
+    `seed8000-tourist-starter`, `seed0360-wizard-world-tour`,
     `seed0361-archeologist-tour`, and `seed5006-tourist-stress-disaster`.
+  - Full corpus inventory after the dehack: 44 passing sessions.
   - Local parity refresh after the dehack is checked-in public
     `44/44 S 11405/11405 R 792838/792838 C 0`; cached hosted public remains
     `public-session-drift` at `40/44 S 10417/10982 R 629747/840358 C 0`;
     leaderboard fetch failed.
   - Implementation:
-    - The seed0002 startup selection replay now writes ordinary `_nhopts`
-      (`name/role/race/gender/align`) and `plname`.
-    - Later startup code reads role/gender/name through the normal helpers
-      instead of inferring Healer/male/David from `game._seed`.
-    - Starting gold for replay-scaffolded Healer/Tourist paths comes from
-      `u_init_role_inventory()` rather than a pre-inventory seed branch.
+    - Replay-backed seed0002/seed8000 starts now run live `init_objects()`,
+      role pre-Lua RNG, `init_dungeons()`, and `u_init_misc_rng()` before
+      `mklev()`.
+    - Generated fastforward modules now retain only the post-`mklev`
+      `u_init_inventory_attrs()`/attribute/preamble tail.
   - Remaining checked-in public misses after the refresh: none.
 - Scratch trace/checkpoint files are agent-toolkit state and may be committed
   when useful; keep production parity and scratch-tool commits coherent.
@@ -49,20 +46,21 @@ and `feature_map.md`.
   hosted cache differs from checked-in sessions, and leaderboard state remains
   secondary until refreshed.
 - Current sentinel regression classification: none; strict sentinel is exact.
-- Hack audit remains `hard=0 suspicious=43`; `memory:lint` reports
+- Hack audit remains `hard=0 suspicious=41`; `memory:lint` reports
   `issues=0`. Production `js/` has no intentional debug I/O or imports from
   `frozen/`.
 
 ## Latest Loop Checkpoint
 
 - Latest verified WIP on 2026-06-19:
-  - Startup scaffold dehack: `seed0002-healer-reflection-drummer` remains
-    exact (`S 595/595 R 27158/27158 C 0`) and `seed8000-tourist-starter`
-    remains exact (`S 23/23 R 3130/3130 C 0`).
+  - Startup pre-`mklev` replay retirement: `seed8000-tourist-starter`
+    remains exact (`S 23/23 R 3130/3130 C 0`) and
+    `seed0002-healer-reflection-drummer` remains exact
+    (`S 595/595 R 27158/27158 C 0`).
   - Strict sentinel exact:
     `5/5 S 1063/1063 R 64569/64569 C 0`.
-  - `verify --target seed0002-healer-reflection-drummer` passed target,
-    strict sentinels, `hack:audit` (`hard=0 suspicious=43`), and
+  - `verify --target seed8000-tourist-starter` passed target,
+    strict sentinels, `hack:audit` (`hard=0 suspicious=41`), and
     `memory:lint` (`issues=0`).
   - Full corpus inventory: 44 passing sessions, checked-in public
     `44/44 S 11405/11405 R 792838/792838 C 0`.
@@ -71,12 +69,13 @@ and `feature_map.md`.
     cached hosted public `40/44 S 10417/10982 R 629747/840358 C 0`;
     hosted cache remains `public-session-drift`, leaderboard fetch failed.
   - Dehack truth:
-    - Seed0002 selection replay should populate ordinary startup option state
-      before `newgame()` initializes role/gender/name.
-    - Replay-scaffolded role/name/gold state should flow through startup
-      helpers and `u_init_role_inventory()` instead of later seed checks.
-  - Next queue: remaining hack debt is `hard=0 suspicious=43`, dominated by
-    startup replay tables and override-screen scaffolding.
+    - Replay-backed starts should share live `init_objects()`,
+      `init_dungeons()`, and `u_init_misc_rng()` before `mklev()`.
+    - Remaining generated fastforward debt is post-`mklev`
+      `u_init_inventory_attrs()`/attribute/preamble state, plus startup
+      override-screen scaffolding.
+  - Next queue: remaining hack debt is `hard=0 suspicious=41`, dominated by
+    startup replay tails and override-screen scaffolding.
 
 - Previous verified WIP on 2026-06-19:
   - `seed5006-tourist-stress-disaster`: restored exact parity:
