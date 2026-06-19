@@ -6140,6 +6140,7 @@ function loadMinetown5Special() {
     game.smeq[game.level.nroom] = game.level.nroom;
     game.level.nroom++;
     game.level.flags.has_temple = true;
+    topologize(temple);
     minetn5Door('closed', 31, 5);
     const altar = game.level?.at(minetn5X(31), minetn5Y(3));
     if (altar) altar.typ = ALTAR;
@@ -12963,10 +12964,38 @@ function wizStartApplyLit(x1, y1, x2, y2, lit) {
         }
 }
 
+function setDoorOrientationFromNeighbors(x, y) {
+    // C ref: sp_lev.c:set_door_orientation().  Secret doors inherit their
+    // hidden wall direction from adjacent walls and doors after des.door().
+    const loc = game.level?.at(x, y);
+    if (!loc) return;
+    const wallOrDoor = (xx, yy) => {
+        if (!isok(xx, yy)) return false;
+        const typ = game.level?.at(xx, yy)?.typ;
+        return IS_WALL(typ) || IS_DOOR(typ) || typ === SDOOR;
+    };
+    let wleft = wallOrDoor(x - 1, y);
+    let wright = wallOrDoor(x + 1, y);
+    let wup = wallOrDoor(x, y - 1);
+    let wdown = wallOrDoor(x, y + 1);
+    if (!wleft && !wright && !wup && !wdown) {
+        const doorJoin = (xx, yy) => !isok(xx, yy)
+            || IS_OBSTRUCTED(game.level?.at(xx, yy)?.typ)
+            || game.level?.at(xx, yy)?.typ === IRONBARS;
+        wleft = doorJoin(x - 1, y);
+        wright = doorJoin(x + 1, y);
+        wup = doorJoin(x, y - 1);
+        wdown = doorJoin(x, y + 1);
+    }
+    loc.horizontal = ((wleft || wright) && !(wup && wdown)) ? 1 : 0;
+}
+
 function wizStartSetDoor(x, y, mask) {
     // C ref: sp_lev.c:sel_set_door().  Applying des.door() to an existing
     // map secret door updates its mask but leaves it as SDOOR.
-    const loc = game.level?.at(wizStartX(x), wizStartY(y));
+    const ax = wizStartX(x);
+    const ay = wizStartY(y);
+    const loc = game.level?.at(ax, ay);
     if (!loc) return;
     let doorMask = mask;
     if (!IS_DOOR(loc.typ) && loc.typ !== SDOOR)
@@ -12975,7 +13004,7 @@ function wizStartSetDoor(x, y, mask) {
         doorMask &= ~D_SECRET;
         if (doorMask < D_CLOSED) doorMask = D_CLOSED;
     }
-    loc.horizontal = false;
+    setDoorOrientationFromNeighbors(ax, ay);
     set_door_mask(loc, doorMask);
 }
 

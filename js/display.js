@@ -1040,8 +1040,10 @@ export function map_level_for_wizard(revealTraps = false) {
                 decgfx: loc.disp_decgfx,
             };
             const visible = cansee(x, y);
+            // C ref: detect.c:show_map_spot().  Mapping marks every
+            // coordinate as seen, not just wall-angle terrain.
+            loc.seenv = 0xff;
             if (loc.typ === SCORR) loc.typ = CORR;
-            if (IS_WALL(loc.typ) || loc.typ === SDOOR) loc.seenv = 0xff;
             const trap = (game.level.traps || []).find(t => t.tx === x && t.ty === y);
             const covered = terrain_covers_objects(loc);
             let glyph = terrain_glyph(loc, x, y);

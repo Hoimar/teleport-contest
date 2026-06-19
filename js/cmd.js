@@ -18248,7 +18248,7 @@ function travelLocationDescription(x, y) {
     const loc = game.level?.at(x, y);
     if (!loc || !travelSeenOrKnown(x, y)) return 'unexplored area (no travel path)';
     const noTravelPath = !!(game.u && (game.u.ux !== x || game.u.uy !== y)
-        && !findTravelStepToKnownTarget({ x, y }));
+        && !isValidTravelPoint({ x, y }));
     let desc;
     if (loc.typ === C.CLOUD) desc = 'fog/vapor cloud';
     else if (IS_WALL(loc.typ)) desc = 'wall (no travel path)';
@@ -18943,12 +18943,14 @@ function findTravelStepToKnownTarget(target, run = game.context?.run) {
     if (bestStep) {
         const travelmap = travelRunMap(run);
         const key = `${bestStep.x},${bestStep.y}`;
-        if (travelmap?.has(key)) {
-            run._travel_stop_message = 'You stop, unsure which way to go.';
-            run._travel_stop_after_step = true;
-        } else if (bestStep.x === target.x && bestStep.y === target.y) {
-            run._travel_stop_after_step = true;
-            game._travel_cached_target = null;
+        if (run) {
+            if (travelmap?.has(key)) {
+                run._travel_stop_message = 'You stop, unsure which way to go.';
+                run._travel_stop_after_step = true;
+            } else if (bestStep.x === target.x && bestStep.y === target.y) {
+                run._travel_stop_after_step = true;
+                game._travel_cached_target = null;
+            }
         }
         travelmap?.add(`${u.ux},${u.uy}`);
         return { dx: bestStep.x - u.ux, dy: bestStep.y - u.uy };
@@ -19022,6 +19024,32 @@ function findTravelStep(target) {
         return travelMoveAllowed(game.u.ux, game.u.uy, dx, dy) ? { dx, dy } : direct;
     }
     return findTravelStepToKnownTarget(guess, run) || direct;
+}
+
+function isValidTravelPoint(target) {
+    // C ref: hack.c:is_valid_travelpt() -> findtravelpath(TRAVP_VALID).
+    const u = game.u;
+    if (!u || !target) return false;
+    if (u.ux === target.x && u.uy === target.y) return true;
+    const start = { x: u.ux, y: u.uy };
+    const seen = new Set([`${start.x},${start.y}`]);
+    const queue = [start];
+    for (let qi = 0; qi < queue.length && qi < COLNO * ROWNO; qi++) {
+        const here = queue[qi];
+        for (const [dx, dy] of TRAVEL_DIRS_ORD) {
+            const nx = here.x + dx;
+            const ny = here.y + dy;
+            if (!C.isok(nx, ny)) continue;
+            if (!travelMoveAllowed(here.x, here.y, dx, dy)) continue;
+            if (!travelPathCellKnown(nx, ny)) continue;
+            if (nx === target.x && ny === target.y) return true;
+            const key = `${nx},${ny}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            queue.push({ x: nx, y: ny });
+        }
+    }
+    return false;
 }
 
 async function beginTravelRunToCachedTarget() {
@@ -25541,6 +25569,11 @@ export async function rhack(key) {
     if (game._awaiting_lookat_menu) {
         clearOverrideScreen();
         game._awaiting_lookat_menu = false;
+        // C ref: win/tty/wintty.c:erase_menu_or_text().  The look-at chooser
+        // is a corner overlay; erase it back to the saved map before the
+        // selected action prints a topline or opens another window.
+        game._full_map_redraw_pending = true;
+        await flush_screen(1);
         if (ch === '/') {
             // C ref: src/pager.c:do_look().  The menu-driven screen lookup
             // prints the short "Pick ..." prompt when verbose is disabled,
@@ -29320,7 +29353,8 @@ export async function continueRunStep() {
         game.context.move = 0;
         return false;
     }
-    if (await runShouldStopBeforeRepeatMove(run)) {
+    if (!(run.travel && run.initialAttempt)
+        && await runShouldStopBeforeRepeatMove(run)) {
         game.context.run = null;
         return false;
     }

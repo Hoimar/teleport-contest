@@ -8,6 +8,7 @@ import { moveloop_core } from '../js/allmain.js';
 import { game } from '../js/gstate.js';
 import { GameDisplay } from '../js/game_display.js';
 import { getRngLog } from '../js/rng.js';
+import { cansee, couldsee } from '../js/vision.js';
 
 function usage() {
     return 'Usage: node scratch/trace-screen-positions.mjs <session> <start>:<end> [--ids a,b,c]';
@@ -25,12 +26,25 @@ function parseIds(argv) {
     return new Set(String(argv[idx + 1] || '').split(',').filter(Boolean).map(Number));
 }
 
+function parseCells(argv) {
+    const idx = argv.indexOf('--cells');
+    if (idx < 0) return [];
+    return String(argv[idx + 1] || '')
+        .split(',')
+        .map((pair) => {
+            const [x, y] = pair.split(':').map(Number);
+            return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
+        })
+        .filter(Boolean);
+}
+
 const argv = process.argv.slice(2);
 const ref = argv[0];
 const rangeRaw = argv[1];
 if (!ref || !rangeRaw) throw new Error(usage());
 const { start, end } = parseRange(rangeRaw);
 const ids = parseIds(argv);
+const cells = parseCells(argv);
 
 const sessionPath = resolveSessionRef(ref);
 const session = normalizeSession(JSON.parse(readFileSync(sessionPath, 'utf8')));
@@ -65,6 +79,22 @@ game._preNhgetchHook = async () => {
         const top = String(screen).split('\n')[0] || '';
         const expected = seg.steps?.[screenIndex] || {};
         const actualCursor = nhGame.getCursors().at(-1) || null;
+        const probedCells = cells.map(({ x, y }) => {
+            const loc = game.level?.at(x, y);
+            return {
+                x,
+                y,
+                typ: loc?.typ ?? null,
+                roomno: loc?.roomno ?? null,
+                edge: loc?.edge ?? null,
+                lit: loc?.lit ?? null,
+                seenv: loc?.seenv ?? null,
+                cansee: cansee(x, y),
+                couldsee: couldsee(x, y),
+                disp: loc?.disp_ch || '',
+                mem: loc?.remembered_glyph || null,
+            };
+        });
         const monsters = (game.level?.monsters || [])
             .filter((mon) => !ids || ids.has(mon.m_id))
             .map((mon, index) => ({
@@ -77,6 +107,10 @@ game._preNhgetchHook = async () => {
                 tame: mon.mtame || 0,
                 peaceful: mon.mpeaceful || 0,
                 track: mon.mtrack || [],
+                ispriest: mon.ispriest || 0,
+                epri: mon.mextra?.epri || null,
+                locRoom: game.level?.at(mon.mx, mon.my)?.roomno ?? 0,
+                locTyp: game.level?.at(mon.mx, mon.my)?.typ ?? null,
             }));
         console.log(JSON.stringify({
             boundary,
@@ -90,10 +124,24 @@ game._preNhgetchHook = async () => {
             afterMoreMessage: game._after_more_message || '',
             afterMoreNeedsPrompt: !!game._after_more_needs_prompt,
             more: !!game._more,
+            protofile: game._last_special_protofile || '',
+            dungeonLevel: game.u?.uz || null,
+            awaitingTravel: !!game._awaiting_travel_prompt,
+            travelCursor: game._travel_cursor || null,
+            travelCachedTarget: game._travel_cached_target || null,
+            run: game.context?.run ? {
+                travel: !!game.context.run.travel,
+                target: game.context.run.target || null,
+                steps: game.context.run.steps || 0,
+                initialAttempt: !!game.context.run.initialAttempt,
+                stopAfterStep: !!game.context.run._travel_stop_after_step,
+                stopMessage: game.context.run._travel_stop_message || '',
+            } : null,
             ux: game.u?.ux,
             uy: game.u?.uy,
             cursorExpected: expected.cursor ?? null,
             cursorActual: actualCursor,
+            cells: probedCells,
             monsters,
         }));
     }
