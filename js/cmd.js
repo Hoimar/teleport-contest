@@ -13258,7 +13258,6 @@ async function finishRandomPolyselfFromWand() {
             text: dropLines.join('  '),
             more: false,
             move: true,
-            exercise: { attr: C.A_WIS, positive: true },
             visionRecalcBefore: form.noEyes,
             polyState: { uac: form.finalAc },
         });
