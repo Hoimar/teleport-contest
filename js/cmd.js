@@ -21990,6 +21990,57 @@ function actionMenuItemType(obj) {
     return 'item';
 }
 
+function setInventoryActionMenuScreen(screen, cursor, obj) {
+    installSerializedScreenHook();
+    clearOverrideScreen();
+    game._inventory_action_menu_screen = screen;
+    game._inventory_action_menu_cursor = cursor ? [cursor[0], cursor[1]] : null;
+    game._inventory_action_menu_obj = obj || null;
+    game._inventory_action_menu_active = true;
+    if (game.nhDisplay && cursor) {
+        if (typeof game.nhDisplay.setCursor === 'function')
+            game.nhDisplay.setCursor(cursor[0], cursor[1]);
+        else {
+            game.nhDisplay.cursorCol = cursor[0];
+            game.nhDisplay.cursorRow = cursor[1];
+        }
+    }
+}
+
+function clearInventoryActionMenuScreen() {
+    game._inventory_action_menu_active = false;
+    game._inventory_action_menu_screen = null;
+    game._inventory_action_menu_cursor = null;
+    game._inventory_action_menu_obj = null;
+}
+
+async function dismissInventoryActionMenu() {
+    clearInventoryActionMenuScreen();
+    clearOverrideScreen();
+    await redrawAfterFullScreenMenuDismiss();
+    game.context.move = 0;
+}
+
+async function handleInventoryActionMenuInput(ch) {
+    const obj = game._inventory_action_menu_obj;
+    if (ch === '\r' || ch === '\n' || ch === ' ' || ch === '\x1b') {
+        await dismissInventoryActionMenu();
+        return;
+    }
+    if (ch === 't' && obj) {
+        clear_pending_message();
+        clearInventoryActionMenuScreen();
+        clearOverrideScreen();
+        game._awaiting_throw_direction = obj;
+        game.context.move = 0;
+        await redrawAfterFullScreenMenuDismiss();
+        await showPromptLine('In what direction? ');
+        return;
+    }
+    if (obj) await showInventoryActionMenu(obj);
+    game.context.move = 0;
+}
+
 async function showInventoryActionMenu(obj) {
     clear_pending_message();
     await flush_screen(1);
@@ -22040,9 +22091,11 @@ async function showInventoryActionMenu(obj) {
     }
 
     const screen = serialize_terminal_grid(display);
-    game._inventory_action_menu_screen = screen;
-    game._inventory_action_menu_obj = obj;
-    showOverride(screen, [menuCol + '(end)'.length + 1, rows.length - 1]);
+    setInventoryActionMenuScreen(
+        screen,
+        [menuCol + '(end)'.length + 1, rows.length - 1],
+        obj,
+    );
 }
 
 function cursorForward(count) {
@@ -26323,6 +26376,11 @@ export async function rhack(key) {
         return;
     }
 
+    if (game._inventory_action_menu_active) {
+        await handleInventoryActionMenuInput(ch);
+        return;
+    }
+
     if (game._tutorial_prompt_active) {
         await handleTutorialPromptInput(ch);
         return;
@@ -29315,28 +29373,6 @@ export async function rhack(key) {
             const obj = idx >= 0 ? game.inventory?.[idx] : null;
             if (obj?.oclass === POTION_CLASS) await drinkPotion(obj, idx);
             else game.context.move = 0;
-            return;
-        }
-        if (prev === game._inventory_action_menu_screen) {
-            const obj = game._inventory_action_menu_obj;
-            if (ch === '\r' || ch === '\n' || ch === ' ' || ch === '\x1b') {
-                game._inventory_action_menu_obj = null;
-                game._inventory_action_menu_screen = null;
-                await redrawAfterFullScreenMenuDismiss();
-                game.context.move = 0;
-                return;
-            }
-            if (ch === 't' && obj) {
-                clear_pending_message();
-                game._inventory_action_menu_obj = null;
-                game._inventory_action_menu_screen = null;
-                game._awaiting_throw_direction = obj;
-                game.context.move = 0;
-                await showPromptLine('In what direction? ');
-                return;
-            }
-            if (obj) await showInventoryActionMenu(obj);
-            game.context.move = 0;
             return;
         }
         if (prev === game._look_data_screen
