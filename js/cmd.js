@@ -21858,6 +21858,38 @@ function buildThrowInventoryMenuLines(showAll = false) {
     return lines;
 }
 
+function setThrowInventoryMenuScreen(screen, cursor, page = 1) {
+    installSerializedScreenHook();
+    clearOverrideScreen();
+    game._throw_inventory_menu_active = true;
+    game._throw_inventory_menu_page = page;
+    if (page === 2) {
+        game._throw_inventory_menu_page2_screen = screen;
+        game._throw_inventory_menu_page2_cursor = cursor ? [cursor[0], cursor[1]] : null;
+    } else {
+        game._throw_inventory_menu_screen = screen;
+        game._throw_inventory_menu_cursor = cursor ? [cursor[0], cursor[1]] : null;
+    }
+    if (game.nhDisplay && cursor) {
+        if (typeof game.nhDisplay.setCursor === 'function')
+            game.nhDisplay.setCursor(cursor[0], cursor[1]);
+        else {
+            game.nhDisplay.cursorCol = cursor[0];
+            game.nhDisplay.cursorRow = cursor[1];
+        }
+    }
+}
+
+function clearThrowInventoryMenuScreen() {
+    game._throw_inventory_menu_active = false;
+    game._throw_inventory_menu_page = 0;
+    game._throw_inventory_menu_screen = null;
+    game._throw_inventory_menu_page2_screen = null;
+    game._throw_inventory_menu_page2_lines = null;
+    game._throw_inventory_menu_cursor = null;
+    game._throw_inventory_menu_page2_cursor = null;
+}
+
 async function showThrowInventoryMenu(showAll = false) {
     // C refs: src/dothrow.c:dothrow(), src/invent.c:getobj().
     await flush_screen(1);
@@ -21899,17 +21931,16 @@ async function showThrowInventoryMenu(showAll = false) {
     const lastText = lines[lastRow]?.text || '';
     const cursorCol = menuCol + lastText.length + (lastText === '(end)' ? 1 : 0);
     const screen = serialize_terminal_grid(display);
-    game._throw_inventory_menu_screen = screen;
-    game._throw_inventory_menu_cursor = [Math.min(cursorCol, COLNO - 1), lastRow];
     game._awaiting_throw_item = true;
     game.context.move = 0;
-    showOverride(screen, game._throw_inventory_menu_cursor);
+    setThrowInventoryMenuScreen(screen, [Math.min(cursorCol, COLNO - 1), lastRow], 1);
 }
 
 function showThrowInventoryMenuPage2() {
     const display = game.nhDisplay;
     const lines = game._throw_inventory_menu_page2_lines || [];
     if (!display?.putstr || !lines.length) return false;
+    game._throw_inventory_menu_active = false;
     const displayRows = display.rows || display.terminal?.rows || 24;
     const menuCol = 1;
     for (let row = 0; row < displayRows; row++)
@@ -21922,10 +21953,61 @@ function showThrowInventoryMenuPage2() {
     const lastText = lines[lastRow]?.text || '';
     const cursorCol = menuCol + lastText.length;
     const screen = serialize_terminal_grid(display);
-    game._throw_inventory_menu_page2_screen = screen;
-    game._throw_inventory_menu_page2_cursor = [Math.min(cursorCol, COLNO - 1), lastRow];
-    showOverride(screen, game._throw_inventory_menu_page2_cursor);
+    setThrowInventoryMenuScreen(screen, [Math.min(cursorCol, COLNO - 1), lastRow], 2);
     return true;
+}
+
+async function showThrowPromptAfterMenuDismiss(obj) {
+    clearThrowInventoryMenuScreen();
+    clearOverrideScreen();
+    await redrawAfterFullScreenMenuDismiss();
+    game._awaiting_throw_item = false;
+    game._awaiting_throw_direction = obj;
+    game.context.move = 0;
+    await showPromptLine('In what direction? ');
+}
+
+async function handleThrowInventoryMenuInput(ch) {
+    const page = game._throw_inventory_menu_page || 1;
+    if (page === 1) {
+        if (ch === ' ' && game._throw_inventory_menu_page2_lines?.length) {
+            showThrowInventoryMenuPage2();
+            game.context.move = 0;
+            return;
+        }
+        const selectGold = ch === '$' && (game._goldCount || 0) > 0;
+        const idx = inventoryIndexForLetter(ch);
+        const obj = idx >= 0 ? game.inventory?.[idx] : null;
+        if (selectGold || obj) {
+            await showThrowPromptAfterMenuDismiss(selectGold
+                ? { otyp: GOLD_PIECE, oclass: COIN_CLASS, quan: game._goldCount || 0 }
+                : obj);
+            return;
+        }
+        if (ch === '\x1b' || ch === ' ' || ch === '\r' || ch === '\n') {
+            clearThrowInventoryMenuScreen();
+            clearOverrideScreen();
+            await redrawAfterFullScreenMenuDismiss();
+            game._awaiting_throw_item = true;
+            await showThrowPrompt();
+            game.context.move = 0;
+            return;
+        }
+        game.context.move = 0;
+        return;
+    }
+
+    const idx = inventoryIndexForLetter(ch);
+    const obj = idx >= 0 ? game.inventory?.[idx] : null;
+    if (obj) await showThrowPromptAfterMenuDismiss(obj);
+    else {
+        clearThrowInventoryMenuScreen();
+        clearOverrideScreen();
+        await redrawAfterFullScreenMenuDismiss();
+        game._awaiting_throw_item = true;
+        await showThrowPrompt();
+        game.context.move = 0;
+    }
 }
 
 function showInventoryMenuPage2() {
@@ -28722,10 +28804,12 @@ export async function rhack(key) {
         return;
     }
 
-    const throwMenuOverrideActive = game._override_prev
-        && (game._override_prev === game._throw_inventory_menu_screen
-            || game._override_prev === game._throw_inventory_menu_page2_screen);
-    if (game._awaiting_throw_item && !throwMenuOverrideActive) {
+    if (game._throw_inventory_menu_active) {
+        await handleThrowInventoryMenuInput(ch);
+        return;
+    }
+
+    if (game._awaiting_throw_item) {
         clear_pending_message();
         game._awaiting_throw_item = false;
         if (ch === ' ' || ch === '\x1b') {
@@ -29244,69 +29328,6 @@ export async function rhack(key) {
             const entry = menu?.entries?.find((item) => item.selector === ch);
             if (entry) entry.selected = !entry.selected;
             if (menu) renderPayMenu(menu);
-            game.context.move = 0;
-            return;
-        }
-        if (prev === game._throw_inventory_menu_screen) {
-            if (ch === ' ' && game._throw_inventory_menu_page2_lines?.length) {
-                showThrowInventoryMenuPage2();
-                game.context.move = 0;
-                return;
-            }
-            const selectGold = ch === '$' && (game._goldCount || 0) > 0;
-            const idx = inventoryIndexForLetter(ch);
-            const obj = idx >= 0 ? game.inventory?.[idx] : null;
-            if (selectGold || obj) {
-                game._throw_inventory_menu_screen = null;
-                game._throw_inventory_menu_page2_screen = null;
-                game._throw_inventory_menu_page2_lines = null;
-                game._throw_inventory_menu_cursor = null;
-                game._throw_inventory_menu_page2_cursor = null;
-                clearOverrideScreen();
-                await redrawAfterFullScreenMenuDismiss();
-                game._awaiting_throw_item = false;
-                game._awaiting_throw_direction = selectGold
-                    ? { otyp: GOLD_PIECE, oclass: COIN_CLASS, quan: game._goldCount || 0 }
-                    : obj;
-                game.context.move = 0;
-                await showPromptLine('In what direction? ');
-                return;
-            }
-            if (ch === '\x1b' || ch === ' ' || ch === '\r' || ch === '\n') {
-                game._throw_inventory_menu_screen = null;
-                game._throw_inventory_menu_page2_screen = null;
-                game._throw_inventory_menu_page2_lines = null;
-                game._throw_inventory_menu_cursor = null;
-                game._throw_inventory_menu_page2_cursor = null;
-                clearOverrideScreen();
-                await redrawAfterFullScreenMenuDismiss();
-                game._awaiting_throw_item = true;
-                await showThrowPrompt();
-                game.context.move = 0;
-                return;
-            }
-            showOverride(prev, game._throw_inventory_menu_cursor || null);
-            game.context.move = 0;
-            return;
-        }
-        if (prev === game._throw_inventory_menu_page2_screen) {
-            const idx = inventoryIndexForLetter(ch);
-            const obj = idx >= 0 ? game.inventory?.[idx] : null;
-            game._throw_inventory_menu_screen = null;
-            game._throw_inventory_menu_page2_screen = null;
-            game._throw_inventory_menu_page2_lines = null;
-            game._throw_inventory_menu_cursor = null;
-            game._throw_inventory_menu_page2_cursor = null;
-            clearOverrideScreen();
-            await redrawAfterFullScreenMenuDismiss();
-            if (obj) {
-                game._awaiting_throw_item = false;
-                game._awaiting_throw_direction = obj;
-                await showPromptLine('In what direction? ');
-            } else {
-                game._awaiting_throw_item = true;
-                await showThrowPrompt();
-            }
             game.context.move = 0;
             return;
         }

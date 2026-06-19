@@ -13,7 +13,7 @@ and `feature_map.md`.
 ## Current State
 
 - Current branch in this workspace: `main`, ahead of origin.
-- Latest verified repair unit: inventory action menu active-state retirement.
+- Latest verified repair unit: throw inventory menu active-state retirement.
 - Checked-in public corpus is exact: `44/44 S 11405/11405 R 792838/792838 C 0`.
 - Hosted public cache remains `public-session-drift` at
   `40/44 S 10417/10982 R 629747/840358 C 0`; leaderboard fetch failed.
@@ -32,6 +32,26 @@ and `feature_map.md`.
 ## Latest Loop Checkpoint
 
 - Latest verified WIP on 2026-06-19:
+  - Throw inventory menu override-state retirement:
+    `seed0108-wizard-extcmd-wishlist` remains exact
+    (`S 303/303 R 16958/16958 C 0`), with focused guards `seed0101`,
+    `seed1800`, `seed0399`, and `seed4500` exact.
+  - Strict sentinel exact:
+    `5/5 S 1063/1063 R 64569/64569 C 0`.
+  - `verify --target seed0108-wizard-extcmd-wishlist` passed target, strict
+    sentinels, `hack:audit` (`hard=0 suspicious=11`), and `memory:lint`
+    (`issues=0`).
+  - Full corpus inventory: 44 passing sessions, checked-in public
+    `44/44 S 11405/11405 R 792838/792838 C 0`.
+  - Dehack truth:
+    - Throw `?/*` inventory picker pages are active serialized throw-menu
+      state rendered by `display.js`, not generic `_override_prev` screens.
+    - Page switching clears stale active state before serializing the next
+      page so the active serialize hook cannot recapture the old page.
+  - Next queue: remaining hack debt is `hard=0 suspicious=11`, dominated by
+    generic override-screen plumbing plus the forbidden-file replay comments.
+
+- Previous verified WIP on 2026-06-19:
   - Inventory action menu override-state retirement:
     `seed0108-wizard-extcmd-wishlist` remains exact
     (`S 303/303 R 16958/16958 C 0`), and regression guard
@@ -112,27 +132,6 @@ and `feature_map.md`.
       rendered by `display.js`, not generic `_override_prev` screens.
     - Page controls, invalid-key redisplay, cancellation, and target selection
       are owned by explicit level-teleport menu state.
-  - Next queue: remaining hack debt is `hard=0 suspicious=11`, dominated by
-    generic override-screen plumbing plus the forbidden-file replay comments.
-
-- Previous verified WIP on 2026-06-19:
-  - Attributes-window override-state retirement:
-    `seed0383-wizard-hallucinate` remains exact
-    (`S 219/219 R 16915/16915 C 0`) and covers Hallucination-sensitive
-    `^X` page dismissal; focused guards `seed0360`, `seed4500`, `seed0116`,
-    and `seed0106` remained exact.
-  - Strict sentinel exact:
-    `5/5 S 1063/1063 R 64569/64569 C 0`.
-  - `verify --target seed0383-wizard-hallucinate` passed target, strict
-    sentinels, `hack:audit` (`hard=0 suspicious=11`), and `memory:lint`
-    (`issues=0`).
-  - Full corpus inventory: 44 passing sessions, checked-in public
-    `44/44 S 11405/11405 R 792838/792838 C 0`.
-  - Dehack truth:
-    - Normal `^X` attributes pages are active serialized attributes-window
-      state rendered by `display.js`, not generic `_override_prev` screens.
-    - Page advance, ignored page keys, and final dismissal are owned by
-      explicit attributes state.
   - Next queue: remaining hack debt is `hard=0 suspicious=11`, dominated by
     generic override-screen plumbing plus the forbidden-file replay comments.
 
