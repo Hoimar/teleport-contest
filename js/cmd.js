@@ -22915,7 +22915,17 @@ async function showTutorialPrompt(invalidChoice = false) {
 async function showPromptLine(text, options = {}) {
     await pline(text);
     const cursorPad = options.trailingInputSpace ? 1 : 0;
-    game._prompt_cursor = [Math.min(text.length + cursorPad, 79), 0];
+    const width = String(text || '').length + cursorPad;
+    if (width >= COLNO) {
+        // C ref: win/tty/topl.c:tty_yn_function(). The appended input space
+        // can wrap the tty cursor onto the continuation row.
+        game._prompt_cursor = [
+            Math.min((width % COLNO) + 1, COLNO - 1),
+            Math.floor(width / COLNO),
+        ];
+    } else {
+        game._prompt_cursor = [width, 0];
+    }
 }
 
 function screenWithPromptLine(screen, text) {
@@ -24893,6 +24903,10 @@ export async function performLevelTeleport(target, options = {}) {
         await pline('A mysterious force prevents you from descending.');
         return;
     }
+    // C ref: src/do.c:goto_level(). iflags.travelcc is level-local and is
+    // cleared before the next dotravel() prompt seeds its cursor.
+    game._travel_cached_target = null;
+    game._travel_cursor = null;
     const wasInHell = isHellLevel(oldUz);
     const prevTemperature = game.level?.flags?.temperature || 0;
     const newDungeon = oldUz.dnum !== newUz.dnum;

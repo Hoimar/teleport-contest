@@ -16,19 +16,16 @@ Treat screen totals as lagging evidence of subsystem progress, not as the optimi
 
 ## Current WIP Addendum (2026-06-06)
 
-- **Current verified WIP:** `seed0360-wizard-world-tour` is exact
-  (`S 833/833 R 120639/120639 C 0`), `seed4500-knight-coverage` is exact
-  (`S 1814/1814 R 108275/108275 C 0`), `seed0373-barbarian-quest-tour`
-  remains at the known verify cursor-only boundary (`S 123/124 R 35386/35386
-  C 1`; triage `S 124/124 R 35386/35386 C 1`), `seed1150-caveman-explore-move`
-  remains exact (`S 51/51 R 3137/3137 C 0`), `seed2600-wizard-custom-binds`
-  is exact (`S 38/38 R 11647/11647 C 0`), and strict sentinels are exact
+- **Current verified WIP:** `seed0014-dequa-fountain-explore` is exact
+  (`S 714/714 R 59178/59178 C 0`), `seed0360-wizard-world-tour` is exact
+  (`S 833/833 R 120639/120639 C 0`), `seed2200-wizard-quaff-zap-read` is
+  exact (`S 230/230 R 3018/3018 C 0`), and strict sentinels are exact
   (`5/5 S 1063/1063 R 64569/64569 C 0`). The regenerated checked-in corpus
-  inventory is `35/44` passing (`S 9607/11405 R 656902/792838 C 1`).
-  Hosted public data is session-file drift (`32/44 S 8704/10982
-  R 523048/840358 C 1`, fetched 2026-06-06), and leaderboard public data is
-  also drifted (`24/44 S 9431/11405 R 645539/792838`); held-out/private
-  sessions remain the cleanliness benchmark.
+  inventory is `36/44` passing (`S 9552/11405 R 604772/792838 C 0`).
+  Cached hosted public data is session-file drift (`33/44 S 8666/10982
+  R 472995/840358 C 0`, fetched 2026-06-12), and leaderboard comparison is
+  unknown because the live fetch failed; held-out/private sessions remain the
+  cleanliness benchmark.
 - **Seed4500 invisible/topline/weapon parity:** `seed4500-knight-coverage`
   is exact after restoring C-shaped remembered invisible marker lifetime,
   monster physical-hit tty overflow, and hand-to-hand weapon selection. Ordinary
@@ -338,6 +335,7 @@ Treat screen totals as lagging evidence of subsystem progress, not as the optimi
 | seed0004-feeding-pony | 409 | 409 | 2026-06-18 | Full parity (`S 409/409 R 12084/12084 C 0`). Current repair covers bear-trap spot effects after a floor-list More: when the trap wound raises encumbrance, the trap topline owns the tty `--More--`, the status row shows the new burden condition but latches pre-`losehp()` HP, and the load message appears after dismissal (`C refs: src/trap.c:trapeffect_bear_trap(), src/pickup.c:encumber_msg(), win/tty/topl.c:update_topl()`). |
 | seed0009-swimmer-mforce | 73 | 73 | 2026-06-18 | Full parity (`S 73/73 R 3713/3713 C 0`). Current repair matches startup move-counter timing: initial `mklev()` and `makedog()` run with moves 0, then role inventory raises moves to 1, so Tutorial entry refreshes `align_shift()` and applies the `tut-1` chaotic special-level reservoir weights (`C refs: src/u_init.c:u_init_role(), src/dog.c:makedog(), src/makemon.c:align_shift()`). |
 | seed0013-friday13-save-then-fullmoon-restore | 99 | 99 | 2026-05-21 | Full parity (`S 99/99 R 4804/4804 C 0`). Covered minimal save/restore snapshot and restore-time Lua shuffle, restore full-moon welcome preamble, Rogue startup inventory/discovery/equipment-report state, Buried-zombies `create_object()`/`set_corpsenm()` corpse burial/timer RNG, and `#terrain` getpos/known-map rendering (`C refs: files.c:restore_saved_game()`, `restore.c:restore_luadata()`, `u_init.c:Rogue[]`, `dat/themerms.lua`, `sp_lev.c:create_object()`, `detect.c:reveal_terrain()`). |
+| seed0014-dequa-fountain-explore | 714 | 714 | 2026-06-19 | Full parity (`S 714/714 R 59178/59178 C 0`). Current repair covers long `tty_yn_function()` prompt cursor wrapping when the invisible trailing input space reaches the tty width, and `goto_level()` clearing cached `_` travel targets so the first post-level-change getpos prompt starts on the hero. Earlier seed0014 coverage includes fountain bath/gold-loss More timing, town watchman fountain warnings, and old-status latching through the gold-loss/watchman prompt (`C refs: win/tty/topl.c:tty_yn_function(), src/do.c:goto_level(), src/cmd.c:dotravel(), src/fountain.c:dipfountain()/dryup()/watchman_warn_fountain(), src/steal.c:somegold()`). |
 | seed0015-valk-level2-pit-dog-wait | 44 | 44 | 2026-05-24 | Full public pass (`S 44/44 R 8563/8563 C 0`). Covered Ghost-of-an-Adventurer themed-room selection/object/ghost fill, Valkyrie startup inventory, oil-lamp gate, current weapon discovery rows, deferred legacy AC, forced-gender welcome/insight wording, spear startup skill text, and visible pet pit death/corpse creation (`C refs: dat/themerms.lua`, `src/selvar.c:selection_rndcoord()`, `src/u_init.c:Valkyrie[]`, `src/allmain.c:welcome()`, `src/insight.c:background_enlightenment()`, `src/weapon.c:skill_init()`, `src/trap.c:mintrap()`). |
 | seed0016-healer-newmoon-eat-zap | 36 | 36 | 2026-05-24 | Full parity (`S 36/36 R 3656/3656 C 0`). Covered Healer startup HP/Pw/AC/attributes, apply/stethoscope/eat prompt wording, self-zapped sleep wand timing, sleeping hunger cadence, pet no-hands gold-stack pickup/More resume, role-driven spell failure percentages, wand descriptor discovery text, and `^X` race/new-moon/attribute-limit wording (`C refs: src/role.c:roles[]`, `src/spell.c:percent_success()`, `src/o_init.c:dodiscovered()`, `src/insight.c:background_enlightenment()`, `src/zap.c:zapyourself()`, `src/eat.c:gethungry()`, `src/mon.c:can_carry()`, `src/dogmove.c:dog_invent()`). |
 | seed0017-samurai-altar-pray | 67 | 67 | 2026-05-24 | Full parity (`S 67/67 R 3465/3465 C 0`). Covered configured no-name tty askname, Samurai role initrecord for prayer anger math, nonblocking post-legacy welcome when `!tutorial` suppresses followup prompts, intrinsically-fast ordinary-prayer timing, and `^X` autopickup wording for `pickup_types:%` plus thrown (`C refs: src/role.c:plnamesuffix()`, `win/tty/wintty.c:tty_askname()`, `src/attrib.c:newhp()`, `src/pray.c:dopray()`, `src/insight.c:attributes_enlightenment()`). |
@@ -364,7 +362,7 @@ Treat screen totals as lagging evidence of subsystem progress, not as the optimi
 | seed0060-orc-rogue-kick-search | 41 | 41 | 2026-05-24 | Full public pass (`S 41/41 R 3626/3626 C 0`). This pass covered Orc Rogue startup race inventory and substitutions, `Xtra_food`, orcish object preknowledge with deferred starting-inventory discovery order, same-turn tame/pacific `m_avoid_kicked_loc()` after `#kick`, infravision display of an out-of-sight pet via `couldsee()`, known orcish dagger naming, and `^X` weapon-skill class wording for racial short swords (`C refs: u_init.c:u_init_role()`, `u_init.c:u_init_race()`, `u_init.c:ini_inv_obj_substitution()`, `u_init.c:u_init_skills_discoveries()`, `dokick.c:dokick()`, `monmove.c:m_avoid_kicked_loc()`, `dogmove.c:dog_move()`, `display.h:_see_with_infrared()`, `display.c:newsym()`, `insight.c:weapon_insight()`). |
 | All other sessions | 1,893 | 7,617 | 2026-05-25 | Non-replay sessions now run general `init_objects()`, partial `role_init`, data-driven `init_dungeons()`, partial `u_init_misc`, starting pet placement, Wizard `ini_inv`, and broader mklev/monster equipment RNG. `seed0030-ten-diverse-deaths` now has all 1953 screens, all 105529 RNG calls, and all cursor positions matched; the latest seed0030 pass covered bones restore, sleeping `disturb()`, named ghost farlook, quick `;` getpos, gas-spore explosion staging, raw extended-command getline wrapping, and tty text-window/top-ten cursor placement. Strict sentinels are exact again (`5/5 S 1063/1063 R 64569/64569 C 0`). |
 
-**As of local parity refresh on 2026-06-19 after the current Wizard travel/mapping repair: `seed0360-wizard-world-tour` is exact (`S 833/833 R 120639/120639 C 0`), `seed2200-wizard-quaff-zap-read` is exact (`S 230/230 R 3018/3018 C 0`), and strict sentinels are exact (`5/5 S 1063/1063 R 64569/64569 C 0`). The checked-in public corpus inventory is `35/44 S 9550/11405 R 604772/792838 C 2`; cached hosted public is `32/44 S 8664/10982 R 472995/840358 C 2` and classified as `public-session-drift` because hosted public sessions differ from checked-in sessions. Leaderboard comparison is `unknown` because all live leaderboard fetches failed; use checked-in sessions for implementation truth and treat hosted/leaderboard score as lagging evidence.**
+**As of local parity refresh on 2026-06-19 after the current seed0014 prompt/travel cursor repair: `seed0014-dequa-fountain-explore` is exact (`S 714/714 R 59178/59178 C 0`), `seed0360-wizard-world-tour` remains exact (`S 833/833 R 120639/120639 C 0`), `seed2200-wizard-quaff-zap-read` remains exact (`S 230/230 R 3018/3018 C 0`), and strict sentinels are exact (`5/5 S 1063/1063 R 64569/64569 C 0`). The checked-in public corpus inventory is `36/44 S 9552/11405 R 604772/792838 C 0`; cached hosted public is `33/44 S 8666/10982 R 472995/840358 C 0` and classified as `public-session-drift` because hosted public sessions differ from checked-in sessions. Leaderboard comparison is `unknown` because all live leaderboard fetches failed; use checked-in sessions for implementation truth and treat hosted/leaderboard score as lagging evidence.**
 
 ---
 

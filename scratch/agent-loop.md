@@ -14,25 +14,26 @@ and `feature_map.md`.
 
 - Current branch in this workspace: `main`, ahead of origin.
 - Latest verified repair unit:
-  - Current WIP after commit `9fe3415` restores
-    `seed0009-swimmer-mforce` from
-    `S 42/73 R 3458/3713 FS 27 FR 3457` to exact
-    `S 73/73 R 3713/3713 C 0`.
+  - `seed0014-dequa-fountain-explore` is exact:
+    `S 714/714 R 59178/59178 C 0` (pre-fix baseline was exact screens/RNG
+    with cursor-only mismatches at screens 383 and 647).
   - Strict sentinels exact: `5/5 S 1063/1063 R 64569/64569 C 0`.
-  - `verify --target seed0009-swimmer-mforce` passed target expectations,
-    strict sentinels, `hack:audit` (`hard=0 suspicious=47`), and
-    `memory:lint` (`issues=0`). `verify --target seed0367-priest-quest-tour`
-    also remains exact, guarding the Medusa `align_shift()` cache behavior.
-  - Local parity refresh after commit `9fe3415` was checked-in public
-    `33/44 S 8676/11405 R 481403/792838 C 1`; hosted public remained
-    `public-session-drift`, and leaderboard fetch failed.
-  - Implementation: startup move-counter timing now follows C: initial
-    `mklev()` and `makedog()` run at moves 0, then `u_init_role()`/role
-    inventory starts ordinary play at moves 1. This lets Tutorial generation
-    refresh `makemon.c:align_shift()` for the `tut-1` special-level alignment.
-  - Remaining checked-in misses before the next refresh: `seed0014`,
-    `seed0030`, `seed0060`, `seed0108`, `seed0360`, `seed0361`, `seed0399`,
-    `seed4500`, `seed5002`, and `seed5006`.
+  - `verify --target seed0014-dequa-fountain-explore` passed target
+    expectations, strict sentinels, `hack:audit` (`hard=0 suspicious=47`),
+    and `memory:lint` (`issues=0`). Focused guards also kept
+    `seed0106-priest-extcmd-sweep` and `seed0360-wizard-world-tour` exact.
+  - Local parity refresh after the repair is checked-in public
+    `36/44 S 9552/11405 R 604772/792838 C 0`; cached hosted public remains
+    `public-session-drift` at `33/44 S 8666/10982 R 472995/840358 C 0`, and
+    leaderboard fetch failed.
+  - Implementation: `tty_yn_function()` prompt cursors now account for the
+    invisible trailing input space wrapping onto the continuation row
+    (`C ref: win/tty/topl.c:tty_yn_function()`), and `goto_level()` clears the
+    cached `_` travel target so the first post-level-change getpos prompt
+    starts on the hero (`C refs: src/do.c:goto_level(), src/cmd.c:dotravel()`).
+  - Remaining checked-in misses after the refresh: 8 public sessions remain
+    non-exact; choose the next frontier from `npm run parity:state -- --full`
+    or `scratch/divergence-inventory.md` rather than from older checkpoint rows.
 - Previous committed repair unit:
   - Commit `47297f2` restored `seed0361-archeologist-tour` from WIP
     `S 204/366 R 4519/53865` to exact
@@ -55,11 +56,11 @@ and `feature_map.md`.
   when useful; keep production parity and scratch-tool commits coherent.
 - Strict sentinels are exact:
   `5/5 S 1063/1063 R 64569/64569 C 0`.
-- Current public classification: checked-in corpus has 38 exact local sessions;
+- Current public classification: checked-in corpus has 36 exact local sessions;
   hosted cache differs from checked-in sessions, and leaderboard state remains
   secondary until refreshed.
 - Current sentinel regression classification: none; strict sentinel is exact.
-- Hack audit remains `hard=0 suspicious=45`; `memory:lint` reports
+- Hack audit remains `hard=0 suspicious=47`; `memory:lint` reports
   `issues=0`. Production `js/` has no intentional debug I/O or imports from
   `frozen/`.
 
