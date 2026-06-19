@@ -1771,6 +1771,44 @@ function renderOverrideScreen(display, screen) {
     renderTextScreen(display, screen, cursor);
 }
 
+function installOverrideSerializeHook(display = game.nhDisplay) {
+    const term = display?.terminal || display;
+    if (!term?.serialize || term._teleportSerializeBase) return;
+    const originalSerialize = term.serialize.bind(term);
+    Object.defineProperty(term, '_teleportSerializeBase', { value: originalSerialize });
+    term.serialize = () => ((game._override_screen || game._override_serialized_persistent)
+            && game._override_serialized_screen)
+        ? game._override_serialized_screen
+        : originalSerialize();
+}
+
+export function showOverrideScreen(screen, cursor) {
+    game._override_serialized_screen = null;
+    game._override_serialized_cursor = null;
+    game._override_screen = screen;
+    game._override_cursor = cursor ? [cursor[0], cursor[1], 1] : null;
+    if (game.nhDisplay && cursor) {
+        game.nhDisplay.cursorCol = cursor[0];
+        game.nhDisplay.cursorRow = cursor[1];
+    }
+}
+
+export function showSerializedOverrideScreen(screen, cursor) {
+    installOverrideSerializeHook();
+    showOverrideScreen(screen, cursor);
+    game._override_serialized_screen = screen;
+    game._override_serialized_cursor = cursor ? [cursor[0], cursor[1], 1] : null;
+}
+
+export function clearOverrideScreenState() {
+    game._override_screen = null;
+    game._override_serialized_screen = null;
+    game._override_serialized_cursor = null;
+    game._override_serialized_persistent = false;
+    game._override_cursor = null;
+    game._override_prev = null;
+}
+
 function currentLatchedMoreScreen() {
     if (!game._latched_more_screen) return '';
     if (!game._latched_more_use_pending_topline || !game._pending_message) {

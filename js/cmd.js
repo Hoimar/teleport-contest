@@ -13,7 +13,9 @@ import {
     apply_hallucination_display_transition, refresh_swallowed_overlay,
     see_monsters, see_objects, see_nearby_objects, see_traps, refresh_warning_monsters, map_level_for_wizard,
     object_glyph_for_menu, serialize_known_terrain_view_screen, terrain_glyph, cls,
-    unmap_invisible_memory,
+    unmap_invisible_memory, showOverrideScreen as showOverride,
+    showSerializedOverrideScreen as showSerializedOverride,
+    clearOverrideScreenState as clearOverrideScreen,
 } from './display.js';
 import { cansee, couldsee, vision_recalc, vision_reset } from './vision.js';
 import {
@@ -16751,42 +16753,6 @@ function keyBindingLine(key, cmd, desc) {
 
 function extendedKeyLine(cmd, desc) {
     return cmd.padEnd(22, ' ') + desc;
-}
-
-function showOverride(screen, cursor) {
-    game._override_serialized_screen = null;
-    game._override_serialized_cursor = null;
-    game._override_screen = screen;
-    game._override_cursor = cursor ? [cursor[0], cursor[1], 1] : null;
-    if (game.nhDisplay && cursor) {
-        game.nhDisplay.cursorCol = cursor[0];
-        game.nhDisplay.cursorRow = cursor[1];
-    }
-}
-
-function showSerializedOverride(screen, cursor) {
-    const display = game.nhDisplay;
-    const term = display?.terminal || display;
-    if (term?.serialize && !term._teleportSerializeBase) {
-        const originalSerialize = term.serialize.bind(term);
-        Object.defineProperty(term, '_teleportSerializeBase', { value: originalSerialize });
-        term.serialize = () => ((game._override_screen || game._override_serialized_persistent)
-                && game._override_serialized_screen)
-            ? game._override_serialized_screen
-            : originalSerialize();
-    }
-    showOverride(screen, cursor);
-    game._override_serialized_screen = screen;
-    game._override_serialized_cursor = cursor ? [cursor[0], cursor[1], 1] : null;
-}
-
-function clearOverrideScreen() {
-    game._override_screen = null;
-    game._override_serialized_screen = null;
-    game._override_serialized_cursor = null;
-    game._override_serialized_persistent = false;
-    game._override_cursor = null;
-    game._override_prev = null;
 }
 
 async function redrawAfterFullScreenMenuDismiss() {

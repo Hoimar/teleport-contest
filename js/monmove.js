@@ -32,6 +32,7 @@ import {
     newsym, queue_more_prompt, pline, flush_screen, clear_pending_message,
     docrt, refresh_swallowed_overlay, serialize_terminal_grid, append_pline, see_monsters,
     show_glyph_cell, terrain_glyph, topline_can_pack_message,
+    showSerializedOverrideScreen as show_serialized_override_basic,
 } from './display.js';
 import { nhgetch } from './input.js';
 import { clear_path, cansee, couldsee, vision_reset, vision_recalc } from './vision.js';
@@ -161,27 +162,6 @@ function render_more_pager_screen_basic(text) {
     lines.length = TERMINAL_ROWS - 1;
     lines.push('--More--');
     return lines.join('\n');
-}
-
-function show_serialized_override_basic(screen, cursor) {
-    const display = game.nhDisplay;
-    const term = display?.terminal || display;
-    if (term?.serialize && !term._teleportSerializeBase) {
-        const originalSerialize = term.serialize.bind(term);
-        Object.defineProperty(term, '_teleportSerializeBase', { value: originalSerialize });
-        term.serialize = () => ((game._override_screen || game._override_serialized_persistent)
-                && game._override_serialized_screen)
-            ? game._override_serialized_screen
-            : originalSerialize();
-    }
-    game._override_screen = screen;
-    game._override_cursor = cursor ? [cursor[0], cursor[1], 1] : null;
-    game._override_serialized_screen = screen;
-    game._override_serialized_cursor = cursor ? [cursor[0], cursor[1], 1] : null;
-    if (game.nhDisplay && cursor) {
-        game.nhDisplay.cursorCol = cursor[0];
-        game.nhDisplay.cursorRow = cursor[1];
-    }
 }
 
 function show_quest_leader_pager_basic(screen, cursor, action = '') {

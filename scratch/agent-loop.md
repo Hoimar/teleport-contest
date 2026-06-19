@@ -20,12 +20,13 @@ and `feature_map.md`.
     exact (`S 23/23 R 3130/3130 C 0`), and checked-in public remains
     `44/44 S 11405/11405 R 792838/792838 C 0`.
   - Strict sentinels exact: `5/5 S 1063/1063 R 64569/64569 C 0`.
-  - `verify --target seed0002-healer-reflection-drummer` passed target
-    expectations, strict sentinels, `hack:audit` (`hard=0 suspicious=14`), and
+  - `verify --target seed0361-archeologist-tour` passed target
+    expectations, strict sentinels, `hack:audit` (`hard=0 suspicious=12`), and
     `memory:lint` (`issues=0`).
   - Focused guards exact: `seed0002-healer-reflection-drummer`,
     `seed8000-tourist-starter`, `seed0077-rogue-chargen`,
-    `seed0102-ranger-name-cancel`, and `seed0900-tourist-explore-actions`.
+    `seed0102-ranger-name-cancel`, `seed0116-wizard-wear-shop`,
+    `seed0361-archeologist-tour`, and `seed0900-tourist-explore-actions`.
   - Full corpus inventory after the dehack: 44 passing sessions.
   - Local parity refresh after the audit/comment cleanup was checked-in public
     `44/44 S 11405/11405 R 792838/792838 C 0`; cached hosted public remains
@@ -39,6 +40,8 @@ and `feature_map.md`.
     - Startup askname/autopick/confirmation screens render directly into the
       tty grid via `renderTextScreen()` before `nhgetch()`, so they no longer
       use gameplay override-screen state.
+    - Serialized tty text-window override state and the terminal serialize hook
+      now live in `display.js`, not duplicated in command/monster modules.
     - `makedog()` still observes zeroed pre-inventory attributes for
       `edog.apport`, matching C ordering.
   - Remaining checked-in public misses after the refresh: none.
@@ -50,7 +53,7 @@ and `feature_map.md`.
   hosted cache differs from checked-in sessions, and leaderboard state remains
   secondary until refreshed.
 - Current sentinel regression classification: none; strict sentinel is exact.
-- Hack audit remains `hard=0 suspicious=14`; `memory:lint` reports
+- Hack audit remains `hard=0 suspicious=12`; `memory:lint` reports
   `issues=0`. Production `js/` has no intentional debug I/O or imports from
   `frozen/`.
 
@@ -63,8 +66,8 @@ and `feature_map.md`.
     remains exact (`S 23/23 R 3130/3130 C 0`).
   - Strict sentinel exact:
     `5/5 S 1063/1063 R 64569/64569 C 0`.
-  - `verify --target seed0002-healer-reflection-drummer` passed target,
-    strict sentinels, `hack:audit` (`hard=0 suspicious=14`), and
+  - `verify --target seed0361-archeologist-tour` passed target,
+    strict sentinels, `hack:audit` (`hard=0 suspicious=12`), and
     `memory:lint` (`issues=0`).
   - Full corpus inventory: 44 passing sessions, checked-in public
     `44/44 S 11405/11405 R 792838/792838 C 0`.
@@ -79,7 +82,11 @@ and `feature_map.md`.
       seed8000; generic override-screen plumbing remains visible debt.
     - Startup askname/autopick/confirmation screens are direct tty-grid renders
       before `nhgetch()`, not gameplay override screens.
-  - Next queue: remaining hack debt is `hard=0 suspicious=14`, dominated by
+    - Serialized tty text-window state is centralized in `display.js`; the
+      remaining override-screen hits are the legacy quest-intro pager,
+      hallucination menu guard, capture hook, renderer, and forbidden-file
+      comments.
+  - Next queue: remaining hack debt is `hard=0 suspicious=12`, dominated by
     generic override-screen plumbing plus the forbidden-file replay comments.
 
 - Previous verified WIP on 2026-06-19:
