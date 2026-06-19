@@ -17797,8 +17797,9 @@ async function showHelpMenu() {
         display.putstr(17, row, lines[row], NO_COLOR, row === 0 ? ATR_INVERSE : 0);
     const screen = serialize_terminal_grid(display);
     game._help_menu_screen = screen;
-    showSerializedOverride(screen, [23, lines.length - 1]);
-    game._override_serialized_persistent = false;
+    game._help_menu_cursor = [23, lines.length - 1];
+    installSerializedScreenHook();
+    game._help_menu_active = true;
 }
 
 function expandTabsForTty(line) {
@@ -17860,8 +17861,24 @@ function renderHelpTextPage() {
     const screen = rows.join('\n');
     game._help_text_screen = screen;
     game._help_text_cursor = [Math.min(morePrompt.length, COLNO - 1), moreRow];
-    showSerializedOverride(screen, game._help_text_cursor);
-    game._override_serialized_persistent = false;
+    installSerializedScreenHook();
+    game._help_text_active = true;
+}
+
+function clearHelpMenuState() {
+    game._help_menu_active = false;
+    game._help_menu_screen = null;
+    game._help_menu_cursor = null;
+}
+
+function clearHelpTextState() {
+    game._help_text_active = false;
+    game._help_text_pages = null;
+    game._help_text_page = 0;
+    game._help_text_more_prompt = null;
+    game._help_text_compact_final_more = false;
+    game._help_text_cursor = null;
+    game._help_text_screen = null;
 }
 
 function showHelpTextLines(lines, options = {}) {
@@ -17918,7 +17935,7 @@ function showAboutNetHack() {
 }
 
 async function handleHelpMenuSelection(ch) {
-    game._help_menu_screen = null;
+    clearHelpMenuState();
     if (ch === '\x1b' || ch === ' ' || ch === '\r' || ch === '\n') {
         await redrawAfterFullScreenMenuDismiss();
         game.context.move = 0;
@@ -17930,6 +17947,7 @@ async function handleHelpMenuSelection(ch) {
         return;
     }
     if (ch === 'e') {
+        await redrawAfterFullScreenMenuDismiss();
         await showLookAtMenu();
         game._awaiting_lookat_menu = true;
         game.context.move = 0;
@@ -17979,6 +17997,32 @@ async function handleHelpMenuSelection(ch) {
         return;
     }
     await showHelpMenu();
+    game.context.move = 0;
+}
+
+async function handleHelpMenuInput(ch) {
+    // C ref: pager.c:dohelp() displays an NHW_MENU and select_menu() consumes
+    // the selector before ordinary command dispatch resumes.
+    clearHelpMenuState();
+    await handleHelpMenuSelection(ch);
+    game.context.move = 0;
+}
+
+async function handleHelpTextInput(ch) {
+    // C ref: win/tty/wintty.c:process_text_window().
+    const dismiss = ch === ' ' || ch === '\r' || ch === '\n';
+    const cancel = ch === '\x1b';
+    const pages = game._help_text_pages || [[]];
+    const page = game._help_text_page || 0;
+    if (dismiss && page + 1 < pages.length) {
+        game._help_text_page = page + 1;
+        renderHelpTextPage();
+    } else if (dismiss || cancel) {
+        clearHelpTextState();
+        await redrawAfterFullScreenMenuDismiss();
+    } else {
+        renderHelpTextPage();
+    }
     game.context.move = 0;
 }
 
@@ -25732,6 +25776,16 @@ export async function rhack(key) {
         return;
     }
 
+    if (game._help_menu_active) {
+        await handleHelpMenuInput(ch);
+        return;
+    }
+
+    if (game._help_text_active) {
+        await handleHelpTextInput(ch);
+        return;
+    }
+
     if (await handleQueuedMore(ch)) return;
 
     if (game._awaiting_quest_leader_align_adjust) {
@@ -28557,38 +28611,6 @@ export async function rhack(key) {
             // non-dismissal keys instead of treating them as menu input.
             showOverride(prev, game._latched_more_cursor || null);
             game.context.move = 0;
-            return;
-        }
-        if (prev === game._help_menu_screen) {
-            clearOverrideScreen();
-            await handleHelpMenuSelection(ch);
-            game.context.move = 0;
-            return;
-        }
-        if (prev === game._help_text_screen) {
-            const keyCode = ch.charCodeAt(0);
-            const dismiss = ch === ' ' || ch === '\r' || ch === '\n';
-            const cancel = ch === '\x1b';
-            const pages = game._help_text_pages || [[]];
-            const page = game._help_text_page || 0;
-            if (dismiss && page + 1 < pages.length) {
-                game._help_text_page = page + 1;
-                renderHelpTextPage();
-            } else if (dismiss || cancel) {
-                game._help_text_pages = null;
-                game._help_text_page = 0;
-                game._help_text_more_prompt = null;
-                game._help_text_compact_final_more = false;
-                game._help_text_cursor = null;
-                game._help_text_screen = null;
-                clearOverrideScreen();
-                await redrawAfterFullScreenMenuDismiss();
-            } else {
-                showSerializedOverride(prev, game._help_text_cursor || [8, C.TERMINAL_ROWS - 1]);
-                game._override_serialized_persistent = false;
-            }
-            game.context.move = 0;
-            void keyCode;
             return;
         }
         if (prev === game._pay_menu_screen) {

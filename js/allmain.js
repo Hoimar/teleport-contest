@@ -2641,7 +2641,8 @@ async function refreshHallucinationDisplayAtInputBoundary(g) {
     // window is active, moveloop_core() has not resumed for the Hallucination
     // input-boundary redraw.
     if (g._override_screen || g._startup_legacy_pager_active || g._tutorial_prompt_active
-        || g._spell_menu_active || g._spell_cast_menu_active) return;
+        || g._spell_menu_active || g._spell_cast_menu_active
+        || g._help_menu_active || g._help_text_active) return;
     if (!(g.u?.uhallucination || g.u?.uprops?.hallucination)) return;
     if (g.u?.uswallow && g.u?.ustuck && g._swallowed_map_active) {
         // C ref: allmain.c:moveloop_core() once-per-player-input Hallucination
