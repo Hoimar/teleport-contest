@@ -20494,10 +20494,10 @@ async function handleQueuedMore(ch) {
             game._more_dismissals_remaining = 0;
             clear_pending_message();
             clearOverrideScreen();
-            showSerializedOverride(screen, cursor);
             game._latched_more_screen = screen;
             game._latched_more_cursor = [cursor[0], cursor[1], 1];
             game._latched_more_keep_until_dismiss = true;
+            game._latched_more_use_pending_topline = false;
             game._quest_leader_pager_active = true;
             queue_more_prompt();
             game.context.move = 0;
@@ -20640,10 +20640,11 @@ async function handleQueuedMore(ch) {
             game._post_arrival_pager_text = '';
             game._post_arrival_pager_active = true;
             clear_pending_message();
-            showSerializedOverride(screen, cursor);
+            clearOverrideScreen();
             game._latched_more_screen = screen;
             game._latched_more_cursor = [cursor[0], cursor[1], 1];
             game._latched_more_keep_until_dismiss = true;
+            game._latched_more_use_pending_topline = false;
             queue_more_prompt();
             game.context.move = 0;
             return true;
@@ -25295,10 +25296,11 @@ function showQuestLeaderPagerText(text, action = '') {
     rn2(2);
     const screen = renderMorePagerScreen(text);
     const cursor = [8, C.TERMINAL_ROWS - 1];
-    showSerializedOverride(screen, cursor);
+    clearOverrideScreen();
     game._latched_more_screen = screen;
     game._latched_more_cursor = [cursor[0], cursor[1], 1];
     game._latched_more_keep_until_dismiss = true;
+    game._latched_more_use_pending_topline = false;
     game._quest_leader_pager_active = true;
     game._quest_leader_pager_action = action || '';
     queue_more_prompt();
@@ -25507,10 +25509,11 @@ async function queuePostArrivalPager(raw, options = {}) {
         game._post_arrival_pager_text = '';
         game._post_arrival_pager_quest_lua_shuffle = false;
         game._post_arrival_pager_active = true;
-        showSerializedOverride(screen, cursor);
+        clearOverrideScreen();
         game._latched_more_screen = screen;
         game._latched_more_cursor = [cursor[0], cursor[1], 1];
         game._latched_more_keep_until_dismiss = true;
+        game._latched_more_use_pending_topline = false;
         queue_more_prompt();
         return true;
     }

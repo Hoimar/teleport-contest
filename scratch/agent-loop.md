@@ -13,7 +13,7 @@ and `feature_map.md`.
 ## Current State
 
 - Current branch in this workspace: `main`, ahead of origin.
-- Latest verified repair unit: loot contents More override-state retirement.
+- Latest verified repair unit: quest/post-arrival pager More override-state retirement.
 - Checked-in public corpus is exact: `44/44 S 11405/11405 R 792838/792838 C 0`.
 - Hosted public cache remains `public-session-drift` at
   `40/44 S 10417/10982 R 629747/840358 C 0`; leaderboard fetch failed.
@@ -32,29 +32,30 @@ and `feature_map.md`.
 ## Latest Loop Checkpoint
 
 - Latest verified WIP on 2026-06-19:
-  - Loot contents More override-state retirement:
-    `seed0108-wizard-extcmd-wishlist` and `seed0012-monk-vault-escort`
-    remain exact.
+  - Quest/post-arrival pager More override-state retirement:
+    `seed0361-archeologist-tour`, `seed0373-barbarian-quest-tour`, and
+    `seed0360-wizard-world-tour` remain exact.
   - Strict sentinel exact:
     `5/5 S 1063/1063 R 64569/64569 C 0`.
   - Full checked-in corpus passed via `bash frozen/score.sh`:
     `44/44 S 11405/11405 R 792838/792838 C 0`.
   - Verification also covered `node --check js/cmd.js`, `git diff --check`,
-    and the focused `verify --target` guard set above; `seed0108` and
-    `seed0012` each passed strict sentinels, hack audit, and memory lint
-    through `verify-change`.
+    and the focused `verify --target` guard set above; `seed0361`,
+    `seed0373`, and `seed0360` each passed strict sentinels, hack audit, and
+    memory lint through `verify-change`.
   - Dehack truth:
-    - The `#loot` look-inside contents frame uses explicit latched-More
-      state, not a generic override screen, before returning to the active
-      loot action menu.
-  - Next queue: remaining production `showOverride()` use is the generic
-    latched-More fallback; hack audit remains `hard=0 suspicious=11`.
+    - Quest leader and post-arrival pager More frames already own explicit
+      latched-More state, so they no longer also install a generic serialized
+      override screen.
+  - Next queue: remaining serialized override users are death/tombstone/top-ten
+    disclosure and the wizard bones unlink prompt; hack audit remains
+    `hard=0 suspicious=11`.
 
 - Previous verified WIP on 2026-06-19:
-  - Terminal-exit screens, read/zap/apply inventory prompt menus, here-command,
-    loot, pay, inventory, potion, throw, inventory-action, wizidentify, and
-    death disclosure menu/window overrides were retired into active serialized
-    state with checked-in corpus and strict sentinels exact.
+  - Loot contents More, terminal-exit screens, read/zap/apply inventory prompt
+    menus, here-command, loot, pay, inventory, potion, throw, inventory-action,
+    wizidentify, and death disclosure menu/window overrides were retired into
+    active or latched state with checked-in corpus and strict sentinels exact.
   - Full corpus inventory: 44 passing sessions, checked-in public
     `44/44 S 11405/11405 R 792838/792838 C 0`.
 
