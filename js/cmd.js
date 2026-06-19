@@ -6646,6 +6646,30 @@ function clearLootMenuArea(col, maxRow) {
         display.putstr(clearCol, row, ' '.repeat(COLNO - clearCol), NO_COLOR, 0);
 }
 
+function setLootMenuScreen(screen, cursor, kind = 'menu') {
+    installSerializedScreenHook();
+    clearOverrideScreen();
+    game._loot_menu_active = true;
+    game._loot_menu_kind = kind;
+    game._loot_menu_screen = screen;
+    game._loot_menu_cursor = cursor ? [cursor[0], cursor[1]] : null;
+    if (game.nhDisplay && cursor) {
+        if (typeof game.nhDisplay.setCursor === 'function')
+            game.nhDisplay.setCursor(cursor[0], cursor[1]);
+        else {
+            game.nhDisplay.cursorCol = cursor[0];
+            game.nhDisplay.cursorRow = cursor[1];
+        }
+    }
+}
+
+function clearLootMenuScreen() {
+    game._loot_menu_active = false;
+    game._loot_menu_kind = null;
+    game._loot_menu_screen = null;
+    game._loot_menu_cursor = null;
+}
+
 function containerActionName(container, held = false) {
     const name = baseObjectName(container) || 'container';
     return `${held ? 'your' : 'the'} ${name}`;
@@ -6662,6 +6686,7 @@ async function finishEmptyLootTakeOut(container, used = false, held = false) {
     game._loot_putin_menu = null;
     game._loot_takeout_menu = null;
     game._loot_contents_more = null;
+    clearLootMenuScreen();
     clearOverrideScreen();
     clear_pending_message();
     await redrawAfterFullScreenMenuDismiss();
@@ -6698,7 +6723,7 @@ function showLootActionMenu(container, used = false, opts = {}) {
     game._loot_type_menu = null;
     game._loot_putin_menu = null;
     game._loot_takeout_menu = null;
-    showOverride(serialize_terminal_grid(display), [col + '(end)'.length + 1, 10]);
+    setLootMenuScreen(serializeBaseTerminalGrid(display), [col + '(end)'.length + 1, 10], 'action');
 }
 
 function lootActionForKey(ch) {
@@ -6762,6 +6787,7 @@ function showLootContainerContents(container, alreadyUsed = false, opts = {}) {
     game._loot_type_menu = null;
     game._loot_putin_menu = null;
     game._loot_takeout_menu = null;
+    clearLootMenuScreen();
     game._loot_contents_more = { container, used: alreadyUsed || gainedInfo, held };
     game._pending_message = `${' '.repeat(headerCol)}Contents of ${name}:`;
     queue_more_prompt();
@@ -6874,7 +6900,7 @@ function showLootTypeMenu(container, selectedAuto = false, opts = {}) {
     };
     game._loot_putin_menu = null;
     game._loot_takeout_menu = null;
-    showOverride(serialize_terminal_grid(display), [col + '(end)'.length + 1, lastRow]);
+    setLootMenuScreen(serializeBaseTerminalGrid(display), [col + '(end)'.length + 1, lastRow], 'type');
 }
 
 async function dismissLootMenu(spentTurn = false) {
@@ -6883,6 +6909,7 @@ async function dismissLootMenu(spentTurn = false) {
     game._loot_putin_menu = null;
     game._loot_takeout_menu = null;
     game._loot_contents_more = null;
+    clearLootMenuScreen();
     clearOverrideScreen();
     clear_pending_message();
     await redrawAfterFullScreenMenuDismiss();
@@ -6892,7 +6919,6 @@ async function dismissLootMenu(spentTurn = false) {
 async function handleLootActionMenuKey(ch) {
     const menu = game._loot_action_menu;
     if (!menu) return false;
-    game._override_prev = null;
     const action = lootActionForKey(ch);
     if (action === 'out') {
         if (!containerContents(menu.container).length) {
@@ -7036,6 +7062,7 @@ function takeOutObjectEntries(container, selectedClasses = null, selectedKeys = 
 async function showLootTakeOutObjectMenu(container, selectedGold = false, opts = {}) {
     const display = game.nhDisplay;
     if (!display?.putstr) return;
+    clearLootMenuScreen();
     clearOverrideScreen();
     await redrawAfterFullScreenMenuDismiss();
     const col = 41;
@@ -7066,7 +7093,7 @@ async function showLootTakeOutObjectMenu(container, selectedGold = false, opts =
         entries,
         held: opts.held ?? (game.inventory || []).includes(container),
     };
-    showOverride(serialize_terminal_grid(display), [col + '(end)'.length + 1, lastRow]);
+    setLootMenuScreen(serializeBaseTerminalGrid(display), [col + '(end)'.length + 1, lastRow], 'takeout');
 }
 
 function takeGoldOutOfContainer(container) {
@@ -7151,7 +7178,6 @@ async function takeSelectedObjectsOutOfContainer(container, entries, selectedKey
 async function handleLootTakeOutMenuKey(ch) {
     const menu = game._loot_takeout_menu;
     if (!menu) return false;
-    game._override_prev = null;
     if (ch === '@') {
         const selectable = (menu.entries || []).filter((entry) => entry.selector);
         const allSelected = selectable.length > 0
@@ -7185,6 +7211,7 @@ async function handleLootTakeOutMenuKey(ch) {
         const entries = menu.entries || [];
         const selectedKeys = menu.selectedKeys instanceof Set ? new Set(menu.selectedKeys) : new Set();
         game._loot_takeout_menu = null;
+        clearLootMenuScreen();
         clearOverrideScreen();
         clear_pending_message();
         await redrawAfterFullScreenMenuDismiss();
@@ -7207,7 +7234,6 @@ async function handleLootTakeOutMenuKey(ch) {
 async function handleLootTypeMenuKey(ch) {
     const menu = game._loot_type_menu;
     if (!menu) return false;
-    game._override_prev = null;
     if (ch === 'A') {
         menu.selectedAuto = !menu.selectedAuto;
         showLootTypeMenu(menu.container, menu.selectedAuto, menu);
@@ -7269,6 +7295,7 @@ async function handleLootTypeMenuKey(ch) {
 async function showLootPutInGoldMenu(container, selected = false, opts = {}) {
     const display = game.nhDisplay;
     if (!display?.putstr) return;
+    clearLootMenuScreen();
     clearOverrideScreen();
     await redrawAfterFullScreenMenuDismiss();
     clearLootMenuArea(23, 4);
@@ -7277,10 +7304,10 @@ async function showLootPutInGoldMenu(container, selected = false, opts = {}) {
     display.putstr(34, 2, '┌───── ', NO_COLOR, 0);
     display.putstr(41, 2, 'Coins', NO_COLOR, ATR_INVERSE);
     display.putstr(34, 3, '│', NO_COLOR, 0);
-    display.putstr(35, 3, '·····', CLR_BLACK, 0);
+    display.putstr(35, 3, '·····', NO_COLOR, 0);
     display.putstr(41, 3, `$ ${selected ? '+' : '-'} ${gold} gold pieces`, NO_COLOR, 0);
     display.putstr(34, 4, '│', NO_COLOR, 0);
-    display.putstr(35, 4, '·····', CLR_BLACK, 0);
+    display.putstr(35, 4, '·····', NO_COLOR, 0);
     display.putstr(41, 4, '(end)', NO_COLOR, 0);
     game._loot_action_menu = null;
     game._loot_type_menu = null;
@@ -7290,7 +7317,7 @@ async function showLootPutInGoldMenu(container, selected = false, opts = {}) {
         held: opts.held ?? (game.inventory || []).includes(container),
     };
     game._loot_takeout_menu = null;
-    showOverride(serialize_terminal_grid(display), [47, 4]);
+    setLootMenuScreen(serializeBaseTerminalGrid(display), [47, 4], 'putin');
 }
 
 function putGoldIntoContainer(container) {
@@ -7325,7 +7352,6 @@ function putGoldIntoContainer(container) {
 async function handleLootPutInMenuKey(ch) {
     const menu = game._loot_putin_menu;
     if (!menu) return false;
-    game._override_prev = null;
     if (ch === '$') {
         menu.selectedGold = !menu.selectedGold;
         await showLootPutInGoldMenu(menu.container, menu.selectedGold, { held: menu.held });
@@ -7336,9 +7362,11 @@ async function handleLootPutInMenuKey(ch) {
         const selected = !!menu.selectedGold;
         const container = menu.container;
         game._loot_putin_menu = null;
+        clearLootMenuScreen();
         clearOverrideScreen();
         clear_pending_message();
         if (selected) {
+            await redrawAfterFullScreenMenuDismiss();
             await pline(putGoldIntoContainer(container));
             game.context.move = 1;
         } else {
