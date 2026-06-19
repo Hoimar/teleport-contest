@@ -14,23 +14,25 @@ and `feature_map.md`.
 
 - Current branch in this workspace: `main`, ahead of origin.
 - Latest verified repair unit:
-  - `seed0007-rogue-snake-swamp` is exact:
-    `S 302/302 R 16373/16373 C 0` (pre-fix baseline was
-    `S 301/302 R 16373/16373 C 0`, missing one retained travel prompt).
+  - `seed0009-swimmer-mforce` is exact:
+    `S 73/73 R 3713/3713 C 0` (pre-fix baseline was
+    `S 36/73 R 3713/3713 C 0`, one Tutorial secret-door glyph orientation
+    mismatch repeated through later frames).
   - Strict sentinels exact: `5/5 S 1063/1063 R 64569/64569 C 0`.
-  - `verify --target seed0007-rogue-snake-swamp` passed target
+  - `verify --target seed0009-swimmer-mforce` passed target
     expectations, strict sentinels, `hack:audit` (`hard=0 suspicious=47`),
     and `memory:lint` (`issues=0`). Focused guards also kept
-    `seed0014-dequa-fountain-explore`, `seed0101-ranger-quiver-throw-travel-engrave`,
-    and `seed0360-wizard-world-tour` exact.
+    `seed0014-dequa-fountain-explore`, `seed0360-wizard-world-tour`, and
+    `seed2600-wizard-custom-binds` exact.
   - Local parity refresh after the repair is checked-in public
-    `37/44 S 9553/11405 R 604772/792838 C 0`; cached hosted public remains
-    `public-session-drift` at `34/44 S 8667/10982 R 472995/840358 C 0`;
+    `38/44 S 9590/11405 R 604772/792838 C 0`; cached hosted public remains
+    `public-session-drift` at `35/44 S 8704/10982 R 472995/840358 C 0`;
     leaderboard was skipped in the full local scan.
-  - Implementation: accepted `_` travel picks preserve C's stale travel prompt
-    as visible topline residue while the cursor returns to the map and travel
-    movement completes (`C refs: src/cmd.c:dotravel(), src/getpos.c:getpos()`).
-  - Remaining checked-in misses after the refresh: 7 public sessions remain
+  - Implementation: Tutorial `des.map()` secret doors run C's neighbor
+    orientation pass after all terrain exists, so hidden `S` cells render as
+    the correct wall direction (`C refs: src/sp_lev.c:set_door_orientation(),
+    dat/tut-1.lua`).
+  - Remaining checked-in misses after the refresh: 6 public sessions remain
     non-exact; choose the next frontier from `npm run parity:state -- --full`
     or `scratch/divergence-inventory.md` rather than from older checkpoint rows.
 - Previous committed repair unit:
@@ -55,7 +57,7 @@ and `feature_map.md`.
   when useful; keep production parity and scratch-tool commits coherent.
 - Strict sentinels are exact:
   `5/5 S 1063/1063 R 64569/64569 C 0`.
-- Current public classification: checked-in corpus has 37 exact local sessions;
+- Current public classification: checked-in corpus has 38 exact local sessions;
   hosted cache differs from checked-in sessions, and leaderboard state remains
   secondary until refreshed.
 - Current sentinel regression classification: none; strict sentinel is exact.

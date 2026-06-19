@@ -12597,6 +12597,14 @@ function tut1LoadTerrain(litRandom) {
     for (let y = 0; y < TUT1_MAP.length; y++)
         for (let x = 0; x < TUT1_MAP[y].length; x++)
             tut1SetTerrain(x, y, TUT1_MAP[y][x]);
+    // C ref: sp_lev.c:set_door_orientation().  Map-loaded Tutorial secret
+    // doors need their hidden wall direction after all neighbors exist.
+    for (let y = 0; y < TUT1_MAP.length; y++)
+        for (let x = 0; x < TUT1_MAP[y].length; x++) {
+            const loc = game.level?.at(tut1X(x), tut1Y(y));
+            if (loc && (IS_DOOR(loc.typ) || loc.typ === SDOOR))
+                setDoorOrientationFromNeighbors(tut1X(x), tut1Y(y));
+        }
     game.level.flags.is_maze_lev = true;
     game.level.flags.nomongen = true;
     game.level.flags.nodeathdrops = true;
