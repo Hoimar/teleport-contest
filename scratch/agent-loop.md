@@ -13,7 +13,7 @@ and `feature_map.md`.
 ## Current State
 
 - Current branch in this workspace: `main`, ahead of origin.
-- Latest verified repair unit: loot menu active-state retirement.
+- Latest verified repair unit: herecmd menu active-state retirement.
 - Checked-in public corpus is exact: `44/44 S 11405/11405 R 792838/792838 C 0`.
 - Hosted public cache remains `public-session-drift` at
   `40/44 S 10417/10982 R 629747/840358 C 0`; leaderboard fetch failed.
@@ -32,10 +32,9 @@ and `feature_map.md`.
 ## Latest Loop Checkpoint
 
 - Latest verified WIP on 2026-06-19:
-  - Loot menu override-state retirement:
+  - Here-command menu override-state retirement:
     `seed0108-wizard-extcmd-wishlist` remains exact
-    (`S 303/303 R 16958/16958 C 0`), with focused guards `seed0012`,
-    `seed0002`, `seed0116`, and `seed4500` exact.
+    (`S 303/303 R 16958/16958 C 0`).
   - Strict sentinel exact:
     `5/5 S 1063/1063 R 64569/64569 C 0`.
   - `verify --target seed0108-wizard-extcmd-wishlist` passed target, strict
@@ -44,12 +43,10 @@ and `feature_map.md`.
   - Full corpus inventory: 44 passing sessions, checked-in public
     `44/44 S 11405/11405 R 792838/792838 C 0`.
   - Dehack truth:
-    - `#loot` action/type/take-out/put-in menus are active serialized
-      loot-menu state rendered by `display.js`, not generic
-      `_override_prev` screens.
-    - The contents `--More--` remains ordinary topline More state before
-      returning to the active action menu.
-    - Put-in gold filler dots use default color on current seed0012 evidence.
+    - `#herecmdmenu` is active serialized here-command menu state rendered by
+      `display.js`, not a generic `_override_prev` screen.
+    - Dismissal clears active state and runs the same redraw boundary as the
+      previous implementation.
   - Next queue: remaining hack debt is `hard=0 suspicious=11`, dominated by
     generic override-screen plumbing plus the forbidden-file replay comments.
 

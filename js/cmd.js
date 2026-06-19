@@ -7443,13 +7443,35 @@ function showHereCommandMenu() {
     for (const [row, text, inverse] of rows)
         display.putstr(col, row, text, NO_COLOR, inverse ? ATR_INVERSE : 0);
     game._herecmd_menu = true;
-    showOverride(serialize_terminal_grid(display), [col + '(end)'.length + 1, 11]);
+    setHereCommandMenuScreen(serializeBaseTerminalGrid(display), [col + '(end)'.length + 1, 11]);
     game.context.move = 0;
+}
+
+function setHereCommandMenuScreen(screen, cursor) {
+    installSerializedScreenHook();
+    clearOverrideScreen();
+    game._herecmd_menu_active = true;
+    game._herecmd_menu_screen = screen;
+    game._herecmd_menu_cursor = cursor ? [cursor[0], cursor[1]] : null;
+    if (game.nhDisplay && cursor) {
+        if (typeof game.nhDisplay.setCursor === 'function')
+            game.nhDisplay.setCursor(cursor[0], cursor[1]);
+        else {
+            game.nhDisplay.cursorCol = cursor[0];
+            game.nhDisplay.cursorRow = cursor[1];
+        }
+    }
+}
+
+function clearHereCommandMenuScreen() {
+    game._herecmd_menu_active = false;
+    game._herecmd_menu_screen = null;
+    game._herecmd_menu_cursor = null;
 }
 
 async function dismissHereCommandMenu() {
     game._herecmd_menu = false;
-    game._override_prev = null;
+    clearHereCommandMenuScreen();
     clearOverrideScreen();
     clear_pending_message();
     await redrawAfterFullScreenMenuDismiss();
