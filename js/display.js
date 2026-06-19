@@ -1771,15 +1771,26 @@ function renderOverrideScreen(display, screen) {
     renderTextScreen(display, screen, cursor);
 }
 
-function installOverrideSerializeHook(display = game.nhDisplay) {
+function activeSerializedTextScreen() {
+    if ((game._override_screen || game._override_serialized_persistent)
+        && game._override_serialized_screen) return game._override_serialized_screen;
+    if (game._startup_legacy_pager_active && game._startup_legacy_pager_screen)
+        return game._startup_legacy_pager_screen;
+    if (game._tutorial_prompt_active && game._tutorial_prompt_screen)
+        return game._tutorial_prompt_screen;
+    if (game._spell_menu_active && game._spell_menu_screen)
+        return game._spell_menu_screen;
+    if (game._spell_cast_menu_active && game._spell_cast_menu_screen)
+        return game._spell_cast_menu_screen;
+    return null;
+}
+
+export function installSerializedScreenHook(display = game.nhDisplay) {
     const term = display?.terminal || display;
     if (!term?.serialize || term._teleportSerializeBase) return;
     const originalSerialize = term.serialize.bind(term);
     Object.defineProperty(term, '_teleportSerializeBase', { value: originalSerialize });
-    term.serialize = () => ((game._override_screen || game._override_serialized_persistent)
-            && game._override_serialized_screen)
-        ? game._override_serialized_screen
-        : originalSerialize();
+    term.serialize = () => activeSerializedTextScreen() || originalSerialize();
 }
 
 export function showOverrideScreen(screen, cursor) {
@@ -1794,7 +1805,7 @@ export function showOverrideScreen(screen, cursor) {
 }
 
 export function showSerializedOverrideScreen(screen, cursor) {
-    installOverrideSerializeHook();
+    installSerializedScreenHook();
     showOverrideScreen(screen, cursor);
     game._override_serialized_screen = screen;
     game._override_serialized_cursor = cursor ? [cursor[0], cursor[1], 1] : null;
@@ -1841,6 +1852,14 @@ function _buildScreenOutput(options = {}) {
     }
     if (game._tutorial_prompt_active && game._tutorial_prompt_screen) {
         renderTextScreen(display, game._tutorial_prompt_screen, game._tutorial_prompt_cursor || null);
+        return;
+    }
+    if (game._spell_menu_active && game._spell_menu_screen) {
+        renderTextScreen(display, game._spell_menu_screen, game._spell_menu_cursor || null);
+        return;
+    }
+    if (game._spell_cast_menu_active && game._spell_cast_menu_screen) {
+        renderTextScreen(display, game._spell_cast_menu_screen, game._spell_cast_menu_cursor || null);
         return;
     }
     if (game._override_screen) {

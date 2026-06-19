@@ -2640,7 +2640,8 @@ async function refreshHallucinationDisplayAtInputBoundary(g) {
     // C tty menus read their selection inside select_menu(); while the menu
     // window is active, moveloop_core() has not resumed for the Hallucination
     // input-boundary redraw.
-    if (g._override_screen || g._startup_legacy_pager_active || g._tutorial_prompt_active) return;
+    if (g._override_screen || g._startup_legacy_pager_active || g._tutorial_prompt_active
+        || g._spell_menu_active || g._spell_cast_menu_active) return;
     if (!(g.u?.uhallucination || g.u?.uprops?.hallucination)) return;
     if (g.u?.uswallow && g.u?.ustuck && g._swallowed_map_active) {
         // C ref: allmain.c:moveloop_core() once-per-player-input Hallucination

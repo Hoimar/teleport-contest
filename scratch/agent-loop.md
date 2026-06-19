@@ -13,7 +13,7 @@ and `feature_map.md`.
 ## Current State
 
 - Current branch in this workspace: `main`, ahead of origin.
-- Latest verified repair unit: startup legacy pager override-state retirement.
+- Latest verified repair unit: spell menu override-state retirement.
 - Checked-in public corpus is exact: `44/44 S 11405/11405 R 792838/792838 C 0`.
 - Hosted public cache remains `public-session-drift` at
   `40/44 S 10417/10982 R 629747/840358 C 0`; leaderboard fetch failed.
@@ -32,6 +32,28 @@ and `feature_map.md`.
 ## Latest Loop Checkpoint
 
 - Latest verified WIP on 2026-06-19:
+  - Spell menu override-state retirement:
+    `seed0383-wizard-hallucinate` remains exact
+    (`S 219/219 R 16915/16915 C 0`) and covers active spell view under
+    hallucination; focused guards for cast/view menus (`seed0501`,
+    `seed0116`, `seed0200`) remained exact.
+  - Strict sentinel exact:
+    `5/5 S 1063/1063 R 64569/64569 C 0`.
+  - `verify --target seed0383-wizard-hallucinate` passed target,
+    strict sentinels, `hack:audit` (`hard=0 suspicious=11`), and
+    `memory:lint` (`issues=0`).
+  - Full corpus inventory: 44 passing sessions, checked-in public
+    `44/44 S 11405/11405 R 792838/792838 C 0`.
+  - Dehack truth:
+    - `+` known-spell view and `Z` cast-spell selection are active tty states
+      rendered by `display.js`, not generic `_override_prev` cases.
+    - The shared serialized-screen hook preserves styled menu header spaces
+      for active full-screen tty states; cast selection redraws before spell
+      effects, while invalid view selectors keep the menu active.
+  - Next queue: remaining hack debt is `hard=0 suspicious=11`, dominated by
+    generic override-screen plumbing plus the forbidden-file replay comments.
+
+- Previous verified WIP on 2026-06-19:
   - Startup legacy pager override-state retirement:
     `seed0103-knight-ride-pony` remains exact
     (`S 60/60 R 2640/2640 C 0`) and covers legacy pager,

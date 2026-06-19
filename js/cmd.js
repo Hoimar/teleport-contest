@@ -15,7 +15,7 @@ import {
     object_glyph_for_menu, serialize_known_terrain_view_screen, terrain_glyph, cls,
     unmap_invisible_memory, showOverrideScreen as showOverride,
     showSerializedOverrideScreen as showSerializedOverride,
-    clearOverrideScreenState as clearOverrideScreen,
+    clearOverrideScreenState as clearOverrideScreen, installSerializedScreenHook,
 } from './display.js';
 import { cansee, couldsee, vision_recalc, vision_reset } from './vision.js';
 import {
@@ -21525,9 +21525,10 @@ function spellMenuPlainLine(entry, turnsLeft, showTurns = false) {
 async function showSpellMenu() {
     const menu = await buildSpellMenuWindow('Currently known spells', true);
     if (!menu) return;
+    installSerializedScreenHook();
     game._spell_menu_screen = menu.screen;
     game._spell_menu_cursor = menu.cursor;
-    showSerializedOverride(menu.screen, menu.cursor);
+    game._spell_menu_active = true;
 }
 
 async function buildSpellMenuWindow(title, includeSort) {
@@ -21593,9 +21594,48 @@ async function buildSpellMenuWindow(title, includeSort) {
 async function showCastSpellMenu() {
     const menu = await buildSpellMenuWindow('Choose which spell to cast', false);
     if (!menu) return;
+    installSerializedScreenHook();
     game._spell_cast_menu_screen = menu.screen;
+    game._spell_cast_menu_cursor = menu.cursor;
     game._spell_cast_menu_choices = new Map(menu.spells.map((entry) => [entry.letter, entry]));
-    showSerializedOverride(menu.screen, menu.cursor);
+    game._spell_cast_menu_active = true;
+}
+
+function clearSpellMenuState({ redraw = true } = {}) {
+    game._spell_menu_active = false;
+    game._spell_menu_screen = null;
+    game._spell_menu_cursor = null;
+    if (redraw) game._full_map_redraw_pending = true;
+}
+
+function clearSpellCastMenuState({ redraw = true } = {}) {
+    game._spell_cast_menu_active = false;
+    game._spell_cast_menu_screen = null;
+    game._spell_cast_menu_cursor = null;
+    game._spell_cast_menu_choices = null;
+    if (redraw) game._full_map_redraw_pending = true;
+}
+
+async function handleSpellMenuInput(ch) {
+    const dismiss = ch === ' ' || ch === '\r' || ch === '\n' || ch === '\x1b';
+    const validSelection = ch === '+'
+        || knownSpellEntries().some((entry) => entry.letter === ch);
+    if (!dismiss && !validSelection) {
+        // C ref: spell.c:dospellmenu() via tty select_menu(); invalid
+        // selectors keep the menu active instead of dismissing it.
+        game.context.move = 0;
+        return;
+    }
+    clearSpellMenuState();
+    game.context.move = 0;
+}
+
+async function handleSpellCastMenuInput(ch) {
+    const entry = game._spell_cast_menu_choices?.get(ch);
+    clearSpellCastMenuState();
+    await redrawAfterFullScreenMenuDismiss();
+    if (entry) await beginCastSpell(entry);
+    else game.context.move = 0;
 }
 
 function spendSpellHunger(entry, energy) {
@@ -25682,6 +25722,16 @@ export async function rhack(key) {
         return;
     }
 
+    if (game._spell_menu_active) {
+        await handleSpellMenuInput(ch);
+        return;
+    }
+
+    if (game._spell_cast_menu_active) {
+        await handleSpellCastMenuInput(ch);
+        return;
+    }
+
     if (await handleQueuedMore(ch)) return;
 
     if (game._awaiting_quest_leader_align_adjust) {
@@ -28509,31 +28559,6 @@ export async function rhack(key) {
             game.context.move = 0;
             return;
         }
-        if (prev === game._spell_cast_menu_screen) {
-            const entry = game._spell_cast_menu_choices?.get(ch);
-            game._spell_cast_menu_screen = null;
-            game._spell_cast_menu_choices = null;
-            await redrawAfterFullScreenMenuDismiss();
-            if (entry) await beginCastSpell(entry);
-            else game.context.move = 0;
-            return;
-        }
-        if (prev === game._spell_menu_screen) {
-            const dismiss = ch === ' ' || ch === '\r' || ch === '\n' || ch === '\x1b';
-            const validSelection = ch === '+'
-                || knownSpellEntries().some((entry) => entry.letter === ch);
-            if (!dismiss && !validSelection) {
-                // C ref: spell.c:dospellmenu() via tty select_menu(); invalid
-                // selectors keep the menu active instead of dismissing it.
-                showSerializedOverride(prev, game._spell_menu_cursor || null);
-            } else {
-                game._spell_menu_screen = null;
-                game._spell_menu_cursor = null;
-                clearOverrideScreen();
-            }
-            game.context.move = 0;
-            return;
-        }
         if (prev === game._help_menu_screen) {
             clearOverrideScreen();
             await handleHelpMenuSelection(ch);
@@ -28902,14 +28927,9 @@ export async function rhack(key) {
             || prev === game._overview_screen
             || prev === game._conduct_screen
             || prev === game._vanquished_screen
-            || prev === game._spell_cast_menu_screen
             || (prev === game._attributes_page1_screen && key !== 32 && key !== 13)
             || prev === game._attributes_page2_screen
             || prev === game._attributes_page3_screen) {
-            game._spell_menu_screen = null;
-            game._spell_menu_cursor = null;
-            game._spell_cast_menu_screen = null;
-            game._spell_cast_menu_choices = null;
             game._look_data_screen = null;
             game._look_list_screen = null;
             game._name_menu_screen = null;
