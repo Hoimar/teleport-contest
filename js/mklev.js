@@ -16533,8 +16533,8 @@ function is_themeroom_eligible(room, difficulty) {
 }
 
 // C ref: themerms.lua themerooms_generate()
-// Reservoir sampling picks one themed room. For seed8000 level 1,
-// 'ordinary' always wins (frequency 1000 vs others ~1-10).
+// Reservoir sampling walks every eligible themed-room entry so RNG ownership
+// matches Lua even when the heavily weighted ordinary room wins.
 async function themerooms_generate(difficulty) {
     let pick = null;
     let total_frequency = 0;
@@ -16575,7 +16575,7 @@ async function themerooms_generate(difficulty) {
     // For 'ordinary' rooms, create a standard room
     const chance = 100;
     if (pick.name !== 'ordinary') {
-        // Themed room — not expected for seed8000, but handle RNG correctly
+        // Non-ordinary themed rooms still run the build_room chance check.
         rn2(100); // chance check (build_room)
     }
     // All themed rooms go through create_room for placement
