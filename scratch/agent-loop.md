@@ -67,36 +67,50 @@ and `feature_map.md`.
 
 ## Latest Loop Checkpoint
 
-- Latest verified WIP on 2026-06-11:
-  - `seed0367-priest-quest-tour`: advanced to
-    `S 221/324 R 4951/50125 C 0`; first mismatch is now screen 203
-    at the level-teleport materialize More map redraw.
+- Latest verified WIP on 2026-06-19:
+  - `seed0030-ten-diverse-deaths`: restored exact parity after the current
+    WIP batch:
+    `S 1953/1953 R 105529/105529 C 0`.
+  - `seed0014-dequa-fountain-explore` remains exact after startup discovery
+    repair:
+    `S 714/714 R 59178/59178 C 0`.
   - Strict sentinel exact:
     `5/5 S 1063/1063 R 64569/64569 C 0`.
-  - `verify --target seed0367-priest-quest-tour` passed.
-  - Local parity refresh:
-    checked-in public `38/44 S 9824/11405 R 659847/792838 C 0`;
-    cached hosted public `35/44 S 8923/10982 R 525993/840358 C 0`.
-  - Subsystem truth: invalid selectors in the `+` known-spells view do not
-    dismiss the menu, and dismissal does not force a full playfield redraw.
-  - Next queue: continue `seed0367-priest-quest-tour` at screen 203
-    (`You materialize on a different level!--More--` map cells); startup-drift
-    sessions remain grouped at RNG 0.
+  - `verify --target seed0030-ten-diverse-deaths` and
+    `verify --target seed0014-dequa-fountain-explore` passed target
+    expectations, strict sentinels, `hack:audit` (`hard=0 suspicious=47`),
+    and `memory:lint` (`issues=0`).
+  - Focused guards exact: `seed0009-swimmer-mforce`,
+    `seed0106-priest-extcmd-sweep`, `seed5002-wizard-coverage-pair`,
+    `seed0060-orc-rogue-kick-search`, and
+    `seed0367-priest-quest-tour`.
+  - Subsystem truth:
+    - `monmove.c:m_search_items()` may let monsters pick up rocks, but rocks
+      are skipped as movement goals.
+    - `steal.c:mdrop_obj()` / `objnam.c:distant_name()` on nearby visible
+      drops applies `observe_object()`-style dknown/encountered side effects,
+      not armor type discovery.
+    - `hack.c:moverock_core()` clears remembered invisible glyphs at a pushed
+      boulder's destination before `movobj()` redraws it.
+    - `u_init.c:u_init_role()` gives Valkyries `knows_class(ARMOR_CLASS)`,
+      and `u_init.c:u_init_race()` pre-knows dwarvish objects for dwarves.
+    - During an adjacent tame-pet kill with a blocking edible-corpse kill More,
+      the C display focus can show the pet on the defender square while model
+      movement/eating resumes only after the More.
+  - Next queue after commit: run `parity:state -- --refresh-live` and pick the
+    next checked-in divergence from the refreshed inventory.
 
 - Previous checkpoint:
-  - `seed0361-archeologist-tour`: exact
-    `S 366/366 R 53865/53865 C 0`.
+  - `seed0009-swimmer-mforce`: exact
+    `S 73/73 R 3713/3713 C 0`.
   - Strict sentinel exact:
     `5/5 S 1063/1063 R 64569/64569 C 0`.
-  - `verify --target seed0361-archeologist-tour` passed.
+  - `verify --target seed0009-swimmer-mforce` passed.
   - Local parity refresh:
-    checked-in public `38/44 S 9822/11405 R 659847/792838 C 0`;
-    cached hosted public `35/44 S 8921/10982 R 525993/840358 C 0`.
-  - Subsystem truth: door-force formulas use condensed `ACURRSTR`, and a
-    quest-leader pager that interrupts monster movement must resume that same
-    monster pass after dismissal.
-  - Next queue: `seed0367-priest-quest-tour` had the best screen prefix among
-    failing sessions.
+    checked-in public `38/44 S 9590/11405 R 604772/792838 C 0`;
+    cached hosted public `35/44 S 8704/10982 R 472995/840358 C 0`.
+  - Subsystem truth: Tutorial secret doors orient from neighboring terrain
+    after `des.map()` terrain is installed.
 
 - Older checkpoint history lives in git and `feature_map.md`; keep this file
   focused on the active loop state and next queue.

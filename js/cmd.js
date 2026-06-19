@@ -183,11 +183,6 @@ const LARGE_SHIELD = 156;
 const DWARVISH_ROUNDSHIELD = 157;
 const SHIELD_OF_REFLECTION = 158;
 
-const VISIBLE_MONSTER_RACIAL_ARMOR_KNOWN = new Set([
-    ELVEN_LEATHER_HELM, ORCISH_HELM, DWARVISH_IRON_HELM,
-    ORCISH_RING_MAIL, ORCISH_CLOAK, DWARVISH_CLOAK,
-    ELVEN_SHIELD, URUK_HAI_SHIELD, ORCISH_SHIELD, DWARVISH_ROUNDSHIELD,
-]);
 const LOW_BOOTS = 163;
 const IRON_SHOES = 164;
 const HIGH_BOOTS = 165;
@@ -13909,6 +13904,9 @@ async function tryPushBoulder(boulder, sx, sy, dx, dy) {
     if (shouldShowBoulderPushMessage(boulder))
         await pline('With great effort you move the boulder.');
     exercise(A_STR, true);
+    // C ref: src/hack.c:moverock_core().  A pushed boulder clears a
+    // remembered invisible glyph at its destination before movobj() redraws.
+    unmap_invisible_memory(rx, ry, { redraw: false });
     // C ref: src/hack.c:moverock_core().  Pushing extracts the boulder from
     // the floor list and re-places it, which makes later fobj scans see it
     // before older floor objects.
@@ -16025,14 +16023,10 @@ function observeMonsterDropNameSideEffects(mon, obj) {
         && dist2(mon.mx, mon.my, game.u?.ux ?? 0, game.u?.uy ?? 0) > neardist) {
         return;
     }
-    // C ref: src/steal.c:mdrop_obj() calls distant_name(obj, doname)
-    // before extract_from_minvent(); nearby visible drops get doname()
-    // side effects in monster-inventory order, before floor stack order.
-    if ((obj.owornmask || 0)
-        && obj.oclass === ARMOR_CLASS
-        && VISIBLE_MONSTER_RACIAL_ARMOR_KNOWN.has(obj.otyp)) {
-        obj.knownName = true;
-    }
+    // C refs: src/steal.c:mdrop_obj(), src/objnam.c:distant_name(),
+    // src/o_init.c:observe_object().  Nearby visible drops get doname()
+    // side effects in monster-inventory order: dknown/encountered may change,
+    // but armor type identity still depends on objects[otyp].oc_name_known.
     inventoryObjectName(obj, { observe: true });
 }
 

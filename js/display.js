@@ -833,9 +833,22 @@ function monster_display_attr(mon) {
     return game.iflags.wc2_petattr || ATR_INVERSE;
 }
 
+function active_pet_kill_more_overlay() {
+    const overlay = game._pet_kill_more_overlay || null;
+    if (!overlay?.mon || !game._more) return null;
+    if (overlay.line && !(game._pending_message || '').includes(overlay.line))
+        return null;
+    return overlay;
+}
+
 function monster_at_display(x, y) {
+    const overlay = active_pet_kill_more_overlay();
+    if (overlay && x === overlay.x && y === overlay.y)
+        return { mon: overlay.mon, wormTail: false };
     const monsters = game.level?.monsters || [];
     const head = monsters.find(m => m.mx === x && m.my === y);
+    if (overlay && head === overlay.mon && x === overlay.oldX && y === overlay.oldY)
+        return null;
     if (head) return { mon: head, wormTail: false };
     const tail = monsters.find(m => (m.wsegs || []).some(seg => seg.wx === x && seg.wy === y));
     return tail ? { mon: tail, wormTail: true } : null;
@@ -2036,6 +2049,8 @@ function terminalCellWidth(text) {
 }
 
 export function clear_pending_message() {
+    const petKillOverlay = game._pet_kill_more_overlay || null;
+    game._pet_kill_more_overlay = null;
     const hadContinuationRow = !!(game._more_next_message_row || game._message_continuation_row);
     game._pending_message = '';
     game._simple_timed_repeat_stop_after_pending = false;
@@ -2059,5 +2074,9 @@ export function clear_pending_message() {
     game._floor_list_show_more = true;
     game._floor_list_clear_to_edge = false;
     game._floor_list_pauses_turn = false;
+    if (petKillOverlay) {
+        newsym(petKillOverlay.oldX, petKillOverlay.oldY);
+        newsym(petKillOverlay.x, petKillOverlay.y);
+    }
     if (hadContinuationRow) game._full_map_redraw_pending = true;
 }

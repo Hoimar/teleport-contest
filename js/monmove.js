@@ -3717,6 +3717,9 @@ function m_search_items_basic(mtmp, ggx, ggy, appr) {
             const pile = objects_at(xx, yy);
             if (!pile.length) continue;
             for (const obj of pile) {
+                // C ref: src/monmove.c:m_search_items().  Monsters may pick
+                // rocks up, but do not detour toward them as item goals.
+                if (obj.otyp === ROCK) continue;
                 const wouldTake = mon_would_take_item(mtmp, obj);
                 const carryAmount = can_carry(mtmp, obj);
                 const wouldConsume = mon_would_consume_item(mtmp, obj);

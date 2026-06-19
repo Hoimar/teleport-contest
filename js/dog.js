@@ -1423,14 +1423,47 @@ function refresh_pet_attack_symbols(mtmp, target) {
     if (visibleCombat && !spottedDefender) map_invisible_basic(target.mx, target.my);
 }
 
+function pet_corpse_food_class_without_resist(mtmp, obj) {
+    if (!obj || obj.otyp !== CORPSE || obj.trap_victim) return MANFOOD;
+    const { carni, herbi } = pet_diet(mtmp);
+    const ptr = monsterPtr(obj.corpsenm);
+    if (pet_corpse_is_poisonous(mtmp, ptr) || pet_corpse_is_acidic(mtmp, ptr))
+        return POISON;
+    if (vegan_monster(ptr)) return herbi ? CADAVER : MANFOOD;
+    return carni ? CADAVER : MANFOOD;
+}
+
+function latch_pet_kill_more_overlay(mtmp, target, corpse, oldx, oldy, targetX, targetY) {
+    if (!corpse || !mtmp?.mtame || dist2(oldx, oldy, targetX, targetY) > 2) return false;
+    if (pet_corpse_food_class_without_resist(mtmp, corpse) > CADAVER) return false;
+    const line = pet_kill_line(target);
+    if (!game._more || !(game._pending_message || '').includes(line)) return false;
+    // C refs: src/dogmove.c:dog_move(), src/mhitm.c:mattackm().
+    // The pet's selected occupied square is the visible combat focus for the
+    // blocking kill frame; actual movement/eating still resumes afterward.
+    game._pet_kill_more_overlay = {
+        mon: mtmp,
+        oldX: oldx,
+        oldY: oldy,
+        x: targetX,
+        y: targetY,
+        line,
+    };
+    newsym(oldx, oldy);
+    return true;
+}
+
 function apply_pet_kill_side_effects(mtmp, target, oldx, oldy, targetX, targetY, blockingFrame = true) {
     noteMonsterDied(target);
     drop_pet_kill_inventory(target);
-    if (corpse_chance(target)) make_pet_kill_corpse(target);
+    const corpse = corpse_chance(target) ? make_pet_kill_corpse(target) : null;
     grow_up_from_kill(mtmp, target);
     const monsters = game.level?.monsters || [];
     const idx = monsters.indexOf(target);
     if (idx >= 0) monsters.splice(idx, 1);
+    const overlayLatched = latch_pet_kill_more_overlay(
+        mtmp, target, corpse, oldx, oldy, targetX, targetY,
+    );
     // C ref: src/dogmove.c:dog_move().  A pet which kills an adjacent monster
     // returns after mattackm(); it does not step into the defender square as
     // part of the death side effects.
@@ -1441,6 +1474,7 @@ function apply_pet_kill_side_effects(mtmp, target, oldx, oldy, targetX, targetY,
     // invisible glyph before the final square redraw.
     unmap_invisible_memory(targetX, targetY, { redraw: false });
     newsym(targetX, targetY);
+    if (overlayLatched) newsym(oldx, oldy);
 }
 
 function drop_pet_kill_inventory(mon) {

@@ -291,6 +291,7 @@ const DWARVISH_IRON_HELM = 91;
 const HELMET = 97;
 const PLATE_MAIL = 121;
 const SPLINT_MAIL = 124;
+const DWARVISH_MITHRIL_COAT = 126;
 const ELVEN_MITHRIL_COAT = 127;
 const CHAIN_MAIL = 128;
 const ORCISH_CHAIN_MAIL = 129;
@@ -690,6 +691,13 @@ const ORC_KNOWN_OBJECTS = [
     ORCISH_SHORT_SWORD, ORCISH_ARROW, ORCISH_BOW, ORCISH_SPEAR,
     ORCISH_DAGGER, ORCISH_CHAIN_MAIL, ORCISH_RING_MAIL, ORCISH_HELM,
     ORCISH_SHIELD, URUK_HAI_SHIELD, ORCISH_CLOAK,
+];
+
+const DWARF_KNOWN_OBJECTS = [
+    // C ref: src/u_init.c:u_init_race().
+    DWARVISH_SPEAR, DWARVISH_SHORT_SWORD, DWARVISH_MATTOCK,
+    DWARVISH_IRON_HELM, DWARVISH_MITHRIL_COAT, DWARVISH_CLOAK,
+    DWARVISH_ROUNDSHIELD,
 ];
 
 const ELF_KNOWN_OBJECTS = [
@@ -1110,6 +1118,10 @@ function u_init_race_inventory(noCreate, roleName) {
         for (const otyp of ELF_KNOWN_OBJECTS) discover_role_known_object(otyp);
         return;
     }
+    if (race === 'dwarf') {
+        for (const otyp of DWARF_KNOWN_OBJECTS) discover_role_known_object(otyp);
+        return;
+    }
     if (race !== 'orc') return;
     if (roleName !== 'Wizard') ini_inv(XTRA_FOOD_INVENTORY, noCreate, roleName);
     for (const otyp of ORC_KNOWN_OBJECTS) discover_role_known_object(otyp);
@@ -1210,6 +1222,7 @@ export function u_init_role_inventory() {
             ini_inv(LAMP_INVENTORY, noCreate, role.name.m);
         }
         for (const otyp of VALKYRIE_KNOWN_WEAPONS) discover_role_known_object(otyp);
+        for (const otyp of KNIGHT_KNOWN_ARMOR) discover_role_known_object(otyp);
     } else if (role?.name?.m === 'Ranger') {
         ini_inv(RANGER_INVENTORY, noCreate, role.name.m);
         // C ref: u_init.c:u_init_role() -> knows_class(WEAPON_CLASS).
