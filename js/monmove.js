@@ -8174,12 +8174,18 @@ export async function finish_deferred_nymph_steal(options = {}) {
             game._after_more_message = game._after_more_message
                 ? `${game._after_more_message}  ${line}`
                 : line;
-            game._after_more_needs_prompt = true;
+            game._after_more_needs_prompt = !options.deferEscapeTail;
             game._monster_topline_deferred = true;
         } else {
             await pline(line);
         }
-        if (options.deferEscapeTail) return true;
+        if (options.deferEscapeTail) {
+            game._deferred_nymph_escape_tail = {
+                mtmp,
+                monId: mtmp.m_id || 0,
+            };
+            return true;
+        }
     }
     const wasVisible = hero_can_spot_monster(mtmp);
     const vanishSubject = wasVisible ? monster_subject(mtmp) : '';
@@ -8188,6 +8194,25 @@ export async function finish_deferred_nymph_steal(options = {}) {
     mhitm_knockback_frontdoor();
     await pline(nymph_stole_line(mtmp, obj, pending.wornMask || 0, vanished ? vanishSubject : ''));
     return true;
+}
+
+export async function finish_deferred_nymph_escape_tail(options = {}) {
+    const pending = game._deferred_nymph_escape_tail;
+    if (!pending) return false;
+    game._deferred_nymph_escape_tail = null;
+    const mtmp = pending.mtmp || (game.level?.monsters || []).find((mon) => mon.m_id === pending.monId);
+    if (!mtmp || !game.level?.monsters?.includes(mtmp) || (mtmp.mhp ?? 1) <= 0) return false;
+    const wasVisible = hero_can_spot_monster(mtmp);
+    const vanishSubject = wasVisible ? monster_subject(mtmp) : '';
+    const vanished = wasVisible && rloc_basic(mtmp);
+    monflee_basic(mtmp, 0, false);
+    mhitm_knockback_frontdoor();
+    if (vanished && vanishSubject) {
+        const line = `${vanishSubject} vanishes!`;
+        if (options.appendToPending && game._pending_message) await append_pline(line);
+        else await pline(line);
+    }
+    return !!game._more;
 }
 
 async function steal_item_melee_attack(mtmp, state, toHit) {

@@ -46,6 +46,7 @@ import {
     finish_deferred_monster_physical_attack,
     finish_deferred_monster_physical_knockback_only,
     finish_deferred_nymph_steal,
+    finish_deferred_nymph_escape_tail,
     finish_deferred_monster_trap_effect,
     finish_pending_swallowed_expulsion,
     create_gas_cloud_basic,
@@ -6501,7 +6502,7 @@ function learnWandFromUse(wand) {
     if (!heroIsBlind()) wand.dknown = true;
     if (wand.dknown === false) return;
     wand.knownName = true;
-    markObjectTypeKnownNoExercise(wand.otyp);
+    discoverObjectType(wand.otyp);
 }
 
 function polymorphZapHitsObject(obj, wand) {
@@ -20712,6 +20713,16 @@ async function handleQueuedMore(ch) {
                     exercise(A_STR, false); // C ref: src/mthrowu.c:thitu().
             }
             await pline(msg);
+            if (!game._after_more_message && game._deferred_nymph_escape_tail) {
+                // C refs: src/steal.c:steal(), src/teleport.c:rloc().
+                // The deferred theft line is displayed after the removal More;
+                // the nymph's escape is the same steal() continuation and can
+                // pack into that topline rather than forcing a new prompt.
+                const tailNeedsPrompt = await finish_deferred_nymph_escape_tail({
+                    appendToPending: true,
+                });
+                if (tailNeedsPrompt) needsPrompt = true;
+            }
             if (!game._after_more_message && game._deferred_nymph_steal) {
                 // C refs: src/steal.c:steal(), src/uhitm.c:mhitm_ad_adtyp().
                 // After a blocked worn-item removal line is revealed, steal()
@@ -28221,11 +28232,9 @@ export async function rhack(key) {
         if (obj.otyp === WAN_DIGGING) {
             obj.chargesKnown = false;
             zapDig(dx, dy);
-            exercise(A_WIS, true);
             if (dx || dy) learnWandFromUse(obj);
         } else if (obj.otyp === WAN_FIRE) {
             await zapFireRayAtHero(dx, dy);
-            learnWandFromUse(obj);
         } else if (obj.otyp === WAN_COLD) {
             await zapColdRay(dx, dy);
             obj.dknown = true;
