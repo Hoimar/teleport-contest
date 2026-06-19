@@ -26813,14 +26813,19 @@ export async function rhack(key) {
             game._travel_cursor = null;
             const pendingBeforeTravel = game._pending_message || '';
             const clearGetposError = /^(?:Unknown direction:|Can't find dungeon feature )/.test(pendingBeforeTravel);
+            const travelPromptResidue = /^Where do you want to travel to\?/.test(pendingBeforeTravel);
             const transientTravelDescription = !!pendingBeforeTravel
                 && !clearGetposError
-                && !/^Where do you want to travel to\?/.test(pendingBeforeTravel);
+                && !travelPromptResidue;
             // C refs: src/getpos.c:getpos()/auto_describe(), src/cmd.c:dotravel().
-            // Valid cursor descriptions remain visible until movement output
-            // replaces them; only getpos error lines are cleared.
+            // Valid cursor descriptions remain active; the selected travel
+            // prompt remains as stale topline residue until movement output
+            // replaces it. Only getpos error lines are cleared outright.
             if (clearGetposError) clear_pending_message();
-            else if (!transientTravelDescription) clear_pending_message();
+            else if (!transientTravelDescription) {
+                clear_pending_message();
+                if (travelPromptResidue) game._topline_residue = pendingBeforeTravel;
+            }
             game._travel_description_pending = transientTravelDescription;
             const startedTravel = await beginTravelRunToCachedTarget();
             if (clearGetposError && !startedTravel && pendingBeforeTravel) await pline(pendingBeforeTravel);

@@ -14,24 +14,23 @@ and `feature_map.md`.
 
 - Current branch in this workspace: `main`, ahead of origin.
 - Latest verified repair unit:
-  - `seed0014-dequa-fountain-explore` is exact:
-    `S 714/714 R 59178/59178 C 0` (pre-fix baseline was exact screens/RNG
-    with cursor-only mismatches at screens 383 and 647).
+  - `seed0007-rogue-snake-swamp` is exact:
+    `S 302/302 R 16373/16373 C 0` (pre-fix baseline was
+    `S 301/302 R 16373/16373 C 0`, missing one retained travel prompt).
   - Strict sentinels exact: `5/5 S 1063/1063 R 64569/64569 C 0`.
-  - `verify --target seed0014-dequa-fountain-explore` passed target
+  - `verify --target seed0007-rogue-snake-swamp` passed target
     expectations, strict sentinels, `hack:audit` (`hard=0 suspicious=47`),
     and `memory:lint` (`issues=0`). Focused guards also kept
-    `seed0106-priest-extcmd-sweep` and `seed0360-wizard-world-tour` exact.
+    `seed0014-dequa-fountain-explore`, `seed0101-ranger-quiver-throw-travel-engrave`,
+    and `seed0360-wizard-world-tour` exact.
   - Local parity refresh after the repair is checked-in public
-    `36/44 S 9552/11405 R 604772/792838 C 0`; cached hosted public remains
-    `public-session-drift` at `33/44 S 8666/10982 R 472995/840358 C 0`, and
-    leaderboard fetch failed.
-  - Implementation: `tty_yn_function()` prompt cursors now account for the
-    invisible trailing input space wrapping onto the continuation row
-    (`C ref: win/tty/topl.c:tty_yn_function()`), and `goto_level()` clears the
-    cached `_` travel target so the first post-level-change getpos prompt
-    starts on the hero (`C refs: src/do.c:goto_level(), src/cmd.c:dotravel()`).
-  - Remaining checked-in misses after the refresh: 8 public sessions remain
+    `37/44 S 9553/11405 R 604772/792838 C 0`; cached hosted public remains
+    `public-session-drift` at `34/44 S 8667/10982 R 472995/840358 C 0`;
+    leaderboard was skipped in the full local scan.
+  - Implementation: accepted `_` travel picks preserve C's stale travel prompt
+    as visible topline residue while the cursor returns to the map and travel
+    movement completes (`C refs: src/cmd.c:dotravel(), src/getpos.c:getpos()`).
+  - Remaining checked-in misses after the refresh: 7 public sessions remain
     non-exact; choose the next frontier from `npm run parity:state -- --full`
     or `scratch/divergence-inventory.md` rather than from older checkpoint rows.
 - Previous committed repair unit:
@@ -56,7 +55,7 @@ and `feature_map.md`.
   when useful; keep production parity and scratch-tool commits coherent.
 - Strict sentinels are exact:
   `5/5 S 1063/1063 R 64569/64569 C 0`.
-- Current public classification: checked-in corpus has 36 exact local sessions;
+- Current public classification: checked-in corpus has 37 exact local sessions;
   hosted cache differs from checked-in sessions, and leaderboard state remains
   secondary until refreshed.
 - Current sentinel regression classification: none; strict sentinel is exact.
