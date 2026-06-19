@@ -13,10 +13,10 @@ and `feature_map.md`.
 ## Current State
 
 - Current branch in this workspace: `main`, ahead of origin.
-- Latest verified repair unit: wizard getbones unlink prompt display-state retirement.
+- Latest verified repair unit: generic override-screen plumbing removal.
 - Checked-in public corpus is exact: `44/44 S 11405/11405 R 792838/792838 C 0`.
 - Hosted public cache remains `public-session-drift` at
-  `40/44 S 10417/10982 R 629747/840358 C 0`; leaderboard fetch failed.
+  `40/44 S 10418/10982 R 629747/840358 C 0`; leaderboard fetch failed.
 - Scratch trace/checkpoint files are agent-toolkit state and may be committed
   when useful; keep production parity and scratch-tool commits coherent.
 - Strict sentinels are exact:
@@ -25,34 +25,37 @@ and `feature_map.md`.
   hosted cache differs from checked-in sessions, and leaderboard state remains
   secondary until refreshed.
 - Current sentinel regression classification: none; strict sentinel is exact.
-- Hack audit remains `hard=0 suspicious=11`; `memory:lint` reports
+- Hack audit remains `hard=0 suspicious=2`; `memory:lint` reports
   `issues=0`. Production `js/` has no intentional debug I/O or imports from
   `frozen/`.
 
 ## Latest Loop Checkpoint
 
 - Latest verified WIP on 2026-06-19:
-  - Wizard getbones unlink prompt display-state retirement:
-    `seed5006-tourist-stress-disaster` remains exact.
+  - Generic override-screen plumbing removal:
+    `seed0361-archeologist-tour` remains exact.
   - Strict sentinel exact:
     `5/5 S 1063/1063 R 64569/64569 C 0`.
   - Full checked-in corpus passed via `bash frozen/score.sh`:
     `44/44 S 11405/11405 R 792838/792838 C 0`.
-  - Verification also covered `triage -- seed5006`,
-    `screen:diff -- seed5006 --first`, `node --check js/cmd.js`,
-    `node --check js/display.js`, `node --check js/allmain.js`,
-    `git diff --check`, and `verify --target seed5006`.
+  - Verification also covered `node --check` for `js/cmd.js`,
+    `js/display.js`, `js/jsmain.js`, `js/allmain.js`, and `js/monmove.js`,
+    `git diff --check`, `verify --target seed0361`, `hack:audit`, and
+    `memory:lint`.
   - Dehack truth:
-    - The wizard `Unlink bones?` prompt is asked inside
-      `bones.c:getbones()` after the bones level has been read but before
-      `goto_level()` redraws the destination. JS keeps the previous prompt
-      screen with row 0 replaced via active bones-unlink prompt state, not
-      generic `_override_screen` state.
-  - Next queue: remaining command-side override use is the generic fallback
-    path and shared override plumbing; hack audit remains
-    `hard=0 suspicious=11`.
+    - Production `js/` no longer has generic `_override_screen`,
+      `_override_prev`, or serialized-override display plumbing. Tty windows,
+      terminal-exit screens, prompts, and blocking More frames render through
+      explicit active or latched state.
+    - `hack:audit` now reports only the two fastforward/replay comment hits in
+      forbidden files `js/storage.js` and `js/terminal.js`.
+  - Next queue: no checked-in public mismatch is active; regenerate/inspect
+    divergence inventory and feature-map debt to choose the next general
+    subsystem frontier for hidden-session cleanliness.
 
 - Previous verified WIP on 2026-06-19:
+  - Wizard getbones unlink prompt display state retired the last direct prompt
+    user of generic serialized override state.
   - Death/quit final disclosure, quest/post-arrival pager More, and loot
     contents More overrides, terminal-exit screens, read/zap/apply inventory
     prompt menus, here-command, loot, pay, inventory, potion, throw,

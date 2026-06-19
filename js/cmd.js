@@ -13,8 +13,7 @@ import {
     apply_hallucination_display_transition, refresh_swallowed_overlay,
     see_monsters, see_objects, see_nearby_objects, see_traps, refresh_warning_monsters, map_level_for_wizard,
     object_glyph_for_menu, serialize_known_terrain_view_screen, terrain_glyph, cls,
-    unmap_invisible_memory, showOverrideScreen as showOverride,
-    clearOverrideScreenState as clearOverrideScreen, installSerializedScreenHook,
+    unmap_invisible_memory, installSerializedScreenHook,
 } from './display.js';
 import { cansee, couldsee, vision_recalc, vision_reset } from './vision.js';
 import {
@@ -4012,7 +4011,6 @@ async function showDeathDisclosure() {
     clear_pending_message();
     game._more = true;
     game._more_dismissals_remaining = 1;
-    clearOverrideScreen();
     game._latched_more_screen = deathTombstoneScreen();
     game._latched_more_cursor = [8, 23, 1];
     game._latched_more_keep_until_dismiss = true;
@@ -4050,7 +4048,6 @@ async function showQuitDisclosure() {
     clear_pending_message();
     game._more = true;
     game._more_dismissals_remaining = 1;
-    clearOverrideScreen();
     game._latched_more_screen = quitDisclosureScreen();
     game._latched_more_cursor = [8, 23, 1];
     game._latched_more_keep_until_dismiss = true;
@@ -4946,7 +4943,6 @@ async function showDeathAttributesPrompt() {
     game._death_inventory_disclosure_pages = null;
     game._death_inventory_disclosure_page = 0;
     clearDisclosureWindowScreen();
-    clearOverrideScreen();
     await redrawAfterFullScreenMenuDismiss();
     const msg = 'Do you want to see your attributes? [ynq] (n)';
     await showPromptLine(msg);
@@ -4983,7 +4979,6 @@ function buildWizIdentifyMenuLines() {
 
 function setWizIdentifyMenuScreen(screen, cursor) {
     installSerializedScreenHook();
-    clearOverrideScreen();
     game._wizidentify_menu_screen = screen;
     game._wizidentify_menu_cursor = cursor ? [cursor[0], cursor[1]] : null;
     game._wizidentify_menu_active = true;
@@ -5027,7 +5022,6 @@ async function showWizIdentifyMenu() {
 
 async function dismissWizIdentifyMenu() {
     clearWizIdentifyMenuScreen();
-    clearOverrideScreen();
     await redrawAfterFullScreenMenuDismiss();
     game.context.move = 0;
 }
@@ -5055,7 +5049,6 @@ async function handleWizIdentifyMenuInput(ch) {
 
 function setInventoryPromptMenuScreen(screen, cursor, kind, letters = null) {
     installSerializedScreenHook();
-    clearOverrideScreen();
     game._inventory_prompt_menu_screen = screen;
     game._inventory_prompt_menu_cursor = cursor ? [cursor[0], cursor[1]] : null;
     game._inventory_prompt_menu_kind = kind || 'inventory';
@@ -5082,7 +5075,6 @@ function clearInventoryPromptMenuScreen() {
 function setTerminalExitScreen(screen, cursor) {
     // C refs: src/save.c:dosave(), src/end.c:done2(), win/tty/wintty.c:tty_exit_nhwindows().
     installSerializedScreenHook();
-    clearOverrideScreen();
     game._terminal_exit_screen = screen;
     game._terminal_exit_cursor = cursor ? [cursor[0], cursor[1]] : null;
     game._terminal_exit_screen_active = true;
@@ -5100,7 +5092,6 @@ function setBonesUnlinkPromptScreen(screen, cursor) {
     // C ref: src/bones.c:getbones(). The wizard unlink prompt is asked after
     // getlev() but before goto_level() performs the destination docrt().
     installSerializedScreenHook();
-    clearOverrideScreen();
     game._bones_unlink_prompt_screen = screen;
     game._bones_unlink_prompt_cursor = cursor ? [cursor[0], cursor[1]] : null;
     game._bones_unlink_prompt_active = true;
@@ -5122,7 +5113,6 @@ function clearBonesUnlinkPromptScreen() {
 
 async function dismissInventoryPromptMenuScreen() {
     clearInventoryPromptMenuScreen();
-    clearOverrideScreen();
     await redrawAfterFullScreenMenuDismiss();
 }
 
@@ -5184,7 +5174,6 @@ async function showApplyInventoryHelpMenu(showAll = false) {
     // C refs: src/invent.c:getobj(), src/apply.c:apply_ok().  '?' shows the
     // suggested apply subset; '*' opens the full inventory picker.
     clearInventoryPromptMenuScreen();
-    clearOverrideScreen();
     clear_pending_message();
     await redrawAfterFullScreenMenuDismiss();
     const display = game.nhDisplay;
@@ -6739,7 +6728,6 @@ function clearLootMenuArea(col, maxRow) {
 
 function setLootMenuScreen(screen, cursor, kind = 'menu') {
     installSerializedScreenHook();
-    clearOverrideScreen();
     game._loot_menu_active = true;
     game._loot_menu_kind = kind;
     game._loot_menu_screen = screen;
@@ -6778,7 +6766,6 @@ async function finishEmptyLootTakeOut(container, used = false, held = false) {
     game._loot_takeout_menu = null;
     game._loot_contents_more = null;
     clearLootMenuScreen();
-    clearOverrideScreen();
     clear_pending_message();
     await redrawAfterFullScreenMenuDismiss();
     await pline(`${sentenceStart(containerActionName(container, held))} is empty.`);
@@ -7004,7 +6991,6 @@ async function dismissLootMenu(spentTurn = false) {
     game._loot_takeout_menu = null;
     game._loot_contents_more = null;
     clearLootMenuScreen();
-    clearOverrideScreen();
     clear_pending_message();
     await redrawAfterFullScreenMenuDismiss();
     game.context.move = spentTurn ? 1 : 0;
@@ -7157,7 +7143,6 @@ async function showLootTakeOutObjectMenu(container, selectedGold = false, opts =
     const display = game.nhDisplay;
     if (!display?.putstr) return;
     clearLootMenuScreen();
-    clearOverrideScreen();
     await redrawAfterFullScreenMenuDismiss();
     const col = 41;
     const selectedClasses = opts.selectedClasses instanceof Set
@@ -7306,7 +7291,6 @@ async function handleLootTakeOutMenuKey(ch) {
         const selectedKeys = menu.selectedKeys instanceof Set ? new Set(menu.selectedKeys) : new Set();
         game._loot_takeout_menu = null;
         clearLootMenuScreen();
-        clearOverrideScreen();
         clear_pending_message();
         await redrawAfterFullScreenMenuDismiss();
         await takeSelectedObjectsOutOfContainer(container, entries, selectedKeys);
@@ -7390,7 +7374,6 @@ async function showLootPutInGoldMenu(container, selected = false, opts = {}) {
     const display = game.nhDisplay;
     if (!display?.putstr) return;
     clearLootMenuScreen();
-    clearOverrideScreen();
     await redrawAfterFullScreenMenuDismiss();
     clearLootMenuArea(23, 4);
     const gold = game._goldCount || 0;
@@ -7457,7 +7440,6 @@ async function handleLootPutInMenuKey(ch) {
         const container = menu.container;
         game._loot_putin_menu = null;
         clearLootMenuScreen();
-        clearOverrideScreen();
         clear_pending_message();
         if (selected) {
             await redrawAfterFullScreenMenuDismiss();
@@ -7543,7 +7525,6 @@ function showHereCommandMenu() {
 
 function setHereCommandMenuScreen(screen, cursor) {
     installSerializedScreenHook();
-    clearOverrideScreen();
     game._herecmd_menu_active = true;
     game._herecmd_menu_screen = screen;
     game._herecmd_menu_cursor = cursor ? [cursor[0], cursor[1]] : null;
@@ -7566,7 +7547,6 @@ function clearHereCommandMenuScreen() {
 async function dismissHereCommandMenu() {
     game._herecmd_menu = false;
     clearHereCommandMenuScreen();
-    clearOverrideScreen();
     clear_pending_message();
     await redrawAfterFullScreenMenuDismiss();
     game.context.move = 0;
@@ -8109,7 +8089,6 @@ function renderPayMenu(menu) {
 
 function setPayMenuScreen(screen, cursor) {
     installSerializedScreenHook();
-    clearOverrideScreen();
     game._pay_menu_active = true;
     game._pay_menu_screen = screen;
     game._pay_menu_cursor = cursor ? [cursor[0], cursor[1]] : null;
@@ -8160,7 +8139,6 @@ async function commitPayMenuSelection(menu) {
     const shkp = menu?.shkp;
     game._pay_menu = null;
     clearPayMenuScreen();
-    clearOverrideScreen();
     await redrawAfterFullScreenMenuDismiss();
     if (!selected.length || !shkp) {
         game.context.move = 0;
@@ -8203,7 +8181,6 @@ async function handlePayMenuInput(ch) {
     if (ch === '\x1b') {
         game._pay_menu = null;
         clearPayMenuScreen();
-        clearOverrideScreen();
         await redrawAfterFullScreenMenuDismiss();
         game.context.move = 0;
         return;
@@ -11109,7 +11086,6 @@ async function handleEnhanceSelection(ch) {
     clearEnhanceSkillsScreen();
     if (ch === 'j') {
         game._enhance_skill_levels = { ...(game._enhance_skill_levels || {}), longSword: 'Skilled' };
-        clearOverrideScreen();
         await redrawAfterFullScreenMenuDismiss();
         await pline('You are now more skilled in long sword.');
         queue_more_prompt();
@@ -11119,7 +11095,6 @@ async function handleEnhanceSelection(ch) {
     }
     if (ch === 'r') {
         game._enhance_skill_levels = { ...(game._enhance_skill_levels || {}), polearms: 'Basic' };
-        clearOverrideScreen();
         await redrawAfterFullScreenMenuDismiss();
         await pline('You are now more skilled in polearms.');
         queue_more_prompt();
@@ -11127,7 +11102,6 @@ async function handleEnhanceSelection(ch) {
         game.context.move = 0;
         return;
     }
-    clearOverrideScreen();
     await redrawAfterFullScreenMenuDismiss();
     game.context.move = 0;
 }
@@ -17055,7 +17029,6 @@ function clearLookWindowScreen({ redraw = false } = {}) {
 
 function setTravelTipScreen(screen, cursor = [16, 8]) {
     installSerializedScreenHook();
-    clearOverrideScreen();
     game._travel_tip_screen = screen;
     game._travel_tip_screen_cursor = cursor ? [cursor[0], cursor[1]] : null;
     game._travel_tip_screen_active = true;
@@ -17077,7 +17050,6 @@ function clearTravelTipScreen() {
 
 function setTerrainWindowScreen(screen, cursor) {
     installSerializedScreenHook();
-    clearOverrideScreen();
     game._terrain_window_screen = screen;
     game._terrain_window_cursor = cursor ? [cursor[0], cursor[1]] : null;
     game._terrain_window_active = true;
@@ -17100,7 +17072,6 @@ function clearTerrainWindowScreen({ redraw = false } = {}) {
 
 function setDisclosureWindowScreen(screen, cursor, kind) {
     installSerializedScreenHook();
-    clearOverrideScreen();
     game._disclosure_window_screen = screen;
     game._disclosure_window_cursor = cursor ? [cursor[0], cursor[1]] : null;
     game._disclosure_window_kind = kind || 'disclosure';
@@ -17124,7 +17095,6 @@ function clearDisclosureWindowScreen() {
 
 function setIntrinsicMenuScreen(screen, cursor) {
     installSerializedScreenHook();
-    clearOverrideScreen();
     game._intrinsic_menu_screen = screen;
     game._intrinsic_menu_cursor = cursor ? [cursor[0], cursor[1]] : null;
     game._intrinsic_menu_active = true;
@@ -17146,7 +17116,6 @@ function clearIntrinsicMenuScreen() {
 
 function setNameMenuScreen(screen, cursor) {
     installSerializedScreenHook();
-    clearOverrideScreen();
     game._name_menu_screen = screen;
     game._name_menu_cursor = cursor ? [cursor[0], cursor[1]] : null;
     game._name_menu_active = true;
@@ -17168,7 +17137,6 @@ function clearNameMenuScreen() {
 
 function setEnhanceSkillsScreen(screen, cursor) {
     installSerializedScreenHook();
-    clearOverrideScreen();
     game._enhance_skills_screen = screen;
     game._enhance_skills_cursor = cursor ? [cursor[0], cursor[1]] : null;
     game._enhance_skills_active = true;
@@ -17190,7 +17158,6 @@ function clearEnhanceSkillsScreen() {
 
 function setDiscoveryWindowScreen(screen, cursor) {
     installSerializedScreenHook();
-    clearOverrideScreen();
     game._discovery_screen = screen;
     game._discovery_cursor = cursor ? [cursor[0], cursor[1]] : null;
     game._discovery_window_active = true;
@@ -17214,7 +17181,6 @@ function clearDiscoveryWindowScreen() {
 
 function setAttributesWindowScreen(screen, cursor) {
     installSerializedScreenHook();
-    clearOverrideScreen();
     game._attributes_screen = screen;
     game._attributes_cursor = cursor ? [cursor[0], cursor[1]] : null;
     game._attributes_window_active = true;
@@ -17244,7 +17210,6 @@ function attributesWindowCursor(screen) {
 
 function setLevelTeleportMenuScreen(menu) {
     installSerializedScreenHook();
-    clearOverrideScreen();
     const cursor = levelTeleportMenuCursor(menu?.screen || '');
     game._level_teleport_menu_screen = menu?.screen || '';
     game._level_teleport_menu_choices = menu?.choices || {};
@@ -17317,7 +17282,6 @@ async function handleDisclosureWindowInput(ch) {
         return;
     }
     clearDisclosureWindowScreen();
-    clearOverrideScreen();
     if (kind === 'death-vanquished') {
         await showDeathConductPrompt();
         return;
@@ -17336,7 +17300,6 @@ async function handleDisclosureWindowInput(ch) {
 
 async function handleNameMenuInput(ch) {
     clearNameMenuScreen();
-    clearOverrideScreen();
     await redrawAfterFullScreenMenuDismiss();
     if (ch === 'a') await beginAnnotatePrompt();
     else if (ch === 'i' || ch === 'y') await beginNameInventoryPrompt();
@@ -17352,7 +17315,6 @@ async function handleDiscoveryWindowInput(ch) {
         setDiscoveryWindowScreen(pages[game._discovery_page], [8, 23]);
     } else {
         clearDiscoveryWindowScreen();
-        clearOverrideScreen();
         await redrawAfterFullScreenMenuDismiss();
     }
     game.context.move = 0;
@@ -17373,7 +17335,6 @@ async function handleAttributesWindowInput(key) {
             );
         } else {
             clearAttributesWindowScreen();
-            clearOverrideScreen();
             await redrawAfterFullScreenMenuDismiss();
         }
         game.context.move = 0;
@@ -17394,7 +17355,6 @@ async function handleAttributesWindowInput(key) {
             );
         } else {
             clearAttributesWindowScreen();
-            clearOverrideScreen();
             await redrawAfterFullScreenMenuDismiss();
         }
         game.context.move = 0;
@@ -17408,7 +17368,6 @@ async function handleAttributesWindowInput(key) {
         );
     } else {
         clearAttributesWindowScreen();
-        clearOverrideScreen();
         await redrawAfterFullScreenMenuDismiss();
     }
     game.context.move = 0;
@@ -17416,7 +17375,6 @@ async function handleAttributesWindowInput(key) {
 
 async function dismissLevelTeleportMenu() {
     clearLevelTeleportMenuScreen();
-    clearOverrideScreen();
     await redrawAfterFullScreenMenuDismiss();
     game.context.move = 0;
 }
@@ -20496,7 +20454,6 @@ async function handleQueuedMore(ch) {
         game._death_blank_more_active = true;
         game._more = true;
         game._more_dismissals_remaining = 1;
-        clearOverrideScreen();
         game._latched_more_screen = deathBlankMoreScreen();
         game._latched_more_cursor = [8, 23, 1];
         game._latched_more_keep_until_dismiss = true;
@@ -20523,7 +20480,6 @@ async function handleQueuedMore(ch) {
             game._more = false;
             game._more_dismissals_remaining = 0;
             clear_pending_message();
-            clearOverrideScreen();
             game._latched_more_screen = screen;
             game._latched_more_cursor = [cursor[0], cursor[1], 1];
             game._latched_more_keep_until_dismiss = true;
@@ -20544,7 +20500,6 @@ async function handleQueuedMore(ch) {
             game._more = false;
             game._more_dismissals_remaining = 0;
             clear_pending_message();
-            clearOverrideScreen();
             await redrawAfterFullScreenMenuDismiss();
             if (questLeaderAction === 'leader-followup' && questLeaderNeedsDebugAlignAdjust()) {
                 await pline(questLeaderDebugAlignMessage());
@@ -20563,7 +20518,6 @@ async function handleQueuedMore(ch) {
             game._more = false;
             game._more_dismissals_remaining = 0;
             clear_pending_message();
-            clearOverrideScreen();
             game._monster_turn_paused_for_more = false;
             game._monster_attack_more_waiting = false;
             game._pre_turn_more_waiting = false;
@@ -20615,14 +20569,12 @@ async function handleQueuedMore(ch) {
             game._more = false;
             game._more_dismissals_remaining = 0;
             clear_pending_message();
-            clearOverrideScreen();
             showLootActionMenu(state.container, state.used, { held: state.held });
             game.context.move = 0;
             return true;
         }
         if (game._post_arrival_pager_active) {
             game._post_arrival_pager_active = false;
-            clearOverrideScreen();
             await redrawAfterFullScreenMenuDismiss();
             const tempMessage = game._post_arrival_temp_message;
             game._post_arrival_temp_message = null;
@@ -20670,7 +20622,6 @@ async function handleQueuedMore(ch) {
             game._post_arrival_pager_text = '';
             game._post_arrival_pager_active = true;
             clear_pending_message();
-            clearOverrideScreen();
             game._latched_more_screen = screen;
             game._latched_more_cursor = [cursor[0], cursor[1], 1];
             game._latched_more_keep_until_dismiss = true;
@@ -21082,7 +21033,6 @@ async function handleQueuedMore(ch) {
         if (await runArrivalFloorLookAfterMore()) return true;
         if (game._direction_help_active || game._direction_help_screen) {
             clearDirectionHelpScreen();
-            game._override_prev = null;
             game._more = false;
             game._more_dismissals_remaining = 0;
             clear_pending_message();
@@ -21933,7 +21883,6 @@ async function commitIntrinsicMenuSelection(menu) {
     // C refs: win/tty/wintty.c:tty_select_menu(), src/wizcmds.c:wiz_intrinsic().
     // The tty window is dismissed before selected intrinsics emit messages.
     clearIntrinsicMenuScreen();
-    clearOverrideScreen();
     await redrawAfterFullScreenMenuDismiss();
     if (!selected.length) {
         return;
@@ -22024,7 +21973,6 @@ async function showInventoryMenu() {
 
 function setInventoryMenuScreen(screen, cursor, page = 1) {
     installSerializedScreenHook();
-    clearOverrideScreen();
     game._inventory_menu_active = true;
     game._inventory_menu_page = page;
     if (page === 2) {
@@ -22079,7 +22027,6 @@ function buildThrowInventoryMenuLines(showAll = false) {
 
 function setThrowInventoryMenuScreen(screen, cursor, page = 1) {
     installSerializedScreenHook();
-    clearOverrideScreen();
     game._throw_inventory_menu_active = true;
     game._throw_inventory_menu_page = page;
     if (page === 2) {
@@ -22178,7 +22125,6 @@ function showThrowInventoryMenuPage2() {
 
 async function showThrowPromptAfterMenuDismiss(obj) {
     clearThrowInventoryMenuScreen();
-    clearOverrideScreen();
     await redrawAfterFullScreenMenuDismiss();
     game._awaiting_throw_item = false;
     game._awaiting_throw_direction = obj;
@@ -22205,7 +22151,6 @@ async function handleThrowInventoryMenuInput(ch) {
         }
         if (ch === '\x1b' || ch === ' ' || ch === '\r' || ch === '\n') {
             clearThrowInventoryMenuScreen();
-            clearOverrideScreen();
             await redrawAfterFullScreenMenuDismiss();
             game._awaiting_throw_item = true;
             await showThrowPrompt();
@@ -22221,7 +22166,6 @@ async function handleThrowInventoryMenuInput(ch) {
     if (obj) await showThrowPromptAfterMenuDismiss(obj);
     else {
         clearThrowInventoryMenuScreen();
-        clearOverrideScreen();
         await redrawAfterFullScreenMenuDismiss();
         game._awaiting_throw_item = true;
         await showThrowPrompt();
@@ -22254,7 +22198,6 @@ function showInventoryMenuPage2() {
 async function handleInventoryLookupMenuInput(ch) {
     game._look_inventory_lookup_active = false;
     clearInventoryMenuScreen();
-    clearOverrideScreen();
     if (ch === '\x1b' || ch === ' ' || ch === '\r' || ch === '\n') {
         await redrawAfterFullScreenMenuDismiss();
         game.context.move = 0;
@@ -22282,7 +22225,6 @@ async function handleInventoryMenuInput(ch) {
     }
     if (page === 2) {
         clearInventoryMenuScreen();
-        clearOverrideScreen();
         await redrawAfterFullScreenMenuDismiss();
         game.context.move = 0;
         return;
@@ -22296,12 +22238,10 @@ async function handleInventoryMenuInput(ch) {
     const obj = idx >= 0 ? game.inventory?.[idx] : null;
     if (obj) {
         clearInventoryMenuScreen();
-        clearOverrideScreen();
         await redrawAfterFullScreenMenuDismiss();
         await showInventoryActionMenu(obj);
     } else if (ch === '\x1b' || ch === ' ' || ch === '\r' || ch === '\n') {
         clearInventoryMenuScreen();
-        clearOverrideScreen();
         await redrawAfterFullScreenMenuDismiss();
     }
     game.context.move = 0;
@@ -22319,7 +22259,6 @@ function buildPotionMenuLines() {
 
 function setPotionMenuScreen(screen, cursor) {
     installSerializedScreenHook();
-    clearOverrideScreen();
     game._potion_menu_screen = screen;
     game._potion_menu_cursor = cursor ? [cursor[0], cursor[1]] : null;
     game._potion_menu_active = true;
@@ -22360,7 +22299,6 @@ async function showPotionMenu() {
 
 async function dismissPotionMenu() {
     clearPotionMenuScreen();
-    clearOverrideScreen();
     await redrawAfterFullScreenMenuDismiss();
     game._awaiting_drink_item = false;
     game.context.move = 0;
@@ -22376,7 +22314,6 @@ async function handlePotionMenuInput(ch) {
     if (obj?.oclass === POTION_CLASS) {
         clear_pending_message();
         clearPotionMenuScreen();
-        clearOverrideScreen();
         await redrawAfterFullScreenMenuDismiss();
         game._awaiting_drink_item = false;
         await drinkPotion(obj, idx);
@@ -22549,7 +22486,6 @@ function actionMenuItemType(obj) {
 
 function setInventoryActionMenuScreen(screen, cursor, obj) {
     installSerializedScreenHook();
-    clearOverrideScreen();
     game._inventory_action_menu_screen = screen;
     game._inventory_action_menu_cursor = cursor ? [cursor[0], cursor[1]] : null;
     game._inventory_action_menu_obj = obj || null;
@@ -22573,7 +22509,6 @@ function clearInventoryActionMenuScreen() {
 
 async function dismissInventoryActionMenu() {
     clearInventoryActionMenuScreen();
-    clearOverrideScreen();
     await redrawAfterFullScreenMenuDismiss();
     game.context.move = 0;
 }
@@ -22587,7 +22522,6 @@ async function handleInventoryActionMenuInput(ch) {
     if (ch === 't' && obj) {
         clear_pending_message();
         clearInventoryActionMenuScreen();
-        clearOverrideScreen();
         game._awaiting_throw_direction = obj;
         game.context.move = 0;
         await redrawAfterFullScreenMenuDismiss();
@@ -24153,7 +24087,6 @@ async function showDeathCreaturesPrompt() {
         return;
     }
     game._death_creatures_prompt_active = true;
-    clearOverrideScreen();
     await redrawAfterFullScreenMenuDismiss();
     const msg = 'Do you want an account of creatures vanquished? [ynaq] (n)';
     await showPromptLine(msg);
@@ -24165,7 +24098,6 @@ async function showDeathConductPrompt() {
     // C ref: src/end.c:disclose().
     game._death_conduct_prompt_active = true;
     clearDisclosureWindowScreen();
-    clearOverrideScreen();
     await redrawAfterFullScreenMenuDismiss();
     const msg = 'Do you want to see your conduct? [ynq] (n)';
     await showPromptLine(msg);
@@ -24177,7 +24109,6 @@ async function showDeathOverviewPrompt() {
     // C ref: src/end.c:disclose().
     game._death_overview_prompt_active = true;
     clearDisclosureWindowScreen();
-    clearOverrideScreen();
     await redrawAfterFullScreenMenuDismiss();
     const msg = 'Do you want to see the dungeon overview? [ynq] (n)';
     await showPromptLine(msg);
@@ -25326,7 +25257,6 @@ function showQuestLeaderPagerText(text, action = '') {
     rn2(2);
     const screen = renderMorePagerScreen(text);
     const cursor = [8, C.TERMINAL_ROWS - 1];
-    clearOverrideScreen();
     game._latched_more_screen = screen;
     game._latched_more_cursor = [cursor[0], cursor[1], 1];
     game._latched_more_keep_until_dismiss = true;
@@ -25539,7 +25469,6 @@ async function queuePostArrivalPager(raw, options = {}) {
         game._post_arrival_pager_text = '';
         game._post_arrival_pager_quest_lua_shuffle = false;
         game._post_arrival_pager_active = true;
-        clearOverrideScreen();
         game._latched_more_screen = screen;
         game._latched_more_cursor = [cursor[0], cursor[1], 1];
         game._latched_more_keep_until_dismiss = true;
@@ -26847,7 +26776,6 @@ export async function rhack(key) {
     }
 
     if (game._terrain_view_intro_more) {
-        game._override_prev = null;
         if (ch === ' ' || ch === '\r' || ch === '\n' || ch === '\x1b') {
             game._terrain_view_intro_more = false;
             game._more = false;
@@ -28502,7 +28430,6 @@ export async function rhack(key) {
 
     if (game._intrinsic_menu) {
         const menu = game._intrinsic_menu;
-        game._override_prev = null;
         if (ch >= '0' && ch <= '9') {
             menu.count = `${menu.count || ''}${ch}`;
             renderIntrinsicMenu(menu);
@@ -28520,7 +28447,6 @@ export async function rhack(key) {
         if (ch === '\x1b') {
             game._intrinsic_menu = null;
             clearIntrinsicMenuScreen();
-            clearOverrideScreen();
             await docrt();
             game.context.move = 0;
             return;
@@ -29368,7 +29294,6 @@ export async function rhack(key) {
         }
         clear_pending_message();
         game._awaiting_zap_item = false;
-        clearOverrideScreen();
         const idx = inventoryIndexForLetter(ch);
         const obj = idx >= 0 ? game.inventory?.[idx] : null;
         if (!obj || obj.oclass !== WAND_CLASS) {
@@ -29702,37 +29627,6 @@ export async function rhack(key) {
         }
         if (typeof obj.spe === 'number' && obj.spe > 0) obj.spe--;
         game.context.move = 1;
-        return;
-    }
-
-    // If an override screen was shown last capture (hook set _override_prev),
-    // handle multi-page menus: set the next page before returning.
-    if (game._override_prev) {
-        const prev = game._override_prev;
-        game._override_prev = null;
-        if (game._more && ch !== ' ' && ch !== '\r' && ch !== '\n' && ch !== '\x1b') {
-            // C ref: win/tty/topl.c:more(); a latched More override ignores
-            // non-dismissal keys instead of treating them as menu input.
-            showOverride(prev, game._latched_more_cursor || null);
-            game.context.move = 0;
-            return;
-        }
-        if (prev === game._look_data_screen
-            || prev === game._look_list_screen) {
-            game._look_data_screen = null;
-            game._look_list_screen = null;
-            clearOverrideScreen();
-            await redrawAfterFullScreenMenuDismiss();
-            game.context.move = 0;
-            return;
-        }
-        if (game._deferred_startup_uac != null) {
-            game.u.uac = game._deferred_startup_uac;
-            game._deferred_startup_uac = null;
-            apply_deferred_startup_wear();
-        }
-        // Any other key: override dismissed (already null)
-        game.context.move = 0;
         return;
     }
 

@@ -32,7 +32,6 @@ import {
     newsym, queue_more_prompt, pline, flush_screen, clear_pending_message,
     docrt, refresh_swallowed_overlay, serialize_terminal_grid, append_pline, see_monsters,
     show_glyph_cell, terrain_glyph, topline_can_pack_message,
-    showSerializedOverrideScreen as show_serialized_override_basic,
 } from './display.js';
 import { nhgetch } from './input.js';
 import { clear_path, cansee, couldsee, vision_reset, vision_recalc } from './vision.js';
@@ -165,7 +164,6 @@ function render_more_pager_screen_basic(text) {
 }
 
 function show_quest_leader_pager_basic(screen, cursor, action = '') {
-    show_serialized_override_basic(screen, cursor);
     game._latched_more_screen = screen;
     game._latched_more_cursor = [cursor[0], cursor[1], 1];
     game._latched_more_keep_until_dismiss = true;

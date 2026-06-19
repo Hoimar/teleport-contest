@@ -1764,16 +1764,7 @@ export function renderTextScreen(display, screen, cursor = null) {
     }
 }
 
-function renderOverrideScreen(display, screen) {
-    const cursor = game._override_cursor
-        || game._latched_more_cursor
-        || (game._override_serialized_persistent ? game._override_serialized_cursor : null);
-    renderTextScreen(display, screen, cursor);
-}
-
 function activeSerializedTextScreen() {
-    if ((game._override_screen || game._override_serialized_persistent)
-        && game._override_serialized_screen) return game._override_serialized_screen;
     if (game._startup_legacy_pager_active && game._startup_legacy_pager_screen)
         return game._startup_legacy_pager_screen;
     if (game._tutorial_prompt_active && game._tutorial_prompt_screen)
@@ -1853,33 +1844,6 @@ export function installSerializedScreenHook(display = game.nhDisplay) {
     term.serialize = () => activeSerializedTextScreen() || originalSerialize();
 }
 
-export function showOverrideScreen(screen, cursor) {
-    game._override_serialized_screen = null;
-    game._override_serialized_cursor = null;
-    game._override_screen = screen;
-    game._override_cursor = cursor ? [cursor[0], cursor[1], 1] : null;
-    if (game.nhDisplay && cursor) {
-        game.nhDisplay.cursorCol = cursor[0];
-        game.nhDisplay.cursorRow = cursor[1];
-    }
-}
-
-export function showSerializedOverrideScreen(screen, cursor) {
-    installSerializedScreenHook();
-    showOverrideScreen(screen, cursor);
-    game._override_serialized_screen = screen;
-    game._override_serialized_cursor = cursor ? [cursor[0], cursor[1], 1] : null;
-}
-
-export function clearOverrideScreenState() {
-    game._override_screen = null;
-    game._override_serialized_screen = null;
-    game._override_serialized_cursor = null;
-    game._override_serialized_persistent = false;
-    game._override_cursor = null;
-    game._override_prev = null;
-}
-
 function currentLatchedMoreScreen() {
     if (!game._latched_more_screen) return '';
     if (!game._latched_more_use_pending_topline || !game._pending_message) {
@@ -1903,7 +1867,8 @@ function _buildScreenOutput(options = {}) {
     const display = game?.nhDisplay;
     if (!display) return;
     if (game._latched_more_screen) {
-        renderOverrideScreen(display, currentLatchedMoreScreen());
+        const screen = currentLatchedMoreScreen();
+        renderTextScreen(display, screen, game._latched_more_cursor || null);
         return;
     }
     if (game._startup_legacy_pager_active && game._startup_legacy_pager_screen) {
@@ -2038,11 +2003,6 @@ function _buildScreenOutput(options = {}) {
         renderTextScreen(display, game._getpos_help_screen, game._getpos_help_cursor || null);
         return;
     }
-    if (game._override_screen) {
-        renderOverrideScreen(display, game._override_screen);
-        return;
-    }
-
     const fullMapRedraw = !!options.fullMap
         || !!game._swallowed_map_active
         || !!game._swallowed_latched_overlay;

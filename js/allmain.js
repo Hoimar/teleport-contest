@@ -2640,7 +2640,7 @@ async function refreshHallucinationDisplayAtInputBoundary(g) {
     // C tty menus read their selection inside select_menu(); while the menu
     // window is active, moveloop_core() has not resumed for the Hallucination
     // input-boundary redraw.
-    if (g._override_screen || g._startup_legacy_pager_active || g._tutorial_prompt_active
+    if (g._startup_legacy_pager_active || g._tutorial_prompt_active
         || g._spell_menu_active || g._spell_cast_menu_active
         || g._help_menu_active || g._help_text_active
         || g._options_window_active
