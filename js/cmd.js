@@ -19302,6 +19302,10 @@ function petCombatHitTopline(line) {
     return /^The (?:kitten|little dog|(?:saddled )?pony) (?:bites|hits|kicks|stings|butts|touches) .+[.!]$/.test(line || '');
 }
 
+function petDeathTopline(line) {
+    return /^The (?:kitten|little dog|(?:saddled )?pony) is (?:killed|destroyed)!$/.test(line || '');
+}
+
 function splitDeferredPetCombatTopline(line) {
     const msg = String(line || '');
     const match = /^(The (?:kitten|little dog|(?:saddled )?pony) (?:misses|bites|hits|kicks|stings|butts|touches) .+?[.!])  (The (?:kitten|little dog|(?:saddled )?pony) .+)$/.exec(msg);
@@ -20484,8 +20488,12 @@ async function handleQueuedMore(ch) {
             if (game._after_more_message) {
                 const ordinaryMonsterToplineDeferred = !!game._monster_topline_deferred;
                 const split = afterMoreSplit;
-                const msg = split?.first || game._after_more_message;
-                const rest = split?.rest || '';
+                let msg = split?.first || game._after_more_message;
+                let rest = split?.rest || '';
+                if (rest && petCombatHitTopline(msg) && topline_can_pack_message(msg, rest)) {
+                    msg = `${msg}  ${rest}`;
+                    rest = '';
+                }
                 const pendingPhysicalSplit = splitDeferredMonsterPhysicalTopline(dismissedTopline);
             // C refs: src/mhitm.c:mattackm(), src/mon.c:monkilled().
             // A deferred monster-vs-monster hit line blocks before visible
@@ -20791,6 +20799,13 @@ async function handleQueuedMore(ch) {
                 game._more_dismissals_remaining = 0;
                 if (pausedMonsterTurn) game._monster_attack_resume_behind_after_more = false;
             }
+            if (pausedMonsterTurn
+                && !needsPrompt
+                && !rest
+                && petDeathTopline(msg)
+                && !game._more
+                && !game._after_more_message)
+                resumeMonsterBehindNewMore = true;
         } else if (game._cloak_displacement_on_msg_pending) {
             const obj = game._cloak_displacement_on_msg_pending;
             game._cloak_displacement_on_msg_pending = null;
@@ -20813,6 +20828,8 @@ async function handleQueuedMore(ch) {
                 game._resume_movemon_after_mon = null;
             if (game._resume_tame_post_distfleeck === pending.target)
                 game._resume_tame_post_distfleeck = null;
+            if (pausedMonsterTurn && !game._more && !game._after_more_message)
+                resumeMonsterBehindNewMore = true;
         } else if (game._nomovemsg && !pausedMonsterTurn) {
             const msg = game._nomovemsg;
             game._nomovemsg = '';
@@ -20832,8 +20849,13 @@ async function handleQueuedMore(ch) {
             else
                 await pline('You hear the rumble of distant thunder...');
         }
-        if (!game._after_more_message)
-            await finish_deferred_monster_pet_hit();
+        const finishedDeferredMonsterPetHit = !game._after_more_message
+            && await finish_deferred_monster_pet_hit();
+        if (finishedDeferredMonsterPetHit
+            && pausedMonsterTurn
+            && !game._more
+            && !game._after_more_message)
+            resumeMonsterBehindNewMore = true;
         if (!game._more && game._deferred_pet_miss_passive) {
             game._deferred_pet_miss_passive = false;
             game._pet_combat_passive_paused = false;

@@ -1265,15 +1265,18 @@ function pet_combat_hit_topline(line) {
     return /^The (?:kitten|little dog|(?:saddled )?pony) (?:bites|hits|kicks|stings|butts|touches) .+/.test(line || '');
 }
 
-function monster_death_topline(line) {
-    return /^The .+ is (?:killed|destroyed)!$/.test(line || '');
-}
-
 async function append_topline_message(line) {
     game._last_pet_combat_line_deferred = false;
     if (game._pending_message?.startsWith('You start putting on ')) game._pending_message = '';
     if (game._pending_message) {
         if (game._more && !hallucinating()) {
+            if (pet_combat_hit_topline(game._pending_message)
+                && topline_can_pack_message(game._pending_message, line)) {
+                game._pending_message = `${game._pending_message}  ${line}`;
+                game._last_topline_message = game._pending_message;
+                game._pet_miss_prompt_after_resume = false;
+                return;
+            }
             if (game._pet_combat_more_latched || pet_combat_hit_topline(game._pending_message)) {
                 game._after_more_message = game._after_more_message
                     ? `${game._after_more_message}  ${line}`
@@ -1321,8 +1324,7 @@ async function append_topline_message(line) {
             return;
         }
         if (pet_combat_hit_topline(game._pending_message) && !hallucinating()) {
-            if (monster_death_topline(line)
-                && topline_can_pack_message(game._pending_message, line)) {
+            if (topline_can_pack_message(game._pending_message, line)) {
                 game._pending_message = `${game._pending_message}  ${line}`;
                 game._last_topline_message = game._pending_message;
                 game._pet_combat_more_latched = false;
@@ -1382,6 +1384,14 @@ async function append_topline_message(line) {
             game._occupation_paused_for_more = true;
         }
     } else {
+        if (game._after_more_message
+            && pet_combat_hit_topline(line)
+            && topline_can_pack_message(line, game._after_more_message)
+            && !hallucinating()) {
+            line = `${line}  ${game._after_more_message}`;
+            game._after_more_message = '';
+            game._after_more_needs_prompt = false;
+        }
         await pline(line);
         if (game._resuming_monster_turn_after_more
             && pet_combat_hit_topline(line)
@@ -1512,6 +1522,13 @@ export async function finish_deferred_monster_pet_hit() {
     rn2(3);
     rn2(6);
     if (target.mhp < 1) {
+        if (game._resume_tame_post_distfleeck === target)
+            game._resume_tame_post_distfleeck = null;
+        if (game._resume_movemon_after_mon === target
+            && attacker
+            && game.level?.monsters?.includes(attacker)) {
+            game._resume_movemon_next_mon = attacker;
+        }
         await finish_pet_kill(attacker, target);
     } else {
         rn2(3);
@@ -2100,9 +2117,14 @@ async function pet_melee_hit(mtmp, target, attack) {
     rn2(6); // mhitm_knockback distance/side gate
     if (target.mhp < 1) {
         const killLine = pet_kill_line(target);
-        const killLineCanPack = !!game._pending_message && !game._more
-            && topline_can_pack_message(game._pending_message, killLine);
-        if ((game._more || (pending_pet_combat_boundary() && !killLineCanPack)) && !hallucinating()) {
+        const pendingLine = game._pending_message || '';
+        const killLineCanPack = !!pendingLine
+            && topline_can_pack_message(pendingLine, killLine);
+        const activePetHitCanPackKill = game._more
+            && pet_combat_hit_topline(pendingLine)
+            && killLineCanPack;
+        if (((game._more && !activePetHitCanPackKill)
+            || (pending_pet_combat_boundary() && !killLineCanPack)) && !hallucinating()) {
             if (!game._more && pending_pet_combat_boundary() && !killLineCanPack) {
                 game._pet_combat_pending_boundary = false;
                 queue_more_prompt();

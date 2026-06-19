@@ -7,25 +7,29 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 
 | Sessions | Buckets | Screens | RNG calls | Errors |
 | --- | --- | --- | --- | --- |
-| 44 | 7 | 9824/11405 | 659847/792838 | 0 |
+| 44 | 11 | 8689/11405 | 484133/792838 | 1 |
 
 ## Bucket Summary
 
 | Count | Phase | Canonical evidence | Subsystem hypothesis | Owner | Needs deeper debug |
 | --- | --- | --- | --- | --- | --- |
-| 38 | passing | seed0116-wizard-wear-shop | Pet behavior: dog_goal() object scan, reachability, carry checks, and object resistance in dogmove.c. | Monsters / pets | yes |
-| 1 | post-startup-live | seed0367-priest-quest-tour | Live command effects, movement, pet/monster behavior, or retained object/map state. | Commands / monsters / objects | no |
-| 1 | post-startup-live | seed0004-feeding-pony | Mixed live-state divergence spanning display, status, messages, or command side effects. | Display / command dispatch | yes |
-| 1 | post-startup-live | seed0006-wizard-water-demon | Live command effects, movement, pet/monster behavior, or retained object/map state. | Commands / monsters / objects | no |
-| 1 | post-startup-live | seed0014-dequa-fountain-explore | Live command effects, movement, pet/monster behavior, or retained object/map state. | Commands / monsters / objects | no |
-| 1 | post-startup-live | seed0007-rogue-snake-swamp | Mixed live-state divergence spanning display, status, messages, or command side effects. | Display / command dispatch | yes |
-| 1 | post-startup-live | seed0009-swimmer-mforce | Mixed live-state divergence spanning display, status, messages, or command side effects. | Display / command dispatch | yes |
+| 34 | passing | seed0116-wizard-wear-shop | Pet behavior: dog_goal() object scan, reachability, carry checks, and object resistance in dogmove.c. | Monsters / pets | yes |
+| 1 | early-startup | seed0360-wizard-world-tour | Chargen, role/race/gender/align selection, options parsing, or early startup RNG ordering. | Player initialization / options | yes |
+| 1 | post-startup-live | seed5006-tourist-stress-disaster | Mixed live-state divergence spanning display, status, messages, or command side effects. | Display / command dispatch | yes |
+| 1 | post-startup-live | seed0361-archeologist-tour | Live command effects, movement, pet/monster behavior, or retained object/map state. | Commands / monsters / objects | no |
+| 1 | post-startup-live | seed0108-wizard-extcmd-wishlist | Live command effects, movement, pet/monster behavior, or retained object/map state. | Commands / monsters / objects | no |
+| 1 | post-startup-live | seed4500-knight-coverage | Mixed live-state divergence spanning display, status, messages, or command side effects. | Display / command dispatch | yes |
+| 1 | post-startup-live | seed0007-rogue-snake-swamp | Message buffer, prompt/menu lifecycle, or command dispatch timing after startup. | Messages / command dispatch | no |
+| 1 | post-startup-live | seed0030-ten-diverse-deaths | Live command effects, movement, pet/monster behavior, or retained object/map state. | Commands / monsters / objects | no |
+| 1 | post-startup-live | seed0009-swimmer-mforce | Live command effects, movement, pet/monster behavior, or retained object/map state. | Commands / monsters / objects | no |
+| 1 | post-startup-live | seed2200-wizard-quaff-zap-read | Live command effects, movement, pet/monster behavior, or retained object/map state. | Commands / monsters / objects | no |
+| 1 | post-startup-live | seed0399-wizard-hallu-actions | Live command effects, movement, pet/monster behavior, or retained object/map state. | Commands / monsters / objects | no |
 
 ## Bucket Details
 
 ### passing: seed0116-wizard-wear-shop
 
-- Count: 38
+- Count: 34
 - Bucket key: `passing | FS=pass | FR=none | none/none | - | rows=-`
 - Canonical screens: 127/127
 - Canonical RNG: 12562/12562
@@ -35,91 +39,147 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 - Hypothesis: Pet behavior: dog_goal() object scan, reachability, carry checks, and object resistance in dogmove.c.
 - Next owner: Monsters / pets
 - Needs deeper debug: yes
-- Sessions: seed0002-healer-reflection-drummer, seed0012-monk-vault-escort, seed0013-friday13-save-then-fullmoon-restore, seed0013-rogue-friday13-combat, seed0015-valk-level2-pit-dog-wait, seed0016-healer-newmoon-eat-zap, seed0017-samurai-altar-pray, seed0030-ten-diverse-deaths, seed0060-orc-rogue-kick-search, seed0077-rogue-chargen, seed0101-ranger-quiver-throw-travel-engrave, seed0102-ranger-name-cancel, seed0103-knight-ride-pony, seed0104-knight-ride-combat, seed0105-valk-chat-lamp-ration, seed0106-priest-extcmd-sweep, seed0107-samurai-twoweapon-enhance, seed0108-wizard-extcmd-wishlist, seed0116-wizard-wear-shop, seed0200-monk-north-search, seed0360-wizard-world-tour, seed0361-archeologist-tour, seed0373-barbarian-quest-tour, seed0383-wizard-hallucinate, seed0398-wizard-wandpoly-pile, seed0399-wizard-hallu-actions, seed0501-priest-cast-read-turn, seed0700-samurai-explore-descend, seed0900-tourist-explore-actions, seed1150-caveman-explore-move, seed1500-rogue-explore-move, seed1800-tourist-eat-throw, seed2200-wizard-quaff-zap-read, seed2600-wizard-custom-binds, seed4500-knight-coverage, seed5002-wizard-coverage-pair, seed5006-tourist-stress-disaster, seed8000-tourist-starter
+- Sessions: seed0002-healer-reflection-drummer, seed0004-feeding-pony, seed0006-wizard-water-demon, seed0012-monk-vault-escort, seed0013-friday13-save-then-fullmoon-restore, seed0013-rogue-friday13-combat, seed0014-dequa-fountain-explore, seed0015-valk-level2-pit-dog-wait, seed0016-healer-newmoon-eat-zap, seed0017-samurai-altar-pray, seed0060-orc-rogue-kick-search, seed0077-rogue-chargen, seed0101-ranger-quiver-throw-travel-engrave, seed0102-ranger-name-cancel, seed0103-knight-ride-pony, seed0104-knight-ride-combat, seed0105-valk-chat-lamp-ration, seed0106-priest-extcmd-sweep, seed0107-samurai-twoweapon-enhance, seed0116-wizard-wear-shop, seed0200-monk-north-search, seed0367-priest-quest-tour, seed0373-barbarian-quest-tour, seed0383-wizard-hallucinate, seed0398-wizard-wandpoly-pile, seed0501-priest-cast-read-turn, seed0700-samurai-explore-descend, seed0900-tourist-explore-actions, seed1150-caveman-explore-move, seed1500-rogue-explore-move, seed1800-tourist-eat-throw, seed2600-wizard-custom-binds, seed5002-wizard-coverage-pair, seed8000-tourist-starter
 
-### post-startup-live: seed0367-priest-quest-tour
-
-- Count: 1
-- Bucket key: `post-startup-live | FS=203 | FR=>1200 | char/map | rnd(4)=>rn2(4) | rows=1,2,3,4,5,6+15`
-- Canonical screens: 221/324
-- Canonical RNG: 4951/50125
-- First screen mismatch: 203 (char/map, rows 1,2,3,4,5,6+15)
-- First RNG mismatch: 4869 (rnd(4)=>rn2(4))
-- Sample cells: [1,0] ch  /8 -> ·/8; [1,1] ch  /8 -> ·/8; [1,2] ch  /8 -> ·/8; [1,3] ch  /8 -> ·/8; [1,4] ch  /8 -> ·/8
-- Hypothesis: Live command effects, movement, pet/monster behavior, or retained object/map state.
-- Next owner: Commands / monsters / objects
-- Needs deeper debug: no
-- Sessions: seed0367-priest-quest-tour
-
-### post-startup-live: seed0004-feeding-pony
+### early-startup: seed0360-wizard-world-tour
 
 - Count: 1
-- Bucket key: `post-startup-live | FS=7 | FR=0-250 | char+attr/mixed | rn2(13)=>rn2(2) | rows=0,1,2,4,5,6+10`
-- Canonical screens: 7/409
-- Canonical RNG: 153/12084
-- First screen mismatch: 7 (char+attr/mixed, rows 0,1,2,4,5,6+10)
-- First RNG mismatch: 0 (rn2(13)=>rn2(2))
-- Sample cells: [0,0] ch  /8 -> A/8; [0,1] ch  /8 -> l/8; [0,2] ch  /8 -> o/8; [0,3] ch  /8 -> h/8; [0,4] ch  /8 -> a/8
+- Bucket key: `early-startup | FS=0 | FR=0-250 | char/mixed | rn2(2)=>null | rows=0,2,3,4,5,6+11`
+- Canonical screens: 0/833
+- Canonical RNG: 0/120639
+- First screen mismatch: 0 (char/mixed, rows 0,2,3,4,5,6+11)
+- First RNG mismatch: 0 (rn2(2)=>null)
+- Sample cells: [0,23] ch I/8 ->  /8; [0,24] ch t/8 ->  /8; [0,26] ch i/8 ->  /8; [0,27] ch s/8 ->  /8; [0,29] ch w/8 ->  /8
+- Hypothesis: Chargen, role/race/gender/align selection, options parsing, or early startup RNG ordering.
+- Next owner: Player initialization / options
+- Needs deeper debug: yes
+- Sessions: seed0360-wizard-world-tour
+
+### post-startup-live: seed5006-tourist-stress-disaster
+
+- Count: 1
+- Bucket key: `post-startup-live | FS=127 | FR=>1200 | char/mixed | rn2(41)=>rn2(19) | rows=0,23`
+- Canonical screens: 131/249
+- Canonical RNG: 8545/13923
+- First screen mismatch: 127 (char/mixed, rows 0,23)
+- First RNG mismatch: 8438 (rn2(41)=>rn2(19))
+- Sample cells: [0,57] ch  /8 -> -/8; [0,58] ch  /8 -> -/8; [0,59] ch  /8 -> M/8; [0,60] ch  /8 -> o/8; [0,61] ch  /8 -> r/8
 - Hypothesis: Mixed live-state divergence spanning display, status, messages, or command side effects.
 - Next owner: Display / command dispatch
 - Needs deeper debug: yes
-- Sessions: seed0004-feeding-pony
+- Sessions: seed5006-tourist-stress-disaster
 
-### post-startup-live: seed0006-wizard-water-demon
+### post-startup-live: seed0361-archeologist-tour
 
 - Count: 1
-- Bucket key: `post-startup-live | FS=77 | FR=>1200 | char/map | rn2(1)=>rnd(22) | rows=9`
-- Canonical screens: 111/123
-- Canonical RNG: 6735/6736
-- First screen mismatch: 77 (char/map, rows 9)
-- First RNG mismatch: 6735 (rn2(1)=>rnd(22))
-- Sample cells: [9,62] ch #/8 -> I/8
+- Bucket key: `post-startup-live | FS=182 | FR=>1200 | char/map | rn2(24)=>rn2(32) | rows=1,2,3,4,5,6+4`
+- Canonical screens: 262/366
+- Canonical RNG: 22551/53865
+- First screen mismatch: 182 (char/map, rows 1,2,3,4,5,6+4)
+- First RNG mismatch: 22093 (rn2(24)=>rn2(32))
+- Sample cells: [1,0] ch  /8 -> m/8; [1,1] ch  /8 -> y/8; [1,2] ch ·/8 ->  /8; [1,3] ch ·/8 -> m/8; [1,4] ch ·/8 -> o/8
 - Hypothesis: Live command effects, movement, pet/monster behavior, or retained object/map state.
 - Next owner: Commands / monsters / objects
 - Needs deeper debug: no
-- Sessions: seed0006-wizard-water-demon
+- Sessions: seed0361-archeologist-tour
 
-### post-startup-live: seed0014-dequa-fountain-explore
+### post-startup-live: seed0108-wizard-extcmd-wishlist
 
 - Count: 1
-- Bucket key: `post-startup-live | FS=8 | FR=>1200 | char/map | rn2(7)=>rn2(12) | rows=2,9`
-- Canonical screens: 8/714
-- Canonical RNG: 3066/59178
-- First screen mismatch: 8 (char/map, rows 2,9)
-- First RNG mismatch: 2956 (rn2(7)=>rn2(12))
-- Sample cells: [2,57] ch f/8 -> </8; [2,58] ch e/8 -> g/8; [2,59] ch m/8 -> e/8; [2,60] ch a/8 -> n/8; [2,61] ch l/8 -> d/8
+- Bucket key: `post-startup-live | FS=235 | FR=none | char/map | - | rows=17,18`
+- Canonical screens: 301/303
+- Canonical RNG: 16958/16958
+- First screen mismatch: 235 (char/map, rows 17,18)
+- First RNG mismatch: - (-)
+- Sample cells: [17,40] ch f/15 -> ./8; [18,39] ch ./8 -> f/15
 - Hypothesis: Live command effects, movement, pet/monster behavior, or retained object/map state.
 - Next owner: Commands / monsters / objects
 - Needs deeper debug: no
-- Sessions: seed0014-dequa-fountain-explore
+- Sessions: seed0108-wizard-extcmd-wishlist
+
+### post-startup-live: seed4500-knight-coverage
+
+- Count: 1
+- Bucket key: `post-startup-live | FS=237 | FR=>1200 | char+attr/mixed | rn2(3)=>rn2(19) | rows=0,2,4,5,6,7+16`
+- Canonical screens: 746/1814
+- Canonical RNG: 52801/108275
+- First screen mismatch: 237 (char+attr/mixed, rows 0,2,4,5,6,7+16)
+- First RNG mismatch: 52674 (rn2(3)=>rn2(19))
+- Sample cells: [0,0] ch S/8 ->  /8; [0,1] ch e/8 -> O/8; [0,2] ch t/8 -> p/8; [0,3] ch  /8 -> t/8; [0,4] ch f/8 -> i/8
+- Hypothesis: Mixed live-state divergence spanning display, status, messages, or command side effects.
+- Next owner: Display / command dispatch
+- Needs deeper debug: yes
+- Sessions: seed4500-knight-coverage
 
 ### post-startup-live: seed0007-rogue-snake-swamp
 
 - Count: 1
-- Bucket key: `post-startup-live | FS=8 | FR=0-250 | char+attr/mixed | rn2(13)=>rn2(2) | rows=0,1,2,4,5,6+8`
-- Canonical screens: 8/302
-- Canonical RNG: 239/16373
-- First screen mismatch: 8 (char+attr/mixed, rows 0,1,2,4,5,6+8)
-- First RNG mismatch: 0 (rn2(13)=>rn2(2))
-- Sample cells: [0,0] ch  /8 -> A/8; [0,1] ch  /8 -> l/8; [0,2] ch  /8 -> o/8; [0,3] ch  /8 -> h/8; [0,4] ch  /8 -> a/8
-- Hypothesis: Mixed live-state divergence spanning display, status, messages, or command side effects.
-- Next owner: Display / command dispatch
-- Needs deeper debug: yes
+- Bucket key: `post-startup-live | FS=257 | FR=none | message/message | - | rows=0`
+- Canonical screens: 301/302
+- Canonical RNG: 16373/16373
+- First screen mismatch: 257 (message/message, rows 0)
+- First RNG mismatch: - (-)
+- Sample cells: [0,0] ch W/8 ->  /8; [0,1] ch h/8 ->  /8; [0,2] ch e/8 ->  /8; [0,3] ch r/8 ->  /8; [0,4] ch e/8 ->  /8
+- Hypothesis: Message buffer, prompt/menu lifecycle, or command dispatch timing after startup.
+- Next owner: Messages / command dispatch
+- Needs deeper debug: no
 - Sessions: seed0007-rogue-snake-swamp
+
+### post-startup-live: seed0030-ten-diverse-deaths
+
+- Count: 1
+- Bucket key: `post-startup-live | FS=29 | FR=>1200 | char/map | rn2(20)=>rn2(16) | rows=18,19`
+- Canonical screens: 1914/1953
+- Canonical RNG: 17059/105529
+- First screen mismatch: 29 (char/map, rows 18,19)
+- First RNG mismatch: 13949 (rn2(20)=>rn2(16))
+- Sample cells: [18,46] ch ·/8 -> f/15; [19,46] ch f/15 -> %/11
+- Hypothesis: Live command effects, movement, pet/monster behavior, or retained object/map state.
+- Next owner: Commands / monsters / objects
+- Needs deeper debug: no
+- Sessions: seed0030-ten-diverse-deaths
 
 ### post-startup-live: seed0009-swimmer-mforce
 
 - Count: 1
-- Bucket key: `post-startup-live | FS=9 | FR=0-250 | char/mixed | rn2(13)=>rn2(2) | rows=0,1,2,4,5,6+8`
-- Canonical screens: 9/73
-- Canonical RNG: 74/3713
-- First screen mismatch: 9 (char/mixed, rows 0,1,2,4,5,6+8)
-- First RNG mismatch: 0 (rn2(13)=>rn2(2))
-- Sample cells: [0,0] ch  /8 -> A/8; [0,1] ch  /8 -> l/8; [0,2] ch  /8 -> o/8; [0,3] ch  /8 -> h/8; [0,4] ch  /8 -> a/8
-- Hypothesis: Mixed live-state divergence spanning display, status, messages, or command side effects.
-- Next owner: Display / command dispatch
-- Needs deeper debug: yes
+- Bucket key: `post-startup-live | FS=31 | FR=none | char/map | - | rows=10`
+- Canonical screens: 36/73
+- Canonical RNG: 3713/3713
+- First screen mismatch: 31 (char/map, rows 10)
+- First RNG mismatch: - (-)
+- Sample cells: [10,6] ch ─/8 -> │/8
+- Hypothesis: Live command effects, movement, pet/monster behavior, or retained object/map state.
+- Next owner: Commands / monsters / objects
+- Needs deeper debug: no
 - Sessions: seed0009-swimmer-mforce
+
+### post-startup-live: seed2200-wizard-quaff-zap-read
+
+- Count: 1
+- Bucket key: `post-startup-live | FS=35 | FR=none | char/map | - | rows=2,3,4,5,6,7+7`
+- Canonical screens: 206/230
+- Canonical RNG: 3018/3018
+- First screen mismatch: 35 (char/map, rows 2,3,4,5,6,7+7)
+- First RNG mismatch: - (-)
+- Sample cells: [2,39] ch ─/8 ->  /8; [2,40] ch ─/8 -> //8; [2,41] ch ─/8 ->  /8; [2,42] ch ─/8 -> -/8; [2,43] ch ┐/8 ->  /8
+- Hypothesis: Live command effects, movement, pet/monster behavior, or retained object/map state.
+- Next owner: Commands / monsters / objects
+- Needs deeper debug: no
+- Sessions: seed2200-wizard-quaff-zap-read
+
+### post-startup-live: seed0399-wizard-hallu-actions
+
+- Count: 1
+- Bucket key: `post-startup-live | FS=42 | FR=>1200 | char/map | rn2(5)=>rn2(75) | rows=2,3,4,5,6,7+13`
+- Canonical screens: 42/532
+- Canonical RNG: 3979/11409
+- First screen mismatch: 42 (char/map, rows 2,3,4,5,6,7+13)
+- First RNG mismatch: 3965 (rn2(5)=>rn2(75))
+- Sample cells: [2,16] ch  /8 -> ┌/8; [2,17] ch  /8 -> ─/8; [2,18] ch  /8 -> ─/8; [2,19] ch  /8 -> ─/8; [2,59] ch ─/8 ->  /8
+- Hypothesis: Live command effects, movement, pet/monster behavior, or retained object/map state.
+- Next owner: Commands / monsters / objects
+- Needs deeper debug: no
+- Sessions: seed0399-wizard-hallu-actions
 
 ## Known Live Blockers
 
@@ -134,18 +194,18 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 | Session | Screens | RNG | Phase | First screen | First RNG | Rows | Samples |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | seed0002-healer-reflection-drummer | 595/595 | 27158/27158 | passing | -:none:none:- | -:- | - | - |
-| seed0004-feeding-pony | 7/409 | 153/12084 | post-startup-live | 7:char+attr:mixed:y | 0:rn2(13)=>rn2(2) | 0,1,2,4,5,6+10 | [0,0] ch  /8 -> A/8; [0,1] ch  /8 -> l/8; [0,2] ch  /8 -> o/8; [0,3] ch  /8 -> h/8; [0,4] ch  /8 -> a/8 |
-| seed0006-wizard-water-demon | 111/123 | 6735/6736 | post-startup-live | 77:char:map:H | 6735:rn2(1)=>rnd(22) | 9 | [9,62] ch #/8 -> I/8 |
-| seed0007-rogue-snake-swamp | 8/302 | 239/16373 | post-startup-live | 8:char+attr:mixed:y | 0:rn2(13)=>rn2(2) | 0,1,2,4,5,6+8 | [0,0] ch  /8 -> A/8; [0,1] ch  /8 -> l/8; [0,2] ch  /8 -> o/8; [0,3] ch  /8 -> h/8; [0,4] ch  /8 -> a/8 |
-| seed0009-swimmer-mforce | 9/73 | 74/3713 | post-startup-live | 9:char:mixed:y | 0:rn2(13)=>rn2(2) | 0,1,2,4,5,6+8 | [0,0] ch  /8 -> A/8; [0,1] ch  /8 -> l/8; [0,2] ch  /8 -> o/8; [0,3] ch  /8 -> h/8; [0,4] ch  /8 -> a/8 |
+| seed0004-feeding-pony | 409/409 | 12084/12084 | passing | -:none:none:- | -:- | - | - |
+| seed0006-wizard-water-demon | 123/123 | 6736/6736 | passing | -:none:none:- | -:- | - | - |
+| seed0007-rogue-snake-swamp | 301/302 | 16373/16373 | post-startup-live | 257:message:message:. | -:- | 0 | [0,0] ch W/8 ->  /8; [0,1] ch h/8 ->  /8; [0,2] ch e/8 ->  /8; [0,3] ch r/8 ->  /8; [0,4] ch e/8 ->  /8 |
+| seed0009-swimmer-mforce | 36/73 | 3713/3713 | post-startup-live | 31:char:map:j | -:- | 10 | [10,6] ch ─/8 -> │/8 |
 | seed0012-monk-vault-escort | 308/308 | 13878/13878 | passing | -:none:none:- | -:- | - | - |
 | seed0013-friday13-save-then-fullmoon-restore | 99/99 | 4804/4804 | passing | -:none:none:- | -:- | - | - |
 | seed0013-rogue-friday13-combat | 59/59 | 4838/4838 | passing | -:none:none:- | -:- | - | - |
-| seed0014-dequa-fountain-explore | 8/714 | 3066/59178 | post-startup-live | 8:char:map:v | 2956:rn2(7)=>rn2(12) | 2,9 | [2,57] ch f/8 -> </8; [2,58] ch e/8 -> g/8; [2,59] ch m/8 -> e/8; [2,60] ch a/8 -> n/8; [2,61] ch l/8 -> d/8 |
+| seed0014-dequa-fountain-explore | 714/714 | 59178/59178 | passing | -:none:none:- | -:- | - | - |
 | seed0015-valk-level2-pit-dog-wait | 44/44 | 8563/8563 | passing | -:none:none:- | -:- | - | - |
 | seed0016-healer-newmoon-eat-zap | 36/36 | 3656/3656 | passing | -:none:none:- | -:- | - | - |
 | seed0017-samurai-altar-pray | 67/67 | 3465/3465 | passing | -:none:none:- | -:- | - | - |
-| seed0030-ten-diverse-deaths | 1953/1953 | 105529/105529 | passing | -:none:none:- | -:- | - | - |
+| seed0030-ten-diverse-deaths | 1914/1953 | 17059/105529 | post-startup-live | 29:char:map:Space | 13949:rn2(20)=>rn2(16) | 18,19 | [18,46] ch ·/8 -> f/15; [19,46] ch f/15 -> %/11 |
 | seed0060-orc-rogue-kick-search | 41/41 | 3626/3626 | passing | -:none:none:- | -:- | - | - |
 | seed0077-rogue-chargen | 33/33 | 3242/3242 | passing | -:none:none:- | -:- | - | - |
 | seed0101-ranger-quiver-throw-travel-engrave | 27/27 | 2371/2371 | passing | -:none:none:- | -:- | - | - |
@@ -155,25 +215,25 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 | seed0105-valk-chat-lamp-ration | 30/30 | 2499/2499 | passing | -:none:none:- | -:- | - | - |
 | seed0106-priest-extcmd-sweep | 267/267 | 4194/4194 | passing | -:none:none:- | -:- | - | - |
 | seed0107-samurai-twoweapon-enhance | 98/98 | 2902/2902 | passing | -:none:none:- | -:- | - | - |
-| seed0108-wizard-extcmd-wishlist | 303/303 | 16958/16958 | passing | -:none:none:- | -:- | - | - |
+| seed0108-wizard-extcmd-wishlist | 301/303 | 16958/16958 | post-startup-live | 235:char:map:y | -:- | 17,18 | [17,40] ch f/15 -> ./8; [18,39] ch ./8 -> f/15 |
 | seed0116-wizard-wear-shop | 127/127 | 12562/12562 | passing | -:none:none:- | -:- | - | - |
 | seed0200-monk-north-search | 40/40 | 3822/3822 | passing | -:none:none:- | -:- | - | - |
-| seed0360-wizard-world-tour | 833/833 | 120639/120639 | passing | -:none:none:- | -:- | - | - |
-| seed0361-archeologist-tour | 366/366 | 53865/53865 | passing | -:none:none:- | -:- | - | - |
-| seed0367-priest-quest-tour | 221/324 | 4951/50125 | post-startup-live | 203:char:map:z | 4869:rnd(4)=>rn2(4) | 1,2,3,4,5,6+15 | [1,0] ch  /8 -> ·/8; [1,1] ch  /8 -> ·/8; [1,2] ch  /8 -> ·/8; [1,3] ch  /8 -> ·/8; [1,4] ch  /8 -> ·/8 |
+| seed0360-wizard-world-tour | 0/833 | 0/120639 | early-startup | 0:char:mixed:init | 0:rn2(2)=>null | 0,2,3,4,5,6+11 | [0,23] ch I/8 ->  /8; [0,24] ch t/8 ->  /8; [0,26] ch i/8 ->  /8; [0,27] ch s/8 ->  /8; [0,29] ch w/8 ->  /8 |
+| seed0361-archeologist-tour | 262/366 | 22551/53865 | post-startup-live | 182:char:map:Enter | 22093:rn2(24)=>rn2(32) | 1,2,3,4,5,6+4 | [1,0] ch  /8 -> m/8; [1,1] ch  /8 -> y/8; [1,2] ch ·/8 ->  /8; [1,3] ch ·/8 -> m/8; [1,4] ch ·/8 -> o/8 |
+| seed0367-priest-quest-tour | 324/324 | 50125/50125 | passing | -:none:none:- | -:- | - | - |
 | seed0373-barbarian-quest-tour | 124/124 | 35386/35386 | passing | -:none:none:- | -:- | - | - |
 | seed0383-wizard-hallucinate | 219/219 | 16915/16915 | passing | -:none:none:- | -:- | - | - |
 | seed0398-wizard-wandpoly-pile | 87/87 | 3026/3026 | passing | -:none:none:- | -:- | - | - |
-| seed0399-wizard-hallu-actions | 532/532 | 11409/11409 | passing | -:none:none:- | -:- | - | - |
+| seed0399-wizard-hallu-actions | 42/532 | 3979/11409 | post-startup-live | 42:char:map:e | 3965:rn2(5)=>rn2(75) | 2,3,4,5,6,7+13 | [2,16] ch  /8 -> ┌/8; [2,17] ch  /8 -> ─/8; [2,18] ch  /8 -> ─/8; [2,19] ch  /8 -> ─/8; [2,59] ch ─/8 ->  /8 |
 | seed0501-priest-cast-read-turn | 28/28 | 2238/2238 | passing | -:none:none:- | -:- | - | - |
 | seed0700-samurai-explore-descend | 51/51 | 3230/3230 | passing | -:none:none:- | -:- | - | - |
 | seed0900-tourist-explore-actions | 84/84 | 2983/2983 | passing | -:none:none:- | -:- | - | - |
 | seed1150-caveman-explore-move | 51/51 | 3137/3137 | passing | -:none:none:- | -:- | - | - |
 | seed1500-rogue-explore-move | 40/40 | 2768/2768 | passing | -:none:none:- | -:- | - | - |
 | seed1800-tourist-eat-throw | 26/26 | 2458/2458 | passing | -:none:none:- | -:- | - | - |
-| seed2200-wizard-quaff-zap-read | 230/230 | 3018/3018 | passing | -:none:none:- | -:- | - | - |
+| seed2200-wizard-quaff-zap-read | 206/230 | 3018/3018 | post-startup-live | 35:char:map:/ | -:- | 2,3,4,5,6,7+7 | [2,39] ch ─/8 ->  /8; [2,40] ch ─/8 -> //8; [2,41] ch ─/8 ->  /8; [2,42] ch ─/8 -> -/8; [2,43] ch ┐/8 ->  /8 |
 | seed2600-wizard-custom-binds | 38/38 | 11647/11647 | passing | -:none:none:- | -:- | - | - |
-| seed4500-knight-coverage | 1814/1814 | 108275/108275 | passing | -:none:none:- | -:- | - | - |
+| seed4500-knight-coverage | 746/1814 | 52801/108275 | post-startup-live | 237:char+attr:mixed:a | 52674:rn2(3)=>rn2(19) | 0,2,4,5,6,7+16 | [0,0] ch S/8 ->  /8; [0,1] ch e/8 -> O/8; [0,2] ch t/8 -> p/8; [0,3] ch  /8 -> t/8; [0,4] ch f/8 -> i/8 |
 | seed5002-wizard-coverage-pair | 410/410 | 12167/12167 | passing | -:none:none:- | -:- | - | - |
-| seed5006-tourist-stress-disaster | 249/249 | 13923/13923 | passing | -:none:none:- | -:- | - | - |
+| seed5006-tourist-stress-disaster | 131/249 | 8545/13923 | post-startup-live | 127:char:mixed:Space | 8438:rn2(41)=>rn2(19) | 0,23 | [0,57] ch  /8 -> -/8; [0,58] ch  /8 -> -/8; [0,59] ch  /8 -> M/8; [0,60] ch  /8 -> o/8; [0,61] ch  /8 -> r/8 |
 | seed8000-tourist-starter | 23/23 | 3130/3130 | passing | -:none:none:- | -:- | - | - |
