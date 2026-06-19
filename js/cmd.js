@@ -16976,6 +16976,30 @@ function clearEnhanceSkillsScreen() {
     game._enhance_skills_cursor = null;
 }
 
+function setDiscoveryWindowScreen(screen, cursor) {
+    installSerializedScreenHook();
+    clearOverrideScreen();
+    game._discovery_screen = screen;
+    game._discovery_cursor = cursor ? [cursor[0], cursor[1]] : null;
+    game._discovery_window_active = true;
+    if (game.nhDisplay && cursor) {
+        if (typeof game.nhDisplay.setCursor === 'function')
+            game.nhDisplay.setCursor(cursor[0], cursor[1]);
+        else {
+            game.nhDisplay.cursorCol = cursor[0];
+            game.nhDisplay.cursorRow = cursor[1];
+        }
+    }
+}
+
+function clearDiscoveryWindowScreen() {
+    game._discovery_window_active = false;
+    game._discovery_screen = null;
+    game._discovery_cursor = null;
+    game._discovery_pages = null;
+    game._discovery_page = 0;
+}
+
 async function handleDisclosureWindowInput() {
     const kind = game._disclosure_window_kind || '';
     clearDisclosureWindowScreen();
@@ -17003,6 +17027,21 @@ async function handleNameMenuInput(ch) {
     if (ch === 'a') await beginAnnotatePrompt();
     else if (ch === 'i' || ch === 'y') await beginNameInventoryPrompt();
     else game.context.move = 0;
+}
+
+async function handleDiscoveryWindowInput(ch) {
+    const dismiss = ch === ' ' || ch === '\r' || ch === '\n';
+    const pages = Array.isArray(game._discovery_pages) ? game._discovery_pages : [];
+    const page = game._discovery_page || 0;
+    if (dismiss && page + 1 < pages.length) {
+        game._discovery_page = page + 1;
+        setDiscoveryWindowScreen(pages[game._discovery_page], [8, 23]);
+    } else {
+        clearDiscoveryWindowScreen();
+        clearOverrideScreen();
+        await redrawAfterFullScreenMenuDismiss();
+    }
+    game.context.move = 0;
 }
 
 function currentFruitName() {
@@ -26029,6 +26068,11 @@ export async function rhack(key) {
         return;
     }
 
+    if (game._discovery_window_active) {
+        await handleDiscoveryWindowInput(ch);
+        return;
+    }
+
     if (game._tutorial_prompt_active) {
         await handleTutorialPromptInput(ch);
         return;
@@ -29155,23 +29199,6 @@ export async function rhack(key) {
             game.context.move = 0;
             return;
         }
-        if (prev === game._discovery_screen) {
-            const dismiss = ch === ' ' || ch === '\r' || ch === '\n';
-            const pages = Array.isArray(game._discovery_pages) ? game._discovery_pages : [];
-            const page = game._discovery_page || 0;
-            if (dismiss && page + 1 < pages.length) {
-                game._discovery_page = page + 1;
-                game._discovery_screen = pages[game._discovery_page];
-                showOverride(game._discovery_screen, [8, 23]);
-            } else {
-                game._discovery_screen = null;
-                game._discovery_pages = null;
-                game._discovery_page = 0;
-                await redrawAfterFullScreenMenuDismiss();
-            }
-            game.context.move = 0;
-            return;
-        }
         if (prev === game._look_data_screen
             || prev === game._look_list_screen
             || (prev === game._attributes_page1_screen && key !== 32 && key !== 13)
@@ -29582,8 +29609,7 @@ export async function rhack(key) {
     } else if (ch === '\\') {
         game.context.move = 0;
         const screen = discoveriesScreen();
-        game._discovery_screen = screen;
-        showOverride(screen, [8, 23]);
+        setDiscoveryWindowScreen(screen, [8, 23]);
     } else if (key === 24) { // ^X
         game.context.move = 0;
         const screens = buildAttributesScreens();
