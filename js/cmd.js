@@ -17000,6 +17000,36 @@ function clearDiscoveryWindowScreen() {
     game._discovery_page = 0;
 }
 
+function setAttributesWindowScreen(screen, cursor) {
+    installSerializedScreenHook();
+    clearOverrideScreen();
+    game._attributes_screen = screen;
+    game._attributes_cursor = cursor ? [cursor[0], cursor[1]] : null;
+    game._attributes_window_active = true;
+    if (game.nhDisplay && cursor) {
+        if (typeof game.nhDisplay.setCursor === 'function')
+            game.nhDisplay.setCursor(cursor[0], cursor[1]);
+        else {
+            game.nhDisplay.cursorCol = cursor[0];
+            game.nhDisplay.cursorRow = cursor[1];
+        }
+    }
+}
+
+function clearAttributesWindowScreen() {
+    game._attributes_window_active = false;
+    game._attributes_screen = null;
+    game._attributes_cursor = null;
+    game._attributes_page1_screen = null;
+    game._attributes_page2_screen = null;
+    game._attributes_page3_screen = null;
+    game._attributes_page = 0;
+}
+
+function attributesWindowCursor(screen) {
+    return [9, Math.max(0, String(screen || '').split('\n').length - 1)];
+}
+
 async function handleDisclosureWindowInput() {
     const kind = game._disclosure_window_kind || '';
     clearDisclosureWindowScreen();
@@ -17038,6 +17068,62 @@ async function handleDiscoveryWindowInput(ch) {
         setDiscoveryWindowScreen(pages[game._discovery_page], [8, 23]);
     } else {
         clearDiscoveryWindowScreen();
+        clearOverrideScreen();
+        await redrawAfterFullScreenMenuDismiss();
+    }
+    game.context.move = 0;
+}
+
+async function handleAttributesWindowInput(key) {
+    // C ref: src/insight.c:doattributes() -> win/tty/wintty.c:tty_display_nhwindow().
+    const advance = key === 32 || key === 13;
+    const escape = key === 27;
+    const page = game._attributes_page || 1;
+
+    if (page === 1) {
+        if (advance && game._attributes_page2_screen) {
+            game._attributes_page = 2;
+            setAttributesWindowScreen(
+                game._attributes_page2_screen,
+                attributesWindowCursor(game._attributes_page2_screen),
+            );
+        } else {
+            clearAttributesWindowScreen();
+            clearOverrideScreen();
+            await redrawAfterFullScreenMenuDismiss();
+        }
+        game.context.move = 0;
+        return;
+    }
+
+    if (page === 2) {
+        if (!advance && !escape) {
+            setAttributesWindowScreen(
+                game._attributes_page2_screen,
+                attributesWindowCursor(game._attributes_page2_screen),
+            );
+        } else if (advance && game._attributes_page3_screen) {
+            game._attributes_page = 3;
+            setAttributesWindowScreen(
+                game._attributes_page3_screen,
+                attributesWindowCursor(game._attributes_page3_screen),
+            );
+        } else {
+            clearAttributesWindowScreen();
+            clearOverrideScreen();
+            await redrawAfterFullScreenMenuDismiss();
+        }
+        game.context.move = 0;
+        return;
+    }
+
+    if (!advance && !escape) {
+        setAttributesWindowScreen(
+            game._attributes_page3_screen,
+            attributesWindowCursor(game._attributes_page3_screen),
+        );
+    } else {
+        clearAttributesWindowScreen();
         clearOverrideScreen();
         await redrawAfterFullScreenMenuDismiss();
     }
@@ -26073,6 +26159,11 @@ export async function rhack(key) {
         return;
     }
 
+    if (game._attributes_window_active) {
+        await handleAttributesWindowInput(key);
+        return;
+    }
+
     if (game._tutorial_prompt_active) {
         await handleTutorialPromptInput(ch);
         return;
@@ -29179,45 +29270,14 @@ export async function rhack(key) {
             game.context.move = 0;
             return;
         }
-        if (prev === game._attributes_page2_screen && key !== 32 && key !== 13 && key !== 27) {
-            const row = Math.max(0, (game._attributes_page2_screen || '').split('\n').length - 1);
-            showOverride(game._attributes_page2_screen, [9, row]);
-            game.context.move = 0;
-            return;
-        }
-        if (prev === game._attributes_page2_screen
-            && game._attributes_page3_screen
-            && (key === 32 || key === 13)) {
-            const row = Math.max(0, (game._attributes_page3_screen || '').split('\n').length - 1);
-            showOverride(game._attributes_page3_screen, [9, row]);
-            game.context.move = 0;
-            return;
-        }
-        if (prev === game._attributes_page3_screen && key !== 32 && key !== 13 && key !== 27) {
-            const row = Math.max(0, (game._attributes_page3_screen || '').split('\n').length - 1);
-            showOverride(game._attributes_page3_screen, [9, row]);
-            game.context.move = 0;
-            return;
-        }
         if (prev === game._look_data_screen
-            || prev === game._look_list_screen
-            || (prev === game._attributes_page1_screen && key !== 32 && key !== 13)
-            || prev === game._attributes_page2_screen
-            || prev === game._attributes_page3_screen) {
+            || prev === game._look_list_screen) {
             game._look_data_screen = null;
             game._look_list_screen = null;
-            game._attributes_page1_screen = null;
-            game._attributes_page2_screen = null;
-            game._attributes_page3_screen = null;
             clearOverrideScreen();
             await redrawAfterFullScreenMenuDismiss();
             game.context.move = 0;
             return;
-        }
-        if (prev === game._attributes_page1_screen && (key === 32 || key === 13)) {
-            // Space/Enter pages to second attributes page.
-            const row = Math.max(0, (game._attributes_page2_screen || '').split('\n').length - 1);
-            showOverride(game._attributes_page2_screen, [9, row]);
         }
         if (game._deferred_startup_uac != null) {
             game.u.uac = game._deferred_startup_uac;
@@ -29616,7 +29676,8 @@ export async function rhack(key) {
         game._attributes_page1_screen = screens.page1;
         game._attributes_page2_screen = screens.page2;
         game._attributes_page3_screen = screens.page3 || null;
-        showOverride(screens.page1, [9, 23]);
+        game._attributes_page = 1;
+        setAttributesWindowScreen(screens.page1, [9, C.TERMINAL_ROWS - 1]);
     } else if (key === 6 && (game.wizard || game.flags?.debug)) {
         // C ref: wizcmds.c:wiz_map() -> detect.c:do_mapping().
         map_level_for_wizard(true);

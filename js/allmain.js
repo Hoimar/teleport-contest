@@ -2652,6 +2652,7 @@ async function refreshHallucinationDisplayAtInputBoundary(g) {
         || g._name_menu_active
         || g._enhance_skills_active
         || g._discovery_window_active
+        || g._attributes_window_active
         || g._direction_help_active || g._getpos_help_active) return;
     if (!(g.u?.uhallucination || g.u?.uprops?.hallucination)) return;
     if (g.u?.uswallow && g.u?.ustuck && g._swallowed_map_active) {

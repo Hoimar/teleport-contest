@@ -13,7 +13,7 @@ and `feature_map.md`.
 ## Current State
 
 - Current branch in this workspace: `main`, ahead of origin.
-- Latest verified repair unit: discovery-window active-state retirement.
+- Latest verified repair unit: attributes-window active-state retirement.
 - Checked-in public corpus is exact: `44/44 S 11405/11405 R 792838/792838 C 0`.
 - Hosted public cache remains `public-session-drift` at
   `40/44 S 10417/10982 R 629747/840358 C 0`; leaderboard fetch failed.
@@ -32,6 +32,27 @@ and `feature_map.md`.
 ## Latest Loop Checkpoint
 
 - Latest verified WIP on 2026-06-19:
+  - Attributes-window override-state retirement:
+    `seed0383-wizard-hallucinate` remains exact
+    (`S 219/219 R 16915/16915 C 0`) and covers Hallucination-sensitive
+    `^X` page dismissal; focused guards `seed0360`, `seed4500`, `seed0116`,
+    and `seed0106` remained exact.
+  - Strict sentinel exact:
+    `5/5 S 1063/1063 R 64569/64569 C 0`.
+  - `verify --target seed0383-wizard-hallucinate` passed target, strict
+    sentinels, `hack:audit` (`hard=0 suspicious=11`), and `memory:lint`
+    (`issues=0`).
+  - Full corpus inventory: 44 passing sessions, checked-in public
+    `44/44 S 11405/11405 R 792838/792838 C 0`.
+  - Dehack truth:
+    - Normal `^X` attributes pages are active serialized attributes-window
+      state rendered by `display.js`, not generic `_override_prev` screens.
+    - Page advance, ignored page keys, and final dismissal are owned by
+      explicit attributes state.
+  - Next queue: remaining hack debt is `hard=0 suspicious=11`, dominated by
+    generic override-screen plumbing plus the forbidden-file replay comments.
+
+- Previous verified WIP on 2026-06-19:
   - Discovery-window override-state retirement:
     `seed0116-wizard-wear-shop` remains exact
     (`S 127/127 R 12562/12562 C 0`) and covers multi-page discoveries;
@@ -90,26 +111,6 @@ and `feature_map.md`.
       `display.js`, not a generic `_override_prev` screen.
     - Selection/cancel clears the active screen before the redraw and before
       annotation or inventory naming prompts.
-  - Next queue: remaining hack debt is `hard=0 suspicious=11`, dominated by
-    generic override-screen plumbing plus the forbidden-file replay comments.
-
-- Previous verified WIP on 2026-06-19:
-  - Intrinsic-menu override-state retirement:
-    `seed4500-knight-coverage` remains exact
-    (`S 1814/1814 R 108275/108275 C 0`) and covers `#wizintrinsic`;
-    hallucination guard `seed0383` remained exact.
-  - Strict sentinel exact:
-    `5/5 S 1063/1063 R 64569/64569 C 0`.
-  - `verify --target seed4500-knight-coverage` passed target, strict
-    sentinels, `hack:audit` (`hard=0 suspicious=11`), and `memory:lint`
-    (`issues=0`).
-  - Full corpus inventory: 44 passing sessions, checked-in public
-    `44/44 S 11405/11405 R 792838/792838 C 0`.
-  - Dehack truth:
-    - `#wizintrinsic` uses active serialized intrinsic-menu state rendered by
-      `display.js`; menu page/count/selection behavior stays in `_intrinsic_menu`.
-    - Commit/ESC clear the active screen before the redraw or selected
-      intrinsic side-effect messages.
   - Next queue: remaining hack debt is `hard=0 suspicious=11`, dominated by
     generic override-screen plumbing plus the forbidden-file replay comments.
 
