@@ -5048,7 +5048,40 @@ async function handleWizIdentifyMenuInput(ch) {
     game.context.move = 0;
 }
 
-async function showInventoryClassMenu(oclass) {
+function setInventoryPromptMenuScreen(screen, cursor, kind, letters = null) {
+    installSerializedScreenHook();
+    clearOverrideScreen();
+    game._inventory_prompt_menu_screen = screen;
+    game._inventory_prompt_menu_cursor = cursor ? [cursor[0], cursor[1]] : null;
+    game._inventory_prompt_menu_kind = kind || 'inventory';
+    game._inventory_prompt_menu_letters = letters || null;
+    game._inventory_prompt_menu_active = true;
+    if (game.nhDisplay && cursor) {
+        if (typeof game.nhDisplay.setCursor === 'function')
+            game.nhDisplay.setCursor(cursor[0], cursor[1]);
+        else {
+            game.nhDisplay.cursorCol = cursor[0];
+            game.nhDisplay.cursorRow = cursor[1];
+        }
+    }
+}
+
+function clearInventoryPromptMenuScreen() {
+    game._inventory_prompt_menu_active = false;
+    game._inventory_prompt_menu_screen = null;
+    game._inventory_prompt_menu_cursor = null;
+    game._inventory_prompt_menu_kind = '';
+    game._inventory_prompt_menu_letters = null;
+}
+
+async function dismissInventoryPromptMenuScreen() {
+    clearInventoryPromptMenuScreen();
+    clearOverrideScreen();
+    await redrawAfterFullScreenMenuDismiss();
+}
+
+async function showInventoryClassMenu(oclass, kind = 'inventory') {
+    // C refs: src/invent.c:getobj(), src/invent.c:display_pickinv().
     await flush_screen(1);
     const display = game.nhDisplay;
     if (!display?.terminal?.serialize && !display?.serialize) return;
@@ -5074,8 +5107,13 @@ async function showInventoryClassMenu(oclass) {
     }
     const lastRow = lines.length - 1;
     const cursorCol = menuCol + (lines[lastRow]?.text || '').length + 1;
-    const screen = serialize_terminal_grid(display);
-    showOverride(screen, [Math.min(cursorCol, COLNO - 1), lastRow]);
+    const screen = serializeBaseTerminalGrid(display);
+    setInventoryPromptMenuScreen(
+        screen,
+        [Math.min(cursorCol, COLNO - 1), lastRow],
+        kind,
+        entries.map((entry) => entry.obj?.invlet).filter(Boolean),
+    );
 }
 
 function buildApplyInventoryHelpLines(showAll = false) {
@@ -5099,6 +5137,7 @@ function buildApplyInventoryHelpLines(showAll = false) {
 async function showApplyInventoryHelpMenu(showAll = false) {
     // C refs: src/invent.c:getobj(), src/apply.c:apply_ok().  '?' shows the
     // suggested apply subset; '*' opens the full inventory picker.
+    clearInventoryPromptMenuScreen();
     clearOverrideScreen();
     clear_pending_message();
     await redrawAfterFullScreenMenuDismiss();
@@ -5114,10 +5153,16 @@ async function showApplyInventoryHelpMenu(showAll = false) {
         display.putstr(menuCol, row, line.text, NO_COLOR, line.heading ? ATR_INVERSE : 0);
     }
     const cursorCol = menuCol + (lines[lastRow]?.text || '').length + 1;
-    game._apply_inventory_help_menu = { showAll };
     game._awaiting_apply_item = true;
     game.context.move = 0;
-    showOverride(serialize_terminal_grid(display), [Math.min(cursorCol, COLNO - 1), lastRow]);
+    setInventoryPromptMenuScreen(
+        serializeBaseTerminalGrid(display),
+        [Math.min(cursorCol, COLNO - 1), lastRow],
+        'apply',
+        lines
+            .map((line) => line.text?.match(/^([A-Za-z$])\s-/)?.[1])
+            .filter(Boolean),
+    );
 }
 
 async function showTerrainMenu() {
@@ -22289,6 +22334,159 @@ async function handlePotionMenuInput(ch) {
     game.context.move = 0;
 }
 
+async function finishZapItemSelection(obj) {
+    if (!await zappableWand(obj)) {
+        game.context.move = 1;
+        await pline('Nothing happens.');
+        return;
+    }
+    if (await maybeBackfireWand(obj)) return;
+    if (obj.otyp === WAN_SECRET_DOOR_DETECTION) {
+        // C ref: zap.c:zapnodir() -> detect.c:findit().
+        exercise(A_WIS, true);
+        await pline("You don't find anything.");
+        learnWandFromUse(obj);
+        game.context.move = 1;
+        return;
+    }
+    game._awaiting_zap_direction = obj;
+    game.context.move = 0;
+    await showPromptLine('In what direction? ');
+}
+
+async function finishApplyObjectSelection(obj) {
+    if (obj.otyp === CREAM_PIE) {
+        // C refs: src/dothrow.c:throwit(), src/do.c:dowipe().
+        // Self-cream sets sticky-goop blindness until #wipe cleans it.
+        consumeInventoryObject(obj);
+        game.u = game.u || {};
+        const blindinc = rnd(25); // C ref: src/apply.c:use_cream_pie().
+        game.u.ucreamed = Math.max(game.u.ucreamed || 0, blindinc);
+        game.u.ublind = true;
+        game.u.uprops = game.u.uprops || {};
+        game.u.uprops.blind = Math.max(game.u.uprops.blind || 0, game.u.ucreamed);
+        game.u.uprops.blinded = Math.max(game.u.uprops.blinded || 0, game.u.ucreamed);
+        await docrt();
+        await plineWithMorePrompt('You immerse your face in the cream pie.');
+        game._more_message_queue = [
+            ...(game._more_message_queue || []),
+            { text: "You can't see through all the sticky goop on your face.", more: false },
+        ];
+        game._cream_pie_resist_after_more = obj;
+        game._pre_turn_more_waiting = true;
+        game._monster_turn_paused_for_more = true;
+        game.context.move = 1;
+        return;
+    }
+    if (obj.oclass !== TOOL_CLASS) {
+        game.context.move = 0;
+        await pline("Sorry, I don't know how to use that.");
+        return;
+    }
+    if (isContainerObject(obj)) {
+        // C refs: src/apply.c:doapply(), src/pickup.c:use_container().
+        const name = baseObjectName(obj) || 'container';
+        if ((obj.otyp === LARGE_BOX || obj.otyp === CHEST) && obj.olocked) {
+            void name;
+            await reportLockedContainerAndMaybeAutounlock(obj);
+            return;
+        }
+        showLootActionMenu(obj, false, { held: true });
+        game.context.move = 0;
+        return;
+    }
+    if (obj.otyp === EXPENSIVE_CAMERA || obj.otyp === STETHOSCOPE
+        || obj.otyp === LOCK_PICK || obj.otyp === CREDIT_CARD) {
+        game._awaiting_apply_direction = obj;
+        game.context.move = 0;
+        await showPromptLine('In what direction? ');
+        return;
+    }
+    if (obj.otyp === MAGIC_MARKER) {
+        game._awaiting_write_on_item = obj;
+        game.context.move = 0;
+        await showPromptLine('What do you want to write on? [*] ');
+        return;
+    }
+    if (obj.otyp === LEATHER_DRUM) {
+        await applyLeatherDrum();
+        return;
+    }
+    game.context.move = 0;
+    await pline('Nothing happens.');
+}
+
+function inventoryPromptMenuNoSelectionKey(ch) {
+    return ch === ' ' || ch === '\r' || ch === '\n';
+}
+
+async function showInventoryPromptAgain(kind) {
+    if (kind === 'read') {
+        game._awaiting_read_item = true;
+        await showPromptLine(`What do you want to read? [${readLetters()} or ?*] `);
+    } else if (kind === 'zap') {
+        const letters = zapLetters();
+        if (letters) {
+            game._awaiting_zap_item = true;
+            await showPromptLine(`What do you want to zap? [${letters} or ?*] `);
+        } else {
+            game._awaiting_zap_item = false;
+            await pline('You have nothing to zap.');
+        }
+    } else if (kind === 'apply') {
+        game._awaiting_apply_item = true;
+        await showPromptLine(`What do you want to use or apply? [${applyLetters()} or ?*] `);
+    }
+    game.context.move = 0;
+}
+
+async function cancelInventoryPromptMenu(kind) {
+    await dismissInventoryPromptMenuScreen();
+    if (kind === 'read') game._awaiting_read_item = false;
+    else if (kind === 'zap') game._awaiting_zap_item = false;
+    else if (kind === 'apply') game._awaiting_apply_item = false;
+    clear_pending_message();
+    game.context.move = 0;
+    await pline('Never mind.');
+}
+
+async function handleInventoryPromptMenuInput(ch) {
+    // C refs: src/invent.c:getobj()/display_pickinv(),
+    // win/tty/wintty.c:process_menu_window().
+    const kind = game._inventory_prompt_menu_kind || 'inventory';
+    const allowed = Array.isArray(game._inventory_prompt_menu_letters)
+        ? game._inventory_prompt_menu_letters
+        : [];
+    if (ch === '\x1b') {
+        await cancelInventoryPromptMenu(kind);
+        return;
+    }
+    if (inventoryPromptMenuNoSelectionKey(ch)) {
+        await dismissInventoryPromptMenuScreen();
+        clear_pending_message();
+        await showInventoryPromptAgain(kind);
+        return;
+    }
+    const idx = inventoryIndexForLetter(ch);
+    const obj = idx >= 0 ? game.inventory?.[idx] : null;
+    if (!obj || (allowed.length && !allowed.includes(ch))) {
+        game.context.move = 0;
+        return;
+    }
+    await dismissInventoryPromptMenuScreen();
+    clear_pending_message();
+    if (kind === 'read') {
+        game._awaiting_read_item = false;
+        await finishReadObjectSelection(obj, idx);
+    } else if (kind === 'zap') {
+        game._awaiting_zap_item = false;
+        await finishZapItemSelection(obj);
+    } else if (kind === 'apply') {
+        game._awaiting_apply_item = false;
+        await finishApplyObjectSelection(obj);
+    }
+}
+
 function actionMenuItemType(obj) {
     if (obj?.oclass === RING_CLASS) return 'ring';
     if (obj?.oclass === ARMOR_CLASS) return 'armor';
@@ -28731,6 +28929,11 @@ export async function rhack(key) {
         return;
     }
 
+    if (game._inventory_prompt_menu_active) {
+        await handleInventoryPromptMenuInput(ch);
+        return;
+    }
+
     if (game._awaiting_drink_item) {
         clear_pending_message();
         if (ch === '?' || ch === '*') {
@@ -29027,7 +29230,7 @@ export async function rhack(key) {
                 return;
             }
             game._awaiting_read_item = true;
-            await showInventoryClassMenu(SCROLL_CLASS);
+            await showInventoryClassMenu(SCROLL_CLASS, 'read');
             game.context.move = 0;
             return;
         }
@@ -29104,7 +29307,7 @@ export async function rhack(key) {
     if (game._awaiting_zap_item) {
         if (ch === '?' || ch === '*') {
             clear_pending_message();
-            await showInventoryClassMenu(WAND_CLASS);
+            await showInventoryClassMenu(WAND_CLASS, 'zap');
             game._awaiting_zap_item = true;
             game.context.move = 0;
             return;
@@ -29119,23 +29322,7 @@ export async function rhack(key) {
             await pline('Never mind.');
             return;
         }
-        if (!await zappableWand(obj)) {
-            game.context.move = 1;
-            await pline('Nothing happens.');
-            return;
-        }
-        if (await maybeBackfireWand(obj)) return;
-        if (obj.otyp === WAN_SECRET_DOOR_DETECTION) {
-            // C ref: zap.c:zapnodir() -> detect.c:findit().
-            exercise(A_WIS, true);
-            await pline("You don't find anything.");
-            learnWandFromUse(obj);
-            game.context.move = 1;
-            return;
-        }
-        game._awaiting_zap_direction = obj;
-        game.context.move = 0;
-        await showPromptLine('In what direction? ');
+        await finishZapItemSelection(obj);
         return;
     }
 
@@ -29362,24 +29549,6 @@ export async function rhack(key) {
     }
 
     if (game._awaiting_apply_item) {
-        const dismissedApplyHelp = !!game._apply_inventory_help_menu;
-        if (dismissedApplyHelp) {
-            game._apply_inventory_help_menu = null;
-            if (ch === '\x1b' || ch === 'q' || ch === 'Q' || ch === ' ') {
-                clearOverrideScreen();
-                await redrawAfterFullScreenMenuDismiss();
-                game._awaiting_apply_item = true;
-                game.context.move = 0;
-                await showPromptLine(`What do you want to use or apply? [${applyLetters()} or ?*] `);
-                return;
-            }
-            if (ch === '?' || ch === '*') {
-                await showApplyInventoryHelpMenu(ch === '*');
-                return;
-            }
-            clearOverrideScreen();
-            await redrawAfterFullScreenMenuDismiss();
-        }
         clear_pending_message();
         game._awaiting_apply_item = false;
         if (ch === '\x1b' || ch === ' ' || ch === '\r' || ch === '\n') {
@@ -29401,65 +29570,7 @@ export async function rhack(key) {
             queue_more_prompt();
             return;
         }
-        if (obj.otyp === CREAM_PIE) {
-            // C refs: src/dothrow.c:throwit(), src/do.c:dowipe().
-            // Self-cream sets sticky-goop blindness until #wipe cleans it.
-            consumeInventoryObject(obj);
-            game.u = game.u || {};
-            const blindinc = rnd(25); // C ref: src/apply.c:use_cream_pie().
-            game.u.ucreamed = Math.max(game.u.ucreamed || 0, blindinc);
-            game.u.ublind = true;
-            game.u.uprops = game.u.uprops || {};
-            game.u.uprops.blind = Math.max(game.u.uprops.blind || 0, game.u.ucreamed);
-            game.u.uprops.blinded = Math.max(game.u.uprops.blinded || 0, game.u.ucreamed);
-            await docrt();
-            await plineWithMorePrompt('You immerse your face in the cream pie.');
-            game._more_message_queue = [
-                ...(game._more_message_queue || []),
-                { text: "You can't see through all the sticky goop on your face.", more: false },
-            ];
-            game._cream_pie_resist_after_more = obj;
-            game._pre_turn_more_waiting = true;
-            game._monster_turn_paused_for_more = true;
-            game.context.move = 1;
-            return;
-        }
-        if (obj.oclass !== TOOL_CLASS) {
-            game.context.move = 0;
-            await pline("Sorry, I don't know how to use that.");
-            return;
-        }
-        if (isContainerObject(obj)) {
-            // C refs: src/apply.c:doapply(), src/pickup.c:use_container().
-            const name = baseObjectName(obj) || 'container';
-            if ((obj.otyp === LARGE_BOX || obj.otyp === CHEST) && obj.olocked) {
-                void name;
-                await reportLockedContainerAndMaybeAutounlock(obj);
-                return;
-            }
-            showLootActionMenu(obj, false, { held: true });
-            game.context.move = 0;
-            return;
-        }
-        if (obj.otyp === EXPENSIVE_CAMERA || obj.otyp === STETHOSCOPE
-            || obj.otyp === LOCK_PICK || obj.otyp === CREDIT_CARD) {
-            game._awaiting_apply_direction = obj;
-            game.context.move = 0;
-            await showPromptLine('In what direction? ');
-            return;
-        }
-        if (obj.otyp === MAGIC_MARKER) {
-            game._awaiting_write_on_item = obj;
-            game.context.move = 0;
-            await showPromptLine('What do you want to write on? [*] ');
-            return;
-        }
-        if (obj.otyp === LEATHER_DRUM) {
-            await applyLeatherDrum();
-            return;
-        }
-        game.context.move = 0;
-        await pline('Nothing happens.');
+        await finishApplyObjectSelection(obj);
         return;
     }
 

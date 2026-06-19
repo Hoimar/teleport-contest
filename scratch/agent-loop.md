@@ -13,7 +13,7 @@ and `feature_map.md`.
 ## Current State
 
 - Current branch in this workspace: `main`, ahead of origin.
-- Latest verified repair unit: herecmd menu active-state retirement.
+- Latest verified repair unit: inventory prompt menu active-state retirement.
 - Checked-in public corpus is exact: `44/44 S 11405/11405 R 792838/792838 C 0`.
 - Hosted public cache remains `public-session-drift` at
   `40/44 S 10417/10982 R 629747/840358 C 0`; leaderboard fetch failed.
@@ -32,106 +32,35 @@ and `feature_map.md`.
 ## Latest Loop Checkpoint
 
 - Latest verified WIP on 2026-06-19:
-  - Here-command menu override-state retirement:
-    `seed0108-wizard-extcmd-wishlist` remains exact
-    (`S 303/303 R 16958/16958 C 0`).
+  - Inventory prompt menu override-state retirement:
+    `seed2200-wizard-quaff-zap-read`, `seed5002-wizard-coverage-pair`,
+    `seed0012-monk-vault-escort`, `seed0108-wizard-extcmd-wishlist`, and
+    `seed4500-knight-coverage` remain exact.
   - Strict sentinel exact:
     `5/5 S 1063/1063 R 64569/64569 C 0`.
-  - `verify --target seed0108-wizard-extcmd-wishlist` passed target, strict
-    sentinels, `hack:audit` (`hard=0 suspicious=11`), and `memory:lint`
-    (`issues=0`).
-  - Full corpus inventory: 44 passing sessions, checked-in public
+  - Full checked-in corpus passed via `bash frozen/score.sh`:
     `44/44 S 11405/11405 R 792838/792838 C 0`.
+  - Initial sandboxed `npm run score` failed with `spawnSync node EPERM`;
+    rerunning through the approved scorer path outside the sandbox succeeded.
+  - Verification also covered `node --check js/cmd.js`, `git diff --check`,
+    and the focused `verify --target` guard set above.
   - Dehack truth:
-    - `#herecmdmenu` is active serialized here-command menu state rendered by
-      `display.js`, not a generic `_override_prev` screen.
-    - Dismissal clears active state and runs the same redraw boundary as the
-      previous implementation.
-  - Next queue: remaining hack debt is `hard=0 suspicious=11`, dominated by
-    generic override-screen plumbing plus the forbidden-file replay comments.
-
-- Previous verified WIP on 2026-06-19:
-  - Throw inventory menu override-state retirement:
-    `seed0108-wizard-extcmd-wishlist` remains exact
-    (`S 303/303 R 16958/16958 C 0`), with focused guards `seed0101`,
-    `seed1800`, `seed0399`, and `seed4500` exact.
-  - Strict sentinel exact:
-    `5/5 S 1063/1063 R 64569/64569 C 0`.
-  - `verify --target seed0108-wizard-extcmd-wishlist` passed target, strict
-    sentinels, `hack:audit` (`hard=0 suspicious=11`), and `memory:lint`
-    (`issues=0`).
-  - Full corpus inventory: 44 passing sessions, checked-in public
-    `44/44 S 11405/11405 R 792838/792838 C 0`.
-  - Dehack truth:
-    - Throw `?/*` inventory picker pages are active serialized throw-menu
-      state rendered by `display.js`, not generic `_override_prev` screens.
-    - Page switching clears stale active state before serializing the next
-      page so the active serialize hook cannot recapture the old page.
-  - Next queue: remaining hack debt is `hard=0 suspicious=11`, dominated by
-    generic override-screen plumbing plus the forbidden-file replay comments.
-
-- Previous verified WIP on 2026-06-19:
-  - Inventory action menu override-state retirement:
-    `seed0108-wizard-extcmd-wishlist` remains exact
-    (`S 303/303 R 16958/16958 C 0`), and regression guard
-    `seed5002-wizard-coverage-pair` remains exact
-    (`S 410/410 R 12167/12167 C 0`).
-  - Strict sentinel exact:
-    `5/5 S 1063/1063 R 64569/64569 C 0`.
-  - `verify --target seed0108-wizard-extcmd-wishlist` passed target, strict
-    sentinels, `hack:audit` (`hard=0 suspicious=11`), and `memory:lint`
-    (`issues=0`).
-  - Full corpus inventory: 44 passing sessions, checked-in public
-    `44/44 S 11405/11405 R 792838/792838 C 0`.
-  - Dehack truth:
-    - Context-sensitive inventory item action menus are active serialized
-      inventory-action state rendered by `display.js`, not generic
+    - `getobj()` inventory prompt menus for read, zap, and apply are active
+      serialized inventory-prompt state rendered by `display.js`, not generic
       `_override_prev` screens.
-    - Throw action destroys/redraws the menu before the shared direction
-      prompt, matching the `select_menu(PICK_ONE)` lifecycle.
-  - Next queue: remaining hack debt is `hard=0 suspicious=11`, dominated by
-    generic override-screen plumbing plus the forbidden-file replay comments.
-- Previous verified WIP on 2026-06-19:
-  - Death disclosure inventory/attributes override-state retirement:
-    `seed0030-ten-diverse-deaths` remains exact
-    (`S 1953/1953 R 105529/105529 C 0`) and covers broad death disclosure;
-    focused guards `seed0006`, `seed0007`, `seed0009`, and `seed0103`
-    remained exact.
-  - Strict sentinel exact:
-    `5/5 S 1063/1063 R 64569/64569 C 0`.
-  - `verify --target seed0030-ten-diverse-deaths` passed target, strict
-    sentinels, `hack:audit` (`hard=0 suspicious=11`), and `memory:lint`
-    (`issues=0`).
-  - Full corpus inventory: 44 passing sessions, checked-in public
-    `44/44 S 11405/11405 R 792838/792838 C 0`.
-  - Dehack truth:
-    - End-of-game inventory disclosure and final attributes pages are active
-      disclosure-window state rendered by `display.js`, not generic
-      `_override_prev` screens.
-    - Page/dismissal handling clears active state before the next death
-      disclosure prompt or page chain.
-  - Next queue: remaining hack debt is `hard=0 suspicious=11`, dominated by
-    generic override-screen plumbing plus the forbidden-file replay comments.
+    - `select_menu()` selection, cancellation, no-selection, and invalid-key
+      ownership stay inside explicit prompt-menu state until the tty redraw
+      boundary runs.
+  - Next queue: remaining `showOverride()` calls are loot contents More,
+    wizard dump/save terminal screens, and the generic latched-More fallback;
+    hack audit remains `hard=0 suspicious=11`.
 
 - Previous verified WIP on 2026-06-19:
-  - Wizidentify-menu override-state retirement:
-    `seed4500-knight-coverage` remains exact
-    (`S 1814/1814 R 108275/108275 C 0`) and covers the no-unidentified-item
-    `#wizidentify` menu/end-key path.
-  - Strict sentinel exact:
-    `5/5 S 1063/1063 R 64569/64569 C 0`.
-  - `verify --target seed4500-knight-coverage` passed target, strict
-    sentinels, `hack:audit` (`hard=0 suspicious=11`), and `memory:lint`
-    (`issues=0`).
+  - Here-command, loot, pay, inventory, potion, throw, inventory-action,
+    wizidentify, and death-disclosure menu/window overrides were retired into
+    active serialized state with checked-in corpus and strict sentinels exact.
   - Full corpus inventory: 44 passing sessions, checked-in public
     `44/44 S 11405/11405 R 792838/792838 C 0`.
-  - Dehack truth:
-    - `#wizidentify` is active serialized menu state rendered by
-      `display.js`, not a generic `_override_prev` screen.
-    - Valid selection, cancel/end keys, and invalid-key redisplay are owned
-      by explicit wizidentify menu state.
-  - Next queue: remaining hack debt is `hard=0 suspicious=11`, dominated by
-    generic override-screen plumbing plus the forbidden-file replay comments.
 
 - Older checkpoint history lives in git and `feature_map.md`; keep this file
   focused on the active loop state and next queue.

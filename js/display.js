@@ -1812,6 +1812,8 @@ function activeSerializedTextScreen() {
         return game._wizidentify_menu_screen;
     if (game._inventory_action_menu_active && game._inventory_action_menu_screen)
         return game._inventory_action_menu_screen;
+    if (game._inventory_prompt_menu_active && game._inventory_prompt_menu_screen)
+        return game._inventory_prompt_menu_screen;
     if (game._throw_inventory_menu_active) {
         if (game._throw_inventory_menu_page === 2 && game._throw_inventory_menu_page2_screen)
             return game._throw_inventory_menu_page2_screen;
@@ -1974,6 +1976,10 @@ function _buildScreenOutput(options = {}) {
     }
     if (game._inventory_action_menu_active && game._inventory_action_menu_screen) {
         renderTextScreen(display, game._inventory_action_menu_screen, game._inventory_action_menu_cursor || null);
+        return;
+    }
+    if (game._inventory_prompt_menu_active && game._inventory_prompt_menu_screen) {
+        renderTextScreen(display, game._inventory_prompt_menu_screen, game._inventory_prompt_menu_cursor || null);
         return;
     }
     if (game._throw_inventory_menu_active) {

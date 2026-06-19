@@ -2656,6 +2656,7 @@ async function refreshHallucinationDisplayAtInputBoundary(g) {
         || g._level_teleport_menu_active
         || g._wizidentify_menu_active
         || g._inventory_action_menu_active
+        || g._inventory_prompt_menu_active
         || g._throw_inventory_menu_active
         || g._potion_menu_active
         || g._inventory_menu_active
