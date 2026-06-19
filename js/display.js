@@ -1792,6 +1792,8 @@ function activeSerializedTextScreen() {
         return game._look_window_screen;
     if (game._travel_tip_screen_active && game._travel_tip_screen)
         return game._travel_tip_screen;
+    if (game._terrain_window_active && game._terrain_window_screen)
+        return game._terrain_window_screen;
     if (game._direction_help_active && game._direction_help_screen)
         return game._direction_help_screen;
     if (game._getpos_help_active && game._getpos_help_screen)
@@ -1894,6 +1896,10 @@ function _buildScreenOutput(options = {}) {
     }
     if (game._travel_tip_screen_active && game._travel_tip_screen) {
         renderTextScreen(display, game._travel_tip_screen, game._travel_tip_screen_cursor || null);
+        return;
+    }
+    if (game._terrain_window_active && game._terrain_window_screen) {
+        renderTextScreen(display, game._terrain_window_screen, game._terrain_window_cursor || null);
         return;
     }
     if (game._direction_help_active && game._direction_help_screen) {

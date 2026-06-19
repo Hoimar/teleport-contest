@@ -13,7 +13,7 @@ and `feature_map.md`.
 ## Current State
 
 - Current branch in this workspace: `main`, ahead of origin.
-- Latest verified repair unit: travel-tip active-state retirement.
+- Latest verified repair unit: terrain-window active-state retirement.
 - Checked-in public corpus is exact: `44/44 S 11405/11405 R 792838/792838 C 0`.
 - Hosted public cache remains `public-session-drift` at
   `40/44 S 10417/10982 R 629747/840358 C 0`; leaderboard fetch failed.
@@ -32,6 +32,27 @@ and `feature_map.md`.
 ## Latest Loop Checkpoint
 
 - Latest verified WIP on 2026-06-19:
+  - Terrain-window override-state retirement:
+    `seed0106-priest-extcmd-sweep` remains exact
+    (`S 267/267 R 4194/4194 C 0`) and covers terrain selector ESC
+    cancellation; `seed0013-friday13-save-then-fullmoon-restore` remains
+    exact (`S 99/99 R 4804/4804 C 0`) for terrain view/tip/Done paths.
+  - Strict sentinel exact:
+    `5/5 S 1063/1063 R 64569/64569 C 0`.
+  - `verify --target seed0106-priest-extcmd-sweep` passed target, strict
+    sentinels, `hack:audit` (`hard=0 suspicious=11`), and `memory:lint`
+    (`issues=0`).
+  - Full corpus inventory: 44 passing sessions, checked-in public
+    `44/44 S 11405/11405 R 792838/792838 C 0`.
+  - Dehack truth:
+    - `#terrain` selector, sanitized known-map view, and Done More frames are
+      active serialized terrain-window states rendered by `display.js`.
+    - Installing terrain active state clears stale generic override state, and
+      selector ESC cancellation requests a map redraw before the next capture.
+  - Next queue: remaining hack debt is `hard=0 suspicious=11`, dominated by
+    generic override-screen plumbing plus the forbidden-file replay comments.
+
+- Previous verified WIP on 2026-06-19:
   - Travel-tip override-state retirement:
     `seed0101-ranger-quiver-throw-travel-engrave` remains exact
     (`S 27/27 R 2371/2371 C 0`) and covers travel tip dismissal; focused
@@ -92,27 +113,6 @@ and `feature_map.md`.
     - Option overlays that rebuild from the terminal grid serialize through
       the base terminal serializer so the active serialize hook cannot return
       a stale previous option screen.
-  - Next queue: remaining hack debt is `hard=0 suspicious=11`, dominated by
-    generic override-screen plumbing plus the forbidden-file replay comments.
-
-- Previous verified WIP on 2026-06-19:
-  - Direction/getpos help override-state retirement:
-    `seed0360-wizard-world-tour` remains exact
-    (`S 833/833 R 120639/120639 C 0`) and covers getpos help dismissal;
-    invalid-direction sentinel `seed0002`, broad direction/getpos guard
-    `seed4500`, and help/farlook guard `seed2200` remained exact.
-  - Strict sentinel exact:
-    `5/5 S 1063/1063 R 64569/64569 C 0`.
-  - `verify --target seed0360-wizard-world-tour` passed target,
-    strict sentinels, `hack:audit` (`hard=0 suspicious=11`), and
-    `memory:lint` (`issues=0`).
-  - Full corpus inventory: 44 passing sessions, checked-in public
-    `44/44 S 11405/11405 R 792838/792838 C 0`.
-  - Dehack truth:
-    - Cmdassist invalid-direction help and getpos help are active serialized
-      `dmore()` screens rendered by `display.js`, not generic overrides.
-    - Dismissal clears More state and redraws the map at dismissal time before
-      follow-up `Never mind.` text or the restored getpos cursor prompt.
   - Next queue: remaining hack debt is `hard=0 suspicious=11`, dominated by
     generic override-screen plumbing plus the forbidden-file replay comments.
 

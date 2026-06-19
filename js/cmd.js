@@ -5113,7 +5113,7 @@ async function showTerrainMenu() {
     for (let row = 0; row <= 4; row++) display.putstr(0, row, ' '.repeat(COLNO), NO_COLOR, 0);
     display.putstr(menuCol - 1, 5, ' '.repeat(COLNO - (menuCol - 1)), NO_COLOR, 0);
     for (const line of lines) display.putstr(menuCol, line.row, line.text, NO_COLOR, line.attr || 0);
-    showOverride(serialize_terminal_grid(display), [menuCol + '(end)'.length + 1, 5]);
+    setTerrainWindowScreen(serializeBaseTerminalGrid(display), [menuCol + '(end)'.length + 1, 5]);
     game._awaiting_terrain_menu = true;
     game.context.move = 0;
 }
@@ -5124,8 +5124,7 @@ function terrainViewCursor() {
 
 function showTerrainView(message, cursor = terrainViewCursor()) {
     const screen = serialize_known_terrain_view_screen(message);
-    showSerializedOverride(screen, cursor);
-    game._override_serialized_persistent = true;
+    setTerrainWindowScreen(screen, cursor);
 }
 
 function showTerrainBrowsePrompt() {
@@ -16866,6 +16865,29 @@ function clearTravelTipScreen() {
     game._travel_tip_screen_cursor = null;
 }
 
+function setTerrainWindowScreen(screen, cursor) {
+    installSerializedScreenHook();
+    clearOverrideScreen();
+    game._terrain_window_screen = screen;
+    game._terrain_window_cursor = cursor ? [cursor[0], cursor[1]] : null;
+    game._terrain_window_active = true;
+    if (game.nhDisplay && cursor) {
+        if (typeof game.nhDisplay.setCursor === 'function')
+            game.nhDisplay.setCursor(cursor[0], cursor[1]);
+        else {
+            game.nhDisplay.cursorCol = cursor[0];
+            game.nhDisplay.cursorRow = cursor[1];
+        }
+    }
+}
+
+function clearTerrainWindowScreen({ redraw = false } = {}) {
+    game._terrain_window_active = false;
+    game._terrain_window_screen = null;
+    game._terrain_window_cursor = null;
+    if (redraw) game._full_map_redraw_pending = true;
+}
+
 function currentFruitName() {
     return String(game.flags?.fruit || 'slime mold');
 }
@@ -25816,7 +25838,7 @@ export async function rhack(key) {
             game._terrain_view_done_more = false;
             game._terrain_view_active = false;
             clear_pending_message();
-            clearOverrideScreen();
+            clearTerrainWindowScreen();
             await redrawAfterFullScreenMenuDismiss();
         }
         game.context.move = 0;
@@ -25830,6 +25852,7 @@ export async function rhack(key) {
             game._more = false;
             game._more_dismissals_remaining = 0;
             clear_pending_message();
+            clearTerrainWindowScreen();
             if (!getposTipSeen()) {
                 markGetposTipSeen();
                 game._travel_tip_active = 'terrain';
@@ -25857,16 +25880,20 @@ export async function rhack(key) {
 
     if (game._awaiting_terrain_menu) {
         game._awaiting_terrain_menu = false;
-        clearOverrideScreen();
         if (ch === 'a') {
+            clearTerrainWindowScreen();
             game._terrain_view_active = true;
             showTerrainView("Showing known terrain only...  (For instructions type a '?')");
         } else if (ch === ' ' || ch === '\r' || ch === '\n') {
+            clearTerrainWindowScreen();
             game._terrain_view_intro_more = true;
             const msg = 'Showing known terrain only...';
             showTerrainView(`${msg}--More--`, [msg.length + '--More--'.length, 0]);
             game._pending_message = msg;
             queue_more_prompt();
+        } else {
+            clearTerrainWindowScreen({ redraw: true });
+            await flush_screen(1);
         }
         game.context.move = 0;
         return;
