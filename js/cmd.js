@@ -16910,6 +16910,28 @@ function clearDisclosureWindowScreen() {
     game._disclosure_window_kind = '';
 }
 
+function setIntrinsicMenuScreen(screen, cursor) {
+    installSerializedScreenHook();
+    clearOverrideScreen();
+    game._intrinsic_menu_screen = screen;
+    game._intrinsic_menu_cursor = cursor ? [cursor[0], cursor[1]] : null;
+    game._intrinsic_menu_active = true;
+    if (game.nhDisplay && cursor) {
+        if (typeof game.nhDisplay.setCursor === 'function')
+            game.nhDisplay.setCursor(cursor[0], cursor[1]);
+        else {
+            game.nhDisplay.cursorCol = cursor[0];
+            game.nhDisplay.cursorRow = cursor[1];
+        }
+    }
+}
+
+function clearIntrinsicMenuScreen() {
+    game._intrinsic_menu_active = false;
+    game._intrinsic_menu_screen = null;
+    game._intrinsic_menu_cursor = null;
+}
+
 async function handleDisclosureWindowInput() {
     const kind = game._disclosure_window_kind || '';
     clearDisclosureWindowScreen();
@@ -19455,8 +19477,7 @@ function renderIntrinsicMenu(menu) {
         : ' (end)';
     lines.push(footer);
     const screen = lines.join('\n');
-    showSerializedOverride(screen, [footer.length, lines.length - 1]);
-    game._override_serialized_persistent = true;
+    setIntrinsicMenuScreen(screen, [footer.length, lines.length - 1]);
 }
 
 function beginIntrinsicMenu() {
@@ -21398,6 +21419,7 @@ async function commitIntrinsicMenuSelection(menu) {
     game._intrinsic_menu = null;
     // C refs: win/tty/wintty.c:tty_select_menu(), src/wizcmds.c:wiz_intrinsic().
     // The tty window is dismissed before selected intrinsics emit messages.
+    clearIntrinsicMenuScreen();
     clearOverrideScreen();
     await redrawAfterFullScreenMenuDismiss();
     if (!selected.length) {
@@ -27522,6 +27544,7 @@ export async function rhack(key) {
         }
         if (ch === '\x1b') {
             game._intrinsic_menu = null;
+            clearIntrinsicMenuScreen();
             clearOverrideScreen();
             await docrt();
             game.context.move = 0;
