@@ -14,6 +14,19 @@ Context note: this file is an index. Prefer `rg` by session id, subsystem, JS mo
 **Metric column:** "gates Y screens" means getting this right is expected to unlock Y screens across the public corpus.
 Treat screen totals as lagging evidence of subsystem progress, not as the optimization target.
 
+## Current Loop Addendum (2026-06-19)
+
+- **Hosted `seed5002-wizard-coverage-pair` death repair:** Restored the hosted
+  live-cache target from `S 293/297 R 12214/12214` to exact
+  (`S 297/297 R 12214/12214 C 0`) while checked-in `seed5002`
+  (`S 410/410 R 12167/12167`), death guard `seed0030`, and strict sentinels
+  remain exact. First-move deaths print `Do not pass Go.  Do not collect 200
+  zorkmids.` before accepted wizard-mode bones/disclosure flow; fatal fire-wand
+  self-bounces set the raw killer phrase and tombstone lines for a bolt of fire
+  zapped by the hero; one-move death and quit disclosures use singular `move`
+  (`C refs: src/end.c:done(), src/end.c:done_in_by()/outrip(),
+  src/zap.c:weffects()/zhitu()`).
+
 ## Current WIP Addendum (2026-06-06)
 
 - **Current verified WIP:** `seed0009-swimmer-mforce` is exact

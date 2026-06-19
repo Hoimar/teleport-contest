@@ -13,11 +13,12 @@ and `feature_map.md`.
 ## Current State
 
 - Current branch in this workspace: `main`, ahead of origin.
-- Latest verified repair unit: live/checked-in `seed0361` Fort Ludios and
-  quest-arrival completion.
+- Latest verified repair unit: live/checked-in `seed5002` first-move
+  wizard-death and fire self-zap tombstone completion.
 - Checked-in public corpus is exact: `44/44 S 11405/11405 R 792838/792838 C 0`.
-- Hosted public cache remains `public-session-drift` at
-  `40/44 S 10506/10982 R 715024/840358 C 0`; leaderboard fetch failed.
+- Last refreshed hosted public cache remained `public-session-drift` at
+  `41/44 S 10584/10982 R 762022/840358 C 0` before the focused seed5002
+  live-target repair; refresh after committing. Leaderboard fetch failed.
 - Scratch trace/checkpoint files are agent-toolkit state and may be committed
   when useful; keep production parity and scratch-tool commits coherent.
 - Strict sentinels are exact:
@@ -31,6 +32,36 @@ and `feature_map.md`.
   `frozen/`.
 
 ## Latest Loop Checkpoint
+
+- Latest verified WIP on 2026-06-19:
+  - Live `.cache` `seed5002-wizard-coverage-pair` is exact:
+    `S 297/297 R 12214/12214 C 0`, from the prior live frontier
+    `S 293/297 R 12214/12214`.
+  - Checked-in `seed5002-wizard-coverage-pair` remains exact:
+    `S 410/410 R 12167/12167 C 0`.
+  - Death-heavy guard `seed0030-ten-diverse-deaths` remains exact:
+    `S 1953/1953 R 105529/105529 C 0`.
+  - Strict sentinel exact:
+    `5/5 S 1063/1063 R 64569/64569 C 0`.
+  - Full checked-in corpus remains exact via `bash frozen/score.sh`:
+    `44/44 S 11405/11405 R 792838/792838 C 0`.
+  - Implementation truth:
+    - `end.c:done()` prints `Do not pass Go.  Do not collect 200 zorkmids.`
+      for deaths on move 1 before wizard-mode bones/disclosure prompts.
+    - Fatal fire-wand self-bounces carry the raw killer phrase and RIP lines
+      from the hero as zapper, matching the current `zap.c:weffects()` /
+      `zap.c:zhitu()` death path.
+    - Death/quit disclosure summaries use singular `move` for one-move runs.
+  - Regression classification: none; this was a hosted live screen-only repair
+    with unchanged RNG, while checked-in seed5002 and death-heavy guards remain
+    exact.
+  - Verification covered `node --check` for `js/cmd.js` and `js/allmain.js`,
+    live/checked-in `seed5002`, death guard `seed0030`, `sentinel:strict`,
+    `hack:audit`, `memory:lint`, `git diff --check`, and the full checked-in
+    public corpus.
+  - Next queue: refresh `parity:state -- --refresh-live` after committing;
+    remaining hosted-public frontiers before this repair were `seed0360` and
+    `seed0367`.
 
 - Latest verified WIP on 2026-06-19:
   - Live `.cache` `seed0361-archeologist-tour` is exact:
@@ -68,54 +99,6 @@ and `feature_map.md`.
     `memory:lint`, and `git diff --check` are clean.
   - Next queue: refresh `parity:state -- --refresh-live` after committing and
     choose the next live-public or hidden-session mismatch.
-
-- Latest verified WIP on 2026-06-19:
-  - Live `seed0360-wizard-world-tour` now reaches
-    `S 298/618 R 102204/133910` from the prior live frontier
-    `S 280/618 R 91652/133910`.
-  - Checked-in `seed0360` remains exact:
-    `S 833/833 R 120639/120639 C 0`.
-  - Strict sentinel exact:
-    `5/5 S 1063/1063 R 64569/64569 C 0`.
-  - Full checked-in corpus remains exact:
-    `44/44 S 11405/11405 R 792838/792838 C 0`.
-  - Implementation truth:
-    - `makemon()` now records `mvitals[].born`/`G_EXTINCT` through the
-      C-shaped `propagate()` birth limit path, so random-monster and class
-      generation skip extinct species unless the caller uses `G_IGNORE`.
-    - Initial shapeshifter `pick_nasty()` now resolves C enum-name nasties
-      such as `PM_ELVEN_MONARCH` through generated JS monster names and
-      applies the C demotion/genocide/out-of-place checks.
-    - Scratch RNG stack tooling can print focused `mkclass` and `fill_zoo`
-      traces for live-session frontier work.
-  - Current live frontier: seed0360 late special-room `fill_zoo()`/gold
-    creation at `FR 102039` (`rnd(2)`/`rn2(210)` order). A broad deferred
-    `mkgold(rn1(...))` helper was rejected because it regressed checked-in
-    Sokoban evidence at `FR 42526`; next work should reconcile placement,
-    occupancy, or session-provenance before changing this ordering.
-  - Verification covered `node --check` for `js/mklev.js` and
-    `js/monstats.js`, focused live/checked-in `verify`, `sentinel:strict`,
-    and the full checked-in public corpus.
-
-- Latest verified WIP on 2026-06-19:
-  - `seed0360-wizard-world-tour` special-level completion:
-    `S 833/833 R 120639/120639 C 0`.
-  - Strict sentinel exact:
-    `5/5 S 1063/1063 R 64569/64569 C 0`.
-  - Full checked-in corpus passed via `bash frozen/score.sh`:
-    `44/44 S 11405/11405 R 792838/792838 C 0`.
-  - Live/public refresh remains `public-session-drift` because hosted public
-    sessions differ from checked-in sessions; leaderboard fetch failed.
-  - Implementation truth covered Mines End Catacombs `minend-3`, Sokoban
-    first-try rock-thrower retry, live `mtmp->m_lev` weapon/offensive-item
-    gates, real shopkeeper carried inventory for Orcus cleanup, Juiblex SWAMP
-    finalization, Sanctum lregion/secret-door order, `light_region()` lit
-    border behavior, and ice/drawbridge terrain glyphs.
-  - Verification also covered `node --check` for `js/mklev.js` and
-    `js/display.js`, `verify --target seed0360`, `sentinel:strict`,
-    `hack:audit`, `memory:lint`, and `git diff --check`.
-  - Next queue: choose the next live-public or hidden-session mismatch from a
-    fresh `parity:state`/triage pass; checked-in public corpus is exact.
 
 - Previous dehack and seed0360 completion detail is in git, `feature_map.md`,
   and `lessons.md`; keep this live checkpoint focused on active frontiers.

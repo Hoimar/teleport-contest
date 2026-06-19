@@ -1317,6 +1317,8 @@ export async function newgame() {
     if (g.u.xray_range == null) g.u.xray_range = -1;
     g.u.uz = { dnum: 0, dlevel: 1 };
     g.flags = g.flags || {};
+    g._death_first_move_message_shown = false;
+    g._death_continue_after_first_move_more = false;
     // Branch placement fallback for paths that have not initialized full
     // dungeon topology; generated levels still need the dungeon exit and Mines
     // branch shape for branch predicates.

@@ -3475,6 +3475,11 @@ async function zapFireRayAtHero(dx, dy) {
     rn2(5);      // current burnarmor() body-hit evidence gate
     drawRayBeam(dx, dy);
     await pline('The bolt of fire bounces!  The bolt of fire hits you!');
+    const self = game.flags?.female ? 'herself' : 'himself';
+    game._death_killer_name = `killed by a bolt of fire zapped by ${self}`;
+    game._death_killer_format = 'raw';
+    game._death_tombstone_killer_lines = ['killed by a bolt', 'of fire zapped', `by ${self}`];
+    game._death_shopkeeper_killer = null;
     game._fire_wand_side_effect_pending = true;
     queue_more_prompt();
 }
@@ -3618,6 +3623,21 @@ async function showDeathSaveBonesPrompt() {
     const msg = 'Save bones? [yn] (n)';
     await showPromptLine(msg);
     game._prompt_cursor = [msg.length + 1, 0];
+}
+
+function firstMoveDeathMessageNeeded() {
+    return !game._death_first_move_message_shown
+        && (game.moves ?? 1) <= 1
+        && !game.done_stopprint;
+}
+
+async function showFirstMoveDeathMessage() {
+    // C ref: src/end.c:done().  Very early deaths print this line before
+    // bones/disclosure handling, including wizard-mode "Save bones?".
+    game._death_first_move_message_shown = true;
+    game._death_continue_after_first_move_more = true;
+    await pline('Do not pass Go.  Do not collect 200 zorkmids.');
+    queue_more_prompt();
 }
 
 async function continueAcceptedDeathFlow() {
@@ -3927,6 +3947,10 @@ function roleGoodbye(role) {
     }
 }
 
+function deathMoveCountText(moves) {
+    return `${moves} move${moves === 1 ? '' : 's'}`;
+}
+
 function deathTombstoneScreen() {
     // C refs: src/end.c:done_in_by()/really_done(), win/tty/wintty.c RIP.
     const name = game.plname || game.u?.name || 'Hero';
@@ -3997,7 +4021,7 @@ function deathTombstoneScreen() {
         `${roleGoodbye(game.urole)} ${name} the ${roleName}...`,
         '',
         `You ${endVerb} in ${dungeonName} on dungeon level ${depth} with ${score} points,`,
-        `and ${gold} pieces of gold, after ${moves} moves.`,
+        `and ${gold} pieces of gold, after ${deathMoveCountText(moves)}.`,
         `You were level ${level} with a maximum of ${maxhp} hit points when you ${endVerb}.`,
         '--More--',
     ];
@@ -4035,7 +4059,7 @@ function quitDisclosureScreen() {
     const lines = Array(24).fill('');
     lines[0] = `${roleGoodbye(game.urole)} ${name} the ${roleName}...`;
     lines[2] = `You quit in ${dungeonName} on dungeon level ${depth} with ${score} points,`;
-    lines[3] = `and ${gold} pieces of gold, after ${moves} moves.`;
+    lines[3] = `and ${gold} pieces of gold, after ${deathMoveCountText(moves)}.`;
     lines[4] = `You were level ${level} with a maximum of ${maxhp} hit points when you quit.`;
     lines[23] = '--More--';
     return lines.join('\n');
@@ -20401,6 +20425,13 @@ async function handleQueuedMore(ch) {
         game.context.move = 1;
         return true;
     } else if (await showPendingMonsterDeathMessage()) {
+    } else if (game._death_continue_after_first_move_more) {
+        game._death_continue_after_first_move_more = false;
+        game._more_dismissals_remaining = 0;
+        game._more = false;
+        await continueAcceptedDeathFlow();
+        game.context.move = 0;
+        return true;
     } else if (game._death_continue_after_shopkeeper_more) {
         game._death_continue_after_shopkeeper_more = false;
         game._more_dismissals_remaining = 0;
@@ -27331,6 +27362,11 @@ export async function rhack(key) {
                 game._death_shopkeeper_takes_name = '';
                 queue_more_prompt();
                 game._death_continue_after_shopkeeper_more = true;
+                game.context.move = 0;
+                return;
+            }
+            if (firstMoveDeathMessageNeeded()) {
+                await showFirstMoveDeathMessage();
                 game.context.move = 0;
                 return;
             }
