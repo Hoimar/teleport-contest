@@ -4977,6 +4977,28 @@ function buildWizIdentifyMenuLines() {
     return lines;
 }
 
+function setWizIdentifyMenuScreen(screen, cursor) {
+    installSerializedScreenHook();
+    clearOverrideScreen();
+    game._wizidentify_menu_screen = screen;
+    game._wizidentify_menu_cursor = cursor ? [cursor[0], cursor[1]] : null;
+    game._wizidentify_menu_active = true;
+    if (game.nhDisplay && cursor) {
+        if (typeof game.nhDisplay.setCursor === 'function')
+            game.nhDisplay.setCursor(cursor[0], cursor[1]);
+        else {
+            game.nhDisplay.cursorCol = cursor[0];
+            game.nhDisplay.cursorRow = cursor[1];
+        }
+    }
+}
+
+function clearWizIdentifyMenuScreen() {
+    game._wizidentify_menu_active = false;
+    game._wizidentify_menu_screen = null;
+    game._wizidentify_menu_cursor = null;
+}
+
 async function showWizIdentifyMenu() {
     // C refs: wizcmds.c:wiz_identify(), invent.c:display_inventory().
     await flush_screen(1);
@@ -4995,13 +5017,12 @@ async function showWizIdentifyMenu() {
     const lastRow = lines.length - 1;
     const cursorCol = menuCol + (lines[lastRow]?.text || '').length + 1;
     const screen = serialize_terminal_grid(display);
-    game._wizidentify_menu_screen = screen;
-    showOverride(screen, [Math.min(cursorCol, COLNO - 1), lastRow]);
+    setWizIdentifyMenuScreen(screen, [Math.min(cursorCol, COLNO - 1), lastRow]);
     game.context.move = 0;
 }
 
 async function dismissWizIdentifyMenu() {
-    game._wizidentify_menu_screen = null;
+    clearWizIdentifyMenuScreen();
     clearOverrideScreen();
     await redrawAfterFullScreenMenuDismiss();
     game.context.move = 0;
@@ -5009,7 +5030,7 @@ async function dismissWizIdentifyMenu() {
 
 async function handleWizIdentifyMenuInput(ch) {
     const entries = wizIdentifyInventoryEntries();
-    if (ch === '_' || ch.charCodeAt(0) === 9) {
+    if ((ch === '_' || ch.charCodeAt(0) === 9) && entries.length) {
         for (const entry of entries) fullyIdentifyObject(entry.obj);
         await dismissWizIdentifyMenu();
         return;
@@ -5020,7 +5041,12 @@ async function handleWizIdentifyMenuInput(ch) {
         await dismissWizIdentifyMenu();
         return;
     }
-    await dismissWizIdentifyMenu();
+    if (ch === '\x1b' || ch === ' ' || ch === '\r' || ch === '\n') {
+        await dismissWizIdentifyMenu();
+        return;
+    }
+    setWizIdentifyMenuScreen(game._wizidentify_menu_screen, game._wizidentify_menu_cursor);
+    game.context.move = 0;
 }
 
 async function showInventoryClassMenu(oclass) {
@@ -26243,6 +26269,11 @@ export async function rhack(key) {
         return;
     }
 
+    if (game._wizidentify_menu_active) {
+        await handleWizIdentifyMenuInput(ch);
+        return;
+    }
+
     if (game._tutorial_prompt_active) {
         await handleTutorialPromptInput(ch);
         return;
@@ -29145,10 +29176,6 @@ export async function rhack(key) {
         if (prev === game._death_attributes_page3_screen) {
             await showDeathCreaturesPrompt();
             game.context.move = 0;
-            return;
-        }
-        if (prev === game._wizidentify_menu_screen) {
-            await handleWizIdentifyMenuInput(ch);
             return;
         }
         if (prev === game._throw_inventory_menu_screen) {
