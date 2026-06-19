@@ -887,6 +887,12 @@ function goodpos(x, y, entflags = 0, ptr = null) {
     return true;
 }
 
+function enextoPtr(ptr) {
+    // C ref: teleport.c:enexto().  A null mdat is converted to a fake
+    // monster using the hero's original monster type before goodpos().
+    return ptr || monsterPtr(game.u?.umonster || 'HUMAN');
+}
+
 function rnd_nextto_goodpos_for_mon(mon, x, y) {
     // C ref: trap.c:rnd_nextto_goodpos().  Long-worm tail placement
     // shuffles all eight neighboring directions before picking the first
@@ -969,15 +975,16 @@ function makemon_rnd_goodpos(ptr, gpflags) {
 }
 
 export function enexto_core(cx, cy, ptr, entflags) {
+    const eptr = enextoPtr(ptr);
     const near = collect_coords(cx, cy, 3, 0, null);
     for (const cc of near)
-        if (goodpos(cc.x, cc.y, entflags, ptr)) return cc;
+        if (goodpos(cc.x, cc.y, entflags, eptr)) return cc;
 
     const all = collect_coords(cx, cy, 0, 0, null);
     for (let i = near.length; i < all.length; i++)
-        if (goodpos(all[i].x, all[i].y, entflags, ptr)) return all[i];
+        if (goodpos(all[i].x, all[i].y, entflags, eptr)) return all[i];
 
-    if ((entflags & 0x00200000) && goodpos(cx, cy, entflags, ptr)) return { x: cx, y: cy }; // GP_ALLOW_XY
+    if ((entflags & 0x00200000) && goodpos(cx, cy, entflags, eptr)) return { x: cx, y: cy }; // GP_ALLOW_XY
     return null;
 }
 
