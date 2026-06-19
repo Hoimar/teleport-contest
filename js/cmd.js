@@ -14,7 +14,6 @@ import {
     see_monsters, see_objects, see_nearby_objects, see_traps, refresh_warning_monsters, map_level_for_wizard,
     object_glyph_for_menu, serialize_known_terrain_view_screen, terrain_glyph, cls,
     unmap_invisible_memory, showOverrideScreen as showOverride,
-    showSerializedOverrideScreen as showSerializedOverride,
     clearOverrideScreenState as clearOverrideScreen, installSerializedScreenHook,
 } from './display.js';
 import { cansee, couldsee, vision_recalc, vision_reset } from './vision.js';
@@ -5095,6 +5094,30 @@ function setTerminalExitScreen(screen, cursor) {
             game.nhDisplay.cursorRow = cursor[1];
         }
     }
+}
+
+function setBonesUnlinkPromptScreen(screen, cursor) {
+    // C ref: src/bones.c:getbones(). The wizard unlink prompt is asked after
+    // getlev() but before goto_level() performs the destination docrt().
+    installSerializedScreenHook();
+    clearOverrideScreen();
+    game._bones_unlink_prompt_screen = screen;
+    game._bones_unlink_prompt_cursor = cursor ? [cursor[0], cursor[1]] : null;
+    game._bones_unlink_prompt_active = true;
+    if (game.nhDisplay && cursor) {
+        if (typeof game.nhDisplay.setCursor === 'function')
+            game.nhDisplay.setCursor(cursor[0], cursor[1]);
+        else {
+            game.nhDisplay.cursorCol = cursor[0];
+            game.nhDisplay.cursorRow = cursor[1];
+        }
+    }
+}
+
+function clearBonesUnlinkPromptScreen() {
+    game._bones_unlink_prompt_active = false;
+    game._bones_unlink_prompt_screen = null;
+    game._bones_unlink_prompt_cursor = null;
 }
 
 async function dismissInventoryPromptMenuScreen() {
@@ -27151,11 +27174,13 @@ export async function rhack(key) {
             // has been answered.
             const msg = 'Unlink bones? [yn] (n)';
             await showPromptLine(msg);
-            game._prompt_cursor = [msg.length + 1, 0];
+            const cursor = [msg.length + 1, 0];
+            game._prompt_cursor = cursor;
             if (promptScreen) {
-                showSerializedOverride(screenWithPromptLine(promptScreen, msg), [msg.length + 1, 0]);
+                setBonesUnlinkPromptScreen(screenWithPromptLine(promptScreen, msg), cursor);
+            } else {
+                game._bones_unlink_prompt_active = true;
             }
-            game._bones_unlink_prompt_active = true;
             game.context.move = 0;
             return;
         }
@@ -27184,8 +27209,7 @@ export async function rhack(key) {
     }
 
     if (game._bones_unlink_prompt_active) {
-        game._bones_unlink_prompt_active = false;
-        game._override_prev = null;
+        clearBonesUnlinkPromptScreen();
         clear_pending_message();
         if (ch === 'y' || ch === 'Y') delete_pending_bones_file();
         const pending = game._pending_level_teleport_after_bones || {};

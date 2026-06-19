@@ -13,7 +13,7 @@ and `feature_map.md`.
 ## Current State
 
 - Current branch in this workspace: `main`, ahead of origin.
-- Latest verified repair unit: death/quit final disclosure display-state retirement.
+- Latest verified repair unit: wizard getbones unlink prompt display-state retirement.
 - Checked-in public corpus is exact: `44/44 S 11405/11405 R 792838/792838 C 0`.
 - Hosted public cache remains `public-session-drift` at
   `40/44 S 10417/10982 R 629747/840358 C 0`; leaderboard fetch failed.
@@ -32,31 +32,33 @@ and `feature_map.md`.
 ## Latest Loop Checkpoint
 
 - Latest verified WIP on 2026-06-19:
-  - Death/quit final disclosure display-state retirement:
-    `seed0030-ten-diverse-deaths`, `seed0006-wizard-quit-disclose`,
-    `seed0007-rogue-snake-swamp`, `seed0103-knight-ride-pony`, and
-    `seed0398-wizard-wandpoly-pile` remain exact.
+  - Wizard getbones unlink prompt display-state retirement:
+    `seed5006-tourist-stress-disaster` remains exact.
   - Strict sentinel exact:
     `5/5 S 1063/1063 R 64569/64569 C 0`.
   - Full checked-in corpus passed via `bash frozen/score.sh`:
     `44/44 S 11405/11405 R 792838/792838 C 0`.
-  - Verification also covered `node --check js/cmd.js`, `git diff --check`,
-    and the focused `verify --target` guard set above.
+  - Verification also covered `triage -- seed5006`,
+    `screen:diff -- seed5006 --first`, `node --check js/cmd.js`,
+    `node --check js/display.js`, `node --check js/allmain.js`,
+    `git diff --check`, and `verify --target seed5006`.
   - Dehack truth:
-    - Tombstone, quit, and blank final-disclosure More frames are tty More
-      frames with latched screen/cursor state, not persistent generic override
-      screens.
-    - Final death top-ten and wizard/explore no-score-list output are terminal
-      exit screens rendered by active terminal-exit display state.
-  - Next queue: remaining direct serialized override user is the wizard bones
-    unlink prompt, plus generic override fallback/plumbing; hack audit remains
+    - The wizard `Unlink bones?` prompt is asked inside
+      `bones.c:getbones()` after the bones level has been read but before
+      `goto_level()` redraws the destination. JS keeps the previous prompt
+      screen with row 0 replaced via active bones-unlink prompt state, not
+      generic `_override_screen` state.
+  - Next queue: remaining command-side override use is the generic fallback
+    path and shared override plumbing; hack audit remains
     `hard=0 suspicious=11`.
 
 - Previous verified WIP on 2026-06-19:
-  - Loot contents More, terminal-exit screens, read/zap/apply inventory prompt
-    menus, here-command, loot, pay, inventory, potion, throw, inventory-action,
-    wizidentify, and death disclosure menu/window overrides were retired into
-    active or latched state with checked-in corpus and strict sentinels exact.
+  - Death/quit final disclosure, quest/post-arrival pager More, and loot
+    contents More overrides, terminal-exit screens, read/zap/apply inventory
+    prompt menus, here-command, loot, pay, inventory, potion, throw,
+    inventory-action, wizidentify, and death disclosure menu/window overrides
+    were retired into active or latched state with checked-in corpus and strict
+    sentinels exact.
   - Full corpus inventory: 44 passing sessions, checked-in public
     `44/44 S 11405/11405 R 792838/792838 C 0`.
 
