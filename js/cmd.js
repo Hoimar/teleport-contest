@@ -16788,6 +16788,35 @@ async function redrawAfterFullScreenMenuDismiss() {
     }
 }
 
+function setOptionsWindowScreen(screen, cursor) {
+    installSerializedScreenHook();
+    game._options_window_screen = screen;
+    game._options_window_cursor = cursor ? [cursor[0], cursor[1]] : null;
+    game._options_window_active = true;
+    if (game.nhDisplay && cursor) {
+        if (typeof game.nhDisplay.setCursor === 'function')
+            game.nhDisplay.setCursor(cursor[0], cursor[1]);
+        else {
+            game.nhDisplay.cursorCol = cursor[0];
+            game.nhDisplay.cursorRow = cursor[1];
+        }
+    }
+}
+
+function serializeOptionsWindowGrid(display = game.nhDisplay) {
+    const term = display?.terminal || display;
+    if (typeof term?._teleportSerializeBase === 'function')
+        return term._teleportSerializeBase();
+    return serialize_terminal_grid(display);
+}
+
+function clearOptionsWindowScreen({ redraw = false } = {}) {
+    game._options_window_active = false;
+    game._options_window_screen = null;
+    game._options_window_cursor = null;
+    if (redraw) game._full_map_redraw_pending = true;
+}
+
 function currentFruitName() {
     return String(game.flags?.fruit || 'slime mold');
 }
@@ -16894,7 +16923,7 @@ function renderPickupTypesMenu() {
         if (!rows[row]) continue;
         display.putstr(col, row, rows[row], NO_COLOR, row === 0 ? ATR_INVERSE : 0);
     }
-    showOverride(serialize_terminal_grid(display), [col + '(end)'.length + 1, 21]);
+    setOptionsWindowScreen(serializeOptionsWindowGrid(display), [col + '(end)'.length + 1, 21]);
 }
 
 async function beginPickupTypesMenu() {
@@ -16902,7 +16931,7 @@ async function beginPickupTypesMenu() {
         selected: pickupTypesSetFromString(game.flags?.pickup_types || ''),
         previous: String(game.flags?.pickup_types || ''),
     };
-    clearOverrideScreen();
+    clearOptionsWindowScreen();
     await redrawAfterFullScreenMenuDismiss();
     renderPickupTypesMenu();
 }
@@ -16916,13 +16945,13 @@ async function handlePickupTypesMenuKey(ch) {
         const returnToPlay = !!menu.returnToPlay;
         const returnToBasicOptions = !!menu.returnToBasicOptions;
         game._pickup_types_menu = null;
+        clearOptionsWindowScreen();
         if (returnToBasicOptions) {
             rerenderBasicOptionsFromFirstPage();
             game.context.move = 0;
             return true;
         }
         if (returnToPlay) {
-            clearOverrideScreen();
             await redrawAfterFullScreenMenuDismiss();
             game.context.move = 0;
             return true;
@@ -16937,13 +16966,13 @@ async function handlePickupTypesMenuKey(ch) {
         const returnToPlay = !!menu.returnToPlay;
         const returnToBasicOptions = !!menu.returnToBasicOptions;
         game._pickup_types_menu = null;
+        clearOptionsWindowScreen();
         if (returnToBasicOptions) {
             rerenderBasicOptionsFromFirstPage();
             game.context.move = 0;
             return true;
         }
         if (returnToPlay) {
-            clearOverrideScreen();
             await redrawAfterFullScreenMenuDismiss();
             game.context.move = 0;
             return true;
@@ -17141,7 +17170,9 @@ function renderBasicOptionsMenu() {
     const lines = basicOptionsLines(menu.page || 0);
     const footerRow = lines.length - 1;
     const footer = lines[footerRow] || '';
-    showSerializedOverride(lines.join('\n'), [footer.length, footerRow]);
+    // C ref: options.c:doset_simple(); select_menu() keeps the tty menu active
+    // until the option key is consumed.
+    setOptionsWindowScreen(lines.join('\n'), [footer.length, footerRow]);
     game.context.move = 0;
 }
 
@@ -17153,7 +17184,7 @@ function beginBasicOptionsMenu() {
 
 async function finishBasicOptionsMenu() {
     game._basic_options_menu = null;
-    clearOverrideScreen();
+    clearOptionsWindowScreen();
     await redrawAfterFullScreenMenuDismiss();
     game.context.move = 0;
 }
@@ -17471,7 +17502,9 @@ function renderSimpleOptionsMenu() {
     const lines = simpleOptionsLines(menu.page);
     const footerRow = lines.length - 1;
     const footer = lines[footerRow] || '';
-    showSerializedOverride(lines.join('\n'), [footer.length, footerRow]);
+    // C ref: options.c:doset_simple_menu(); the full options list is a tty
+    // menu window that remains active across selection input.
+    setOptionsWindowScreen(lines.join('\n'), [footer.length, footerRow]);
     game.context.move = 0;
 }
 
@@ -17542,7 +17575,7 @@ async function showNextOptionsMessageOrPrompt() {
         game._more = false;
         game._more_dismissals_remaining = 0;
         clear_pending_message();
-        clearOverrideScreen();
+        clearOptionsWindowScreen();
         for (const name of next.names || []) applySimpleBooleanOptionOnce(name);
         applySimpleBooleanOptionOnce(game._options_message_queue?.[0]?.names?.[0]);
         await pline(next.line || '');
@@ -17569,7 +17602,7 @@ async function finishSimpleOptionsMenu() {
     game._options_menu = null;
     game._options_preapplied = new Set();
     game._pickup_types_menu = null;
-    clearOverrideScreen();
+    clearOptionsWindowScreen();
     await redrawAfterFullScreenMenuDismiss();
 
     const messages = [];
@@ -17597,11 +17630,12 @@ function rerenderOptionsFromFirstPage() {
 }
 
 async function beginOptionsFruitPrompt(options = {}) {
+    clearOptionsWindowScreen();
     await redrawAfterFullScreenMenuDismiss();
     game._awaiting_options_fruit = true;
     game._options_fruit_return_to_basic = !!options.returnToBasicOptions;
     game._options_fruit_input = '';
-    const baseRows = serialize_terminal_grid(game.nhDisplay).split('\n');
+    const baseRows = serializeOptionsWindowGrid(game.nhDisplay).split('\n');
     while (baseRows.length < C.TERMINAL_ROWS) baseRows.push('');
     baseRows[22] = '';
     baseRows[23] = '';
@@ -17614,7 +17648,7 @@ function renderOptionsFruitPromptScreen() {
     const input = game._options_fruit_input || '';
     const prompt = input ? `Set fruit to what? ${input}` : 'Set fruit to what?';
     const screen = screenWithPromptLine(game._options_fruit_base_screen || '', prompt);
-    showSerializedOverride(screen, [Math.min('Set fruit to what? '.length + input.length, 79), 0]);
+    setOptionsWindowScreen(screen, [Math.min('Set fruit to what? '.length + input.length, 79), 0]);
     game._pending_message = prompt;
     game.context.move = 0;
 }
@@ -17631,6 +17665,7 @@ async function handleOptionsFruitKey(ch) {
         game._options_fruit_return_to_basic = false;
         game._options_fruit_input = '';
         game._options_fruit_base_screen = null;
+        clearOptionsWindowScreen();
         clear_pending_message();
         if (returnToBasicOptions) {
             rerenderBasicOptionsFromFirstPage();
@@ -17645,6 +17680,7 @@ async function handleOptionsFruitKey(ch) {
         game._options_fruit_return_to_basic = false;
         game._options_fruit_input = '';
         game._options_fruit_base_screen = null;
+        clearOptionsWindowScreen();
         clear_pending_message();
         if (returnToBasicOptions) {
             rerenderBasicOptionsFromFirstPage();

@@ -13,7 +13,7 @@ and `feature_map.md`.
 ## Current State
 
 - Current branch in this workspace: `main`, ahead of origin.
-- Latest verified repair unit: direction/getpos help active-state retirement.
+- Latest verified repair unit: option-window active-state retirement.
 - Checked-in public corpus is exact: `44/44 S 11405/11405 R 792838/792838 C 0`.
 - Hosted public cache remains `public-session-drift` at
   `40/44 S 10417/10982 R 629747/840358 C 0`; leaderboard fetch failed.
@@ -32,6 +32,28 @@ and `feature_map.md`.
 ## Latest Loop Checkpoint
 
 - Latest verified WIP on 2026-06-19:
+  - Option-window override-state retirement:
+    `seed4500-knight-coverage` remains exact
+    (`S 1814/1814 R 108275/108275 C 0`) and covers basic options plus
+    fruit prompt; focused guards `seed0006`, `seed0007`, and `seed0014`
+    remained exact for basic/full options and pickup-types.
+  - Strict sentinel exact:
+    `5/5 S 1063/1063 R 64569/64569 C 0`.
+  - `verify --target seed4500-knight-coverage` passed target,
+    strict sentinels, `hack:audit` (`hard=0 suspicious=11`), and
+    `memory:lint` (`issues=0`).
+  - Full corpus inventory: 44 passing sessions, checked-in public
+    `44/44 S 11405/11405 R 792838/792838 C 0`.
+  - Dehack truth:
+    - `O`/`m-O`, pickup-types, and option fruit prompts are active
+      serialized option tty-window states rendered by `display.js`.
+    - Option overlays that rebuild from the terminal grid serialize through
+      the base terminal serializer so the active serialize hook cannot return
+      a stale previous option screen.
+  - Next queue: remaining hack debt is `hard=0 suspicious=11`, dominated by
+    generic override-screen plumbing plus the forbidden-file replay comments.
+
+- Previous verified WIP on 2026-06-19:
   - Direction/getpos help override-state retirement:
     `seed0360-wizard-world-tour` remains exact
     (`S 833/833 R 120639/120639 C 0`) and covers getpos help dismissal;
@@ -92,29 +114,6 @@ and `feature_map.md`.
     - The shared serialized-screen hook preserves styled menu header spaces
       for active full-screen tty states; cast selection redraws before spell
       effects, while invalid view selectors keep the menu active.
-  - Next queue: remaining hack debt is `hard=0 suspicious=11`, dominated by
-    generic override-screen plumbing plus the forbidden-file replay comments.
-
-- Previous verified WIP on 2026-06-19:
-  - Startup legacy pager override-state retirement:
-    `seed0103-knight-ride-pony` remains exact
-    (`S 60/60 R 2640/2640 C 0`) and covers legacy pager,
-    queued welcome/tutorial handoff, and tutorial invalid-selector behavior.
-    Focused legacy/no-legacy guards (`seed0017`, `seed1800`, `seed0101`,
-    `seed0002`, `seed8000`, `seed0116`, `seed0361`, `seed0077`,
-    `seed1150`) remained exact.
-  - Strict sentinel exact:
-    `5/5 S 1063/1063 R 64569/64569 C 0`.
-  - `verify --target seed0103-knight-ride-pony` passed target,
-    strict sentinels, `hack:audit` (`hard=0 suspicious=11`), and
-    `memory:lint` (`issues=0`).
-  - Full corpus inventory: 44 passing sessions, checked-in public
-    `44/44 S 11405/11405 R 792838/792838 C 0`.
-  - Dehack truth:
-    - The configured-role legacy lore pager is now dedicated startup tty state
-      rendered by `display.js`, not a generic `_override_screen`.
-    - Non-dismissal keys keep that pager active while queued welcome waits;
-      dismissal applies deferred startup wear/AC and requests a map redraw.
   - Next queue: remaining hack debt is `hard=0 suspicious=11`, dominated by
     generic override-screen plumbing plus the forbidden-file replay comments.
 
