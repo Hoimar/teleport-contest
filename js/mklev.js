@@ -8,7 +8,7 @@
 import { game } from './gstate.js';
 import { GameMap } from './game.js';
 import { rn2, rnd, rn1, rne, rnz, d } from './rng.js';
-import { init_rect, rnd_rect, get_rect, split_rects } from './rect.js';
+import { init_rect, rnd_rect, get_rect, split_rects, within_bounded_area } from './rect.js';
 import { depth as depth_of_level, distmin, dist2 } from './hacklib.js';
 import { randomEngraving, randomEpitaph, wipeoutText } from './random_text.js';
 import { vfsDeleteFile, vfsReadFile, vfsWriteFile } from './storage.js';
@@ -698,8 +698,7 @@ function bad_location(x, y, nlx, nly, nhx, nhy) {
     const loc = game.level?.at(x, y);
     if (!loc) return true;
     if (occupied(x, y)) return true;
-    // Excluded region
-    if (nlx && x >= nlx && x <= nhx && y >= nly && y <= nhy) return true;
+    if (within_bounded_area(x, y, nlx, nly, nhx, nhy)) return true;
     // Must be ROOM, AIR, or (CORR in maze).
     if (loc.typ !== ROOM && loc.typ !== AIR
         && !(loc.typ === CORR && game.level?.flags?.is_maze_lev))
@@ -2932,8 +2931,9 @@ function is_elf_mon(ptr) {
     return ptr?.mlet === 'S_HUMAN' && (ptr.name?.includes('ELF') || ptr.name?.includes('ELVEN'));
 }
 
-function maybe_init_offensive_item_for(ptr) {
-    if (adj_lev_for(ptr) > rn2(75)) {
+function maybe_init_offensive_item_for(ptr, mon = null) {
+    const monLevel = mon?.m_lev ?? adj_lev_for(ptr);
+    if (monLevel > rn2(75)) {
         const offensive = rnd_offensive_item_for(ptr);
         if (offensive) mksobj(offensive, true, false);
     }
@@ -2977,7 +2977,7 @@ function rnd_offensive_item_for(ptr) {
     }
 }
 
-function m_initweap_general_for(ptr) {
+function m_initweap_general_for(ptr, mon = null) {
     const flags = ptr?.mflags2 ?? 0;
     const bias = ((flags & M2_LORD) ? 1 : 0)
         + ((flags & M2_PRINCE) ? 2 : 0)
@@ -3011,20 +3011,20 @@ function m_initweap_general_for(ptr) {
     default:
         break;
     }
-    maybe_init_offensive_item_for(ptr);
+    maybe_init_offensive_item_for(ptr, mon);
 }
 
-function m_initweap_for(ptr) {
+function m_initweap_for(ptr, mon = null) {
     if (!ptr) return;
     if (ptr.name === 'SHOPKEEPER') {
-        maybe_init_offensive_item_for(ptr);
+        maybe_init_offensive_item_for(ptr, mon);
         return;
     }
     if (ptr.msound === MS_PRIEST || questMonRepresentsRole(ptr, 'Priest')) {
         const mace = mksobj(MACE, false, false);
         mace.spe = rnd(3);
         if (!rn2(2)) curse(mace);
-        maybe_init_offensive_item_for(ptr);
+        maybe_init_offensive_item_for(ptr, mon);
         return;
     }
     if (ptr.mlet === 'S_DEMON') {
@@ -3046,8 +3046,8 @@ function m_initweap_for(ptr) {
             mksobj(FLAIL, true, false);
             break;
         }
-        if (ptr.mflags2 & M2_DEMON) m_initweap_general_for(ptr);
-        else maybe_init_offensive_item_for(ptr);
+        if (ptr.mflags2 & M2_DEMON) m_initweap_general_for(ptr, mon);
+        else maybe_init_offensive_item_for(ptr, mon);
         return;
     }
     if (ptr.mlet === 'S_ANGEL' && ptr.name !== 'KI_RIN') {
@@ -3070,7 +3070,7 @@ function m_initweap_for(ptr) {
             shield.oerodeproof = true;
             shield.spe = 0;
         }
-        maybe_init_offensive_item_for(ptr);
+        maybe_init_offensive_item_for(ptr, mon);
         return;
     }
     if (ptr.mlet === 'S_GIANT') {
@@ -3078,7 +3078,7 @@ function m_initweap_for(ptr) {
         if (ptr.name !== 'ETTIN' && !rn2(5)) {
             mksobj(rn2(2) ? TWO_HANDED_SWORD : BATTLE_AXE, true, false);
         }
-        maybe_init_offensive_item_for(ptr);
+        maybe_init_offensive_item_for(ptr, mon);
         return;
     }
     if (is_mercenary_for(ptr)) {
@@ -3103,7 +3103,7 @@ function m_initweap_for(ptr) {
         if (w1) mksobj(w1, true, false);
         if (!w2 && w1 !== DAGGER && !rn2(4)) w2 = KNIFE;
         if (w2) mksobj(w2, true, false);
-        maybe_init_offensive_item_for(ptr);
+        maybe_init_offensive_item_for(ptr, mon);
         return;
     }
     if (is_elf_mon(ptr)) {
@@ -3133,11 +3133,11 @@ function m_initweap_for(ptr) {
             if (rn2(3)) mksobj(PICK_AXE, true, false);
             if (!rn2(50)) mksobj(CRYSTAL_BALL, true, false);
         }
-        maybe_init_offensive_item_for(ptr);
+        maybe_init_offensive_item_for(ptr, mon);
         return;
     }
     if (ptr.mlet === 'S_HUMAN' && (ptr.mflags2 & M2_WERE)) {
-        maybe_init_offensive_item_for(ptr);
+        maybe_init_offensive_item_for(ptr, mon);
         return;
     }
     if (ptr.msound === MS_GUARDIAN) {
@@ -3171,7 +3171,7 @@ function m_initweap_for(ptr) {
             mksobj(CLUB, true, false);
             mksobj(LEATHER_ARMOR, true, false);
         }
-        maybe_init_offensive_item_for(ptr);
+        maybe_init_offensive_item_for(ptr, mon);
         return;
     }
     if (ptr.name === 'HOBBIT') {
@@ -3189,7 +3189,7 @@ function m_initweap_for(ptr) {
         }
         if (!rn2(10)) mksobj(ELVEN_MITHRIL_COAT, true, false);
         if (!rn2(10)) mksobj(DWARVISH_CLOAK, true, false);
-        maybe_init_offensive_item_for(ptr);
+        maybe_init_offensive_item_for(ptr, mon);
         return;
     }
     if (ptr.mlet === 'S_HUMANOID' && (ptr.mflags2 & M2_DWARF)) {
@@ -3208,20 +3208,20 @@ function m_initweap_for(ptr) {
         } else {
             mksobj(!rn2(3) ? PICK_AXE : DAGGER, true, false);
         }
-        maybe_init_offensive_item_for(ptr);
+        maybe_init_offensive_item_for(ptr, mon);
         return;
     }
     if (ptr.mlet === 'S_KOP') {
         if (!rn2(4)) m_initthrow_for(CREAM_PIE, 2);
         if (!rn2(3)) mksobj(rn2(2) ? CLUB : RUBBER_HOSE, true, false);
-        maybe_init_offensive_item_for(ptr);
+        maybe_init_offensive_item_for(ptr, mon);
         return;
     }
     if (ptr.mlet === 'S_KOBOLD') {
         if (!rn2(4)) {
             m_initthrow_for(DART, 12);
         }
-        if (adj_lev_for(ptr) > rn2(75)) {
+        if ((mon?.m_lev ?? adj_lev_for(ptr)) > rn2(75)) {
             // rnd_offensive_item() is not modeled yet.
         }
         return;
@@ -3236,7 +3236,7 @@ function m_initweap_for(ptr) {
                 m_initthrow_for(CROSSBOW_BOLT, 12);
             }
         }
-        maybe_init_offensive_item_for(ptr);
+        maybe_init_offensive_item_for(ptr, mon);
         return;
     }
     if (ptr.mlet === 'S_TROLL') {
@@ -3256,53 +3256,53 @@ function m_initweap_for(ptr) {
                 break;
             }
         }
-        maybe_init_offensive_item_for(ptr);
+        maybe_init_offensive_item_for(ptr, mon);
         return;
     }
     if (ptr.mlet === 'S_WRAITH') {
         mksobj(KNIFE, true, false);
         mksobj(LONG_SWORD, true, false);
-        maybe_init_offensive_item_for(ptr);
+        maybe_init_offensive_item_for(ptr, mon);
         return;
     }
     if (ptr.mlet === 'S_ZOMBIE') {
         if (!rn2(4)) mksobj(LEATHER_ARMOR, true, false);
         if (!rn2(4)) mksobj(rn2(3) ? KNIFE : SHORT_SWORD, true, false);
-        maybe_init_offensive_item_for(ptr);
+        maybe_init_offensive_item_for(ptr, mon);
         return;
     }
     if (ptr.mlet === 'S_LIZARD') {
         if (ptr.name === 'SALAMANDER') {
             mksobj(rn2(7) ? SPEAR : (rn2(3) ? TRIDENT : STILETTO), true, false);
         }
-        maybe_init_offensive_item_for(ptr);
+        maybe_init_offensive_item_for(ptr, mon);
         return;
     }
     if (ptr.mlet === 'S_OGRE') {
         const divisor = ptr.name === 'OGRE_KING' ? 3 : ptr.name === 'OGRE_LORD' ? 6 : 12;
         if (!rn2(divisor)) mksobj(BATTLE_AXE, true, false);
         else mksobj(CLUB, true, false);
-        maybe_init_offensive_item_for(ptr);
+        maybe_init_offensive_item_for(ptr, mon);
         return;
     }
     if (ptr.mlet === 'S_GNOME') {
-        m_initweap_general_for(ptr);
+        m_initweap_general_for(ptr, mon);
         return;
     }
     if (ptr.mlet === 'S_VAMPIRE') {
-        m_initweap_general_for(ptr);
+        m_initweap_general_for(ptr, mon);
         return;
     }
     if (ptr.mlet === 'S_GOLEM') {
-        m_initweap_general_for(ptr);
+        m_initweap_general_for(ptr, mon);
         return;
     }
     if (ptr.mlet === 'S_HUMANOID') {
-        maybe_init_offensive_item_for(ptr);
+        maybe_init_offensive_item_for(ptr, mon);
         return;
     }
     if (ptr.mlet !== 'S_ORC') {
-        maybe_init_offensive_item_for(ptr);
+        maybe_init_offensive_item_for(ptr, mon);
         return;
     }
     if (rn2(2)) mksobj(ORCISH_HELM, true, false);
@@ -3331,7 +3331,7 @@ function m_initweap_for(ptr) {
         }
         break;
     }
-    maybe_init_offensive_item_for(ptr);
+    maybe_init_offensive_item_for(ptr, mon);
 }
 
 function peace_minded_for(ptr) {
@@ -3674,7 +3674,9 @@ export function makemon(mdat, x, y, mmflags = 0) {
         do {
             ptr = rndmonst_adj(0, 0);
             if (!ptr) return null;
-        } while (++tryct <= 50 && !goodpos(x, y, gpflags, ptr));
+        } while (++tryct <= 50
+            && ((tryct === 1 && mon_throws_rocks_for(ptr) && isSokobanLevel())
+                || !goodpos(x, y, gpflags, ptr)));
     }
     const m_id = next_ident();
     const monState = newmonhp_state_for(ptr);
@@ -3802,7 +3804,7 @@ export function makemon(mdat, x, y, mmflags = 0) {
         game._monster_init_item_count = initialItemCount;
         game._monster_init_has_gold = initialHasGold;
         try {
-            if (is_armed_for(ptr)) m_initweap_for(ptr);
+            if (is_armed_for(ptr)) m_initweap_for(ptr, mon);
             m_initinv_for(ptr, mon);
             // C ref: makemon.c:makemon() calls m_dowear(mtmp, TRUE) after
             // initial monster inventory creation; creation wear has no delay.
@@ -4559,6 +4561,28 @@ const MINEND_2_MAP = [
     '|.--------------|.|--------------------|.|.........................       |',
     '|.................|                    |.....................|........    |',
     '---------------------------------------------------------------------------',
+];
+
+const MINEND_3_XSTART = 3;
+const MINEND_3_YSTART = 3;
+const MINEND_3_MAP = [
+    ' - - - - - - - - - - -- -- - - . - - - - - - - - - -- - - -- - - - - . - - |',
+    '------...---------.-----------...-----.-------.-------     ----------------|',
+    ' - - - - - - - - - - - . - - - . - - - - - - - - - - -- - -- - . - - - - - |',
+    '------------.---------...-------------------------.---   ------------------|',
+    ' - - - - - - - - - - . . - - --- - . - - - - - - - - -- -- - - - - |.....| |',
+    '--.---------------.......------------------------------- ----------|.....S-|',
+    ' - - - - |.. ..| - ....... . - - - - |.........| - - - --- - - - - |.....| |',
+    '----.----|.....|------.......--------|.........|--------------.------------|',
+    ' - - - - |..{..| - - -.... . --- - -.S.........S - - - - - - - - - - - - - |',
+    '---------|.....|--.---...------------|.........|---------------------------|',
+    ' - - - - |.. ..| - - - . - - - - - - |.........| - --- . - - - - - - - - - |',
+    '----------------------...-------.---------------------...------------------|',
+    '---..| - - - - - - - - . --- - - - - - - - - - - - - - . - - --- - - --- - |',
+    '-.S..|----.-------.------- ---------.-----------------...----- -----.-------',
+    '---..| - - - - - - - -- - - -- . - - - - - . - - - . - . - - -- -- - - - -- ',
+    '-.S..|--------.---.---       -...---------------...{.---------   ---------  ',
+    '--|. - - - - - - - -- - - - -- . - - - --- - - - . . - - - - -- - - - - - - ',
 ];
 
 const SOKO1_XSTART = 27;
@@ -6044,6 +6068,260 @@ function loadMinend2Special() {
     flip_level_rnd(3);
 }
 
+function minend3X(x) { return x + MINEND_3_XSTART; }
+function minend3Y(y) { return y + MINEND_3_YSTART; }
+
+function minend3FillLevel(lit) {
+    for (let y = 0; y < ROWNO; y++)
+        for (let x = 2; x <= COLNO - 2; x++) {
+            const loc = game.level?.at(x, y);
+            if (!loc) continue;
+            loc.typ = HWALL;
+            loc.flags = 0;
+            loc.doormask = 0;
+            loc.lit = !!lit;
+        }
+}
+
+function minend3SetTerrain(x, y, ch) {
+    const loc = game.level?.at(minend3X(x), minend3Y(y));
+    if (!loc) return;
+    loc.flags = 0;
+    loc.doormask = 0;
+    loc.lit = false;
+    switch (ch) {
+    case '.':
+        loc.typ = ROOM;
+        break;
+    case '-':
+        loc.typ = HWALL;
+        break;
+    case '|':
+        loc.typ = VWALL;
+        break;
+    case 'S':
+        loc.typ = SDOOR;
+        set_door_mask(loc, D_CLOSED);
+        break;
+    case '{':
+        loc.typ = FOUNTAIN;
+        break;
+    default:
+        loc.typ = STONE;
+        break;
+    }
+}
+
+function minend3Region(x1, y1, x2, y2, lit) {
+    const grow = lit ? 1 : 0;
+    for (let y = y1 - grow; y <= y2 + grow; y++)
+        for (let x = x1 - grow; x <= x2 + grow; x++) {
+            const loc = game.level?.at(minend3X(x), minend3Y(y));
+            if (loc) loc.lit = !!lit;
+        }
+}
+
+function minend3Door(state, x, y) {
+    const loc = game.level?.at(minend3X(x), minend3Y(y));
+    if (!loc) return;
+    if (!IS_DOOR(loc.typ) && loc.typ !== SDOOR) loc.typ = DOOR;
+    set_door_mask(loc, state === 'locked' ? D_LOCKED : D_CLOSED);
+}
+
+function minend3NonDiggable(x1, y1, x2, y2) {
+    for (let y = y1; y <= y2; y++)
+        for (let x = x1; x <= x2; x++) {
+            const loc = game.level?.at(minend3X(x), minend3Y(y));
+            if (loc) loc.wall_info = (loc.wall_info || 0) | W_NONDIGGABLE;
+        }
+}
+
+function minend3Abs(pt) {
+    return { x: minend3X(pt.x), y: minend3Y(pt.y) };
+}
+
+function minend3RandomDryLocation() {
+    return specialRandomDryLocation(MINEND_3_MAP[0].length, MINEND_3_MAP.length,
+        MINEND_3_XSTART, MINEND_3_YSTART);
+}
+
+function minend3TrapLocation() {
+    let loc = minend3RandomDryLocation();
+    let trycnt = 0;
+    while ((game.level?.at(loc.x, loc.y)?.typ === STAIRS
+            || game.level?.at(loc.x, loc.y)?.typ === LADDER)
+           && ++trycnt <= 100) {
+        loc = minend3RandomDryLocation();
+    }
+    return loc;
+}
+
+function minend3TypedObject(otyp, pt = null, init = true, artif = false) {
+    const loc = pt ? minend3Abs(pt) : minend3RandomDryLocation();
+    return mksobj_at(otyp, loc.x, loc.y, init, artif);
+}
+
+function minend3ClassObject(oclass) {
+    const loc = minend3RandomDryLocation();
+    return mkobj_at(oclass, loc.x, loc.y, true);
+}
+
+function minend3RandomObject() {
+    const loc = minend3RandomDryLocation();
+    return mkobj_at(RANDOM_CLASS, loc.x, loc.y, true);
+}
+
+function minend3Trap(kind = null, pt = null) {
+    const loc = pt ? minend3Abs(pt) : minend3TrapLocation();
+    const actual = kind ?? mktrap_random_kind();
+    return mktrapAt(loc.x, loc.y, actual);
+}
+
+function minend3MonsterLocation(ptr) {
+    if (!ptr) return specialRandomCoordLocation(MINEND_3_MAP[0].length,
+        MINEND_3_MAP.length, MINEND_3_XSTART, MINEND_3_YSTART, DRY);
+    let humidity = pm_to_humidity(ptr);
+    let loc = specialRandomCoordLocation(MINEND_3_MAP[0].length,
+        MINEND_3_MAP.length, MINEND_3_XSTART, MINEND_3_YSTART, humidity | NO_LOC_WARN);
+    if (!loc) {
+        humidity |= DRY;
+        loc = specialRandomCoordLocation(MINEND_3_MAP[0].length,
+            MINEND_3_MAP.length, MINEND_3_XSTART, MINEND_3_YSTART, humidity);
+    }
+    return loc;
+}
+
+function minend3Monster(ref) {
+    const cls = String(ref || '').length === 1
+        ? (castleMonsterClass(ref)
+            || Object.keys(MONSTER_SYMBOLS).find((mlet) => MONSTER_SYMBOLS[mlet] === ref))
+        : null;
+    let ptr = cls ? null : monster_ptr(ref);
+    let scriptedFemale = null;
+    if (!cls && monster_name_needs_find_gender_roll(ref, ptr)) scriptedFemale = !!rn2(2);
+    rn2(3); // induced_align() fallback for unaligned Mines End monsters.
+    if (cls) ptr = mkclass_aligned(cls, G_NOGEN);
+    let loc = minend3MonsterLocation(ptr);
+    if (m_at(loc.x, loc.y)) {
+        const cc = enexto_core(loc.x, loc.y, ptr, GP_CHECKSCARY)
+            || enexto_core(loc.x, loc.y, ptr, 0);
+        if (cc) loc = cc;
+    }
+    const mon = apply_monster_name_gender(makemon(ptr, loc.x, loc.y, 0), ref);
+    if (mon && scriptedFemale != null) mon.female = scriptedFemale;
+    return mon;
+}
+
+function minend3MazeWalk(x, y, dirName, typ = ROOM) {
+    x = minend3X(x);
+    y = minend3Y(y);
+    switch (dirName) {
+    case 'north': y--; break;
+    case 'south': y++; break;
+    case 'east': x++; break;
+    case 'west': x--; break;
+    default: break;
+    }
+    const loc = game.level?.at(x, y);
+    if (loc && !IS_DOOR(loc.typ)) {
+        loc.typ = typ;
+        loc.flags = 0;
+    }
+    if (!(x % 2)) {
+        if (dirName === 'east') x++;
+        else x--;
+        const xloc = game.level?.at(x, y);
+        if (xloc) {
+            xloc.typ = typ;
+            xloc.flags = 0;
+        }
+    }
+    if (!(y % 2)) {
+        if (dirName === 'south') y++;
+        else y--;
+    }
+    specialWalkfrom(x, y, typ);
+}
+
+function loadMinend3Special() {
+    // C ref: dat/minend-3.lua loaded through sp_lev.c:lspo_map().
+    rn2(3); rn2(2); // nhlib shuffle()
+    const litRandom = rn2(2); // splev_initlev()
+    minend3FillLevel(litRandom);
+    game.level.flags.is_maze_lev = true;
+    game.level.flags.nommap = true;
+    game.level.flags.mines_walls = true;
+    for (let y = 0; y < MINEND_3_MAP.length; y++)
+        for (let x = 0; x < MINEND_3_MAP[y].length; x++)
+            minend3SetTerrain(x, y, MINEND_3_MAP[y][x]);
+
+    const place = [{ x: 1, y: 15 }, { x: 68, y: 6 }, { x: 1, y: 13 }];
+    lua_shuffle(place);
+
+    minend3NonDiggable(67, 3, 73, 7);
+    minend3NonDiggable(0, 12, 2, 16);
+    const fountain1 = game.level?.at(minend3X(12), minend3Y(8));
+    if (fountain1) {
+        fountain1.typ = FOUNTAIN;
+        game.level.flags.nfountains = (game.level.flags.nfountains || 0) + 1;
+    }
+    const fountain2 = game.level?.at(minend3X(51), minend3Y(15));
+    if (fountain2) {
+        fountain2.typ = FOUNTAIN;
+        game.level.flags.nfountains = (game.level.flags.nfountains || 0) + 1;
+    }
+    minend3Region(0, 0, 75, 16, false);
+    minend3Region(38, 6, 46, 10, true);
+    minend3Door('closed', 37, 8);
+    minend3Door('closed', 47, 8);
+    minend3Door('closed', 73, 5);
+    minend3Door('closed', 2, 15);
+    minend3MazeWalk(36, 8, 'west', ROOM);
+    placeSpecialStair(minend3X(42), minend3Y(8), true);
+    wallify_map(MINEND_3_XSTART - 1, MINEND_3_YSTART - 1,
+        MINEND_3_XSTART + MINEND_3_MAP[0].length + 1,
+        MINEND_3_YSTART + MINEND_3_MAP.length + 1);
+
+    minend3TypedObject(DIAMOND);
+    minend3ClassObject(GEM_CLASS);
+    minend3TypedObject(DIAMOND);
+    minend3ClassObject(GEM_CLASS);
+    minend3TypedObject(EMERALD);
+    minend3ClassObject(GEM_CLASS);
+    minend3TypedObject(EMERALD);
+    minend3ClassObject(GEM_CLASS);
+    minend3TypedObject(EMERALD);
+    minend3ClassObject(GEM_CLASS);
+    minend3TypedObject(RUBY);
+    minend3ClassObject(GEM_CLASS);
+    minend3TypedObject(RUBY);
+    minend3TypedObject(AMETHYST);
+    minend3ClassObject(GEM_CLASS);
+    minend3TypedObject(AMETHYST);
+    const luckstone = minend3TypedObject(LUCKSTONE, place[1]);
+    if (luckstone) {
+        luckstone.blessed = false;
+        luckstone.cursed = false;
+    }
+    minend3TypedObject(FLINT, place[0]);
+    for (let i = 0; i < 5; i++) minend3ClassObject(SCROLL_CLASS);
+    for (let i = 0; i < 4; i++) minend3ClassObject(SPBOOK_CLASS);
+    for (let i = 0; i < 3; i++) minend3RandomObject();
+    for (let i = 0; i < 7; i++) minend3Trap();
+    minend3Trap(LEVEL_TELEP, place[1]);
+    minend3Trap(LEVEL_TELEP, place[0]);
+    for (const ref of [
+        'M', 'M', 'M', 'M', 'M',
+        'ettin mummy',
+        'V',
+        'Z', 'Z', 'Z', 'Z', 'Z',
+        'V',
+        'e', 'e', 'e', 'e',
+    ]) minend3Monster(ref);
+    wallification(1, 0, COLNO - 1, ROWNO - 1);
+    flip_level_rnd(3);
+}
+
 function loadMinetown5Special() {
     // C ref: dat/minetn-5.lua loaded through sp_lev.c:lspo_map().
     rn2(3); rn2(2); // nhlib shuffle()
@@ -6392,7 +6670,6 @@ function flipLregionArea(area, flp, minx, miny, maxx, maxy) {
     if (!area) return;
     let { x1, y1, x2, y2 } = area;
     if ([x1, y1, x2, y2].some(v => v == null)) return;
-    if (x1 < minx || x2 > maxx || y1 < miny || y2 > maxy) return;
     if (flp & 1) {
         const ny1 = flipYForBounds(y2, miny, maxy);
         const ny2 = flipYForBounds(y1, miny, maxy);
@@ -8712,13 +8989,10 @@ function registerValleyLregions(flp, bounds) {
     ];
 }
 
-function registerSanctumLregions(flp, bounds) {
-    const down = flipRectForBounds({
-        x1: 54, y1: 1, x2: 79, y2: 18,
-    }, flp, bounds.minx, bounds.miny, bounds.maxx, bounds.maxy);
+function registerSanctumLregions() {
     game._special_lregions.push({
         rtype: LR_DOWNTELE,
-        inarea: down,
+        inarea: { x1: 54, y1: 1, x2: 79, y2: 18 },
         delarea: { x1: -1, y1: -1, x2: -1, y2: -1 },
     });
 }
@@ -8959,12 +9233,15 @@ function createCastleRoomRegion(x1, y1, x2, y2, lit, rtype, needfill) {
 }
 
 function castleApplyRegion(x1, y1, x2, y2, lit, rtype = OROOM, needfill = FILL_NONE) {
-    for (let y = y1; y <= y2; y++) {
-        for (let x = x1; x <= x2; x++) {
-            const loc = game.level?.at(castleX(x), castleY(y));
+    const lowx = lit ? Math.max(castleX(x1) - 1, 1) : castleX(x1);
+    const hix = lit ? Math.min(castleX(x2) + 1, COLNO - 1) : castleX(x2);
+    const lowy = lit ? Math.max(castleY(y1) - 1, 0) : castleY(y1);
+    const hiy = lit ? Math.min(castleY(y2) + 1, ROWNO - 1) : castleY(y2);
+    for (let y = lowy; y <= hiy; y++) {
+        for (let x = lowx; x <= hix; x++) {
+            const loc = game.level?.at(x, y);
             if (!loc) continue;
-            if (loc.typ === ROOM || loc.typ === CORR || loc.typ === DOOR || loc.typ === SDOOR)
-                loc.lit = !!lit;
+            loc.lit = IS_LAVA(loc.typ) ? true : !!lit;
         }
     }
     if (rtype !== OROOM) createCastleRoomRegion(x1, y1, x2, y2, lit, rtype, needfill);
@@ -9476,9 +9753,8 @@ function loadSanctumSpecial() {
     rn2(2); // splev_initlev()
     loadSanctumTerrain();
 
-    rn2(4); // des.door({ wall = "random", state = "secret" }) wall
-    rn2(4); // random wall coordinate selection front door
     const temple = sanctumCreateRoomRegion(15, 7, 21, 10, 1, TEMPLE, FILL_LVFLAGS);
+    if (temple) createThemeroomDoor(temple, D_SECRET, W_ANY);
     const altar = game.level?.at(sanctumX(18), sanctumY(8));
     if (altar) {
         altar.typ = ALTAR;
@@ -9539,16 +9815,9 @@ function loadSanctumSpecial() {
     for (const id of ['L', 'L', 'V', 'V', 'V']) sanctumCreateMonster(id);
 
     placeSpecialStair(sanctumX(63), sanctumY(15), true);
-    const ext = get_level_extends();
-    const bounds = {
-        minx: Math.max(1, ext.xmin),
-        maxx: Math.min(COLNO - 1, ext.xmax),
-        miny: Math.max(0, ext.ymin),
-        maxy: Math.min(ROWNO - 1, ext.ymax),
-    };
+    registerSanctumLregions();
     wallification(1, 0, COLNO - 1, ROWNO - 1);
-    const flp = flip_level_rnd(3);
-    registerSanctumLregions(flp, bounds);
+    flip_level_rnd(3);
     fixup_special();
 }
 
@@ -14821,6 +15090,10 @@ function makemaz_special(slev) {
         loadMinend2Special();
         return;
     }
+    if (game._last_special_protofile === 'minend-3') {
+        loadMinend3Special();
+        return;
+    }
     if (game._last_special_protofile === 'oracle') {
         loadOracleSpecial();
         return;
@@ -14971,6 +15244,7 @@ export async function mklev() {
     if (loadedSpecial && (game._last_special_protofile === 'castle'
         || game._last_special_protofile === 'valley'
         || game._last_special_protofile === 'sanctum'
+        || game._last_special_protofile === 'juiblex'
         || game._last_special_protofile === 'orcus'
         || game._last_special_protofile === 'minetn-2'
         || game._last_special_protofile === 'minetn-3'
@@ -18587,12 +18861,21 @@ function shkinit(shopIndex, sroom) {
             customer: '',
         };
     }
-    rnd(100); // C ref: shknam.c:mkmonmoney() initial capital amount.
-    next_ident(); // C ref: mkobj.c:mksobj(GOLD_PIECE) for shopkeeper capital.
-    if (shopIndex === 6) mksobj(TOUCHSTONE, true, false);
+    // C ref: shknam.c:shkinit() mkmonmoney() computes the amount before
+    // mksobj(GOLD_PIECE) assigns the object id.
+    const capitalAmount = 1000 + 30 * rnd(100);
+    const capital = mksobj(GOLD_PIECE, false, false);
+    if (capital) {
+        capital.quan = capitalAmount;
+        capital.owt = weight(capital);
+        if (shk) give_mon_obj(shk, capital);
+    }
+    if (shopIndex === 6 && shk) give_mon_obj(shk, mksobj(TOUCHSTONE, true, false));
+    else if (shopIndex === 6) mksobj(TOUCHSTONE, true, false);
     if (shopIndex === 7 || shopIndex === 8 || (shopIndex === 6 && rn2(2))
         || (shopIndex === 0 && rn2(5))) {
-        mksobj(SCR_CHARGING, true, false);
+        const scroll = mksobj(SCR_CHARGING, true, false);
+        if (shk) give_mon_obj(shk, scroll);
     }
     if (shk?.mextra?.eshk) shk.mextra.eshk.shknam = shopkeeperName(shopIndex, shk);
     return sroom.fdoor ?? 0;
@@ -18692,13 +18975,10 @@ function remove_orcus_shopkeeper(croom) {
         mon.isshk && ((game.level?.at(mon.mx, mon.my)?.roomno ?? 0) === rmno));
     if (idx < 0) return;
     const [shk] = game.level.monsters.splice(idx, 1);
-    // C ref: shknam.c:stock_room() Orcus ghost-town hack calls mongone()
-    // after stocking; inventory disposal checks obj_resists() for each item.
+    // C refs: shknam.c:stock_room(), steal.c:mdrop_special_objs().
+    // Orcus's ghost-town shopkeepers are removed with mongone(); special-item
+    // rescue probes obj_resists(0,0) once for each carried object.
     for (const obj of shk.inventory || []) obj_resists_discard_rng(obj);
-    // JS does not yet materialize the C shopkeeper capital/bill-admin
-    // inventory, but mongone() discards those carried records too.
-    rn2(100);
-    rn2(100);
 }
 
 function stock_room(croom) {
@@ -18964,6 +19244,7 @@ function fill_special_room(croom) {
     if (croom.rtype === BEEHIVE) game.level.flags.has_beehive = true;
     if (croom.rtype === BARRACKS) game.level.flags.has_barracks = true;
     if (croom.rtype === TEMPLE) game.level.flags.has_temple = true;
+    if (croom.rtype === SWAMP) game.level.flags.has_swamp = true;
 }
 
 // ============================================================

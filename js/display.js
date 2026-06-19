@@ -11,7 +11,8 @@ import {
     COLNO, ROWNO, STONE, ROOM, CORR, DOOR, SDOOR, SCORR, STAIRS,
     HWALL, VWALL, TLCORNER, TRCORNER, BLCORNER, BRCORNER,
     CROSSWALL, TUWALL, TDWALL, TLWALL, TRWALL,
-    TREE, FOUNTAIN, SINK, ALTAR, GRAVE, THRONE, POOL, MOAT, WATER, LAVAPOOL, LAVAWALL, AIR, CLOUD,
+    TREE, FOUNTAIN, SINK, ALTAR, GRAVE, THRONE, POOL, MOAT, WATER, LAVAPOOL, LAVAWALL, ICE, AIR, CLOUD,
+    DBWALL, DRAWBRIDGE_UP, DRAWBRIDGE_DOWN, DB_UNDER, DB_MOAT, DB_LAVA, DB_ICE, DB_FLOOR,
     D_NODOOR, D_ISOPEN, D_CLOSED, D_LOCKED,
     AM_MASK, AM_CHAOTIC, AM_NEUTRAL, AM_LAWFUL, AM_SANCTUM,
     ARROW_TRAP, DART_TRAP, ROCKTRAP, SQKY_BOARD, BEAR_TRAP, LANDMINE,
@@ -306,6 +307,17 @@ function altarColor(loc) {
     }
 }
 
+function drawbridge_under_type(loc) {
+    // C ref: display.c:back_to_glyph(), rm.h:drawbridgemask.
+    switch ((loc?.drawbridgemask ?? loc?.flags ?? 0) & DB_UNDER) {
+    case DB_MOAT: return MOAT;
+    case DB_LAVA: return LAVAPOOL;
+    case DB_ICE: return ICE;
+    case DB_FLOOR: return ROOM;
+    default: return ROOM;
+    }
+}
+
 // ── Terrain to display character + color + DEC flag ──
 export function terrain_glyph(loc, x, y) {
     const typ = display_wall_type(loc, x, y);
@@ -343,6 +355,14 @@ export function terrain_glyph(loc, x, y) {
         case LAVAPOOL:
         case LAVAWALL:
             return { ch: '`', color: NO_COLOR, dec: false };
+        case ICE:
+            return { ch: '.', color: NO_COLOR, dec: false };
+        case DBWALL:
+            return { ch: '#', color: NO_COLOR, dec: false };
+        case DRAWBRIDGE_UP:
+            return terrain_glyph({ ...loc, typ: drawbridge_under_type(loc) }, x, y);
+        case DRAWBRIDGE_DOWN:
+            return { ch: '.', color: NO_COLOR, dec: false };
         default:        return { ch: '?', color: NO_COLOR, dec: false };
         }
     }
@@ -404,6 +424,14 @@ export function terrain_glyph(loc, x, y) {
             return { ch: '}', color: CLR_RED, dec: false };
         case LAVAWALL:
             return { ch: '}', color: CLR_ORANGE, dec: false };
+        case ICE:
+            return { ch: '.', color: CLR_CYAN, dec: false };
+        case DBWALL:
+            return { ch: '#', color: CLR_BROWN, dec: false };
+        case DRAWBRIDGE_UP:
+            return terrain_glyph({ ...loc, typ: drawbridge_under_type(loc) }, x, y);
+        case DRAWBRIDGE_DOWN:
+            return { ch: '.', color: CLR_BROWN, dec: false };
         case AIR:
             return { ch: ' ', color: CLR_CYAN, dec: false };
         case CLOUD:
@@ -471,6 +499,14 @@ export function terrain_glyph(loc, x, y) {
         return { ch: '`', color: CLR_RED, dec: false };
     case LAVAWALL:
         return { ch: '`', color: CLR_ORANGE, dec: false };
+    case ICE:
+        return { ch: '~', color: CLR_CYAN, dec: true };
+    case DBWALL:
+        return { ch: '#', color: CLR_BROWN, dec: false };
+    case DRAWBRIDGE_UP:
+        return terrain_glyph({ ...loc, typ: drawbridge_under_type(loc) }, x, y);
+    case DRAWBRIDGE_DOWN:
+        return { ch: '~', color: CLR_BROWN, dec: true };
     case AIR:
         // C ref: display.c:back_to_glyph() S_air.
         return { ch: ' ', color: CLR_CYAN, dec: false };
