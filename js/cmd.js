@@ -10877,8 +10877,7 @@ function showEnhanceSkillsMenu() {
         : role === 'Priest'
             ? priestEnhanceSkillsScreen()
             : ' \x1b[7mCurrent skills:\x1b[0m\n';
-    game._enhance_skills_screen = screen;
-    showOverride(screen, [9, 23]);
+    setEnhanceSkillsScreen(screen, [9, 23]);
 }
 
 async function beginEnhanceCommand() {
@@ -10895,9 +10894,11 @@ async function beginEnhanceCommand() {
 }
 
 async function handleEnhanceSelection(ch) {
+    clearEnhanceSkillsScreen();
     if (ch === 'j') {
         game._enhance_skill_levels = { ...(game._enhance_skill_levels || {}), longSword: 'Skilled' };
         clearOverrideScreen();
+        await redrawAfterFullScreenMenuDismiss();
         await pline('You are now more skilled in long sword.');
         queue_more_prompt();
         game._enhance_resume_after_more = true;
@@ -10907,13 +10908,13 @@ async function handleEnhanceSelection(ch) {
     if (ch === 'r') {
         game._enhance_skill_levels = { ...(game._enhance_skill_levels || {}), polearms: 'Basic' };
         clearOverrideScreen();
+        await redrawAfterFullScreenMenuDismiss();
         await pline('You are now more skilled in polearms.');
         queue_more_prompt();
         game._enhance_resume_after_more = true;
         game.context.move = 0;
         return;
     }
-    game._enhance_skills_screen = null;
     clearOverrideScreen();
     await redrawAfterFullScreenMenuDismiss();
     game.context.move = 0;
@@ -16951,6 +16952,28 @@ function clearNameMenuScreen() {
     game._name_menu_active = false;
     game._name_menu_screen = null;
     game._name_menu_cursor = null;
+}
+
+function setEnhanceSkillsScreen(screen, cursor) {
+    installSerializedScreenHook();
+    clearOverrideScreen();
+    game._enhance_skills_screen = screen;
+    game._enhance_skills_cursor = cursor ? [cursor[0], cursor[1]] : null;
+    game._enhance_skills_active = true;
+    if (game.nhDisplay && cursor) {
+        if (typeof game.nhDisplay.setCursor === 'function')
+            game.nhDisplay.setCursor(cursor[0], cursor[1]);
+        else {
+            game.nhDisplay.cursorCol = cursor[0];
+            game.nhDisplay.cursorRow = cursor[1];
+        }
+    }
+}
+
+function clearEnhanceSkillsScreen() {
+    game._enhance_skills_active = false;
+    game._enhance_skills_screen = null;
+    game._enhance_skills_cursor = null;
 }
 
 async function handleDisclosureWindowInput() {
@@ -26001,6 +26024,11 @@ export async function rhack(key) {
         return;
     }
 
+    if (game._enhance_skills_active) {
+        await handleEnhanceSelection(ch);
+        return;
+    }
+
     if (game._tutorial_prompt_active) {
         await handleTutorialPromptInput(ch);
         return;
@@ -29144,10 +29172,6 @@ export async function rhack(key) {
             game.context.move = 0;
             return;
         }
-        if (prev === game._enhance_skills_screen) {
-            await handleEnhanceSelection(ch);
-            return;
-        }
         if (prev === game._look_data_screen
             || prev === game._look_list_screen
             || (prev === game._attributes_page1_screen && key !== 32 && key !== 13)
@@ -29155,7 +29179,6 @@ export async function rhack(key) {
             || prev === game._attributes_page3_screen) {
             game._look_data_screen = null;
             game._look_list_screen = null;
-            game._enhance_skills_screen = null;
             game._attributes_page1_screen = null;
             game._attributes_page2_screen = null;
             game._attributes_page3_screen = null;

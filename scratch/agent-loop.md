@@ -13,7 +13,7 @@ and `feature_map.md`.
 ## Current State
 
 - Current branch in this workspace: `main`, ahead of origin.
-- Latest verified repair unit: name-menu active-state retirement.
+- Latest verified repair unit: enhance-menu active-state retirement.
 - Checked-in public corpus is exact: `44/44 S 11405/11405 R 792838/792838 C 0`.
 - Hosted public cache remains `public-session-drift` at
   `40/44 S 10417/10982 R 629747/840358 C 0`; leaderboard fetch failed.
@@ -32,6 +32,27 @@ and `feature_map.md`.
 ## Latest Loop Checkpoint
 
 - Latest verified WIP on 2026-06-19:
+  - Enhance-menu override-state retirement:
+    `seed0107-samurai-twoweapon-enhance` remains exact
+    (`S 98/98 R 2902/2902 C 0`), `seed0106-priest-extcmd-sweep`
+    remains exact (`S 267/267 R 4194/4194 C 0`), and the regression
+    guard `seed4500-knight-coverage` remains exact
+    (`S 1814/1814 R 108275/108275 C 0`).
+  - Strict sentinel exact:
+    `5/5 S 1063/1063 R 64569/64569 C 0`.
+  - `verify --target seed4500-knight-coverage` passed target, strict
+    sentinels, `hack:audit` (`hard=0 suspicious=11`), and `memory:lint`
+    (`issues=0`).
+  - Full corpus inventory: 44 passing sessions, checked-in public
+    `44/44 S 11405/11405 R 792838/792838 C 0`.
+  - Dehack truth:
+    - `#enhance` skills menu is active serialized enhance-menu state rendered
+      by `display.js`, not a generic `_override_prev` screen.
+    - Selected skill messages print after the menu erase/redraw boundary.
+  - Next queue: remaining hack debt is `hard=0 suspicious=11`, dominated by
+    generic override-screen plumbing plus the forbidden-file replay comments.
+
+- Previous verified WIP on 2026-06-19:
   - Name-menu override-state retirement:
     `seed0102-ranger-name-cancel` remains exact
     (`S 25/25 R 4485/4485 C 0`) and covers `#name` menu cancel;
@@ -90,27 +111,6 @@ and `feature_map.md`.
       disclosure-window states rendered by `display.js`.
     - Final disclosure chaining uses the active window kind instead of
       generic `_override_prev`.
-  - Next queue: remaining hack debt is `hard=0 suspicious=11`, dominated by
-    generic override-screen plumbing plus the forbidden-file replay comments.
-
-- Previous verified WIP on 2026-06-19:
-  - Terrain-window override-state retirement:
-    `seed0106-priest-extcmd-sweep` remains exact
-    (`S 267/267 R 4194/4194 C 0`) and covers terrain selector ESC
-    cancellation; `seed0013-friday13-save-then-fullmoon-restore` remains
-    exact (`S 99/99 R 4804/4804 C 0`) for terrain view/tip/Done paths.
-  - Strict sentinel exact:
-    `5/5 S 1063/1063 R 64569/64569 C 0`.
-  - `verify --target seed0106-priest-extcmd-sweep` passed target, strict
-    sentinels, `hack:audit` (`hard=0 suspicious=11`), and `memory:lint`
-    (`issues=0`).
-  - Full corpus inventory: 44 passing sessions, checked-in public
-    `44/44 S 11405/11405 R 792838/792838 C 0`.
-  - Dehack truth:
-    - `#terrain` selector, sanitized known-map view, and Done More frames are
-      active serialized terrain-window states rendered by `display.js`.
-    - Installing terrain active state clears stale generic override state, and
-      selector ESC cancellation requests a map redraw before the next capture.
   - Next queue: remaining hack debt is `hard=0 suspicious=11`, dominated by
     generic override-screen plumbing plus the forbidden-file replay comments.
 
