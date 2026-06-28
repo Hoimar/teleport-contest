@@ -4,6 +4,9 @@ Cross-reference of every major subsystem between the C reference and the JS port
 Use this to choose your next implementation target. Update the **Status** and **Notes** columns after each session.
 
 Context note: this file is an index. Prefer `rg` by session id, subsystem, JS module, C source, or FR number, then read only the relevant row and nearby section. Avoid full-reading it during tight implementation loops unless refreshing global priorities.
+Dated addenda and row evidence are historical snapshots. For the active queue,
+prefer `scratch/agent-loop.md`, `scratch/divergence-inventory.md`, and
+`npm run parity:state -- --refresh-live`.
 
 **Status legend:**
 - 🔴 Not started / fully stubbed
@@ -14,7 +17,7 @@ Context note: this file is an index. Prefer `rg` by session id, subsystem, JS mo
 **Metric column:** "gates Y screens" means getting this right is expected to unlock Y screens across the public corpus.
 Treat screen totals as lagging evidence of subsystem progress, not as the optimization target.
 
-## Current Loop Addendum (2026-06-19)
+## Historical Loop Addendum (2026-06-19)
 
 - **Hosted `seed5002-wizard-coverage-pair` death repair:** Restored the hosted
   live-cache target from `S 293/297 R 12214/12214` to exact
