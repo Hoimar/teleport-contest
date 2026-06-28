@@ -383,22 +383,105 @@ async function analyzeSentinels() {
 }
 
 async function fetchJson(url) {
+    const text = await fetchTextRobust(url);
+    try {
+        return JSON.parse(text);
+    } catch (err) {
+        throw new Error(`invalid JSON: ${err.message}`);
+    }
+}
+
+function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function compactFetchError(err) {
+    const code = err?.cause?.code || err?.code;
+    return code ? `${err.message} (${code})` : err.message;
+}
+
+async function fetchTextNode(url) {
     const res = await fetch(url, {
         cache: 'no-store',
         signal: AbortSignal.timeout(12000),
     });
     const text = await res.text();
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return JSON.parse(text);
+    return text;
 }
 
-async function fetchLeaderboard(baseUrl) {
-    const candidates = [
+function fetchTextCurl(url) {
+    const child = spawnSync('curl', ['-L', '--silent', '--show-error', '--fail', '--max-time', '20', url], {
+        cwd: PROJECT_ROOT,
+        encoding: 'utf8',
+        maxBuffer: 32 * 1024 * 1024,
+    });
+    if (child.error || child.status !== 0) {
+        throw new Error(child.error?.message || child.stderr.trim() || child.stdout.trim() || `curl exited ${child.status ?? 1}`);
+    }
+    return child.stdout;
+}
+
+async function fetchTextRobust(url) {
+    const errors = [];
+    for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+            return await fetchTextNode(url);
+        } catch (err) {
+            errors.push(`fetch attempt ${attempt + 1}: ${compactFetchError(err)}`);
+            await sleep(250 * (attempt + 1));
+        }
+    }
+    try {
+        return fetchTextCurl(url);
+    } catch (err) {
+        errors.push(`curl fallback: ${err.message}`);
+        throw new Error(errors.join('; '));
+    }
+}
+
+function uniqueStrings(values) {
+    return [...new Set(values.filter(Boolean))];
+}
+
+function stripCacheQuery(url) {
+    const parsed = new URL(url);
+    if (parsed.searchParams.has('t')) parsed.searchParams.delete('t');
+    return parsed.toString();
+}
+
+function extractLeaderboardDataUrls(html, pageUrl) {
+    const urls = [];
+    const dataConst = html.match(/\bDATA_URL\s*=\s*['"]([^'"]+)['"]/);
+    if (dataConst) urls.push(new URL(dataConst[1], pageUrl).toString());
+    for (const match of html.matchAll(/fetch\(\s*['"]([^'"]*data\.json[^'"]*)['"]/g)) {
+        urls.push(stripCacheQuery(new URL(match[1], pageUrl).toString()));
+    }
+    return urls;
+}
+
+async function discoverLeaderboardCandidates(baseUrl) {
+    const pages = [`${baseUrl}/leaderboard/`, `${baseUrl}/`];
+    const candidates = [];
+    const errors = [];
+    for (const pageUrl of pages) {
+        try {
+            const html = await fetchTextRobust(pageUrl);
+            candidates.push(...extractLeaderboardDataUrls(html, pageUrl));
+        } catch (err) {
+            errors.push(`${pageUrl}: ${err.message}`);
+        }
+    }
+    candidates.push(
         `${baseUrl}/leaderboard/data.json`,
         `${baseUrl}/data.json`,
         `${baseUrl}/leaderboard.json`,
-    ];
-    const errors = [];
+    );
+    return { candidates: uniqueStrings(candidates), errors };
+}
+
+async function fetchLeaderboard(baseUrl) {
+    const { candidates, errors } = await discoverLeaderboardCandidates(baseUrl);
     for (const url of candidates) {
         try {
             return { available: true, url, data: await fetchJson(url) };

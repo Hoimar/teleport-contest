@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { mkdir, writeFile } from 'node:fs/promises';
+import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 
 const DEFAULT_BASE_URL = 'https://mazesofmenace.ai';
@@ -15,9 +16,27 @@ function usage() {
 }
 
 async function fetchText(url) {
-    const res = await fetch(url, { cache: 'no-store' });
-    if (!res.ok) throw new Error(`${url} returned HTTP ${res.status}`);
-    return res.text();
+    const errors = [];
+    for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+            const res = await fetch(url, { cache: 'no-store' });
+            if (!res.ok) throw new Error(`${url} returned HTTP ${res.status}`);
+            return await res.text();
+        } catch (err) {
+            const code = err?.cause?.code || err?.code;
+            errors.push(`fetch attempt ${attempt + 1}: ${code ? `${err.message} (${code})` : err.message}`);
+            await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)));
+        }
+    }
+    const child = spawnSync('curl', ['-L', '--silent', '--show-error', '--fail', '--max-time', '20', url], {
+        encoding: 'utf8',
+        maxBuffer: 32 * 1024 * 1024,
+    });
+    if (child.error || child.status !== 0) {
+        errors.push(`curl fallback: ${child.error?.message || child.stderr.trim() || child.stdout.trim() || `curl exited ${child.status ?? 1}`}`);
+        throw new Error(`${url} fetch failed; ${errors.join('; ')}`);
+    }
+    return child.stdout;
 }
 
 async function main() {

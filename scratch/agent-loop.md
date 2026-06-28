@@ -13,19 +13,23 @@ and `feature_map.md`.
 ## Current State
 
 - Current branch in this workspace: `main`, ahead of origin.
-- Latest verified repair unit: branch-topology fallback cleanup.
+- Latest verified repair unit: leaderboard-fetch discovery cleanup.
 - Checked-in public corpus is exact: `44/44 S 11405/11405 R 792838/792838 C 0`.
 - Last refreshed hosted public cache is exact:
   `44/44 S 10982/10982 R 840358/840358 C 0`. It still classifies as
   `public-session-drift` because 30 hosted session files differ from
   checked-in sessions, but both score surfaces are exact.
-- Leaderboard fetch still fails from all known endpoints.
+- Leaderboard fetch succeeds from `https://mazesofmenace.ai/leaderboard/data.json`.
+  Default inferred team `Hoimar` currently classifies as `public-session-drift`:
+  leaderboard public `29/44 S 11292/11405 R 792838/792838`; held-out
+  `2523/11265` points and `2/44` passing.
 - Scratch trace/checkpoint files are agent-toolkit state and may be committed
   when useful; keep production parity and scratch-tool commits coherent.
 - Strict sentinels are exact:
   `5/5 S 1063/1063 R 64569/64569 C 0`.
 - Current public classification: checked-in and hosted public corpora are exact;
-  leaderboard state remains unknown because endpoint fetches failed.
+  leaderboard fetch works, but default inferred team `Hoimar` differs from the
+  hosted public score surface and remains deploy/lag evidence.
 - Current sentinel regression classification: none; strict sentinel is exact.
 - Hack audit is clean: `hard=0 suspicious=0`. Production `js/` has no
   intentional debug I/O or imports from `frozen/`.
@@ -33,6 +37,14 @@ and `feature_map.md`.
 ## Latest Loop Checkpoint
 
 - Latest verified WIP on 2026-06-28:
+  - Harness truth: `scripts/parity-state.mjs` discovers leaderboard data URLs
+    from `/leaderboard/` and `/`, keeps the known JSON candidates, retries
+    transient Node fetch/DNS failures, and can fall back to `curl -L`; default
+    inferred team `Hoimar` now fetches from
+    `https://mazesofmenace.ai/leaderboard/data.json` instead of reporting
+    endpoint failure.
+  - Harness truth: `scripts/fetch-live-public-sessions.mjs` uses the same
+    retry plus `curl -L` fallback shape for hosted public session pulls.
   - Production dehack: `newgame()` no longer installs a hardcoded branch/dungeon
     fallback after `init_dungeons()`; branch predicates and stair direction now
     rely on generated dungeon topology (`C refs: dungeon.c:init_dungeons()`,
@@ -81,8 +93,10 @@ and `feature_map.md`.
     `memory:lint ok`, regenerated divergence inventory is one passing bucket
     with no live blockers.
   - Regression classification: none. Checked-in public, hosted public, target,
-    and strict sentinels are exact. Leaderboard remains unknown because
-    endpoint fetches failed.
+    and strict sentinels are exact. Leaderboard fetch succeeds; default inferred
+    team `Hoimar` currently differs from hosted public score evidence and has
+    held-out gaps, so leaderboard remains deploy/lag evidence rather than a
+    local parity blocker.
   - Global next-step check: active queue is empty; use regenerated
     divergence-inventory buckets for the next live target. Broad startup,
     role, or display TODOs need fresh failing evidence before implementation.
