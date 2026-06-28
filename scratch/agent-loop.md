@@ -13,7 +13,7 @@ and `feature_map.md`.
 ## Current State
 
 - Current branch in this workspace: `main`, ahead of origin.
-- Latest verified repair unit: feature-map active-state wording cleanup.
+- Latest verified repair unit: feature-map stale state cleanup.
 - Checked-in public corpus is exact: `44/44 S 11405/11405 R 792838/792838 C 0`.
 - Last refreshed hosted public cache is exact:
   `44/44 S 10982/10982 R 840358/840358 C 0`. It still classifies as
@@ -33,6 +33,9 @@ and `feature_map.md`.
 ## Latest Loop Checkpoint
 
 - Latest verified WIP on 2026-06-28:
+  - Durable feature-map truth: current moveloop/monster-movement rows no longer
+    describe per-step fast-forward stubs as active and now record the current
+    exact `seed0383` evidence instead of the old partial score.
   - Durable feature-map truth: current message, menu, and help/look rows now
     describe active or latched More, tty-window/menu, and lookup-window state
     rather than "active override" wording; dated historical dehack entries
