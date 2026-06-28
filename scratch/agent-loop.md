@@ -13,7 +13,7 @@ and `feature_map.md`.
 ## Current State
 
 - Current branch in this workspace: `main`, ahead of origin.
-- Latest verified repair unit: scratch trace tooling convention cleanup.
+- Latest verified repair unit: lessons override-screen history cleanup.
 - Checked-in public corpus is exact: `44/44 S 11405/11405 R 792838/792838 C 0`.
 - Last refreshed hosted public cache is exact:
   `44/44 S 10982/10982 R 840358/840358 C 0`. It still classifies as
@@ -33,6 +33,10 @@ and `feature_map.md`.
 ## Latest Loop Checkpoint
 
 - Latest verified WIP on 2026-06-28:
+  - Durable memory truth: top-level `lessons.md` UI guidance now marks generic
+    `_override_screen` menu/page handling as historical and points agents at
+    named active tty-window/menu, terminal-exit, prompt, or latched-More state
+    with stored cursor ownership.
   - Harness/doc truth: `feature_map.md` now records that tracked reusable
     `scratch/*trace*.mjs` and `scratch/*loader.mjs` files are agent-toolkit
     diagnostics; one-off probes should stay temporary or untracked.
