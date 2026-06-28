@@ -4226,6 +4226,18 @@ async function wildmiss_displaced_image_basic(mtmp) {
     const invis = game.u?.uinvis || game.u?.uprops?.invisible || game.u?.Invis;
     const line = `The ${monster_name(mtmp)} strikes at your ${invis ? 'invisible ' : ''}displaced image and misses you!`;
     clear_transient_travel_description_for_monster_line();
+    if (!game._more && game._pending_message === line) {
+        // C refs: src/mhitu.c:wildmiss(), win/tty/topl.c:update_topl().
+        // A fast monster can wild-miss at the same displaced image again while
+        // the identical line is already the ordinary current topline.  C just
+        // prompts on that current line; it does not create a second deferred
+        // copy to reveal after the prompt is dismissed.
+        queue_more_prompt();
+        game._restore_message_after_more = line;
+        game._monster_attack_more_latched = true;
+        game._monster_attack_resume_behind_after_more = false;
+        return true;
+    }
     if (game._pending_message) {
         game._after_more_message = game._after_more_message
             ? `${game._after_more_message}  ${line}`
@@ -8428,6 +8440,44 @@ function finish_deferred_physical_hit_damage(mtmp, damage, preDamageHp, current 
     return false;
 }
 
+async function reveal_active_more_deferred_physical_hit(g, mtmp) {
+    const pending = g._deferred_monster_physical_attack;
+    const current = pending?.current;
+    const line = g._after_more_message || '';
+    const resumeBehindDisplayedMore = !!g._hero_melee_artifact_hit_deferred_more;
+    if (!resumeBehindDisplayedMore) return false;
+    if (!g._more || !g._pending_message || !line) return false;
+    if (pending?.mtmp !== mtmp) return false;
+    if (!current || typeof current.damage !== 'number'
+        || typeof current.preDamageHp !== 'number') return false;
+    if (!is_simple_monster_hit_you_chain(line)) return false;
+    if (!g._monster_attack_resume_behind_after_more) return false;
+
+    // C refs: win/tty/topl.c:update_topl()/more(), src/mhitu.c:hitmu().
+    // When an old prompt is dismissed while a physical hit line is waiting
+    // behind it, the hit line becomes the current tty More and its stored
+    // damage has already reached botl(); later attack rows resume after that
+    // displayed hit More.
+    g._pending_message = line;
+    g._after_more_message = '';
+    g._after_more_needs_prompt = false;
+    g._after_more_strict_keys = false;
+    g._monster_attack_tail_pending_pack = false;
+    g._hero_melee_artifact_hit_deferred_more = false;
+    g._latched_more_screen = null;
+    g._latched_more_cursor = null;
+    g._latched_more_keep_until_dismiss = false;
+    g._latched_more_use_pending_topline = false;
+    if ((g._more_dismissals_remaining || 0) <= 0)
+        g._more_dismissals_remaining = 1;
+    finish_deferred_physical_hit_damage(mtmp, current.damage, current.preDamageHp, current);
+    pending.current = null;
+    g._revealed_physical_hit_resume_behind_more = resumeBehindDisplayedMore;
+    g._last_topline_message = line;
+    g._last_topline_can_force_more = false;
+    return true;
+}
+
 function finish_deferred_current_physical_hit(mtmp, current) {
     const { attack, verb } = current || {};
     if (!attack) return false;
@@ -9476,6 +9526,19 @@ async function maybe_finish_post_move_attack(g, mtmp, moveStatus, postMoveState,
             g._monster_turn_paused_for_more = true;
             g._monster_attack_more_waiting = true;
             return false;
+        }
+        const revealedActivePhysical = await reveal_active_more_deferred_physical_hit(g, mtmp);
+        const resumeBehindRevealedPhysical = !!g._revealed_physical_hit_resume_behind_more;
+        g._revealed_physical_hit_resume_behind_more = false;
+        if (revealedActivePhysical
+            && resumeBehindRevealedPhysical
+            && !g._deferred_monster_physical_attack?.attacks
+                ?.slice(g._deferred_monster_physical_attack.nextIndex)
+                .some(Boolean)) {
+            g._monster_attack_pause_after_more = false;
+            g._monster_attack_resume_behind_after_more = false;
+            g._hallucination_warning_rng_active = true;
+            return true;
         }
         if (g._after_more_message) {
             if (g._pending_message

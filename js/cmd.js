@@ -19209,10 +19209,14 @@ function travelLocationDescription(x, y) {
     // than the raw '@' map symbol.
     if (game.u?.ux === x && game.u?.uy === y) return heroGetposDescription();
     const loc = game.level?.at(x, y);
-    // C refs: src/getpos.c:auto_describe(), src/pager.c:lookat().
-    // Travel describes the displayed/remembered glyph; unseen stone is still
-    // unexplored before the travel-validity suffix is added.
-    if (!loc || !travelSeenOrKnown(x, y)) return 'unexplored area (no travel path)';
+    if (!loc) return 'unexplored area (no travel path)';
+    // C refs: src/getpos.c:auto_describe(), src/pager.c:do_screen_description().
+    // Travel describes the displayed glyph.  A recorded blank stone cmap cell
+    // is a stone glyph; an unrecorded raw stone cell is still unexplored.
+    const blankStoneGlyph = (loc.typ === STONE || loc.typ === SCORR)
+        && loc.disp_ch === ' ';
+    if (!travelSeenOrKnown(x, y) && !blankStoneGlyph)
+        return 'unexplored area (no travel path)';
     const noTravelPath = !!(game.u && (game.u.ux !== x || game.u.uy !== y)
         && !isValidTravelPoint({ x, y }));
     let desc;
@@ -22040,6 +22044,10 @@ async function handleQueuedMore(ch) {
         game.context.move = 0;
     } else if (pausedMonsterTurn && !game._more && !game._death_prompt_active) {
         const resumeTailOnly = !!game._resume_turn_tail_after_more;
+        const resumeCommandAfterPostDosoundsTail =
+            game._resume_command_key_after_post_dosounds_tail != null;
+        const resumeCommandAfterMore =
+            game._resume_command_key_after_more != null;
         game._monster_turn_paused_for_more = false;
         game._swallowed_damage_more_waiting = false;
         game._pre_turn_more_waiting = false;
@@ -22055,7 +22063,10 @@ async function handleQueuedMore(ch) {
             game._latched_status_turn = null;
         }
         clearLatchedStatusAttrsAfterMore();
-        if (!resumeTailOnly) game._resume_monster_turn = true;
+        if (!resumeTailOnly
+            && !resumeCommandAfterPostDosoundsTail
+            && !resumeCommandAfterMore)
+            game._resume_monster_turn = true;
         game.context.move = 1;
     } else if (!game._more && (game._nomul_turns_remaining || 0) > 0) {
         // C ref: topl.c:more(), allmain.c:moveloop_core().  Dismissing a
@@ -30006,10 +30017,21 @@ export async function rhack(key) {
         // C refs: src/artifact.c:artifact_hit(), win/tty/topl.c:more().
         // Artifact hit output reaches the topline first; the next command
         // attempt blocks on the same line before rhack() clears it.  Dismissing
-        // that More resumes the interrupted turn tail before fresh input.
+        // that More is consumed before this command continues through normal
+        // rhack() dispatch.
         game._hero_melee_artifact_hit_deferred_more = false;
         queue_more_prompt();
+        await flush_screen(1);
+        game._latched_more_screen = serialize_terminal_grid(game.nhDisplay);
+        game._latched_more_cursor = [
+            Math.min(`${game._pending_message || ''}--More--`.length, 79),
+            0,
+            1,
+        ];
+        game._latched_more_keep_until_dismiss = true;
+        game._latched_more_use_pending_topline = false;
         game._pre_turn_more_waiting = true;
+        game._resume_command_key_after_more = key;
         game._monster_turn_paused_for_more = true;
         game.context.move = 0;
         return;

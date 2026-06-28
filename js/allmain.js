@@ -2836,15 +2836,37 @@ export async function moveloop_core() {
     const key = await nhgetch();
     // Read and execute one command
     await rhack(key);
+    if (g._resume_command_key_after_more != null && !g._more) {
+        const resumeCommandKey = g._resume_command_key_after_more;
+        g._resume_command_key_after_more = null;
+        await rhack(resumeCommandKey);
+        if (g._more || g._monster_turn_paused_for_more) return;
+    } else if (!g._more) {
+        g._resume_command_key_after_more = null;
+    }
     if (g._resume_post_dosounds_turn_tail && !g._more) {
         g._resume_post_dosounds_turn_tail = false;
+        const resumeMonsterAfterTail = !!g._resume_monster_turn_after_post_dosounds_tail;
+        const resumeCommandKey = g._resume_command_key_after_post_dosounds_tail;
+        g._resume_monster_turn_after_post_dosounds_tail = false;
+        g._resume_command_key_after_post_dosounds_tail = null;
         await finishPostDosoundsTurnTail(g);
         // C ref: allmain.c:moveloop_core().  A sound More can interrupt the
         // immobile-hero loop after u_calc_moveamt() left movement below
         // NORMAL_SPEED; dismissing it resumes the tail and then keeps looping
         // until the hero has movement again.
         if (!await finishZeroMovePolyCatchup(g)) return;
-        return;
+        if (resumeCommandKey != null && !g._more && !g._monster_turn_paused_for_more) {
+            await rhack(resumeCommandKey);
+            if (g._more || g._monster_turn_paused_for_more) return;
+        } else if (resumeMonsterAfterTail && !g._more && !g._monster_turn_paused_for_more) {
+            g._resume_monster_turn = true;
+        } else {
+            return;
+        }
+    } else if (!g._resume_post_dosounds_turn_tail) {
+        g._resume_monster_turn_after_post_dosounds_tail = false;
+        g._resume_command_key_after_post_dosounds_tail = null;
     }
     // C ref: teleport.c:level_tele() schedules the destination; allmain.c
     // performs deferred_goto() after rhack() returns.
