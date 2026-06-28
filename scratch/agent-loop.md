@@ -27,8 +27,8 @@ and `feature_map.md`.
 - Current public classification: checked-in and hosted public corpora are exact;
   leaderboard state remains unknown because endpoint fetches failed.
 - Current sentinel regression classification: none; strict sentinel is exact.
-- Hack audit remains `hard=0 suspicious=2`. Production `js/` has no intentional
-  debug I/O or imports from `frozen/`.
+- Hack audit is clean: `hard=0 suspicious=0`. Production `js/` has no
+  intentional debug I/O or imports from `frozen/`.
 
 ## Latest Loop Checkpoint
 
@@ -49,7 +49,7 @@ and `feature_map.md`.
     `44/44 S 10982/10982 R 840358/840358 C 0`; still classified as
     `public-session-drift` because 30 hosted session files differ from
     checked-in sessions, with exact score delta.
-  - Maintenance checks: `hack:audit` remains `hard=0 suspicious=2`,
+  - Maintenance checks: `hack:audit` is `hard=0 suspicious=0`,
     `memory:lint ok`, regenerated divergence inventory is one passing bucket
     with no live blockers.
   - Regression classification: none. Checked-in public, hosted public, target,

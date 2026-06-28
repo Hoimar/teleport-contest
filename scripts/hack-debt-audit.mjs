@@ -18,6 +18,24 @@ const PATTERNS = [
     { kind: 'frozen-import', level: 'hard', re: /from\s+['"][^'"]*frozen\// },
 ];
 
+const KNOWN_FALSE_POSITIVES = [
+    {
+        file: 'js/storage.js',
+        kind: 'fastforward/replay',
+        text: '// replay. session_test_runner.mjs / NethackGame instances create one of these',
+    },
+    {
+        file: 'js/terminal.js',
+        kind: 'fastforward/replay',
+        text: '*   Can throw (end of replay), return a code (default key), or return',
+    },
+];
+
+function isKnownFalsePositive(rel, kind, text) {
+    return KNOWN_FALSE_POSITIVES.some((known) =>
+        known.file === rel && known.kind === kind && text.trim() === known.text);
+}
+
 function parseArgs(argv) {
     const out = {
         strict: argv.includes('--strict'),
@@ -52,6 +70,7 @@ export function auditHackDebt() {
             const line = lines[i];
             for (const pattern of PATTERNS) {
                 if (!pattern.re.test(line)) continue;
+                if (isKnownFalsePositive(rel, pattern.kind, line)) continue;
                 findings.push({
                     file: rel,
                     line: i + 1,
