@@ -13,7 +13,7 @@ and `feature_map.md`.
 ## Current State
 
 - Current branch in this workspace: `main`, ahead of origin.
-- Latest verified repair unit: lessons override-screen history cleanup.
+- Latest verified repair unit: lessons active-screen wording cleanup.
 - Checked-in public corpus is exact: `44/44 S 11405/11405 R 792838/792838 C 0`.
 - Last refreshed hosted public cache is exact:
   `44/44 S 10982/10982 R 840358/840358 C 0`. It still classifies as
@@ -33,6 +33,10 @@ and `feature_map.md`.
 ## Latest Loop Checkpoint
 
 - Latest verified WIP on 2026-06-28:
+  - Durable memory truth: remaining current-guidance `lessons.md` references to
+    menu/prompt/spell/help "override" handling now use active tty-window,
+    prompt, More, or stored active-screen wording; historical evidence rows
+    remain intact.
   - Durable memory truth: top-level `lessons.md` UI guidance now marks generic
     `_override_screen` menu/page handling as historical and points agents at
     named active tty-window/menu, terminal-exit, prompt, or latched-More state
