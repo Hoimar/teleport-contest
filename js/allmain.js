@@ -133,23 +133,29 @@ async function slipOrTripBasic() {
     }
 }
 
-async function fumbleTopline(msg) {
-    // C refs: src/timeout.c:nh_timeout() FUMBLING, win/tty/topl.c:update_topl().
-    // Fumble output is an ordinary pline(); tty packs it behind a prior
-    // same-turn topline such as mhitm.c:noises() when there is room.
+async function timeoutTopline(msg) {
+    // C refs: src/timeout.c:nh_timeout(), win/tty/topl.c:update_topl().
+    // Timeout output is ordinary pline() traffic; tty packs it behind a prior
+    // same-turn topline when there is room, otherwise the old line owns More.
     if (!game._pending_message || game._travel_description_pending) {
         await pline(msg);
-        return;
+        return false;
     }
     if (topline_can_pack_message(game._pending_message, msg)) {
         await append_pline(msg);
-        return;
+        return false;
     }
     queue_more_prompt();
     game._after_more_message = game._after_more_message
         ? `${game._after_more_message}  ${msg}`
         : msg;
     game._after_more_needs_prompt = false;
+    return true;
+}
+
+async function fumbleTopline(msg) {
+    // C ref: src/timeout.c:nh_timeout() FUMBLING.
+    await timeoutTopline(msg);
 }
 
 async function timeoutFumblingBasic(u) {
@@ -265,8 +271,16 @@ async function nhTimeoutBasic() {
             u.uencumber = newcap;
             const encmsg = oldcap > newcap ? encumbranceDecreaseMessage(newcap) : '';
             if (oldcap > newcap && oldcap > 0) game._encumbered_move_debt_encumbrance = oldcap;
-            await pline(`Your ${legs} ${legs === 'legs' ? 'feel' : 'feels'} better.`);
-            if (encmsg) await append_pline(encmsg);
+            const deferred = await timeoutTopline(`Your ${legs} ${legs === 'legs' ? 'feel' : 'feels'} better.`);
+            if (encmsg) {
+                if (deferred) {
+                    game._after_more_message = game._after_more_message
+                        ? `${game._after_more_message}  ${encmsg}`
+                        : encmsg;
+                } else {
+                    await append_pline(encmsg);
+                }
+            }
         }
     }
     for (const { x, y } of expire_corpse_timeouts()) newsym(x, y);
