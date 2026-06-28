@@ -39,9 +39,9 @@ Treat screen totals as lagging evidence of subsystem progress, not as the optimi
   (`5/5 S 1063/1063 R 64569/64569 C 0`). The regenerated checked-in corpus
   inventory is `38/44` passing (`S 9590/11405 R 604772/792838 C 0`).
   Cached hosted public data is session-file drift (`35/44 S 8704/10982
-  R 472995/840358 C 0`, fetched 2026-06-12), and leaderboard comparison is
-  unknown because the live fetch failed; held-out/private sessions remain the
-  cleanliness benchmark.
+  R 472995/840358 C 0`, fetched 2026-06-12). At that historical checkpoint,
+  leaderboard comparison was unknown because the live fetch failed;
+  held-out/private sessions remain the cleanliness benchmark.
 - **Seed4500 invisible/topline/weapon parity:** `seed4500-knight-coverage`
   is exact after restoring C-shaped remembered invisible marker lifetime,
   monster physical-hit tty overflow, and hand-to-hand weapon selection. Ordinary
