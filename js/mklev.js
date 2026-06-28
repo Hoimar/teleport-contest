@@ -1780,7 +1780,6 @@ function mkgold(amount, x, y) {
     return existing;
 }
 
-function dealloc_obj(otmp) { /* stub */ }
 function curse(otmp) { if (otmp) otmp.cursed = true; }
 function weight(otmp) {
     if (!otmp) return 1;

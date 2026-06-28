@@ -13,7 +13,7 @@ and `feature_map.md`.
 ## Current State
 
 - Current branch in this workspace: `main`, ahead of origin.
-- Latest verified repair unit: leaderboard-fetch discovery cleanup.
+- Latest verified repair unit: mklev dead-stub cleanup.
 - Checked-in public corpus is exact: `44/44 S 11405/11405 R 792838/792838 C 0`.
 - Last refreshed hosted public cache is exact:
   `44/44 S 10982/10982 R 840358/840358 C 0`. It still classifies as
@@ -37,6 +37,8 @@ and `feature_map.md`.
 ## Latest Loop Checkpoint
 
 - Latest verified WIP on 2026-06-28:
+  - Production dehack: removed the unused no-op `dealloc_obj()` scaffold from
+    `js/mklev.js`; no static call sites remained.
   - Harness truth: `scripts/parity-state.mjs` discovers leaderboard data URLs
     from `/leaderboard/` and `/`, keeps the known JSON candidates, retries
     transient Node fetch/DNS failures, and can fall back to `curl -L`; default
