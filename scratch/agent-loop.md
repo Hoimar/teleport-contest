@@ -13,7 +13,7 @@ and `feature_map.md`.
 ## Current State
 
 - Current branch in this workspace: `main`, ahead of origin.
-- Latest verified repair unit: feature-map stale state cleanup.
+- Latest verified repair unit: monster/object-fill evidence cleanup.
 - Checked-in public corpus is exact: `44/44 S 11405/11405 R 792838/792838 C 0`.
 - Last refreshed hosted public cache is exact:
   `44/44 S 10982/10982 R 840358/840358 C 0`. It still classifies as
@@ -33,6 +33,9 @@ and `feature_map.md`.
 ## Latest Loop Checkpoint
 
 - Latest verified WIP on 2026-06-28:
+  - Durable feature-map truth: monster/object-fill now records live startup
+    state instead of startup fast-forward scaffolds and replaces stale partial
+    `seed0383`/`seed5002` evidence with current exact-session evidence.
   - Durable feature-map truth: current moveloop/monster-movement rows no longer
     describe per-step fast-forward stubs as active and now record the current
     exact `seed0383` evidence instead of the old partial score.
