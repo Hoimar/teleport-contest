@@ -229,6 +229,7 @@ function defaultHypothesis(record) {
 }
 
 function recordHypothesis(record) {
+    if (record.phaseBucket === 'passing') return defaultHypothesis(record);
     return KNOWN_BLOCKERS.get(record.session) ?? defaultHypothesis(record);
 }
 
@@ -463,21 +464,24 @@ function renderMarkdown(records, buckets, summary) {
     lines.push('');
     lines.push('## Known Live Blockers');
     lines.push('');
-    lines.push(markdownTable(
-        ['Session', 'Screens', 'RNG', 'First screen', 'First RNG', 'Hypothesis'],
-        [...KNOWN_BLOCKERS.keys()].map((session) => {
-            const record = records.find((candidate) => candidate.session === session);
-            if (!record) return [stripSessionSuffix(session), '-', '-', '-', '-', 'not in selected corpus'];
-            return [
-                stripSessionSuffix(session),
+    const activeKnownBlockers = [...KNOWN_BLOCKERS.keys()]
+        .map((session) => records.find((candidate) => candidate.session === session))
+        .filter((record) => record && record.phaseBucket !== 'passing');
+    if (!activeKnownBlockers.length) {
+        lines.push('No known live blockers in this corpus run.');
+    } else {
+        lines.push(markdownTable(
+            ['Session', 'Screens', 'RNG', 'First screen', 'First RNG', 'Hypothesis'],
+            activeKnownBlockers.map((record) => [
+                stripSessionSuffix(record.session),
                 `${record.matchedScreens}/${record.totalScreens}`,
                 `${record.matchedRngCalls}/${record.totalRngCalls}`,
                 `${record.firstScreenMismatchIndex ?? '-'}:${record.mismatchClass}:${record.surface}:${record.keyDisplay}`,
                 `${record.firstRngMismatchIndex ?? '-'}:${record.rngSignature}`,
                 record.hypothesis,
-            ];
-        }),
-    ));
+            ]),
+        ));
+    }
     lines.push('');
     lines.push('## Session Inventory');
     lines.push('');

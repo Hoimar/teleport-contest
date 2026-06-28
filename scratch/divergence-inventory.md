@@ -13,7 +13,7 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 
 | Count | Phase | Canonical evidence | Subsystem hypothesis | Owner | Needs deeper debug |
 | --- | --- | --- | --- | --- | --- |
-| 44 | passing | seed0116-wizard-wear-shop | Pet behavior: dog_goal() object scan, reachability, carry checks, and object resistance in dogmove.c. | Monsters / pets | yes |
+| 44 | passing | seed0116-wizard-wear-shop | No compact divergence found for this corpus run. | None | no |
 
 ## Bucket Details
 
@@ -26,18 +26,14 @@ Sessions are evidence for subsystem hypotheses, not targets for seed-specific fi
 - First screen mismatch: - (none/none, rows -)
 - First RNG mismatch: - (-)
 - Sample cells: -
-- Hypothesis: Pet behavior: dog_goal() object scan, reachability, carry checks, and object resistance in dogmove.c.
-- Next owner: Monsters / pets
-- Needs deeper debug: yes
+- Hypothesis: No compact divergence found for this corpus run.
+- Next owner: None
+- Needs deeper debug: no
 - Sessions: seed0002-healer-reflection-drummer, seed0004-feeding-pony, seed0006-wizard-water-demon, seed0007-rogue-snake-swamp, seed0009-swimmer-mforce, seed0012-monk-vault-escort, seed0013-friday13-save-then-fullmoon-restore, seed0013-rogue-friday13-combat, seed0014-dequa-fountain-explore, seed0015-valk-level2-pit-dog-wait, seed0016-healer-newmoon-eat-zap, seed0017-samurai-altar-pray, seed0030-ten-diverse-deaths, seed0060-orc-rogue-kick-search, seed0077-rogue-chargen, seed0101-ranger-quiver-throw-travel-engrave, seed0102-ranger-name-cancel, seed0103-knight-ride-pony, seed0104-knight-ride-combat, seed0105-valk-chat-lamp-ration, seed0106-priest-extcmd-sweep, seed0107-samurai-twoweapon-enhance, seed0108-wizard-extcmd-wishlist, seed0116-wizard-wear-shop, seed0200-monk-north-search, seed0360-wizard-world-tour, seed0361-archeologist-tour, seed0367-priest-quest-tour, seed0373-barbarian-quest-tour, seed0383-wizard-hallucinate, seed0398-wizard-wandpoly-pile, seed0399-wizard-hallu-actions, seed0501-priest-cast-read-turn, seed0700-samurai-explore-descend, seed0900-tourist-explore-actions, seed1150-caveman-explore-move, seed1500-rogue-explore-move, seed1800-tourist-eat-throw, seed2200-wizard-quaff-zap-read, seed2600-wizard-custom-binds, seed4500-knight-coverage, seed5002-wizard-coverage-pair, seed5006-tourist-stress-disaster, seed8000-tourist-starter
 
 ## Known Live Blockers
 
-| Session | Screens | RNG | First screen | First RNG | Hypothesis |
-| --- | --- | --- | --- | --- | --- |
-| seed0116-wizard-wear-shop | 127/127 | 12562/12562 | -:none:none:- | -:- | Pet behavior: dog_goal() object scan, reachability, carry checks, and object resistance in dogmove.c. |
-| seed0383-wizard-hallucinate | 219/219 | 16915/16915 | -:none:none:- | -:- | Special-level monster setup: des.monster() selected-monster initialization, equipment, and hallucination display context. |
-| seed8000-tourist-starter | 23/23 | 3130/3130 | -:none:none:- | -:- | Live turn loop: post-screen monster movement RNG ownership after visible screen parity. |
+No known live blockers in this corpus run.
 
 ## Session Inventory
 
