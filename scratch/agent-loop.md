@@ -12,8 +12,10 @@ and `feature_map.md`.
 
 ## Current State
 
-- Current branch in this workspace: `main`, ahead of origin.
-- Latest verified repair unit: leaderboard comparison-surface cleanup.
+- Current branch in this workspace: `main`; use `agent:brief` Branch/status for
+  live ahead/behind state.
+- Latest verified repair unit: agent-brief current-state expansion plus
+  leaderboard wording cleanup.
 - Checked-in public corpus is exact: `44/44 S 11405/11405 R 792838/792838 C 0`.
 - Last refreshed hosted public cache is exact:
   `44/44 S 10982/10982 R 840358/840358 C 0`. It still classifies as
@@ -42,6 +44,13 @@ and `feature_map.md`.
     totals match the leaderboard payload. This keeps hosted-session drift from
     masking deploy/leaderboard lag when the leaderboard row still uses the
     checked-in public corpus shape.
+  - Harness truth: `scripts/agent-brief.mjs` now prints the full compact
+    `## Current State` block instead of clipping wrapped leaderboard status
+    bullets mid-sentence, and target hits on wrapped Markdown lines include the
+    preceding context line so historical notes do not look current.
+  - Durable feature-map truth: the old "leaderboard comparison was unknown"
+    note is explicitly historical; current leaderboard fetch state remains the
+    active refresh evidence below.
   - Production dehack: removed the unused no-op `dealloc_obj()` scaffold from
     `js/mklev.js`; no static call sites remained.
   - Harness truth: `scripts/parity-state.mjs` discovers leaderboard data URLs

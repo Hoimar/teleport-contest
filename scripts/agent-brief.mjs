@@ -51,6 +51,15 @@ function targetTerms(target) {
     return [...parts].filter(Boolean);
 }
 
+function contextualHit(lines, idx) {
+    const line = lines[idx];
+    const prev = idx > 0 ? lines[idx - 1] : '';
+    if (/^\s+\S/.test(line) && prev.trim() && !prev.startsWith('## ')) {
+        return `${idx}: ${prev.trim()} / ${idx + 1}: ${line.trim()}`;
+    }
+    return `${idx + 1}: ${line}`;
+}
+
 function grepLines(text, terms, limit) {
     if (!terms.length) return [];
     const lowerTerms = terms.map((term) => term.toLowerCase());
@@ -59,7 +68,7 @@ function grepLines(text, terms, limit) {
     for (let i = 0; i < lines.length; i++) {
         const lower = lines[i].toLowerCase();
         if (!lowerTerms.some((term) => lower.includes(term))) continue;
-        hits.push(`${i + 1}: ${lines[i]}`);
+        hits.push(contextualHit(lines, i));
         if (hits.length >= limit) break;
     }
     return hits;
@@ -125,7 +134,7 @@ function main() {
     console.log('- Commit rule: after verified truth or harness changes, stage only the coherent files and commit.');
 
     printBlock('Dirty Files Sample', dirty.length ? limitLines(dirty.map((line) => `- ${line}`), 12) : ['- none']);
-    printBlock('Checkpoint Current State', section(checkpoint, '## Current State', 10));
+    printBlock('Checkpoint Current State', section(checkpoint, '## Current State', 24));
     printBlock('Checkpoint Queue', section(checkpoint, '## Current Queue', 16));
     printBlock('Feature Map Hits', grepLines(featureMap, terms, options.lines));
     printBlock('Lesson Hits', grepLines(lessons, terms, options.lines));
