@@ -13,7 +13,7 @@ and `feature_map.md`.
 ## Current State
 
 - Current branch in this workspace: `main`, ahead of origin.
-- Latest verified repair unit: hack-audit false-positive suppression cleanup.
+- Latest verified repair unit: scratch trace tooling convention cleanup.
 - Checked-in public corpus is exact: `44/44 S 11405/11405 R 792838/792838 C 0`.
 - Last refreshed hosted public cache is exact:
   `44/44 S 10982/10982 R 840358/840358 C 0`. It still classifies as
@@ -33,7 +33,10 @@ and `feature_map.md`.
 ## Latest Loop Checkpoint
 
 - Latest verified WIP on 2026-06-28:
-  - Harness truth: `scripts/hack-debt-audit.mjs` now suppresses two exact
+  - Harness/doc truth: `feature_map.md` now records that tracked reusable
+    `scratch/*trace*.mjs` and `scratch/*loader.mjs` files are agent-toolkit
+    diagnostics; one-off probes should stay temporary or untracked.
+  - Previous harness truth: `scripts/hack-debt-audit.mjs` suppresses two exact
     API-comment false positives in frozen `js/storage.js` and `js/terminal.js`
     while continuing to scan real hard/debug/frozen-import debt.
   - Previous production truth remains the Juiblex named-level topology
