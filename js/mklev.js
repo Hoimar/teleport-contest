@@ -28,7 +28,7 @@ import {
     D_NODOOR, D_BROKEN, D_CLOSED, D_ISOPEN, D_LOCKED, D_TRAPPED, D_SECRET,
     OROOM, VAULT, THEMEROOM, COURT, BARRACKS, ZOO, LEPREHALL, SHOPBASE, DELPHI, MORGUE, TEMPLE, SWAMP, BEEHIVE, COCKNEST, ANTHOLE,
     CANDLESHOP, TOOLSHOP, FOODSHOP, BOOKSHOP, FODDERSHOP, WANDSHOP,
-    ROOMOFFSET, MAXNROFROOMS, SHARED,
+    ROOMOFFSET, MAXNROFROOMS, SHARED, SHARED_PLUS,
     SDOOR, SCORR, IRONBARS, TREE, FOUNTAIN, SINK, ALTAR, GRAVE,
     DIR_N, DIR_S, DIR_E, DIR_W, DIR_180,
     IS_WALL, IS_STWALL, IS_DOOR, IS_SDOOR, IS_OBSTRUCTED, IS_FURNITURE, IS_POOL, IS_LAVA, IS_ROOM,
@@ -3528,6 +3528,38 @@ function room_type_at(x, y) {
     return room_for_no(roomno)?.rtype ?? 0;
 }
 
+function room_type_matches(roomno, rtype) {
+    if (!rtype) return true;
+    const type = room_for_no(roomno)?.rtype ?? 0;
+    return type === rtype || (rtype === SHOPBASE && type > SHOPBASE);
+}
+
+function in_rooms(x, y, rtype) {
+    // C ref: hack.c:in_rooms().  Return matching room numbers for ordinary
+    // room squares and shared boundaries; callers use array truth/first entry
+    // instead of C's static char buffer.
+    const loc = game.level?.at(x, y);
+    const roomno = loc?.roomno ?? 0;
+    const out = [];
+    const add = (rno) => {
+        if (rno >= ROOMOFFSET && !out.includes(rno) && room_type_matches(rno, rtype))
+            out.unshift(rno);
+    };
+    if (roomno >= ROOMOFFSET) {
+        add(roomno);
+        return out;
+    }
+    if (roomno !== SHARED && roomno !== SHARED_PLUS) return out;
+    const step = roomno === SHARED ? 2 : 1;
+    for (let xx = x - 1; xx <= x + 1; xx += step) {
+        for (let yy = y - 1; yy <= y + 1; yy += step) {
+            if (!isok(xx, yy)) continue;
+            add(game.level?.at(xx, yy)?.roomno ?? 0);
+        }
+    }
+    return out;
+}
+
 function set_mimic_sym(mon) {
     if (!mon) return;
 
@@ -4090,9 +4122,6 @@ function make_grave(x, y, text) {
     loc.typ = GRAVE;
     if (text == null) randomEpitaph();
 }
-
-// in_rooms stub
-function in_rooms(x, y, rtype) { return []; }
 
 // ============================================================
 // Core mklev functions (ported from main project's mklev.js)
@@ -18967,7 +18996,7 @@ function dosdoor(x, y, aroom, type) {
     const map = game.level;
     const loc = map.at(x, y);
     if (!loc) return;
-    const shdoor = in_rooms(x, y, 0).length > 0;
+    const shdoor = in_rooms(x, y, SHOPBASE).length > 0;
     if (!IS_WALL(loc.typ)) type = DOOR;
     loc.typ = type;
     if (type === DOOR) {

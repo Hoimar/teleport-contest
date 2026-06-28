@@ -14,8 +14,8 @@ and `feature_map.md`.
 
 - Current branch in this workspace: `main`; use `agent:brief` Branch/status for
   live ahead/behind state.
-- Latest verified repair unit: agent-brief current-state expansion plus
-  leaderboard wording cleanup.
+- Latest verified repair unit: mklev room-membership helper for generated
+  shop-door placement.
 - Checked-in public corpus is exact: `44/44 S 11405/11405 R 792838/792838 C 0`.
 - Last refreshed hosted public cache is exact:
   `44/44 S 10982/10982 R 840358/840358 C 0`. It still classifies as
@@ -39,6 +39,16 @@ and `feature_map.md`.
 ## Latest Loop Checkpoint
 
 - Latest verified WIP on 2026-06-28:
+  - Production truth: `js/mklev.js` now has a C-shaped `in_rooms()` helper for
+    ordinary and shared room-number cells, and `dosdoor()` uses
+    `in_rooms(x,y,SHOPBASE)` like upstream so generated shop doors skip the
+    ordinary random trap branch (`C refs: hack.c:in_rooms()`,
+    `mklev.c:dosdoor()`).
+  - Verification: focused `seed0116-wizard-wear-shop`,
+    `seed0360-wizard-world-tour`, and `seed5002-wizard-coverage-pair` stayed
+    exact; regenerated checked-in corpus stayed `44/44`; strict sentinels
+    stayed `5/5 S 1063/1063 R 64569/64569 C 0`; `hack:audit` remained
+    `hard=0 suspicious=0`.
   - Harness truth: `scripts/parity-state.mjs` now compares leaderboard public
     rows against the checked-in or hosted public score surface whose session
     totals match the leaderboard payload. This keeps hosted-session drift from
