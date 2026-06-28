@@ -100,7 +100,7 @@ Treat screen totals as lagging evidence of subsystem progress, not as the optimi
   encountered-object path so `dodiscovered()` can show `splash of venom`
   without debug-wide synthetic rows (`C refs: mthrowu.c:m_throw(),
   o_init.c:observe_object()/discover_object()`).
-- **Display/topline/vision front doors:** Current WIP restores arrival
+- **Display/topline/vision front doors:** This snapshot restored arrival
   temperature/smoke packing through tty topline width rules, clears display
   `disp_*` state during full `docrt()` redraws, suppresses warning digits on
   unseen long-worm tail cells, and only uses the special iron-bars glyph path
