@@ -13,7 +13,7 @@ and `feature_map.md`.
 ## Current State
 
 - Current branch in this workspace: `main`, ahead of origin.
-- Latest verified repair unit: Juiblex named-level topology predicate cleanup.
+- Latest verified repair unit: hack-audit false-positive suppression cleanup.
 - Checked-in public corpus is exact: `44/44 S 11405/11405 R 792838/792838 C 0`.
 - Last refreshed hosted public cache is exact:
   `44/44 S 10982/10982 R 840358/840358 C 0`. It still classifies as
@@ -33,14 +33,14 @@ and `feature_map.md`.
 ## Latest Loop Checkpoint
 
 - Latest verified WIP on 2026-06-28:
-  - Subsystem truth: `js/dungeon.js` now records `game.juiblex_level` from the
-    generated special-level map, and `js/const.js:Is_juiblex_level()` compares
-    `dnum/dlevel` like the other named-level helpers.
-  - C refs: `dungeon.c:level_map[]`, `include/dungeon.h:Is_juiblex_level()`.
-  - Direct topology sanity: generated Juiblex level `{dnum:1,dlevel:5}` returns
-    true; an unrelated level returns false.
-  - Target verify: `seed0360-wizard-world-tour` exact
-    `S 833/833 R 120639/120639 C 0`.
+  - Harness truth: `scripts/hack-debt-audit.mjs` now suppresses two exact
+    API-comment false positives in frozen `js/storage.js` and `js/terminal.js`
+    while continuing to scan real hard/debug/frozen-import debt.
+  - Previous production truth remains the Juiblex named-level topology
+    predicate cleanup (`C refs: dungeon.c:level_map[]`,
+    `include/dungeon.h:Is_juiblex_level()`).
+  - Hack audit is clean:
+    `hard=0 suspicious=0`.
   - Strict sentinel exact:
     `5/5 S 1063/1063 R 64569/64569 C 0`.
   - Checked-in public corpus exact:
