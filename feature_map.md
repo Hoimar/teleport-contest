@@ -30,9 +30,9 @@ Treat screen totals as lagging evidence of subsystem progress, not as the optimi
   (`C refs: src/end.c:done(), src/end.c:done_in_by()/outrip(),
   src/zap.c:weffects()/zhitu()`).
 
-## Current WIP Addendum (2026-06-06)
+## Historical WIP Addendum (2026-06-06)
 
-- **Current verified WIP:** `seed0009-swimmer-mforce` is exact
+- **Verified WIP snapshot:** `seed0009-swimmer-mforce` is exact
   (`S 73/73 R 3713/3713 C 0`), `seed0007-rogue-snake-swamp` remains exact
   (`S 302/302 R 16373/16373 C 0`), `seed0014-dequa-fountain-explore` remains
   exact (`S 714/714 R 59178/59178 C 0`), and strict sentinels are exact
