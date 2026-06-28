@@ -30,8 +30,11 @@ that changed and classifies any sentinel movement.
 `npm run parity:state -- --refresh-live` fetches the hosted public sessions,
 compares their hashes and score totals with checked-in `sessions/`, checks the
 sentinel invariant, and best-effort compares the inferred fork owner with the
-online leaderboard. Use `--team <name>` when the fork owner is not the
-leaderboard name, `--full` for non-exact rows, and `--json` for automation.
+online leaderboard. Leaderboard comparison chooses the checked-in or hosted
+public score surface whose public-session shape matches the leaderboard payload,
+so hosted-session drift does not mask deploy lag for an older leaderboard run.
+Use `--team <name>` when the fork owner is not the leaderboard name, `--full`
+for non-exact rows, and `--json` for automation.
 Delta sections are always `left minus right`; for example
 `S +4/+8` means four more matched screens over eight more total screens in the
 left corpus. Per-session rows distinguish `session-file-drift`,

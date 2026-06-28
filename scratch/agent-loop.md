@@ -13,14 +13,14 @@ and `feature_map.md`.
 ## Current State
 
 - Current branch in this workspace: `main`, ahead of origin.
-- Latest verified repair unit: mklev dead-stub cleanup.
+- Latest verified repair unit: leaderboard comparison-surface cleanup.
 - Checked-in public corpus is exact: `44/44 S 11405/11405 R 792838/792838 C 0`.
 - Last refreshed hosted public cache is exact:
   `44/44 S 10982/10982 R 840358/840358 C 0`. It still classifies as
   `public-session-drift` because 30 hosted session files differ from
   checked-in sessions, but both score surfaces are exact.
 - Leaderboard fetch succeeds from `https://mazesofmenace.ai/leaderboard/data.json`.
-  Default inferred team `Hoimar` currently classifies as `public-session-drift`:
+  Default inferred team `Hoimar` currently classifies as `leaderboard-lag`:
   leaderboard public `29/44 S 11292/11405 R 792838/792838`; held-out
   `2523/11265` points and `2/44` passing.
 - Scratch trace/checkpoint files are agent-toolkit state and may be committed
@@ -28,8 +28,8 @@ and `feature_map.md`.
 - Strict sentinels are exact:
   `5/5 S 1063/1063 R 64569/64569 C 0`.
 - Current public classification: checked-in and hosted public corpora are exact;
-  leaderboard fetch works, but default inferred team `Hoimar` differs from the
-  hosted public score surface and remains deploy/lag evidence.
+  leaderboard fetch works, but default inferred team `Hoimar` is behind the
+  checked-in public score surface and remains deploy/lag evidence.
 - Current sentinel regression classification: none; strict sentinel is exact.
 - Hack audit is clean: `hard=0 suspicious=0`. Production `js/` has no
   intentional debug I/O or imports from `frozen/`.
@@ -37,6 +37,11 @@ and `feature_map.md`.
 ## Latest Loop Checkpoint
 
 - Latest verified WIP on 2026-06-28:
+  - Harness truth: `scripts/parity-state.mjs` now compares leaderboard public
+    rows against the checked-in or hosted public score surface whose session
+    totals match the leaderboard payload. This keeps hosted-session drift from
+    masking deploy/leaderboard lag when the leaderboard row still uses the
+    checked-in public corpus shape.
   - Production dehack: removed the unused no-op `dealloc_obj()` scaffold from
     `js/mklev.js`; no static call sites remained.
   - Harness truth: `scripts/parity-state.mjs` discovers leaderboard data URLs

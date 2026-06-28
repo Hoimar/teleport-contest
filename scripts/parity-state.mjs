@@ -600,7 +600,21 @@ function scoresEqual(localSummary, leaderboardSummary) {
         localSummary.rngTotal === leaderboardSummary.rngTotal;
 }
 
-function classifyLeaderboard({ leaderboard, teamName, scoreCorpus, corpusComparison, git }) {
+function scoreShapeMatches(summary, leaderboardSummary) {
+    if (!summary || !leaderboardSummary) return false;
+    if (summary.sessions !== leaderboardSummary.sessions) return false;
+    if (summary.screenTotal !== leaderboardSummary.screenTotal) return false;
+    if (leaderboardSummary.rngTotal != null && summary.rngTotal !== leaderboardSummary.rngTotal) return false;
+    return true;
+}
+
+function chooseLeaderboardScoreCorpus(publicSummary, localCorpus, liveCorpus) {
+    if (localCorpus?.available && scoreShapeMatches(localCorpus.summary, publicSummary)) return localCorpus;
+    if (liveCorpus?.available && scoreShapeMatches(liveCorpus.summary, publicSummary)) return liveCorpus;
+    return liveCorpus?.available ? liveCorpus : localCorpus;
+}
+
+function classifyLeaderboard({ leaderboard, teamName, localCorpus, liveCorpus, corpusComparison, git }) {
     if (!leaderboard?.available) {
         return { class: 'unknown', reason: (leaderboard?.errors || ['leaderboard unavailable']).join(' | ') };
     }
@@ -608,6 +622,8 @@ function classifyLeaderboard({ leaderboard, teamName, scoreCorpus, corpusCompari
     if (!team) {
         return { class: 'unknown', reason: `team ${teamName || '(none)'} not found`, url: leaderboard.url };
     }
+    const publicSummary = summarizeLeaderboardSessions(team);
+    const scoreCorpus = chooseLeaderboardScoreCorpus(publicSummary, localCorpus, liveCorpus);
     if (!scoreCorpus?.available) {
         return { class: 'unknown', reason: 'no local/live corpus score available', url: leaderboard.url, team: compactLeaderboardTeam(team) };
     }
@@ -615,9 +631,8 @@ function classifyLeaderboard({ leaderboard, teamName, scoreCorpus, corpusCompari
     const sessionDelta = leaderboardCorpus
         ? compareCorpusScores(scoreCorpus, leaderboardCorpus, scoreCorpus.label, 'leaderboard public')
         : null;
-    const publicSummary = summarizeLeaderboardSessions(team);
-    if (corpusComparison?.class === 'public-session-drift') {
-        return { class: 'public-session-drift', reason: corpusComparison.reason, url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta };
+    if (!scoreShapeMatches(scoreCorpus.summary, publicSummary) && corpusComparison?.class === 'public-session-drift') {
+        return { class: 'public-session-drift', reason: 'leaderboard public corpus shape differs from checked-in and hosted public sessions', url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta };
     }
     if (git.dirty) {
         return { class: 'local-dirty-or-unpushed', reason: 'working tree has local changes not represented by leaderboard', url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta };
@@ -629,7 +644,7 @@ function classifyLeaderboard({ leaderboard, teamName, scoreCorpus, corpusCompari
         if (held && Number(held.points ?? 0) !== Number(held.maxPoints ?? 0)) {
             return { class: 'heldout-only-gap', reason: 'public score matches; held-out sessions remain private cleanliness evidence', url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta };
         }
-        return { class: 'same', reason: 'leaderboard public score matches local hosted-public score', url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta };
+        return { class: 'same', reason: `leaderboard public score matches local ${scoreCorpus.label} score`, url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta };
     }
 
     if (team.lastScored && git.commitTime && Date.parse(team.lastScored) < Date.parse(git.commitTime)) {
@@ -789,12 +804,12 @@ async function main() {
 
     const wantLeaderboard = options.leaderboard;
     const leaderboardData = wantLeaderboard ? await fetchLeaderboard(options.baseUrl) : null;
-    const scoreCorpus = liveCorpus.available ? liveCorpus : localCorpus;
     const leaderboard = wantLeaderboard
         ? classifyLeaderboard({
             leaderboard: leaderboardData,
             teamName: options.team,
-            scoreCorpus,
+            localCorpus,
+            liveCorpus,
             corpusComparison,
             git,
         })
