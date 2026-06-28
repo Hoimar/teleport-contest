@@ -1322,8 +1322,8 @@ export async function newgame() {
     // after init_dungeons() and u_init_misc().
     l_nhcore_init();
 
-    // Set up game state needed by mklev
-    if (!g.dungeons) g.dungeons = [{ dname: 'The Dungeons of Doom', depth_start: 1, num_dunlevs: 30 }];
+    // Set up game state needed by mklev.  init_dungeons() above installs
+    // dungeon topology, branch records, and mines_dnum before level creation.
     g.u = g.u || {};
     // C ref: src/u_init.c:u_init_misc().  Some startup paths skip the full
     // initializer, but later hero-state consumers still expect these fields.
@@ -1333,15 +1333,6 @@ export async function newgame() {
     g.flags = g.flags || {};
     g._death_first_move_message_shown = false;
     g._death_continue_after_first_move_more = false;
-    // Branch placement fallback for paths that have not initialized full
-    // dungeon topology; generated levels still need the dungeon exit and Mines
-    // branch shape for branch predicates.
-    if (!g.branches) g.branches = [
-        { end1: { dnum: 0, dlevel: 1 }, end2: { dnum: 7, dlevel: 1 }, end1_up: true },
-        { end1: { dnum: 0, dlevel: 2 }, end2: { dnum: 2, dlevel: 1 }, end1_up: false },
-    ];
-    if (g.mines_dnum == null) g.mines_dnum = 2;
-
     // Real mklev generates the level with correct room positions
     // Structural phase consumes RNG for rooms/corridors/doors/stairs
     await mklev();

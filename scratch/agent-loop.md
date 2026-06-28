@@ -13,7 +13,7 @@ and `feature_map.md`.
 ## Current State
 
 - Current branch in this workspace: `main`, ahead of origin.
-- Latest verified repair unit: monster/object-fill evidence cleanup.
+- Latest verified repair unit: branch-topology fallback cleanup.
 - Checked-in public corpus is exact: `44/44 S 11405/11405 R 792838/792838 C 0`.
 - Last refreshed hosted public cache is exact:
   `44/44 S 10982/10982 R 840358/840358 C 0`. It still classifies as
@@ -33,6 +33,13 @@ and `feature_map.md`.
 ## Latest Loop Checkpoint
 
 - Latest verified WIP on 2026-06-28:
+  - Production dehack: `newgame()` no longer installs a hardcoded branch/dungeon
+    fallback after `init_dungeons()`; branch predicates and stair direction now
+    rely on generated dungeon topology (`C refs: dungeon.c:init_dungeons()`,
+    `mklev.c:place_branch()`).
+  - Durable feature-map truth: branch entrance placement now records generated
+    `end1_up` topology from `init_dungeons()` instead of the retired seed8000
+    startup fallback.
   - Durable feature-map truth: monster/object-fill now records live startup
     state instead of startup fast-forward scaffolds and replaces stale partial
     `seed0383`/`seed5002` evidence with current exact-session evidence.
