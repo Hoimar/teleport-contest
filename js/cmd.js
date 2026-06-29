@@ -49,6 +49,7 @@ import {
     finish_deferred_nymph_escape_tail,
     finish_deferred_monster_trap_effect,
     finish_pending_swallowed_expulsion,
+    finish_after_more_monster_explosion_basic,
     create_gas_cloud_basic,
     monster_projectile_destroyed_by_hit,
 } from './monmove.js';
@@ -1435,7 +1436,7 @@ function wishedObjectSpec(name) {
     }
     if (wish.includes('apple')) {
         rn2(16);
-        return { ...spec, otyp: APPLE };
+        return { ...spec, otyp: APPLE, quan: spec.quan ?? 1 };
     }
     if (wish.includes('chest')) {
         // C ref: objnam.c:rnd_otyp_by_namedesc().  The name lookup for a
@@ -2778,6 +2779,28 @@ async function readScrollOfDestroyArmor(obj) {
 async function finishReadObjectSelection(obj, idx = inventoryIndexForLetter(obj?.invlet || '')) {
     if (!obj) {
         game.context.move = 0;
+        return;
+    }
+    if (obj.otyp === FORTUNE_COOKIE) {
+        // C refs: src/read.c:doread(), src/rumors.c:outrumor(BY_COOKIE).
+        if (!heroIsBlind()) noteLiterateConduct();
+        consumeInventoryObject(obj);
+        if (heroIsBlind()) {
+            game._cookie_message_queue = [
+                { text: 'This cookie has a scrap of paper inside.', more: true },
+                { text: 'What a pity that you cannot read it!', move: true },
+            ];
+        } else {
+            const rumor = getRumor(obj.blessed ? 1 : obj.cursed ? -1 : 0, false);
+            exercise(A_WIS, true);
+            game._cookie_message_queue = [
+                { text: 'This cookie has a scrap of paper inside.  It reads:', more: true },
+                { text: rumor, move: true },
+            ];
+        }
+        game.context.move = 0;
+        await pline('You break up the cookie and throw away the pieces.');
+        queue_more_prompt();
         return;
     }
     if (obj.oclass !== SCROLL_CLASS && obj.oclass !== SPBOOK_CLASS) {
@@ -4413,6 +4436,16 @@ function baseObjectName(obj) {
         // C ref: objnam.c:xname_flags().  Blind inventory formatting does
         // not expose an undiscovered wand's shuffled appearance.
         return 'wand';
+    }
+    if (obj?.oclass === SCROLL_CLASS && obj.dknown === false) {
+        // C ref: objnam.c:xname_flags().  Blind inventory formatting does
+        // not expose an undiscovered scroll's shuffled label.
+        return 'scroll';
+    }
+    if (obj?.oclass === SPBOOK_CLASS && obj.dknown === false) {
+        // C ref: objnam.c:xname_flags().  Blind inventory formatting does
+        // not expose an undiscovered spellbook title.
+        return 'spellbook';
     }
     if (obj?.otyp === POT_WATER) {
         if (obj.blessed) return 'potion of holy water';
@@ -6886,6 +6919,10 @@ function containerLootSortName(obj) {
 
 function containerContentMenuRows(container) {
     const contents = containerContents(container);
+    // C refs: src/end.c:container_contents(), src/invent.c:loot_xname(),
+    // src/objnam.c:xname_flags().  Sorting and displaying visible container
+    // contents names the objects, which observes their descriptions first.
+    for (const obj of contents) observeObjectForNaming(obj);
     // C ref: src/end.c:container_contents() -> sortloot(SORTLOOT_LOOT).
     // Names sort lexicographically while ignoring quantity, with original
     // object-list order as the final tie-breaker.
@@ -21614,6 +21651,7 @@ async function handleQueuedMore(ch) {
                     exercise(A_STR, false); // C ref: src/mthrowu.c:thitu().
             }
             await pline(msg);
+            finish_after_more_monster_explosion_basic();
             if (!game._after_more_message && game._deferred_nymph_escape_tail) {
                 // C refs: src/steal.c:steal(), src/teleport.c:rloc().
                 // The deferred theft line is displayed after the removal More;
@@ -22134,7 +22172,7 @@ async function commitIntrinsicMenuSelection(menu) {
             game.u.uhallucination = newtimeout;
             const isHallucinating = !!(game.u.uhallucination || game.u.uprops.hallucination);
             apply_hallucination_display_transition(wasHallucinating, isHallucinating);
-            await pline('Oh wow!  Everything looks so cosmic!');
+            await pline(`Oh wow!  Everything ${heroIsBlind() ? 'feels' : 'looks'} so cosmic!`);
             queue_more_prompt();
             continue;
         }
@@ -29273,12 +29311,15 @@ export async function rhack(key) {
         } else if (ch === 'b') {
             game.context.move = 0;
             await pline('You are already wearing that!');
+        } else if (obj) {
+            game.context.move = 0;
+            await pline('That is a silly thing to wear.');
         } else if (ch === '\x1b') {
             game.context.move = 0;
             await pline('Never mind.');
         } else {
             game.context.move = 0;
-            await pline("You can't wear that.");
+            await pline("You don't have that object.");
         }
         return;
     }

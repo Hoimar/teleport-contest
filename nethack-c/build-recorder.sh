@@ -139,6 +139,18 @@ cd "$RECORDER_DIR"
 export SOURCE_DATE_EPOCH="${TELEPORT_BUILD_EPOCH:-1777723200}"
 make -j"$NPROC" SYSCFLAGS="$LUA_SYSCFLAGS" >/dev/null
 make install >/dev/null
+SYSCONF_FILE="$INSTALL_PREFIX/games/lib/nethackdir/sysconf"
+if [ ! -f "$SYSCONF_FILE" ]; then
+    cp sys/unix/sysconf "$SYSCONF_FILE"
+fi
+# Recorder sessions rely on OPTIONS=playmode:debug being accepted on any
+# developer machine; the upstream sample sysconf limits that to root/games.
+tmp_sysconf="$SYSCONF_FILE.tmp"
+awk 'BEGIN { seen = 0 }
+     /^WIZARDS=/ { print "WIZARDS=*"; seen = 1; next }
+     { print }
+     END { if (!seen) print "WIZARDS=*" }' "$SYSCONF_FILE" > "$tmp_sysconf"
+mv "$tmp_sysconf" "$SYSCONF_FILE"
 echo
 echo "[ok] recorder built: $RECORDER_DIR/src/nethack"
 echo "[ok] installed to:    $INSTALL_PREFIX/games/lib/nethackdir/"

@@ -120,10 +120,27 @@ function inferTeamFromGitRemote() {
 }
 
 function gitState() {
+    const status = gitOutput(['status', '--short']) || '';
+    const upstream = gitOutput(['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}']);
+    let ahead = null, behind = null;
+    if (upstream) {
+        const counts = gitOutput(['rev-list', '--left-right', '--count', `${upstream}...HEAD`]);
+        const [behindText, aheadText] = (counts || '').split(/\s+/);
+        if (behindText !== undefined && aheadText !== undefined) {
+            behind = Number(behindText);
+            ahead = Number(aheadText);
+        }
+    }
     return {
         commit: gitOutput(['rev-parse', '--short', 'HEAD']) ?? 'unknown',
+        commitFull: gitOutput(['rev-parse', 'HEAD']) ?? 'unknown',
         commitTime: gitOutput(['log', '-1', '--format=%cI']),
-        dirty: Boolean(gitOutput(['status', '--short'])),
+        branch: gitOutput(['branch', '--show-current']) || null,
+        upstream,
+        ahead,
+        behind,
+        dirty: Boolean(status),
+        dirtyFiles: status ? status.split('\n').filter(Boolean).length : 0,
     };
 }
 
@@ -608,6 +625,24 @@ function scoreShapeMatches(summary, leaderboardSummary) {
     return true;
 }
 
+function gitCaveats(git) {
+    const caveats = [];
+    if (git.dirty) {
+        caveats.push(`working tree has ${git.dirtyFiles || 1} uncommitted file(s) not represented by leaderboard`);
+    }
+    if ((git.ahead ?? 0) > 0) {
+        caveats.push(`local HEAD is ahead of ${git.upstream || 'upstream'} by ${git.ahead} commit(s)`);
+    }
+    if ((git.behind ?? 0) > 0) {
+        caveats.push(`local branch is behind ${git.upstream || 'upstream'} by ${git.behind} commit(s)`);
+    }
+    return caveats;
+}
+
+function reasonWithCaveats(reason, caveats) {
+    return caveats.length ? `${reason}; ${caveats.join('; ')}` : reason;
+}
+
 function chooseLeaderboardScoreCorpus(publicSummary, localCorpus, liveCorpus) {
     if (localCorpus?.available && scoreShapeMatches(localCorpus.summary, publicSummary)) return localCorpus;
     if (liveCorpus?.available && scoreShapeMatches(liveCorpus.summary, publicSummary)) return liveCorpus;
@@ -631,26 +666,30 @@ function classifyLeaderboard({ leaderboard, teamName, localCorpus, liveCorpus, c
     const sessionDelta = leaderboardCorpus
         ? compareCorpusScores(scoreCorpus, leaderboardCorpus, scoreCorpus.label, 'leaderboard public')
         : null;
+    const caveats = gitCaveats(git);
     if (!scoreShapeMatches(scoreCorpus.summary, publicSummary) && corpusComparison?.class === 'public-session-drift') {
-        return { class: 'public-session-drift', reason: 'leaderboard public corpus shape differs from checked-in and hosted public sessions', url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta };
-    }
-    if (git.dirty) {
-        return { class: 'local-dirty-or-unpushed', reason: 'working tree has local changes not represented by leaderboard', url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta };
+        return { class: 'public-session-drift', reason: reasonWithCaveats('leaderboard public corpus shape differs from checked-in and hosted public sessions', caveats), url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta, caveats };
     }
 
     const publicEqual = scoresEqual(scoreCorpus.summary, publicSummary);
     if (publicEqual) {
         const held = team.heldOut;
         if (held && Number(held.points ?? 0) !== Number(held.maxPoints ?? 0)) {
-            return { class: 'heldout-only-gap', reason: 'public score matches; held-out sessions remain private cleanliness evidence', url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta };
+            return { class: 'heldout-only-gap', reason: reasonWithCaveats('public score matches; held-out sessions remain private cleanliness evidence', caveats), url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta, caveats };
         }
-        return { class: 'same', reason: `leaderboard public score matches local ${scoreCorpus.label} score`, url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta };
+        return { class: 'same', reason: reasonWithCaveats(`leaderboard public score matches local ${scoreCorpus.label} score`, caveats), url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta, caveats };
     }
 
-    if (team.lastScored && git.commitTime && Date.parse(team.lastScored) < Date.parse(git.commitTime)) {
-        return { class: 'leaderboard-lag', reason: 'leaderboard lastScored is older than local HEAD commit time', url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta };
+    if ((git.ahead ?? 0) > 0) {
+        return { class: 'local-dirty-or-unpushed', reason: reasonWithCaveats(`local HEAD is ahead of ${git.upstream || 'upstream'} and cannot be reflected by leaderboard yet`, caveats), url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta, caveats };
     }
-    return { class: 'scorer-drift', reason: 'same public corpus but leaderboard public score differs from local scorer output', url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta };
+    if (team.lastScored && git.commitTime && Date.parse(team.lastScored) < Date.parse(git.commitTime)) {
+        return { class: 'leaderboard-lag', reason: reasonWithCaveats('leaderboard lastScored is older than local HEAD commit time', caveats), url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta, caveats };
+    }
+    if (git.dirty) {
+        return { class: 'local-dirty-or-unpushed', reason: reasonWithCaveats('working tree has local changes not represented by leaderboard', caveats), url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta, caveats };
+    }
+    return { class: 'scorer-drift', reason: reasonWithCaveats('same public corpus but leaderboard public score differs from local scorer output', caveats), url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta, caveats };
 }
 
 function auditSummary() {
@@ -727,6 +766,13 @@ function printScoreDelta(title, delta, options = {}) {
 function printHuman(payload) {
     console.log('# Parity State');
     console.log(`- commit: ${payload.git.commit}${payload.git.dirty ? ' dirty' : ''}`);
+    if (payload.git.branch || payload.git.upstream) {
+        const upstream = payload.git.upstream || 'no upstream';
+        const ahead = payload.git.ahead == null ? '?' : payload.git.ahead;
+        const behind = payload.git.behind == null ? '?' : payload.git.behind;
+        console.log(`- branch: ${payload.git.branch || 'unknown'} -> ${upstream} (ahead ${ahead}, behind ${behind})`);
+    }
+    if (payload.git.dirty) console.log(`- dirty files: ${payload.git.dirtyFiles}`);
     console.log(`- generated: ${payload.generatedAt}`);
     printCorpus('Checked-In Public Corpus', payload.localCorpus);
     printCorpus('Cached Hosted Public Corpus', payload.liveCorpus);

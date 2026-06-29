@@ -11,6 +11,7 @@ aliases; direct `node` commands work the same way.
 | Screen diff | `npm run screen:diff -- <session> --first` | `node scripts/screen-diff.mjs <session> --first` |
 | Verify | `npm run verify -- --target <session>` | `node scripts/verify-change.mjs --target <session>` |
 | Strict sentinel | `npm run sentinel:strict` | `node scripts/run-sentinel-suite.mjs --strict` |
+| Scoreboard state | `npm run scoreboard:state` | `node scripts/parity-state.mjs --refresh-live --full` |
 | Hack audit | `npm run hack:audit` | `node scripts/hack-debt-audit.mjs` |
 | Memory lint | `npm run memory:lint` | `node scripts/memory-lint.mjs` |
 
@@ -44,11 +45,17 @@ Important classifications:
 
 - `same`: checked-in and hosted public sessions agree.
 - `public-session-drift`: hosted public sessions changed or the cache was stale.
-- `local-dirty-or-unpushed`: local work cannot match the leaderboard run.
+- `local-dirty-or-unpushed`: local commits or WIP cannot match the leaderboard run.
 - `leaderboard-lag`: leaderboard scoring predates local HEAD.
 - `scorer-drift`: same public corpus, different local vs leaderboard public score.
 - `heldout-only-gap`: public score agrees, hidden held-out score differs.
 - `unknown`: endpoint, team, or local data was unavailable.
+
+Current limitation: the public leaderboard JSON reports repo, `lastScored`, and
+score totals, but not the git commit that was scored. When the local tree is
+dirty or ahead, the classifier is deliberately conservative. For unresolved
+scoreboard motion, compare from a clean pushed ref or add a clean-ref scorer
+mode rather than treating timestamp alone as commit evidence.
 
 ## Library Boundary
 

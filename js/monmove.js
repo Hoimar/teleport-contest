@@ -13,7 +13,7 @@ import {
     D_BROKEN, D_CLOSED, D_ISOPEN, D_LOCKED, D_NODOOR, D_TRAPPED,
     ALL_TRAPS, NO_TRAP,
     ARROW_TRAP, DART_TRAP, ROCKTRAP, BEAR_TRAP, LANDMINE, ROLLING_BOULDER_TRAP,
-    RUST_TRAP, FIRE_TRAP, PIT, SPIKED_PIT, HOLE, TRAPDOOR,
+    RUST_TRAP, FIRE_TRAP, PIT, SPIKED_PIT, HOLE, TRAPDOOR, TELEP_TRAP,
     ANTI_MAGIC, DOOR, IRONBARS, LADDER, LAVAWALL, MAGIC_PORTAL, MAGIC_TRAP,
     CORR, ROOM, SCORR, SQKY_BOARD, SLP_GAS_TRAP, STAIRS, STATUE_TRAP, STONE, TREE, VIBRATING_SQUARE, WEB,
     ACCESSIBLE, IS_DOOR, IS_LAVA, IS_OBSTRUCTED, IS_POOL, IS_ROOM, IS_STWALL, IS_TREE, IS_WALL, IS_WATERWALL,
@@ -2675,6 +2675,13 @@ function increment_hero_blind_timeout_basic(amount) {
     }
 }
 
+function hero_resists_light_blindness_basic() {
+    // C ref: src/mondata.c:resists_blnd() for gy.youmonst.
+    return hero_is_blind_basic()
+        || !!game.u?.uprops?.light_induced_blindness_resistance
+        || !!(game.u?.data?.mflags1 & M1_NOEYES);
+}
+
 function verbose_messages_enabled_basic() {
     return game.flags?.verbose !== false;
 }
@@ -4971,6 +4978,42 @@ async function append_monster_topline(line) {
     return true;
 }
 
+async function blinding_explosion_attack_hero_basic(mtmp, attack) {
+    // C refs: src/mhitu.c:mattacku()/explmu().  Adjacent AT_EXPL attacks hit
+    // automatically and roll their damage before the blindness side effect is
+    // blocked behind the explosion topline's tty More.
+    if (!attack || mtmp.mcan) return false;
+    const [, , damn, damd] = attack;
+    const duration = d(damn, damd);
+    const packed = await append_monster_topline(`${monster_subject(mtmp)} explodes!`);
+    if (!packed) return true;
+    queue_more_prompt();
+    game._monster_attack_more_latched = true;
+    game._monster_attack_pause_after_more = true;
+    const resisted = hero_resists_light_blindness_basic();
+    game._after_more_monster_explosion = {
+        mtmp,
+        duration,
+        blind: !resisted,
+    };
+    game._after_more_message = resisted
+        ? 'You seem unaffected by it.'
+        : 'You are blinded by a blast of light!';
+    game._after_more_needs_prompt = false;
+    return true;
+}
+
+export function finish_after_more_monster_explosion_basic() {
+    const pending = game._after_more_monster_explosion;
+    if (!pending) return false;
+    game._after_more_monster_explosion = null;
+    if (pending.blind)
+        increment_hero_blind_timeout_basic(pending.duration);
+    if (pending.mtmp && game.level?.monsters?.includes(pending.mtmp))
+        remove_dead_monster(pending.mtmp);
+    return true;
+}
+
 async function append_monster_effect_topline(line, opts = {}) {
     if (game._life_saving_silent_monster_resume) return;
     clear_transient_travel_description_for_monster_line();
@@ -6014,6 +6057,10 @@ async function mintrap_basic(mtmp) {
     if (trap.ttyp === LANDMINE) return mintrap_landmine_basic(mtmp, trap);
     if (trap.ttyp === PIT || trap.ttyp === SPIKED_PIT) return mintrap_pit_basic(mtmp, trap);
     if (trap.ttyp === HOLE || trap.ttyp === TRAPDOOR) return mintrap_hole_basic(mtmp, trap);
+    if (trap.ttyp === TELEP_TRAP) {
+        rloc_basic(mtmp);
+        return MMOVE_DIED;
+    }
     if (trap.ttyp === FIRE_TRAP) return mintrap_fire_basic(mtmp, trap);
     if (trap.ttyp === MAGIC_TRAP) return mintrap_magic_basic(mtmp, trap);
     if (trap.ttyp === WEB) return mintrap_web_basic(mtmp, trap);
@@ -6800,6 +6847,11 @@ function basic_engulf_attack(mtmp) {
     if (aatyp !== 'AT_ENGL' || damn <= 0 || damd <= 0) return null;
     if (!['AD_COLD', 'AD_FIRE', 'AD_ELEC', 'AD_PHYS', 'AD_ACID'].includes(adtyp)) return null;
     return attack;
+}
+
+function blinding_explosion_attack(mtmp) {
+    return (mtmp.data?.mattk || []).find((attack) =>
+        attack?.[0] === 'AT_EXPL' && attack?.[1] === 'AD_BLND') || null;
 }
 
 function cooldown_replacement_attack(mtmp) {
@@ -8862,6 +8914,7 @@ async function mattacku_basic(mtmp, state, opts = {}) {
     const physical = engulf ? null : basic_physical_attacks(mtmp, !rangeWeapon);
     const stealAttack = engulf ? null : steal_item_attack_basic(mtmp, !rangeWeapon);
     const magicAttack = !engulf && state?.nearby ? adjacent_magic_spell_attack_basic(mtmp) : null;
+    const explosionAttack = !engulf && state?.nearby ? blinding_explosion_attack(mtmp) : null;
     // C refs: src/mhitu.c:mattacku(), src/muse.c:find_offensive().
     // mattacku() computes AC_VALUE() before checking offensive inventory.
     const toHit = mattacku_to_hit(mtmp);
@@ -8908,7 +8961,8 @@ async function mattacku_basic(mtmp, state, opts = {}) {
         && mtmp.data?.name !== 'DISPLACER_BEAST';
     const targetsDisplacedImage = heroDisplaced && state?.nearby
         && (mtmp.mux !== game.u?.ux || mtmp.muy !== game.u?.uy);
-    if (!engulf && !physical && !stealAttack && !magicAttack && !rangeWeapon && !rangeBreath && !rangeSpit) {
+    if (!engulf && !physical && !stealAttack && !magicAttack && !explosionAttack
+        && !rangeWeapon && !rangeBreath && !rangeSpit) {
         if (state?.inrange && (mtmp.data?.mattk || []).some(Boolean)) {
             if (targetsDisplacedImage && wildmissMelee) {
                 await wildmiss_displaced_image_basic(mtmp);
@@ -8926,6 +8980,11 @@ async function mattacku_basic(mtmp, state, opts = {}) {
     if (targetsDisplacedImage && (physical || wildmissMelee)) {
         await wildmiss_displaced_image_basic(mtmp);
         return true;
+    }
+    if (!physical && !stealAttack && !magicAttack && explosionAttack) {
+        if (!game._monster_topline_deferred && !monster_attack_tail_pack_pending())
+            await flush_pending_more_before_monster_message();
+        return blinding_explosion_attack_hero_basic(mtmp, explosionAttack);
     }
     if (game._hero_melee_message_pending && game._pending_message) queue_more_prompt();
     if (rangeWeapon && !physical) {
