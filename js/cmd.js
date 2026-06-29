@@ -460,6 +460,7 @@ const SCR_MAGIC_MAPPING = 337;
 const SCR_PUNISHMENT = 341;
 const SCR_MAIL = 364;
 const BOULDER = 475;
+const HEAVY_IRON_BALL = 477;
 const APPLE = 277;
 const ORANGE = 278;
 const PEAR = 279;
@@ -1908,7 +1909,10 @@ function thrownObjectFromInventory(obj) {
     if ((obj.quan || 1) > 1) {
         next_ident();
         const thrown = { ...obj, quan: 1, invlet: undefined, ox: 0, oy: 0 };
+        const unitWeight = OBJECT_WEIGHT[obj.otyp];
+        if (Number.isFinite(unitWeight)) thrown.owt = unitWeight;
         obj.quan--;
+        if (Number.isFinite(unitWeight)) obj.owt = Math.max(1, obj.quan || 1) * unitWeight;
         return thrown;
     }
     const idx = game.inventory?.indexOf(obj) ?? -1;
@@ -1917,12 +1921,43 @@ function thrownObjectFromInventory(obj) {
     return obj;
 }
 
-function thrownLanding(dx, dy) {
+function objectWeightForThrow(obj) {
+    if (!obj) return 1;
+    const unitWeight = OBJECT_WEIGHT[obj.otyp];
+    if (Number.isFinite(unitWeight)) return Math.max(0, unitWeight * (obj.quan || 1));
+    return Math.max(1, obj.owt || 1);
+}
+
+function thrownObjectIsAmmo(obj) {
+    return isAmmoObject(obj) || obj?.otyp === DART || obj?.otyp === SHURIKEN;
+}
+
+function thrownRange(obj, wielded) {
+    // C ref: src/dothrow.c:throwit().  Ordinary thrown range is based on
+    // ACURRSTR and object weight, then adjusted for ammo/launcher cases.
+    const crossbowing = matchingLauncherForAmmo(obj, wielded) && wielded?.otyp === CROSSBOW;
+    const urange = Math.trunc((crossbowing ? 18 : currentFormulaStrength()) / 2);
+    let range = obj?.otyp === HEAVY_IRON_BALL
+        ? urange - Math.trunc(objectWeightForThrow(obj) / 100)
+        : urange - Math.trunc(objectWeightForThrow(obj) / 40);
+    if (range < 1) range = 1;
+    if (thrownObjectIsAmmo(obj)) {
+        if (matchingLauncherForAmmo(obj, wielded)) {
+            range = crossbowing ? BOLT_LIM : range + 1;
+        } else if (obj?.oclass !== GEM_CLASS) {
+            range = Math.trunc(range / 2);
+        }
+    }
+    if (obj?.otyp === BOULDER) range = 20;
+    return Math.max(1, range);
+}
+
+function thrownLanding(dx, dy, rangeLimit) {
     let x = game.u?.ux ?? 0;
     let y = game.u?.uy ?? 0;
     let last = { x, y };
     let hitHard = false;
-    for (let range = 0; range < 8; range++) {
+    for (let range = 0; range < rangeLimit; range++) {
         const nx = x + dx;
         const ny = y + dy;
         const loc = game.level?.at(nx, ny);
@@ -1937,12 +1972,12 @@ function thrownLanding(dx, dy) {
     return { ...last, hitHard };
 }
 
-function thrownMonsterTarget(dx, dy) {
+function thrownMonsterTarget(dx, dy, rangeLimit) {
     // C ref: src/zap.c:bhit().  A thrown object stops at the first monster
     // on the projectile line before the caller resolves thitmonst().
     let x = game.u?.ux ?? 0;
     let y = game.u?.uy ?? 0;
-    for (let range = 0; range < 8; range++) {
+    for (let range = 0; range < rangeLimit; range++) {
         const nx = x + dx;
         const ny = y + dy;
         const loc = game.level?.at(nx, ny);
@@ -2147,12 +2182,16 @@ async function throwInventoryObject(obj, dirKey) {
     for (let shot = 0; shot < shotCount; shot++) {
         const thrown = thrownObjectFromInventory(obj);
         if (!thrown) break;
-        const thrownTarget = thrownBlindingObject(thrown) ? thrownMonsterTarget(dx, dy) : null;
+        // C ref: src/zap.c:bhit().  Thrown-object tmp_at() initializes the
+        // projectile glyph with obj_to_glyph(..., rn2_on_display_rng).
+        if (!game.u?.uswallow) object_glyph_for_menu(thrown);
+        const rangeLimit = thrownRange(thrown, wielded);
+        const thrownTarget = thrownBlindingObject(thrown) ? thrownMonsterTarget(dx, dy, rangeLimit) : null;
         if (thrownTarget && await thitmonstThrownBlindingObject(thrown, thrownTarget.mon))
             continue;
-        const target = plainThrownObjectMissesMonster(thrown) ? thrownMonsterTarget(dx, dy) : null;
+        const target = plainThrownObjectMissesMonster(thrown) ? thrownMonsterTarget(dx, dy, rangeLimit) : null;
         if (target) await thitmonstPlainMiss(thrown, target.mon);
-        const landing = target || thrownTarget || thrownLanding(dx, dy);
+        const landing = target || thrownTarget || thrownLanding(dx, dy, rangeLimit);
         const destroyed = thrownBreaktestDestroysObject(thrown, landing);
         if (landing.x === (game.u?.ux ?? 0) && landing.y === (game.u?.uy ?? 0) && !landing.hitHard) break;
         if (!destroyed) {

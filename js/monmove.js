@@ -1407,11 +1407,22 @@ function defer_warning_redraw_square(x, y) {
         game._deferred_warning_redraws.push({ x, y });
 }
 
-export function flush_deferred_warning_redraws() {
+export function flush_deferred_warning_redraws({ hallucinatedWarningRng = false } = {}) {
     const pending = game._deferred_warning_redraws || [];
     if (!pending.length) return;
-    game._deferred_warning_redraws = [];
-    for (const pt of pending) newsym(pt.x, pt.y);
+    const hallucinating = !!(game.u?.uprops?.hallucination || game.u?.uhallucination);
+    const previousWarningRng = game._monster_move_warning_rng_active;
+    // Single-pair deferred warning redraws are already covered by the normal
+    // Hallucination refresh on the current boundary; only batched movement
+    // flushes need this extra display-RNG warning draw.
+    if (hallucinatedWarningRng && hallucinating && pending.length > 2)
+        game._monster_move_warning_rng_active = true;
+    try {
+        game._deferred_warning_redraws = [];
+        for (const pt of pending) newsym(pt.x, pt.y);
+    } finally {
+        game._monster_move_warning_rng_active = previousWarningRng;
+    }
 }
 
 function minliquid_basic(mtmp) {
@@ -10083,7 +10094,13 @@ export async function movemon() {
         return false;
     }
     g._packed_monster_more_candidate = false;
-    if (!g._more) flush_deferred_warning_redraws();
+    if (!g._more) {
+        // C refs: src/monmove.c:postmov(), src/display.c:display_warning().
+        // Batched deferred off-screen warning redraws flushed at the
+        // monster-turn input boundary still use display RNG while
+        // hallucinating.
+        flush_deferred_warning_redraws({ hallucinatedWarningRng: true });
+    }
 
     return somebody_can_move;
 }
