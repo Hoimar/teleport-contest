@@ -1412,10 +1412,12 @@ export function flush_deferred_warning_redraws({ hallucinatedWarningRng = false 
     if (!pending.length) return;
     const hallucinating = !!(game.u?.uprops?.hallucination || game.u?.uhallucination);
     const previousWarningRng = game._monster_move_warning_rng_active;
-    // Single-pair deferred warning redraws are already covered by the normal
-    // Hallucination refresh on the current boundary; only batched movement
-    // flushes need this extra display-RNG warning draw.
-    if (hallucinatedWarningRng && hallucinating && pending.length > 2)
+    // Single-pair deferred warning redraws are normally covered by the
+    // Hallucination boundary refresh.  Batched movement flushes and the
+    // monster turn immediately after a displayed thrown projectile still need
+    // the postmove warning display RNG here.
+    if (hallucinatedWarningRng && hallucinating
+        && (pending.length > 2 || game._thrown_projectile_display_rng_moves === game.moves))
         game._monster_move_warning_rng_active = true;
     try {
         game._deferred_warning_redraws = [];

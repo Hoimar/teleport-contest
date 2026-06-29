@@ -2184,7 +2184,12 @@ async function throwInventoryObject(obj, dirKey) {
         if (!thrown) break;
         // C ref: src/zap.c:bhit().  Thrown-object tmp_at() initializes the
         // projectile glyph with obj_to_glyph(..., rn2_on_display_rng).
-        if (!game.u?.uswallow) object_glyph_for_menu(thrown);
+        if (!game.u?.uswallow) {
+            object_glyph_for_menu(thrown);
+            // The following monster turn may flush deferred warning redraws
+            // against the same display-RNG position as the thrown glyph.
+            game._thrown_projectile_display_rng_moves = game.moves;
+        }
         const rangeLimit = thrownRange(thrown, wielded);
         const thrownTarget = thrownBlindingObject(thrown) ? thrownMonsterTarget(dx, dy, rangeLimit) : null;
         if (thrownTarget && await thitmonstThrownBlindingObject(thrown, thrownTarget.mon))
