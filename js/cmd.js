@@ -11,7 +11,8 @@ import {
     newsym, show_glyph_cell, flush_screen, pline, append_pline, clear_pending_message, docrt,
     serialize_terminal_grid, queue_more_prompt, topline_can_pack_message,
     apply_hallucination_display_transition, refresh_swallowed_overlay,
-    see_monsters, see_objects, see_nearby_objects, see_traps, refresh_warning_monsters, map_level_for_wizard,
+    see_monsters, see_objects, see_nearby_objects, see_traps, refresh_message_clear_map_rows,
+    refresh_warning_monsters, map_level_for_wizard,
     object_glyph_for_menu, serialize_known_terrain_view_screen, terrain_glyph, cls,
     unmap_invisible_memory, installSerializedScreenHook,
 } from './display.js';
@@ -2276,10 +2277,11 @@ function applyLetters() {
 
 function readLetters() {
     ensureInventoryLetters();
-    return (game.inventory || [])
+    const letters = (game.inventory || [])
         .filter((obj) => obj?.oclass === SCROLL_CLASS || obj?.oclass === SPBOOK_CLASS)
         .map((obj) => obj.invlet)
-        .join('');
+        .filter(validInvlet);
+    return letters.length > 5 ? compactLettersInOrder(letters) : letters.join('');
 }
 
 function readSuggestedObjects() {
@@ -2810,6 +2812,19 @@ async function finishReadObjectSelection(obj, idx = inventoryIndexForLetter(obj?
         game.context.move = 0;
         await pline('That is a silly thing to read.');
         return;
+    }
+    if (heroIsBlind() && obj.otyp !== SPE_BOOK_OF_THE_DEAD) {
+        // C ref: src/read.c:doread().  Blind scroll reading is allowed only
+        // when the label is known; regular spellbooks and novels are blocked.
+        let what = '';
+        if (obj.otyp === SPE_NOVEL) what = 'words';
+        else if (obj.oclass === SPBOOK_CLASS) what = 'mystic runes';
+        else if (!obj.dknown) what = 'formula on the scroll';
+        if (what) {
+            game.context.move = 0;
+            await pline(`Being blind, you cannot read the ${what}.`);
+            return;
+        }
     }
     noteLiterateConduct();
     if (obj.oclass === SPBOOK_CLASS) {
@@ -20249,7 +20264,29 @@ function selectIntrinsicMenuPage(menu, count) {
     }
 }
 
+function refreshHallucinationAfterMoreDismissal() {
+    if (game._more) return;
+    if (!(game.u?.uhallucination || game.u?.uprops?.hallucination)) return;
+    if (game.u?.uswallow && game.u?.ustuck && game._swallowed_map_active)
+        refresh_swallowed_overlay();
+    else {
+        // C ref: src/allmain.c:moveloop_core().  After tty more() returns
+        // to a fresh input boundary, hallucination redraws monsters, objects,
+        // and traps before nhgetch() captures the next screen.
+        const prevWarning = game._hallucination_warning_rng_active;
+        game._hallucination_warning_rng_active = true;
+        try {
+            see_monsters();
+            see_objects();
+            see_traps();
+        } finally {
+            game._hallucination_warning_rng_active = prevWarning;
+        }
+    }
+}
+
 function refreshSwallowedHallucinationAfterMore({ visibleMap = false } = {}) {
+    if (game._more) return;
     if (!(game.u?.uhallucination || game.u?.uprops?.hallucination)) return;
     if (game.u?.uswallow && game.u?.ustuck && game._swallowed_map_active)
         refresh_swallowed_overlay();
@@ -21965,15 +22002,22 @@ async function handleQueuedMore(ch) {
             game._clear_pet_combat_more_after_resume = true;
             rn2(3); // C ref: src/mhitm.c:passivemm().
         }
-        // C ref: topl.c:more() returns to the interrupted command before
-        // allmain.c's next input prompt; swallowed Hallucination redraws
-        // once in that resumed path and again at the input boundary.
+        // C ref: win/tty/topl.c:more(), src/allmain.c:moveloop_core().
+        // A completed blocking More reaches a fresh input boundary before
+        // nhgetch() captures the next screen, so sighted Hallucination gets
+        // its normal random map redraw here rather than one capture later.
         const finishedSwallowedExpulsion = await finish_pending_swallowed_expulsion();
         const preserveActiveMoreSplitHalluMap = !!game._active_more_split_preserve_hallu_map_once;
         game._active_more_split_preserve_hallu_map_once = false;
         if (!swallowedDamageResume && !preTurnResume && !monsterAttackResume
-            && !preserveActiveMoreSplitHalluMap)
-            refreshSwallowedHallucinationAfterMore({ visibleMap: finishedSwallowedExpulsion });
+            && !preserveActiveMoreSplitHalluMap) {
+            if (finishedSwallowedExpulsion) {
+                refreshSwallowedHallucinationAfterMore({ visibleMap: true });
+            } else {
+                refresh_message_clear_map_rows();
+                refreshHallucinationAfterMoreDismissal();
+            }
+        }
     }
     if (game._deferred_move_floor_list
         && (game._more_dismissals_remaining || 0) <= 0

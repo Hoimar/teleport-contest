@@ -1062,6 +1062,23 @@ export function see_traps() {
     }
 }
 
+export function refresh_message_clear_map_rows() {
+    // C refs: win/tty/topl.c:more(), win/tty/wintty.c:tty_clear_nhwindow(),
+    // docorner().  Clearing a blocking message can row-refresh the map before
+    // allmain's next hallucination input-boundary refresh.
+    if (!game.level || game._swallowed_map_active || game._swallowed_latched_overlay) return;
+    if (!(game.u?.uhallucination || game.u?.uprops?.hallucination)) return;
+    const prevWarning = game._hallucination_warning_rng_active;
+    game._hallucination_warning_rng_active = true;
+    try {
+        for (let y = 0; y < ROWNO; y++)
+            for (let x = 1; x < COLNO; x++)
+                newsym(x, y);
+    } finally {
+        game._hallucination_warning_rng_active = prevWarning;
+    }
+}
+
 function show_premapped_mimics() {
     if (!game.level?.flags?.premapped) return;
     for (const mon of game.level.monsters || []) {
@@ -1262,7 +1279,19 @@ export function refresh_swallowed_overlay() {
 export function apply_hallucination_display_transition(wasHallucinating, isHallucinating) {
     if (wasHallucinating === isHallucinating) return;
     if (!game.u?.uswallow || !game._swallowed_map_active || !game.u?.ustuck) {
+        // C ref: src/potion.c:make_hallucinated().  The visible map is
+        // refreshed before the transition pline, so the blocking More frame
+        // already shows hallucinated monsters, objects, and traps.
         game._swallowed_overlay = null;
+        const prevWarning = game._hallucination_warning_rng_active;
+        game._hallucination_warning_rng_active = true;
+        try {
+            see_monsters();
+            see_objects();
+            see_traps();
+        } finally {
+            game._hallucination_warning_rng_active = prevWarning;
+        }
         return;
     }
     // C ref: potion.c:make_hallucinated() -> swallowed(0).
@@ -1738,11 +1767,15 @@ function _statusLine2() {
         ? game._status_uencumber_override
         : (u.uencumber || 0);
     if (statusEncumbrance > 0) conditions.push(encStatus[statusEncumbrance] || 'Overloaded');
-    if (u.uprops?.confusion || u.uconfusion) conditions.push('Conf');
-    if (u.uprops?.hallucination || u.uhallucination) conditions.push('Hallu');
+    // C refs: src/botl.c:do_statusline2(), src/windows.c:genl_status_update().
+    // Status conditions render in fixed severity order after hunger/capacity.
     if (u.uprops?.blinded || u.uprops?.blind || u.ublind) conditions.push('Blind');
     if (u.uprops?.deaf) conditions.push('Deaf');
-    if (form?.fly) conditions.push('Fly');
+    if (u.uprops?.stunned || u.ustunned) conditions.push('Stun');
+    if (u.uprops?.confusion || u.uconfusion) conditions.push('Conf');
+    if (u.uprops?.hallucination || u.uhallucination) conditions.push('Hallu');
+    if (u.uprops?.levitation) conditions.push('Lev');
+    if (u.uprops?.flying || form?.fly) conditions.push('Fly');
     if (u.usteed) conditions.push('Ride');
     const conditionText = conditions.length ? ` ${conditions.join(' ')}` : '';
     const hp = game._latched_status_uhp != null && (game._more || game._death_prompt_active)
