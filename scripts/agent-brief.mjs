@@ -114,6 +114,11 @@ function statusSummary(lines) {
     return [...counts.entries()].map(([code, count]) => `${code}=${count}`).join(' ');
 }
 
+function lastChanged(rel) {
+    const out = sh(['git', 'log', '-1', '--format=%h %cI', '--', rel]);
+    return out || 'untracked or unknown';
+}
+
 function main() {
     const options = parseArgs(process.argv.slice(2));
     const checkpoint = read('scratch/agent-loop.md');
@@ -129,12 +134,13 @@ function main() {
     console.log(`- Branch/status: ${status.split('\n')[0] || '-'}`);
     console.log(`- Commit: ${commit || '-'}`);
     console.log(`- Target: ${target || '-'}`);
+    console.log(`- Checkpoint snapshot: scratch/agent-loop.md last changed ${lastChanged('scratch/agent-loop.md')}; refresh live state with parity:state before relying on stale-sensitive bullets.`);
     console.log('- Required policy: read `AGENTS.md`; use targeted reads for linked docs.');
     console.log(`- Human summary: ${dirty.length} dirty file(s)${dirty.length ? ` (${statusSummary(dirty)})` : ''}; start with brief-linked context, then triage before editing.`);
     console.log('- Commit rule: after verified truth or harness changes, stage only the coherent files and commit.');
 
     printBlock('Dirty Files Sample', dirty.length ? limitLines(dirty.map((line) => `- ${line}`), 12) : ['- none']);
-    printBlock('Checkpoint Current State', section(checkpoint, '## Current State', 24));
+    printBlock('Checkpoint Current State Snapshot', section(checkpoint, '## Current State', 24));
     printBlock('Checkpoint Queue', section(checkpoint, '## Current Queue', 16));
     printBlock('Feature Map Hits', grepLines(featureMap, terms, options.lines));
     printBlock('Lesson Hits', grepLines(lessons, terms, options.lines));
