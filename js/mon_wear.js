@@ -1,6 +1,7 @@
-import { OBJECT_DELAY } from './object_data.js';
+import { OBJECT_DELAY, OBJECT_MATERIAL } from './object_data.js';
 import {
     W_AMUL, W_ARM, W_ARMC, W_ARMF, W_ARMG, W_ARMH, W_ARMS, W_ARMU,
+    W_SADDLE,
 } from './const.js';
 import { game } from './gstate.js';
 import { rn2 } from './rng.js';
@@ -11,10 +12,14 @@ const M1_MINDLESS = 0x00010000;
 const M1_HUMANOID = 0x00020000;
 const M1_ANIMAL = 0x00040000;
 const M1_SLITHY = 0x00080000;
+const M1_AMORPHOUS = 0x00000004;
+const M1_UNSOLID = 0x00100000;
 const MZ_SMALL = 1;
 const MZ_HUMAN = 2;
 const MZ_LARGE = 3;
 const MZ_HUGE = 4;
+const LEATHER = 7;
+const RUBBER_HOSE = 78;
 const MUMMY_WRAPPING = 138;
 const ELVEN_LEATHER_HELM = 89;
 const ELVEN_MITHRIL_COAT = 127;
@@ -47,6 +52,14 @@ function mon_is_humanoid(mtmp) {
 
 function mon_is_noncorporeal(mtmp) {
     return mtmp.data?.mlet === 'S_GHOST';
+}
+
+function mon_is_amorphous(mtmp) {
+    return !!((mtmp.data?.mflags1 ?? 0) & M1_AMORPHOUS);
+}
+
+function mon_is_unsolid(mtmp) {
+    return !!((mtmp.data?.mflags1 ?? 0) & M1_UNSOLID);
 }
 
 function mon_is_whirly(mtmp) {
@@ -84,6 +97,27 @@ function mon_wrapping_allowed(mtmp) {
 function mon_has_feet_slot(mtmp) {
     const flags1 = mtmp.data?.mflags1 ?? 0;
     return !(flags1 & M1_SLITHY) && mtmp.data?.mlet !== 'S_CENTAUR';
+}
+
+function mon_has_horns(mtmp) {
+    return ['HORNED_DEVIL', 'MINOTAUR', 'ASMODEUS', 'BALROG',
+        'WHITE_UNICORN', 'GRAY_UNICORN', 'BLACK_UNICORN', 'KI_RIN']
+        .includes(mtmp.data?.name);
+}
+
+function can_saddle_basic(mtmp) {
+    const mlet = mtmp.data?.mlet;
+    return ['S_QUADRUPED', 'S_UNICORN', 'S_ANGEL', 'S_CENTAUR', 'S_DRAGON', 'S_JABBERWOCK'].includes(mlet)
+        && (mtmp.data?.msize ?? MZ_HUMAN) >= MZ_HUMAN
+        && (!mon_is_humanoid(mtmp) || mlet === 'S_CENTAUR')
+        && !mon_is_amorphous(mtmp)
+        && !mon_is_noncorporeal(mtmp)
+        && !mon_is_whirly(mtmp)
+        && !mon_is_unsolid(mtmp);
+}
+
+function is_flimsy_object(obj) {
+    return (OBJECT_MATERIAL[obj?.otyp] ?? 0) <= LEATHER || obj?.otyp === RUBBER_HOSE;
 }
 
 function can_wear_suit_slot(mtmp) {
@@ -145,6 +179,25 @@ function worn_in_slot(mtmp, slot) {
     return (mtmp.inventory || []).find((obj) => (obj.owornmask || 0) & slot) || null;
 }
 
+function remove_from_inventory(mtmp, obj) {
+    const inv = mtmp?.inventory || [];
+    const idx = inv.indexOf(obj);
+    const wornMask = obj?.owornmask || 0;
+    if (idx >= 0) inv.splice(idx, 1);
+    if (mtmp?.mw === obj) mtmp.mw = null;
+    if (obj) obj.owornmask = 0;
+    if (mtmp) mtmp.misc_worn_check = (mtmp.misc_worn_check || 0) & ~wornMask;
+}
+
+function useup_monster_armor(mtmp, obj) {
+    remove_from_inventory(mtmp, obj);
+}
+
+function lose_monster_armor(mtmp, obj, dropObject) {
+    remove_from_inventory(mtmp, obj);
+    if (obj && dropObject) dropObject(mtmp, obj);
+}
+
 function first_unworn_in_slot(mtmp, slot, acceptsObject = null) {
     return (mtmp.inventory || []).find((obj) => object_slot(obj) === slot
         && !obj.owornmask
@@ -187,7 +240,49 @@ export function m_dowear_basic(mtmp, creation = false) {
         (obj) => canWearSuit || racial_exception(mtmp, obj));
 }
 
-export function mon_break_armor_basic(mtmp) {
+export function mon_break_armor_basic(mtmp, options = {}) {
     if (!mtmp) return;
+    const dropObject = options.dropObject || null;
     monster_hallu_pronoun_side_effects();
+    const breakArmor = mon_breaks_armor(mtmp);
+    const slipArmor = !breakArmor && mon_slips_armor(mtmp);
+    if (breakArmor) {
+        let obj = worn_in_slot(mtmp, W_ARM);
+        if (obj) useup_monster_armor(mtmp, obj);
+        obj = worn_in_slot(mtmp, W_ARMC);
+        if (obj && (obj.otyp !== MUMMY_WRAPPING || !mon_wrapping_allowed(mtmp))) {
+            if (obj.oartifact) lose_monster_armor(mtmp, obj, dropObject);
+            else useup_monster_armor(mtmp, obj);
+        }
+        obj = worn_in_slot(mtmp, W_ARMU);
+        if (obj) useup_monster_armor(mtmp, obj);
+    } else if (slipArmor) {
+        let obj = worn_in_slot(mtmp, W_ARM);
+        if (obj) lose_monster_armor(mtmp, obj, dropObject);
+        obj = worn_in_slot(mtmp, W_ARMC);
+        if (obj && (obj.otyp !== MUMMY_WRAPPING || !mon_wrapping_allowed(mtmp)))
+            lose_monster_armor(mtmp, obj, dropObject);
+        obj = worn_in_slot(mtmp, W_ARMU);
+        if (obj) lose_monster_armor(mtmp, obj, dropObject);
+    }
+    const handlessOrTiny = !mon_has_hands(mtmp) || mon_is_verysmall(mtmp);
+    if (handlessOrTiny) {
+        let obj = worn_in_slot(mtmp, W_ARMG);
+        if (obj) lose_monster_armor(mtmp, obj, dropObject);
+        obj = worn_in_slot(mtmp, W_ARMS);
+        if (obj) lose_monster_armor(mtmp, obj, dropObject);
+    }
+    if (handlessOrTiny || mon_has_horns(mtmp)) {
+        const obj = worn_in_slot(mtmp, W_ARMH);
+        if (obj && (handlessOrTiny || !is_flimsy_object(obj)))
+            lose_monster_armor(mtmp, obj, dropObject);
+    }
+    if (handlessOrTiny || ((mtmp.data?.mflags1 ?? 0) & M1_SLITHY) || mtmp.data?.mlet === 'S_CENTAUR') {
+        const obj = worn_in_slot(mtmp, W_ARMF);
+        if (obj) lose_monster_armor(mtmp, obj, dropObject);
+    }
+    if (!can_saddle_basic(mtmp)) {
+        const obj = worn_in_slot(mtmp, W_SADDLE);
+        if (obj) lose_monster_armor(mtmp, obj, dropObject);
+    }
 }

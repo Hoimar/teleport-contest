@@ -9401,7 +9401,12 @@ function apply_newcham_basic(mon, ptr) {
     let hp = oldMax > 0 ? Math.trunc(oldHp * mon.mhpmax / oldMax) : mon.mhpmax;
     if (hp < 0 || hp > mon.mhpmax) hp = mon.mhpmax;
     mon.mhp = hp || 1;
-    mon_break_armor_basic(mon);
+    mon_break_armor_basic(mon, {
+        dropObject(mtmp, obj) {
+            stackobj(place_object(obj, mtmp.mx, mtmp.my));
+            newsym(mtmp.mx, mtmp.my);
+        },
+    });
     return true;
 }
 
