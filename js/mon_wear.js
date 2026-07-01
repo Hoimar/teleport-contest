@@ -1,5 +1,6 @@
 import { OBJECT_DELAY, OBJECT_MATERIAL } from './object_data.js';
 import {
+    I_SPECIAL,
     W_AMUL, W_ARM, W_ARMC, W_ARMF, W_ARMG, W_ARMH, W_ARMS, W_ARMU,
     W_SADDLE,
 } from './const.js';
@@ -186,7 +187,10 @@ function remove_from_inventory(mtmp, obj) {
     if (idx >= 0) inv.splice(idx, 1);
     if (mtmp?.mw === obj) mtmp.mw = null;
     if (obj) obj.owornmask = 0;
-    if (mtmp) mtmp.misc_worn_check = (mtmp.misc_worn_check || 0) & ~wornMask;
+    if (mtmp) {
+        mtmp.misc_worn_check = (mtmp.misc_worn_check || 0) & ~wornMask;
+        if (wornMask) mtmp.misc_worn_check |= I_SPECIAL;
+    }
 }
 
 function useup_monster_armor(mtmp, obj) {

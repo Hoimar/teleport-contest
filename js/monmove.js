@@ -9407,6 +9407,7 @@ function apply_newcham_basic(mon, ptr) {
             newsym(mtmp.mx, mtmp.my);
         },
     });
+    mon.misc_worn_check = (mon.misc_worn_check || 0) | I_SPECIAL;
     return true;
 }
 

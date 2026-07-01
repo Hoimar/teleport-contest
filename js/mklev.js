@@ -33,7 +33,7 @@ import {
     DIR_N, DIR_S, DIR_E, DIR_W, DIR_180,
     IS_WALL, IS_STWALL, IS_DOOR, IS_SDOOR, IS_OBSTRUCTED, IS_FURNITURE, IS_POOL, IS_LAVA, IS_ROOM,
     ACCESSIBLE,
-    SPACE_POS, ZAP_POS, isok, W_NONDIGGABLE,
+    SPACE_POS, ZAP_POS, isok, I_SPECIAL, W_NONDIGGABLE,
     WM_MASK, WM_W_LEFT, WM_W_RIGHT, WM_W_TOP, WM_W_BOTTOM,
     WM_T_LONG, WM_T_BL, WM_T_BR,
     WM_X_TL, WM_X_TR, WM_X_BL, WM_X_BR, WM_X_TLBR, WM_X_BLTR,
@@ -2671,6 +2671,7 @@ function initial_shapeshift(mon, ptr) {
     mon.mhp = monState.hp;
     mon.mhpmax = monState.hp;
     mon_break_armor_basic(mon);
+    mon.misc_worn_check = (mon.misc_worn_check || 0) | I_SPECIAL;
     return true;
 }
 
