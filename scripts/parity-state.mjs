@@ -666,6 +666,8 @@ function summarizeLeaderboardHistory(team, targetSummary, limit = 12) {
         : 0;
     const points = numberRange(comparable.map((row) => row.points));
     const passing = numberRange(comparable.map((row) => row.passing));
+    const pointSpread = points ? points.max - points.min : 0;
+    const passingSpread = passing ? passing.max - passing.min : 0;
     const latest = rows[rows.length - 1] || null;
     return {
         entries: history.length,
@@ -675,9 +677,12 @@ function summarizeLeaderboardHistory(team, targetSummary, limit = 12) {
         lastTs: latest?.ts || null,
         points,
         passing,
+        pointSpread,
+        passingSpread,
         matchingTarget,
         target,
         latest,
+        volatile: comparable.length >= 3 && (pointSpread > 0 || passingSpread > 0),
         persistentMismatch: Boolean(target && comparable.length >= 3 && matchingTarget === 0),
     };
 }
@@ -931,7 +936,10 @@ function printHuman(payload) {
                 const target = history.target
                     ? `local ${history.target.exact}/${history.target.sessions} S ${fmtCount(history.target.screenMatched, history.target.screenTotal)}`
                     : 'local target';
-                console.log(`- history: last ${history.window}/${history.entries} score(s), comparable ${history.comparable}, passing ${fmtRange(history.passing)}, S ${fmtRange(history.points, `/${history.target?.screenTotal ?? '?'}`)}; ${history.matchingTarget}/${history.comparable} match ${target}`);
+                const volatility = history.volatile
+                    ? `; volatile spread S ${formatSigned(history.pointSpread)} passing ${formatSigned(history.passingSpread)}`
+                    : '';
+                console.log(`- history: last ${history.window}/${history.entries} score(s), comparable ${history.comparable}, passing ${fmtRange(history.passing)}, S ${fmtRange(history.points, `/${history.target?.screenTotal ?? '?'}`)}; ${history.matchingTarget}/${history.comparable} match ${target}${volatility}`);
                 if (history.firstTs || history.lastTs) {
                     console.log(`- history window: ${history.firstTs || 'unknown'} -> ${history.lastTs || 'unknown'}`);
                 }

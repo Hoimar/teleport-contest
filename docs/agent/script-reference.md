@@ -13,6 +13,9 @@ aliases; direct `node` commands work the same way.
 | Strict sentinel | `npm run sentinel:strict` | `node scripts/run-sentinel-suite.mjs --strict` |
 | Scoreboard state | `npm run scoreboard:state` | `node scripts/parity-state.mjs --refresh-live --full` |
 | Scoreboard JSON | `npm run scoreboard:json` | `node scripts/parity-state.mjs --refresh-live --full --json` |
+| Score surfaces | `npm run score:surfaces -- [session]` | `node scripts/score-surfaces.mjs [session]` |
+| Browser score | `npm run score:browser -- [session]` | `node scripts/browser-score.mjs [session]` |
+| Play asset state | `npm run score:play-assets` | `node scripts/play-assets-state.mjs` |
 | Hack audit | `npm run hack:audit` | `node scripts/hack-debt-audit.mjs` |
 | Memory lint | `npm run memory:lint` | `node scripts/memory-lint.mjs` |
 | Generate help data | `npm run generate:help-data` | `node scripts/generate-help-data.mjs` |
@@ -65,6 +68,17 @@ mode rather than treating timestamp alone as commit evidence.
 The `refs`, `timing`, and `next` lines show whether the last score run is before
 or after local and upstream HEAD, and whether the next action is pushing local
 commits, waiting for a newer score run, or investigating scorer drift.
+
+## Scoreboard Drift Tools
+
+Use these when local public score is exact but the online row keeps moving:
+
+- `npm run score:play-assets`: compare checked-in `js/*.js` with public
+  `/play/<team>/js/` assets, including nearest matching commit for stale files.
+- `npm run score:browser -- [session]`: replay in headless Chromium; use
+  `--mode official|viewer|both` and `--root <checkout>`.
+- `npm run score:surfaces -- [session]`: score one Node replay through visual,
+  strict, legacy, and raw screen comparators.
 
 ## Library Boundary
 

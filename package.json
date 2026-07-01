@@ -7,6 +7,9 @@
   "scripts": {
     "score": "bash frozen/score.sh",
     "score:live-public": "node scripts/fetch-live-public-sessions.mjs && bash frozen/score.sh .cache/live-sessions",
+    "score:browser": "node scripts/browser-score.mjs",
+    "score:play-assets": "node scripts/play-assets-state.mjs",
+    "score:surfaces": "node scripts/score-surfaces.mjs",
     "sentinel": "node scripts/run-sentinel-suite.mjs",
     "sentinel:strict": "node scripts/run-sentinel-suite.mjs --strict",
     "parity:state": "node scripts/parity-state.mjs",
