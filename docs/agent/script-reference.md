@@ -16,6 +16,7 @@ aliases; direct `node` commands work the same way.
 | Score surfaces | `npm run score:surfaces -- [session]` | `node scripts/score-surfaces.mjs [session]` |
 | Browser score | `npm run score:browser -- [session]` | `node scripts/browser-score.mjs [session]` |
 | Play asset state | `npm run score:play-assets` | `node scripts/play-assets-state.mjs` |
+| Storage scope score | `npm run score:storage-scope -- [session]` | `node scripts/score-storage-scope.mjs [session]` |
 | Hack audit | `npm run hack:audit` | `node scripts/hack-debt-audit.mjs` |
 | Memory lint | `npm run memory:lint` | `node scripts/memory-lint.mjs` |
 | Generate help data | `npm run generate:help-data` | `node scripts/generate-help-data.mjs` |
@@ -61,13 +62,10 @@ Important classifications:
 - `unknown`: endpoint, team, or local data was unavailable.
 
 Current limitation: the public leaderboard JSON reports repo, `lastScored`, and
-score totals, but not the git commit that was scored. When the local tree is
-dirty or ahead, the classifier is deliberately conservative. For unresolved
-scoreboard motion, compare from a clean pushed ref or add a clean-ref scorer
-mode rather than treating timestamp alone as commit evidence.
-The `refs`, `timing`, and `next` lines show whether the last score run is before
-or after local and upstream HEAD, and whether the next action is pushing local
-commits, waiting for a newer score run, or investigating scorer drift.
+score totals, but not the scored commit. Dirty/ahead trees are conservative;
+for unresolved motion, compare from a clean pushed ref or add a clean-ref scorer.
+The `refs`, `timing`, and `next` lines show whether the last run is before or
+after local/upstream HEAD and what operational action is next.
 
 ## Scoreboard Drift Tools
 
@@ -77,6 +75,9 @@ Use these when local public score is exact but the online row keeps moving:
   `/play/<team>/js/` assets, including nearest matching commit for stale files.
 - `npm run score:browser -- [session]`: replay in headless Chromium; use
   `--mode official|viewer|both` and `--root <checkout>`.
+- `npm run score:storage-scope -- [session]`: replay through one JS module
+  process while varying storage lifetime; use it to separate module/storage
+  leakage from online cells-only scorer drift.
 - `npm run score:surfaces -- [session]`: score one Node replay through visual,
   strict, legacy, and raw screen comparators.
 
