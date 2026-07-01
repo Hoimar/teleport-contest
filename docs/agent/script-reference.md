@@ -15,6 +15,7 @@ aliases; direct `node` commands work the same way.
 | Scoreboard JSON | `npm run scoreboard:json` | `node scripts/parity-state.mjs --refresh-live --full --json` |
 | Hack audit | `npm run hack:audit` | `node scripts/hack-debt-audit.mjs` |
 | Memory lint | `npm run memory:lint` | `node scripts/memory-lint.mjs` |
+| Generate help data | `npm run generate:help-data` | `node scripts/generate-help-data.mjs` |
 
 ## Output Meaning
 

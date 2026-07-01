@@ -19,6 +19,7 @@
     "memory:lint": "node scripts/memory-lint.mjs",
     "deps:audit": "npm audit --audit-level=moderate",
     "screen:diff": "node scripts/screen-diff.mjs",
+    "generate:help-data": "node scripts/generate-help-data.mjs",
     "play": "echo 'Open index.html in a browser to play'"
   },
   "engines": {

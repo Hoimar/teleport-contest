@@ -40,6 +40,7 @@ import { d, rn1, rn2, rnd, rnl, rnz } from './rng.js';
 import { dist2, midnight } from './hacklib.js';
 import { getObjectDescription } from './o_init.js';
 import { getRumor, hallucinatedLiquidName, randomHallucinatedMonsterName, wipeoutText } from './random_text.js';
+import { HELP_DATA_FILES } from './help_data.js';
 import {
     finish_deferred_monster_breath_ray,
     finish_deferred_monster_magic_spell_effect,
@@ -18852,21 +18853,9 @@ function showHelpTextLines(lines, options = {}) {
     renderHelpTextPage();
 }
 
-async function readUpstreamDataFile(name) {
-    try {
-        if (globalThis.process?.versions?.node) {
-            const fs = await import('node:fs/promises');
-            return await fs.readFile(`nethack-c/upstream/dat/${name}`, 'utf8');
-        }
-    } catch {
-        return null;
-    }
-    return null;
-}
-
 async function showHelpDataFile(name) {
     // C ref: pager.c:dispfile_*() -> tty_display_file().
-    const text = await readUpstreamDataFile(name);
+    const text = HELP_DATA_FILES[name] ?? null;
     if (text == null) {
         await redrawAfterFullScreenMenuDismiss();
         await pline(`Cannot open "${name}".`);
