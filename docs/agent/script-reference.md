@@ -35,6 +35,9 @@ sentinel invariant, and best-effort compares the inferred fork owner with the
 online leaderboard. Leaderboard comparison chooses the checked-in or hosted
 public score surface whose public-session shape matches the leaderboard payload,
 so hosted-session drift does not mask deploy lag for an older leaderboard run.
+It also summarizes the recent leaderboard history window; repeated comparable
+scores that do not match the local score are reported as persistent scorer drift
+instead of plain timestamp lag.
 Use `--team <name>` when the fork owner is not the leaderboard name, `--full`
 for non-exact rows, and `--json` for automation.
 Delta sections are always `left minus right`; for example
@@ -48,6 +51,7 @@ Important classifications:
 - `public-session-drift`: hosted public sessions changed or the cache was stale.
 - `local-dirty-or-unpushed`: local commits or WIP cannot match the leaderboard run.
 - `leaderboard-lag`: leaderboard scoring predates local HEAD.
+- `persistent-scorer-drift`: recent comparable leaderboard history repeatedly differs from local score, so timestamp lag alone is not a sufficient explanation.
 - `scorer-drift`: same public corpus, different local vs leaderboard public score.
 - `heldout-only-gap`: public score agrees, hidden held-out score differs.
 - `unknown`: endpoint, team, or local data was unavailable.

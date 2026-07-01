@@ -629,6 +629,59 @@ function scoreShapeMatches(summary, leaderboardSummary) {
     return true;
 }
 
+function finiteNumber(value) {
+    const number = Number(value);
+    return Number.isFinite(number) ? number : null;
+}
+
+function numberRange(values) {
+    const finite = values.filter((value) => Number.isFinite(value));
+    if (!finite.length) return null;
+    return {
+        min: Math.min(...finite),
+        max: Math.max(...finite),
+    };
+}
+
+function summarizeLeaderboardHistory(team, targetSummary, limit = 12) {
+    const history = Array.isArray(team?.history) ? team.history : [];
+    const tail = history.slice(-limit);
+    const rows = tail.map((entry) => ({
+        ts: entry.ts || null,
+        points: finiteNumber(entry.points),
+        maxPoints: finiteNumber(entry.maxPoints),
+        passing: finiteNumber(entry.passing),
+    }));
+    const target = targetSummary ? {
+        exact: targetSummary.exact,
+        sessions: targetSummary.sessions,
+        screenMatched: targetSummary.screenMatched,
+        screenTotal: targetSummary.screenTotal,
+    } : null;
+    const comparable = target
+        ? rows.filter((row) => row.maxPoints === target.screenTotal)
+        : [];
+    const matchingTarget = target
+        ? comparable.filter((row) => row.points === target.screenMatched && row.passing === target.exact).length
+        : 0;
+    const points = numberRange(comparable.map((row) => row.points));
+    const passing = numberRange(comparable.map((row) => row.passing));
+    const latest = rows[rows.length - 1] || null;
+    return {
+        entries: history.length,
+        window: rows.length,
+        comparable: comparable.length,
+        firstTs: rows[0]?.ts || null,
+        lastTs: latest?.ts || null,
+        points,
+        passing,
+        matchingTarget,
+        target,
+        latest,
+        persistentMismatch: Boolean(target && comparable.length >= 3 && matchingTarget === 0),
+    };
+}
+
 function gitCaveats(git) {
     const caveats = [];
     if (git.dirty) {
@@ -656,7 +709,7 @@ function timeRelation(left, right) {
     return 'same-time';
 }
 
-function scoreboardMotion({ git, team, publicEqual }) {
+function scoreboardMotion({ git, team, publicEqual, persistentHistory }) {
     const lastScored = team?.lastScored || null;
     const upstreamName = git.upstream || null;
     let nextAction = 'Inspect scorer drift before assuming the scoreboard will move.';
@@ -666,6 +719,8 @@ function scoreboardMotion({ git, team, publicEqual }) {
         nextAction = `Push ${git.ahead} local commit(s) before expecting this HEAD on the leaderboard.`;
     } else if ((git.behind ?? 0) > 0) {
         nextAction = `Sync with ${upstreamName || 'upstream'} before comparing this checkout to the leaderboard.`;
+    } else if (persistentHistory) {
+        nextAction = 'Treat the delta as persistent scorer/environment drift; reproduce the online scorer surface instead of waiting on commit timing alone.';
     } else if (timeRelation(lastScored, git.commitTime) === 'before') {
         nextAction = 'Wait for or trigger a scorer run after the current HEAD commit time.';
     } else if (publicEqual) {
@@ -715,30 +770,35 @@ function classifyLeaderboard({ leaderboard, teamName, localCorpus, liveCorpus, c
         ? compareCorpusScores(scoreCorpus, leaderboardCorpus, scoreCorpus.label, 'leaderboard public')
         : null;
     const caveats = gitCaveats(git);
+    const history = summarizeLeaderboardHistory(team, scoreCorpus.summary);
     if (!scoreShapeMatches(scoreCorpus.summary, publicSummary) && corpusComparison?.class === 'public-session-drift') {
-        return { class: 'public-session-drift', reason: reasonWithCaveats('leaderboard public corpus shape differs from checked-in and hosted public sessions', caveats), url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta, caveats };
+        return { class: 'public-session-drift', reason: reasonWithCaveats('leaderboard public corpus shape differs from checked-in and hosted public sessions', caveats), url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta, caveats, history };
     }
 
     const publicEqual = scoresEqual(scoreCorpus.summary, publicSummary);
-    const motion = scoreboardMotion({ git, team, publicEqual });
+    const persistentHistory = !publicEqual && history.persistentMismatch;
+    const motion = scoreboardMotion({ git, team, publicEqual, persistentHistory });
     if (publicEqual) {
         const held = team.heldOut;
         if (held && Number(held.points ?? 0) !== Number(held.maxPoints ?? 0)) {
-            return { class: 'heldout-only-gap', reason: reasonWithCaveats('public score matches; held-out sessions remain private cleanliness evidence', caveats), url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta, caveats, motion };
+            return { class: 'heldout-only-gap', reason: reasonWithCaveats('public score matches; held-out sessions remain private cleanliness evidence', caveats), url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta, caveats, motion, history };
         }
-        return { class: 'same', reason: reasonWithCaveats(`leaderboard public score matches local ${scoreCorpus.label} score`, caveats), url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta, caveats, motion };
+        return { class: 'same', reason: reasonWithCaveats(`leaderboard public score matches local ${scoreCorpus.label} score`, caveats), url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta, caveats, motion, history };
     }
 
     if ((git.ahead ?? 0) > 0) {
-        return { class: 'local-dirty-or-unpushed', reason: reasonWithCaveats(`local HEAD is ahead of ${git.upstream || 'upstream'} and cannot be reflected by leaderboard yet`, caveats), url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta, caveats, motion };
-    }
-    if (team.lastScored && git.commitTime && Date.parse(team.lastScored) < Date.parse(git.commitTime)) {
-        return { class: 'leaderboard-lag', reason: reasonWithCaveats('leaderboard lastScored is older than local HEAD commit time', caveats), url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta, caveats, motion };
+        return { class: 'local-dirty-or-unpushed', reason: reasonWithCaveats(`local HEAD is ahead of ${git.upstream || 'upstream'} and cannot be reflected by leaderboard yet`, caveats), url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta, caveats, motion, history };
     }
     if (git.dirty) {
-        return { class: 'local-dirty-or-unpushed', reason: reasonWithCaveats('working tree has local changes not represented by leaderboard', caveats), url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta, caveats, motion };
+        return { class: 'local-dirty-or-unpushed', reason: reasonWithCaveats('working tree has local changes not represented by leaderboard', caveats), url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta, caveats, motion, history };
     }
-    return { class: 'scorer-drift', reason: reasonWithCaveats('same public corpus but leaderboard public score differs from local scorer output', caveats), url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta, caveats, motion };
+    if (persistentHistory) {
+        return { class: 'persistent-scorer-drift', reason: reasonWithCaveats(`leaderboard history has ${history.matchingTarget}/${history.comparable} recent comparable score(s) matching local ${scoreCorpus.label}; timestamp lag alone does not explain the stable public delta`, caveats), url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta, caveats, motion, history };
+    }
+    if (team.lastScored && git.commitTime && Date.parse(team.lastScored) < Date.parse(git.commitTime)) {
+        return { class: 'leaderboard-lag', reason: reasonWithCaveats('leaderboard lastScored is older than local HEAD commit time', caveats), url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta, caveats, motion, history };
+    }
+    return { class: 'scorer-drift', reason: reasonWithCaveats('same public corpus but leaderboard public score differs from local scorer output', caveats), url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta, caveats, motion, history };
 }
 
 function auditSummary() {
@@ -757,6 +817,12 @@ function auditSummary() {
 
 function fmtCount(matched, total) {
     return `${matched}/${total}`;
+}
+
+function fmtRange(range, suffix = '') {
+    if (!range) return 'unknown';
+    const body = range.min === range.max ? `${range.min}` : `${range.min}-${range.max}`;
+    return `${body}${suffix}`;
 }
 
 function summarizeLine(summary) {
@@ -859,6 +925,16 @@ function printHuman(payload) {
             }
             if (team.heldOut) {
                 console.log(`- held-out: points ${fmtCount(team.heldOut.points, team.heldOut.maxPoints)} passing ${fmtCount(team.heldOut.passing, team.heldOut.total)}; private sessions are the cleanliness benchmark`);
+            }
+            if (payload.leaderboard.history) {
+                const history = payload.leaderboard.history;
+                const target = history.target
+                    ? `local ${history.target.exact}/${history.target.sessions} S ${fmtCount(history.target.screenMatched, history.target.screenTotal)}`
+                    : 'local target';
+                console.log(`- history: last ${history.window}/${history.entries} score(s), comparable ${history.comparable}, passing ${fmtRange(history.passing)}, S ${fmtRange(history.points, `/${history.target?.screenTotal ?? '?'}`)}; ${history.matchingTarget}/${history.comparable} match ${target}`);
+                if (history.firstTs || history.lastTs) {
+                    console.log(`- history window: ${history.firstTs || 'unknown'} -> ${history.lastTs || 'unknown'}`);
+                }
             }
             if (payload.leaderboard.motion) {
                 const motion = payload.leaderboard.motion;
