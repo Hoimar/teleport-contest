@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { copyFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -14,8 +14,9 @@ function usage() {
     console.log([
         'Usage: node scripts/score-ref.mjs [--json] [--full] [--keep] [--target <path>] [ref]',
         '',
-        'Scores a clean git ref by unpacking it to /tmp and running that ref\'s',
-        'frozen public scorer. Default ref is @{u}; default target is sessions.',
+        'Scores a clean git ref by unpacking it to /tmp, applying the official',
+        'frozen js/ overlay, and running that ref\'s public scorer.',
+        'Default ref is @{u}; default target is sessions.',
     ].join('\n'));
 }
 
@@ -84,6 +85,12 @@ function parseRunnerJson(stdout) {
     const idx = stdout.lastIndexOf(marker);
     if (idx < 0) throw new Error('scorer output did not include __RESULTS_JSON__');
     return JSON.parse(stdout.slice(idx + marker.length).trim());
+}
+
+function applyFrozenOverlay(dir) {
+    for (const name of ['isaac64.js', 'terminal.js', 'storage.js']) {
+        copyFileSync(path.join(dir, 'frozen', name), path.join(dir, 'js', name));
+    }
 }
 
 function cursorOnlyCount(metrics) {
@@ -157,6 +164,7 @@ export function scoreRef(ref, options = {}) {
         const commit = gitOutput(['rev-parse', '--short', ref]);
         const commitTime = gitOutput(['log', '-1', '--format=%cI', ref]);
         dir = unpackRef(ref);
+        applyFrozenOverlay(dir);
         const target = options.target || 'sessions';
         const run = spawnSync(process.execPath, ['frozen/ps_test_runner.mjs', target], {
             cwd: dir,
