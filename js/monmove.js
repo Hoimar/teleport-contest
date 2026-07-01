@@ -35,7 +35,7 @@ import {
 } from './display.js';
 import { nhgetch } from './input.js';
 import { clear_path, cansee, couldsee, vision_reset, vision_recalc } from './vision.js';
-import { m_dowear_basic } from './mon_wear.js';
+import { m_dowear_basic, mon_break_armor_basic } from './mon_wear.js';
 import { calculated_armor_class, newuexp } from './u_init.js';
 import { gettrack } from './track.js';
 import { randomHallucinatedMonsterName, wipeoutText } from './random_text.js';
@@ -9401,6 +9401,7 @@ function apply_newcham_basic(mon, ptr) {
     let hp = oldMax > 0 ? Math.trunc(oldHp * mon.mhpmax / oldMax) : mon.mhpmax;
     if (hp < 0 || hp > mon.mhpmax) hp = mon.mhpmax;
     mon.mhp = hp || 1;
+    mon_break_armor_basic(mon);
     return true;
 }
 

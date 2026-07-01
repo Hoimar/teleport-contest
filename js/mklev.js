@@ -18,7 +18,7 @@ import {
 } from './object_data.js';
 import { getObjectColor, getObjectMaterial } from './o_init.js';
 import { MONSTER_DATA } from './monster_data.js';
-import { m_dowear_basic } from './mon_wear.js';
+import { m_dowear_basic, mon_break_armor_basic } from './mon_wear.js';
 import { noteMonsterBorn, monsterGenocided, monsterGone } from './monstats.js';
 import { CLR_CYAN, CLR_GRAY, NO_COLOR } from './terminal.js';
 import {
@@ -2670,6 +2670,7 @@ function initial_shapeshift(mon, ptr) {
     mon.m_lev = monState.level;
     mon.mhp = monState.hp;
     mon.mhpmax = monState.hp;
+    mon_break_armor_basic(mon);
     return true;
 }
 

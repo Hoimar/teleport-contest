@@ -3,6 +3,7 @@ import {
     W_AMUL, W_ARM, W_ARMC, W_ARMF, W_ARMG, W_ARMH, W_ARMS, W_ARMU,
 } from './const.js';
 import { game } from './gstate.js';
+import { rn2 } from './rng.js';
 import { randomHallucinatedMonsterName } from './random_text.js';
 
 const M1_NOHANDS = 0x00002000;
@@ -114,6 +115,15 @@ function mon_name_side_effect() {
     if (hallucinating()) randomHallucinatedMonsterName('the');
 }
 
+function monster_hallu_pronoun_side_effects() {
+    if (!hallucinating()) return;
+    // C refs: worn.c:mon_break_armor(), you.h:mhim()/mhis(),
+    // mondata.c:pronoun_gender(). mon_break_armor() computes both pronouns
+    // at entry, before any armor-slot tests.
+    rn2(4);
+    rn2(4);
+}
+
 function object_slot(obj) {
     const otyp = obj?.otyp;
     if (otyp >= 89 && otyp <= 100) return W_ARMH;
@@ -175,4 +185,9 @@ export function m_dowear_basic(mtmp, creation = false) {
     if (mon_has_feet_slot(mtmp)) m_dowear_type_basic(mtmp, W_ARMF, creation);
     m_dowear_type_basic(mtmp, W_ARM, creation,
         (obj) => canWearSuit || racial_exception(mtmp, obj));
+}
+
+export function mon_break_armor_basic(mtmp) {
+    if (!mtmp) return;
+    monster_hallu_pronoun_side_effects();
 }
