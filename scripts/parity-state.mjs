@@ -692,6 +692,36 @@ function summarizeLeaderboardHistory(team, targetSummary, limit = 12) {
     };
 }
 
+function leaderboardFailureSignature(team) {
+    const sessions = Array.isArray(team?.sessions) ? team.sessions : [];
+    const failed = sessions.filter((session) => !session.passed);
+    const rows = failed.map((session) => {
+        const rng = session.rng || {};
+        const rngSteps = session.rngSteps || {};
+        const screen = session.screen || {};
+        const cellsOnly = session.cellsOnly || screen;
+        const cursors = session.cursors || {};
+        return {
+            session: session.name,
+            missedScreens: Number(screen.total ?? 0) - Number(screen.matched ?? 0),
+            rngFull: Number(rng.matched ?? -1) === Number(rng.total ?? 0),
+            rngStepsFull: Number(rngSteps.matched ?? -1) === Number(rngSteps.total ?? 0),
+            cellsOnlyEqualsScreen: Number(cellsOnly.matched ?? -1) === Number(screen.matched ?? 0) &&
+                Number(cellsOnly.total ?? -1) === Number(screen.total ?? 0),
+            cursorsFull: Number(cursors.matched ?? -1) === Number(cursors.total ?? 0),
+        };
+    });
+    return {
+        failed: rows.length,
+        missedScreens: rows.reduce((acc, row) => acc + row.missedScreens, 0),
+        fullRng: rows.filter((row) => row.rngFull).length,
+        fullRngSteps: rows.filter((row) => row.rngStepsFull).length,
+        cellsOnlyScreen: rows.filter((row) => row.cellsOnlyEqualsScreen).length,
+        fullCursors: rows.filter((row) => row.cursorsFull).length,
+        rows,
+    };
+}
+
 function gitCaveats(git) {
     const caveats = [];
     if (git.dirty) {
@@ -823,8 +853,9 @@ function classifyLeaderboard({ leaderboard, teamName, localCorpus, liveCorpus, c
         : null;
     const caveats = gitCaveats(git);
     const history = summarizeLeaderboardHistory(team, scoreCorpus.summary);
+    const failureSignature = leaderboardFailureSignature(team);
     if (!scoreShapeMatches(scoreCorpus.summary, publicSummary) && corpusComparison?.class === 'public-session-drift') {
-        return withCleanRef({ class: 'public-session-drift', reason: reasonWithCaveats('leaderboard public corpus shape differs from checked-in and hosted public sessions', caveats), url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta, caveats, history });
+        return withCleanRef({ class: 'public-session-drift', reason: reasonWithCaveats('leaderboard public corpus shape differs from checked-in and hosted public sessions', caveats), url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta, caveats, history, failureSignature });
     }
 
     const publicEqual = scoresEqual(scoreCorpus.summary, publicSummary);
@@ -833,9 +864,9 @@ function classifyLeaderboard({ leaderboard, teamName, localCorpus, liveCorpus, c
     if (publicEqual) {
         const held = team.heldOut;
         if (held && Number(held.points ?? 0) !== Number(held.maxPoints ?? 0)) {
-            return withCleanRef({ class: 'heldout-only-gap', reason: reasonWithCaveats('public score matches; held-out sessions remain private cleanliness evidence', caveats), url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta, caveats, motion, history });
+            return withCleanRef({ class: 'heldout-only-gap', reason: reasonWithCaveats('public score matches; held-out sessions remain private cleanliness evidence', caveats), url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta, caveats, motion, history, failureSignature });
         }
-        return withCleanRef({ class: 'same', reason: reasonWithCaveats(`leaderboard public score matches local ${scoreCorpus.label} score`, caveats), url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta, caveats, motion, history });
+        return withCleanRef({ class: 'same', reason: reasonWithCaveats(`leaderboard public score matches local ${scoreCorpus.label} score`, caveats), url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta, caveats, motion, history, failureSignature });
     }
 
     if (cleanRef?.rulesOutLocalAhead) {
@@ -855,22 +886,23 @@ function classifyLeaderboard({ leaderboard, teamName, localCorpus, liveCorpus, c
             caveats,
             motion: cleanRefMotion,
             history,
+            failureSignature,
         });
     }
 
     if ((git.ahead ?? 0) > 0) {
-        return withCleanRef({ class: 'local-dirty-or-unpushed', reason: reasonWithCaveats(`local HEAD is ahead of ${git.upstream || 'upstream'} and cannot be reflected by leaderboard yet`, caveats), url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta, caveats, motion, history });
+        return withCleanRef({ class: 'local-dirty-or-unpushed', reason: reasonWithCaveats(`local HEAD is ahead of ${git.upstream || 'upstream'} and cannot be reflected by leaderboard yet`, caveats), url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta, caveats, motion, history, failureSignature });
     }
     if (git.dirty) {
-        return withCleanRef({ class: 'local-dirty-or-unpushed', reason: reasonWithCaveats('working tree has local changes not represented by leaderboard', caveats), url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta, caveats, motion, history });
+        return withCleanRef({ class: 'local-dirty-or-unpushed', reason: reasonWithCaveats('working tree has local changes not represented by leaderboard', caveats), url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta, caveats, motion, history, failureSignature });
     }
     if (persistentHistory) {
-        return withCleanRef({ class: 'persistent-scorer-drift', reason: reasonWithCaveats(`leaderboard history has ${history.matchingTarget}/${history.comparable} recent comparable score(s) matching local ${scoreCorpus.label}; timestamp lag alone does not explain the stable public delta`, caveats), url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta, caveats, motion, history });
+        return withCleanRef({ class: 'persistent-scorer-drift', reason: reasonWithCaveats(`leaderboard history has ${history.matchingTarget}/${history.comparable} recent comparable score(s) matching local ${scoreCorpus.label}; timestamp lag alone does not explain the stable public delta`, caveats), url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta, caveats, motion, history, failureSignature });
     }
     if (team.lastScored && git.commitTime && Date.parse(team.lastScored) < Date.parse(git.commitTime)) {
-        return withCleanRef({ class: 'leaderboard-lag', reason: reasonWithCaveats('leaderboard lastScored is older than local HEAD commit time', caveats), url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta, caveats, motion, history });
+        return withCleanRef({ class: 'leaderboard-lag', reason: reasonWithCaveats('leaderboard lastScored is older than local HEAD commit time', caveats), url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta, caveats, motion, history, failureSignature });
     }
-    return withCleanRef({ class: 'scorer-drift', reason: reasonWithCaveats('same public corpus but leaderboard public score differs from local scorer output', caveats), url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta, caveats, motion, history });
+    return withCleanRef({ class: 'scorer-drift', reason: reasonWithCaveats('same public corpus but leaderboard public score differs from local scorer output', caveats), url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta, caveats, motion, history, failureSignature });
 }
 
 function auditSummary() {
@@ -994,6 +1026,10 @@ function printHuman(payload) {
                 const pub = payload.leaderboard.publicSummary;
                 const rng = pub.rngMatched == null ? 'unknown' : fmtCount(pub.rngMatched, pub.rngTotal);
                 console.log(`- public: exact ${pub.exact}/${pub.sessions} S ${fmtCount(pub.screenMatched, pub.screenTotal)} R ${rng}`);
+            }
+            if (payload.leaderboard.failureSignature?.failed) {
+                const sig = payload.leaderboard.failureSignature;
+                console.log(`- online failure signature: ${sig.failed} failed public session(s), ${sig.missedScreens} missed screen(s); full RNG ${sig.fullRng}/${sig.failed}, full RNG-steps ${sig.fullRngSteps}/${sig.failed}, cells-only screen ${sig.cellsOnlyScreen}/${sig.failed}, full cursors ${sig.fullCursors}/${sig.failed}`);
             }
             if (team.heldOut) {
                 console.log(`- held-out: points ${fmtCount(team.heldOut.points, team.heldOut.maxPoints)} passing ${fmtCount(team.heldOut.passing, team.heldOut.total)}; private sessions are the cleanliness benchmark`);
