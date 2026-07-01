@@ -9401,6 +9401,8 @@ function apply_newcham_basic(mon, ptr) {
     let hp = oldMax > 0 ? Math.trunc(oldHp * mon.mhpmax / oldMax) : mon.mhpmax;
     if (hp < 0 || hp > mon.mhpmax) hp = mon.mhpmax;
     mon.mhp = hp || 1;
+    mon.meverseen = 0;
+    newsym(mon.mx, mon.my);
     mon_break_armor_basic(mon, {
         dropObject(mtmp, obj) {
             stackobj(place_object(obj, mtmp.mx, mtmp.my));
@@ -9408,7 +9410,26 @@ function apply_newcham_basic(mon, ptr) {
         },
     });
     mon.misc_worn_check = (mon.misc_worn_check || 0) | I_SPECIAL;
+    drop_shapechange_boulders_basic(mon);
     return true;
+}
+
+function drop_shapechange_boulders_basic(mon) {
+    // C ref: src/mon.c:newcham(). Former rock-throwers cannot keep carrying
+    // boulders after changing into a non-rock-throwing form.
+    if (!mon || ((mon.data?.mflags2 ?? 0) & M2_ROCKTHROW)) return;
+    const inv = mon.inventory || [];
+    let dropped = false;
+    for (let i = inv.length - 1; i >= 0; i--) {
+        const obj = inv[i];
+        if (obj?.otyp !== BOULDER) continue;
+        inv.splice(i, 1);
+        if (mon.mw === obj) mon.mw = null;
+        obj.owornmask = 0;
+        stackobj(place_object(obj, mon.mx, mon.my));
+        dropped = true;
+    }
+    if (dropped) newsym(mon.mx, mon.my);
 }
 
 function decide_to_shapeshift_basic(mon) {
