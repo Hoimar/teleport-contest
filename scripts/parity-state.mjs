@@ -122,6 +122,7 @@ function inferTeamFromGitRemote() {
 function gitState() {
     const status = gitOutput(['status', '--short']) || '';
     const upstream = gitOutput(['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}']);
+    const upstreamCommitFull = upstream ? gitOutput(['rev-parse', upstream]) : null;
     let ahead = null, behind = null;
     if (upstream) {
         const counts = gitOutput(['rev-list', '--left-right', '--count', `${upstream}...HEAD`]);
@@ -137,6 +138,9 @@ function gitState() {
         commitTime: gitOutput(['log', '-1', '--format=%cI']),
         branch: gitOutput(['branch', '--show-current']) || null,
         upstream,
+        upstreamCommit: upstreamCommitFull ? gitOutput(['rev-parse', '--short', upstream]) : null,
+        upstreamCommitFull,
+        upstreamCommitTime: upstream ? gitOutput(['log', '-1', '--format=%cI', upstream]) : null,
         ahead,
         behind,
         dirty: Boolean(status),
@@ -643,6 +647,50 @@ function reasonWithCaveats(reason, caveats) {
     return caveats.length ? `${reason}; ${caveats.join('; ')}` : reason;
 }
 
+function timeRelation(left, right) {
+    const l = Date.parse(left || '');
+    const r = Date.parse(right || '');
+    if (!Number.isFinite(l) || !Number.isFinite(r)) return 'unknown';
+    if (l < r) return 'before';
+    if (l > r) return 'after';
+    return 'same-time';
+}
+
+function scoreboardMotion({ git, team, publicEqual }) {
+    const lastScored = team?.lastScored || null;
+    const upstreamName = git.upstream || null;
+    let nextAction = 'Inspect scorer drift before assuming the scoreboard will move.';
+    if (git.dirty) {
+        nextAction = 'Commit or discard local WIP before expecting leaderboard parity with this tree.';
+    } else if ((git.ahead ?? 0) > 0) {
+        nextAction = `Push ${git.ahead} local commit(s) before expecting this HEAD on the leaderboard.`;
+    } else if ((git.behind ?? 0) > 0) {
+        nextAction = `Sync with ${upstreamName || 'upstream'} before comparing this checkout to the leaderboard.`;
+    } else if (timeRelation(lastScored, git.commitTime) === 'before') {
+        nextAction = 'Wait for or trigger a scorer run after the current HEAD commit time.';
+    } else if (publicEqual) {
+        nextAction = 'Public leaderboard is current for the comparable corpus; hidden held-out parity is the next scoring surface.';
+    }
+    return {
+        localHead: {
+            commit: git.commit,
+            time: git.commitTime,
+            lastScoredRelation: timeRelation(lastScored, git.commitTime),
+        },
+        upstreamHead: {
+            name: upstreamName,
+            commit: git.upstreamCommit,
+            time: git.upstreamCommitTime,
+            lastScoredRelation: timeRelation(lastScored, git.upstreamCommitTime),
+        },
+        ahead: git.ahead,
+        behind: git.behind,
+        dirty: git.dirty,
+        lastScored,
+        nextAction,
+    };
+}
+
 function chooseLeaderboardScoreCorpus(publicSummary, localCorpus, liveCorpus) {
     if (localCorpus?.available && scoreShapeMatches(localCorpus.summary, publicSummary)) return localCorpus;
     if (liveCorpus?.available && scoreShapeMatches(liveCorpus.summary, publicSummary)) return liveCorpus;
@@ -672,24 +720,25 @@ function classifyLeaderboard({ leaderboard, teamName, localCorpus, liveCorpus, c
     }
 
     const publicEqual = scoresEqual(scoreCorpus.summary, publicSummary);
+    const motion = scoreboardMotion({ git, team, publicEqual });
     if (publicEqual) {
         const held = team.heldOut;
         if (held && Number(held.points ?? 0) !== Number(held.maxPoints ?? 0)) {
-            return { class: 'heldout-only-gap', reason: reasonWithCaveats('public score matches; held-out sessions remain private cleanliness evidence', caveats), url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta, caveats };
+            return { class: 'heldout-only-gap', reason: reasonWithCaveats('public score matches; held-out sessions remain private cleanliness evidence', caveats), url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta, caveats, motion };
         }
-        return { class: 'same', reason: reasonWithCaveats(`leaderboard public score matches local ${scoreCorpus.label} score`, caveats), url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta, caveats };
+        return { class: 'same', reason: reasonWithCaveats(`leaderboard public score matches local ${scoreCorpus.label} score`, caveats), url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta, caveats, motion };
     }
 
     if ((git.ahead ?? 0) > 0) {
-        return { class: 'local-dirty-or-unpushed', reason: reasonWithCaveats(`local HEAD is ahead of ${git.upstream || 'upstream'} and cannot be reflected by leaderboard yet`, caveats), url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta, caveats };
+        return { class: 'local-dirty-or-unpushed', reason: reasonWithCaveats(`local HEAD is ahead of ${git.upstream || 'upstream'} and cannot be reflected by leaderboard yet`, caveats), url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta, caveats, motion };
     }
     if (team.lastScored && git.commitTime && Date.parse(team.lastScored) < Date.parse(git.commitTime)) {
-        return { class: 'leaderboard-lag', reason: reasonWithCaveats('leaderboard lastScored is older than local HEAD commit time', caveats), url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta, caveats };
+        return { class: 'leaderboard-lag', reason: reasonWithCaveats('leaderboard lastScored is older than local HEAD commit time', caveats), url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta, caveats, motion };
     }
     if (git.dirty) {
-        return { class: 'local-dirty-or-unpushed', reason: reasonWithCaveats('working tree has local changes not represented by leaderboard', caveats), url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta, caveats };
+        return { class: 'local-dirty-or-unpushed', reason: reasonWithCaveats('working tree has local changes not represented by leaderboard', caveats), url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta, caveats, motion };
     }
-    return { class: 'scorer-drift', reason: reasonWithCaveats('same public corpus but leaderboard public score differs from local scorer output', caveats), url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta, caveats };
+    return { class: 'scorer-drift', reason: reasonWithCaveats('same public corpus but leaderboard public score differs from local scorer output', caveats), url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta, caveats, motion };
 }
 
 function auditSummary() {
@@ -810,6 +859,15 @@ function printHuman(payload) {
             }
             if (team.heldOut) {
                 console.log(`- held-out: points ${fmtCount(team.heldOut.points, team.heldOut.maxPoints)} passing ${fmtCount(team.heldOut.passing, team.heldOut.total)}; private sessions are the cleanliness benchmark`);
+            }
+            if (payload.leaderboard.motion) {
+                const motion = payload.leaderboard.motion;
+                const upstream = motion.upstreamHead.name
+                    ? `${motion.upstreamHead.name} ${motion.upstreamHead.commit || 'unknown'}`
+                    : 'no upstream';
+                console.log(`- refs: local ${motion.localHead.commit} at ${motion.localHead.time || 'unknown'}; upstream ${upstream} at ${motion.upstreamHead.time || 'unknown'}`);
+                console.log(`- timing: lastScored is ${motion.localHead.lastScoredRelation} local HEAD and ${motion.upstreamHead.lastScoredRelation} upstream HEAD`);
+                console.log(`- next: ${motion.nextAction}`);
             }
             printScoreDelta('Local Vs Leaderboard Public Delta', payload.leaderboard.sessionDelta, {
                 limit: payload.options.full ? Number.POSITIVE_INFINITY : 10,

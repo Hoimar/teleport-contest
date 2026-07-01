@@ -12,6 +12,7 @@ aliases; direct `node` commands work the same way.
 | Verify | `npm run verify -- --target <session>` | `node scripts/verify-change.mjs --target <session>` |
 | Strict sentinel | `npm run sentinel:strict` | `node scripts/run-sentinel-suite.mjs --strict` |
 | Scoreboard state | `npm run scoreboard:state` | `node scripts/parity-state.mjs --refresh-live --full` |
+| Scoreboard JSON | `npm run scoreboard:json` | `node scripts/parity-state.mjs --refresh-live --full --json` |
 | Hack audit | `npm run hack:audit` | `node scripts/hack-debt-audit.mjs` |
 | Memory lint | `npm run memory:lint` | `node scripts/memory-lint.mjs` |
 
@@ -56,6 +57,9 @@ score totals, but not the git commit that was scored. When the local tree is
 dirty or ahead, the classifier is deliberately conservative. For unresolved
 scoreboard motion, compare from a clean pushed ref or add a clean-ref scorer
 mode rather than treating timestamp alone as commit evidence.
+The `refs`, `timing`, and `next` lines show whether the last score run is before
+or after local and upstream HEAD, and whether the next action is pushing local
+commits, waiting for a newer score run, or investigating scorer drift.
 
 ## Library Boundary
 
