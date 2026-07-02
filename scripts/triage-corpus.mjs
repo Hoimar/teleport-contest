@@ -16,33 +16,6 @@ const FR_BANDS = [
     { name: '>1200', min: 1201, max: Infinity },
 ];
 
-const KNOWN_BLOCKERS = new Map([
-    [
-        'seed0116-wizard-wear-shop.session.json',
-        {
-            hypothesis: 'Pet behavior: dog_goal() object scan, reachability, carry checks, and object resistance in dogmove.c.',
-            owner: 'Monsters / pets',
-            needsDeeperDebug: true,
-        },
-    ],
-    [
-        'seed0383-wizard-hallucinate.session.json',
-        {
-            hypothesis: 'Special-level monster setup: des.monster() selected-monster initialization, equipment, and hallucination display context.',
-            owner: 'Special levels / monsters',
-            needsDeeperDebug: true,
-        },
-    ],
-    [
-        'seed8000-tourist-starter.session.json',
-        {
-            hypothesis: 'Live turn loop: post-screen monster movement RNG ownership after visible screen parity.',
-            owner: 'Turn loop / monster movement',
-            needsDeeperDebug: true,
-        },
-    ],
-]);
-
 function asciiCompare(a, b) {
     const aa = String(a || '');
     const bb = String(b || '');
@@ -235,8 +208,7 @@ function defaultHypothesis(record) {
 }
 
 function recordHypothesis(record) {
-    if (record.phaseBucket === 'passing') return defaultHypothesis(record);
-    return KNOWN_BLOCKERS.get(record.session) ?? defaultHypothesis(record);
+    return defaultHypothesis(record);
 }
 
 function sampleCells(firstScreenMismatch) {
@@ -316,22 +288,6 @@ function makeBuckets(records) {
         bucket.count++;
         bucket.sessions.push(record.session);
         if (record.needsDeeperDebug) bucket.needsDeeperDebug = true;
-        if (KNOWN_BLOCKERS.has(record.session) && !KNOWN_BLOCKERS.has(bucket.canonicalSession)) {
-            bucket.canonicalSession = record.session;
-            bucket.canonicalSummary = {
-                screens: `${record.matchedScreens}/${record.totalScreens}`,
-                rngCalls: `${record.matchedRngCalls}/${record.totalRngCalls}`,
-                firstScreen: record.firstScreenMismatchIndex,
-                firstRng: record.firstRngMismatchIndex,
-                rngSignature: record.rngSignature,
-                surface: record.surface,
-                mismatchClass: record.mismatchClass,
-                rowSummary: record.rowSummary,
-                sampleCells: record.firstSampleCells,
-            };
-            bucket.hypothesis = record.hypothesis;
-            bucket.owner = record.owner;
-        }
     }
 
     return [...byKey.values()].sort((a, b) => {
@@ -467,28 +423,6 @@ function renderMarkdown(records, buckets, summary) {
         lines.push(`- Needs deeper debug: ${bucket.needsDeeperDebug ? 'yes' : 'no'}`);
         lines.push(`- Sessions: ${bucket.sessions.map(stripSessionSuffix).join(', ')}`);
     }
-    lines.push('');
-    lines.push('## Known Live Blockers');
-    lines.push('');
-    const activeKnownBlockers = [...KNOWN_BLOCKERS.keys()]
-        .map((session) => records.find((candidate) => candidate.session === session))
-        .filter((record) => record && record.phaseBucket !== 'passing');
-    if (!activeKnownBlockers.length) {
-        lines.push('No known live blockers in this corpus run.');
-    } else {
-        lines.push(markdownTable(
-            ['Session', 'Screens', 'RNG', 'First screen', 'First RNG', 'Hypothesis'],
-            activeKnownBlockers.map((record) => [
-                stripSessionSuffix(record.session),
-                `${record.matchedScreens}/${record.totalScreens}`,
-                `${record.matchedRngCalls}/${record.totalRngCalls}`,
-                `${record.firstScreenMismatchIndex ?? '-'}:${record.mismatchClass}:${record.surface}:${record.keyDisplay}`,
-                `${record.firstRngMismatchIndex ?? '-'}:${record.rngSignature}`,
-                record.hypothesis,
-            ]),
-        ));
-    }
-    lines.push('');
     lines.push('## Session Inventory');
     lines.push('');
     lines.push(markdownTable(
