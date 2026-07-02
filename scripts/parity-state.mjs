@@ -720,10 +720,12 @@ function scoreActionsEvidence(actionsState, team, git) {
             branch: actionsState.branch,
         };
     }
-    const lastScoredRelation = timeRelation(team?.lastScored, latest.updatedAt);
-    const headMatchesUpstream = Boolean(latest.headSha && git.upstreamCommitFull && latest.headSha === git.upstreamCommitFull);
-    const headMatchesLocal = Boolean(latest.headSha && git.commitFull && latest.headSha === git.commitFull);
-    const completedSuccess = latest.status === 'completed' && latest.conclusion === 'success';
+    const compared = actionsState.latestSuccessful || latest;
+    const latestSuccessful = actionsState.latestSuccessful || null;
+    const lastScoredRelation = timeRelation(team?.lastScored, compared.updatedAt);
+    const headMatchesUpstream = Boolean(compared.headSha && git.upstreamCommitFull && compared.headSha === git.upstreamCommitFull);
+    const headMatchesLocal = Boolean(compared.headSha && git.commitFull && compared.headSha === git.commitFull);
+    const completedSuccess = compared.status === 'completed' && compared.conclusion === 'success';
     const scoreArtifact = (actionsState.artifacts || []).find((artifact) => artifact.name === 'score-results') || null;
     return {
         available: true,
@@ -740,6 +742,28 @@ function scoreActionsEvidence(actionsState, team, git) {
             createdAt: latest.createdAt,
             updatedAt: latest.updatedAt,
             htmlUrl: latest.htmlUrl,
+        },
+        latestSuccessful: latestSuccessful ? {
+            id: latestSuccessful.id,
+            number: latestSuccessful.number,
+            status: latestSuccessful.status,
+            conclusion: latestSuccessful.conclusion,
+            headSha: latestSuccessful.headSha,
+            headShaShort: latestSuccessful.headShaShort,
+            createdAt: latestSuccessful.createdAt,
+            updatedAt: latestSuccessful.updatedAt,
+            htmlUrl: latestSuccessful.htmlUrl,
+        } : null,
+        compared: {
+            id: compared.id,
+            number: compared.number,
+            status: compared.status,
+            conclusion: compared.conclusion,
+            headSha: compared.headSha,
+            headShaShort: compared.headShaShort,
+            createdAt: compared.createdAt,
+            updatedAt: compared.updatedAt,
+            htmlUrl: compared.htmlUrl,
         },
         artifact: scoreArtifact ? {
             id: scoreArtifact.id,
@@ -804,7 +828,7 @@ function classifyLeaderboard({ leaderboard, teamName, localCorpus, liveCorpus, c
         const nextAction = 'Leaderboard predates the latest successful GitHub Score run for the current upstream HEAD. Wait for or trigger the online scorer after that run, then refresh scoreboard:state.';
         return withCleanRef({
             class: 'leaderboard-lag',
-            reason: reasonWithCaveats(`latest GitHub Score run #${actions.latest.number} for ${actions.latest.headShaShort} completed after leaderboard lastScored; the online row has not caught up to the current pushed ref`, caveats),
+            reason: reasonWithCaveats(`latest successful GitHub Score run #${actions.compared.number} for ${actions.compared.headShaShort} completed after leaderboard lastScored; the online row has not caught up to the current pushed ref`, caveats),
             url: leaderboard.url,
             team: compactLeaderboardTeam(team),
             publicSummary,
@@ -1042,10 +1066,15 @@ function printHuman(payload) {
                 const actions = payload.leaderboard.actions;
                 if (actions.available) {
                     const latest = actions.latest;
+                    const compared = actions.compared || actions.latestSuccessful || latest;
+                    const comparedLabel = actions.latestSuccessful ? 'latest successful' : 'latest';
+                    const latestPrefix = latest.id === compared.id
+                        ? `#${latest.number}`
+                        : `latest #${latest.number} ${latest.status}/${latest.conclusion || 'unknown'}; ${comparedLabel} #${compared.number}`;
                     const artifact = actions.artifact
                         ? `; artifact ${actions.artifact.name} ${actions.artifact.expired ? 'expired' : 'active'}`
                         : '; artifact unavailable';
-                    console.log(`- actions: #${latest.number} ${latest.status}/${latest.conclusion || 'unknown'} ${latest.headShaShort || 'unknown'} updated ${latest.updatedAt || 'unknown'}; leaderboard lastScored is ${actions.lastScoredRelation} Actions update${artifact}`);
+                    console.log(`- actions: ${latestPrefix} ${compared.status}/${compared.conclusion || 'unknown'} ${compared.headShaShort || 'unknown'} updated ${compared.updatedAt || 'unknown'}; leaderboard lastScored is ${actions.lastScoredRelation} ${comparedLabel} Actions update${artifact}`);
                 } else {
                     console.log(`- actions: unavailable: ${actions.error}`);
                 }

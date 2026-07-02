@@ -86,8 +86,8 @@ and `feature_map.md`.
     official failed-session reference and each local surface minus that row.
   - Harness truth: `scoreboard:state`/`scoreboard:json` now pass
     `--score-upstream --score-actions`, resolving the configured upstream ref
-    before scoring a clean `/tmp` checkout and checking the latest GitHub Score
-    workflow update for the pushed upstream SHA.
+    before scoring a clean `/tmp` checkout and checking the latest successful
+    GitHub Score workflow update for the pushed upstream SHA.
     The aliases also save both `.cache/leaderboard-data.json` and a
     timestamped `.cache/leaderboard-history/*.json` snapshot so current and
     historic online rows remain replayable after the live endpoint moves.
@@ -112,7 +112,7 @@ and `feature_map.md`.
     bucket.
   - Production determinism: inventory-letter range helpers now call the same
     explicit ASCII comparator as broader inventory and loot ordering.
-  - External scorer evidence: latest public GitHub Actions Score run is
+  - External scorer evidence: latest successful public GitHub Actions Score run is
     `#116` for pushed `513765f`, success, with non-expired `score-results`
     artifact metadata; the current leaderboard row was scored before that run
     updated.

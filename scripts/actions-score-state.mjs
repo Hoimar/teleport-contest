@@ -14,13 +14,14 @@ import {
 const PROJECT_ROOT = new URL('..', import.meta.url).pathname.replace(/\/$/, '');
 export const DEFAULT_ACTIONS_WORKFLOW = 'score.yml';
 export const DEFAULT_ACTIONS_BRANCH = 'main';
+export const DEFAULT_ACTIONS_RUN_LIMIT = 10;
 
 function usage() {
     return [
         'Usage: node scripts/actions-score-state.mjs [--repo owner/repo] [--workflow score.yml] [--branch main] [--leaderboard-json <file>] [--team <name>] [--json]',
         '',
-        'Reports the latest GitHub Actions Score workflow run and score-results',
-        'artifact metadata. Pair this with scoreboard:state when the public',
+        'Reports recent GitHub Actions Score workflow runs and score-results',
+        'artifact metadata for the latest successful run. Pair this with scoreboard:state when the public',
         'leaderboard differs from local scorer surfaces.',
     ].join('\n');
 }
@@ -30,6 +31,7 @@ function parseArgs(argv) {
         repo: null,
         workflow: DEFAULT_ACTIONS_WORKFLOW,
         branch: DEFAULT_ACTIONS_BRANCH,
+        limit: DEFAULT_ACTIONS_RUN_LIMIT,
         leaderboardJson: existsSync(join(PROJECT_ROOT, '.cache/leaderboard-data.json'))
             ? '.cache/leaderboard-data.json'
             : null,
@@ -53,6 +55,10 @@ function parseArgs(argv) {
             out.branch = argv[++i] || DEFAULT_ACTIONS_BRANCH;
         } else if (arg.startsWith('--branch=')) {
             out.branch = arg.slice('--branch='.length);
+        } else if (arg === '--limit') {
+            out.limit = Number(argv[++i] || DEFAULT_ACTIONS_RUN_LIMIT);
+        } else if (arg.startsWith('--limit=')) {
+            out.limit = Number(arg.slice('--limit='.length));
         } else if (arg === '--leaderboard-json') {
             out.leaderboardJson = argv[++i] || null;
         } else if (arg.startsWith('--leaderboard-json=')) {
@@ -69,6 +75,8 @@ function parseArgs(argv) {
             throw new Error(`unknown argument ${arg}`);
         }
     }
+    if (!Number.isFinite(out.limit) || out.limit < 1) out.limit = DEFAULT_ACTIONS_RUN_LIMIT;
+    out.limit = Math.min(Math.trunc(out.limit), 100);
     return out;
 }
 
@@ -141,10 +149,33 @@ export async function fetchJson(url) {
     throw new Error(errors.join('; '));
 }
 
-export function githubApiUrl(repo, workflow, branch) {
+export function githubApiUrl(repo, workflow, branch, perPage = DEFAULT_ACTIONS_RUN_LIMIT) {
     const encodedWorkflow = encodeURIComponent(workflow);
-    const params = new URLSearchParams({ branch, per_page: '1' });
+    const params = new URLSearchParams({ branch, per_page: String(perPage) });
     return `https://api.github.com/repos/${repo}/actions/workflows/${encodedWorkflow}/runs?${params.toString()}`;
+}
+
+function compactRun(run) {
+    if (!run) return null;
+    return {
+        id: run.id,
+        number: run.run_number,
+        status: run.status,
+        conclusion: run.conclusion,
+        event: run.event,
+        title: run.display_title,
+        headBranch: run.head_branch,
+        headSha: run.head_sha,
+        headShaShort: String(run.head_sha || '').slice(0, 7),
+        createdAt: run.created_at,
+        startedAt: run.run_started_at,
+        updatedAt: run.updated_at,
+        htmlUrl: run.html_url,
+    };
+}
+
+function isSuccessfulRun(run) {
+    return run?.status === 'completed' && run?.conclusion === 'success';
 }
 
 export async function fetchActionsState(options = {}) {
@@ -152,29 +183,23 @@ export async function fetchActionsState(options = {}) {
     if (!repo) throw new Error('--repo owner/repo is required when origin is not a GitHub repo');
     const workflow = options.workflow || DEFAULT_ACTIONS_WORKFLOW;
     const branch = options.branch || DEFAULT_ACTIONS_BRANCH;
-    const runs = await fetchJson(githubApiUrl(repo, workflow, branch));
-    const latest = runs.workflow_runs?.[0] || null;
-    const artifacts = latest ? await fetchJson(latest.artifacts_url) : null;
+    const limit = Math.min(Math.max(Math.trunc(Number(options.limit || DEFAULT_ACTIONS_RUN_LIMIT)), 1), 100);
+    const runs = await fetchJson(githubApiUrl(repo, workflow, branch, limit));
+    const recentRuns = runs.workflow_runs || [];
+    const latest = recentRuns[0] || null;
+    const latestSuccessful = recentRuns.find(isSuccessfulRun) || null;
+    const artifactRun = latestSuccessful || latest;
+    const artifacts = artifactRun ? await fetchJson(artifactRun.artifacts_url) : null;
     return {
         repo,
         workflow,
         branch,
+        limit,
         totalRuns: Number(runs.total_count ?? 0),
-        latest: latest ? {
-            id: latest.id,
-            number: latest.run_number,
-            status: latest.status,
-            conclusion: latest.conclusion,
-            event: latest.event,
-            title: latest.display_title,
-            headBranch: latest.head_branch,
-            headSha: latest.head_sha,
-            headShaShort: String(latest.head_sha || '').slice(0, 7),
-            createdAt: latest.created_at,
-            startedAt: latest.run_started_at,
-            updatedAt: latest.updated_at,
-            htmlUrl: latest.html_url,
-        } : null,
+        latest: compactRun(latest),
+        latestSuccessful: compactRun(latestSuccessful),
+        artifactRun: compactRun(artifactRun),
+        recentRuns: recentRuns.map(compactRun),
         artifacts: (artifacts?.artifacts || []).map((artifact) => ({
             id: artifact.id,
             name: artifact.name,
@@ -228,15 +253,25 @@ function printHuman(payload) {
     console.log(`- head: ${run.headShaShort} ${run.title || ''}`.trimEnd());
     console.log(`- times: created ${run.createdAt || 'unknown'}, updated ${run.updatedAt || 'unknown'}`);
     console.log(`- url: ${run.htmlUrl}`);
+    const successful = payload.actions.latestSuccessful;
+    if (successful) {
+        const suffix = successful.id === run.id ? 'same as latest' : `${successful.headShaShort} updated ${successful.updatedAt || 'unknown'}`;
+        console.log(`- latest successful: #${successful.number} ${successful.id} (${suffix})`);
+    } else {
+        console.log(`- latest successful: none in last ${payload.actions.limit} run(s)`);
+    }
     if (payload.refs?.local?.full) {
         console.log(`- local HEAD: ${payload.refs.local.commit} ${payload.refs.local.subject || ''}`.trimEnd());
     }
     if (payload.refs?.upstream?.full) {
-        const matches = payload.refs.upstream.full === run.headSha ? 'matches' : 'differs';
-        console.log(`- upstream ${payload.refs.upstream.name}: ${payload.refs.upstream.commit} ${matches} latest run`);
+        const comparedRun = successful || run;
+        const matches = payload.refs.upstream.full === comparedRun.headSha ? 'matches' : 'differs';
+        const comparedLabel = successful ? 'latest successful run' : 'latest run';
+        console.log(`- upstream ${payload.refs.upstream.name}: ${payload.refs.upstream.commit} ${matches} ${comparedLabel}`);
     }
     if (payload.actions.artifacts.length) {
-        console.log(`- artifacts: ${payload.actions.artifacts.length}`);
+        const artifactRun = payload.actions.artifactRun || successful || run;
+        console.log(`- artifacts for #${artifactRun.number}: ${payload.actions.artifacts.length}`);
         for (const artifact of payload.actions.artifacts) {
             console.log(`  ${artifact.name}: id ${artifact.id}, expired ${artifact.expired ? 'yes' : 'no'}, size ${artifact.size}, created ${artifact.createdAt || 'unknown'}${artifact.digest ? `, ${artifact.digest}` : ''}`);
         }
@@ -251,7 +286,9 @@ function printHuman(payload) {
         console.log(`- source: ${board.source}${board.snapshot ? `, snapshot ${board.snapshot}` : ''}`);
         console.log(`- team: ${board.team} (${board.fork || 'unknown fork'}), last scored ${board.lastScored || 'unknown'}`);
         console.log(`- public: ${pub.passing ?? '?'} / ${pub.total ?? '?'} passing, S ${pub.points ?? '?'}/${pub.maxPoints ?? '?'}`);
-        console.log(`- timing: leaderboard lastScored is ${timeRelation(board.lastScored, run.updatedAt)} latest Actions update`);
+        const comparedRun = successful || run;
+        const comparedLabel = successful ? 'latest successful Actions update' : 'latest Actions update';
+        console.log(`- timing: leaderboard lastScored is ${timeRelation(board.lastScored, comparedRun.updatedAt)} ${comparedLabel}`);
     }
     console.log('');
     console.log('Artifact zip downloads may require authenticated GitHub API access even when metadata is public.');
