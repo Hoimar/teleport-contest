@@ -16,6 +16,7 @@ import {
 import { auditHackDebt } from './hack-debt-audit.mjs';
 import { collectMemoryIssues } from './memory-lint.mjs';
 import { scoreRef } from './score-ref.mjs';
+import { fetchActionsState } from './actions-score-state.mjs';
 import {
     DEFAULT_LEADERBOARD_BASE_URL,
     fetchLeaderboard,
@@ -32,7 +33,7 @@ const DEFAULT_LIVE_DIR = '.cache/live-sessions';
 
 function usage() {
     return [
-        'Usage: node scripts/parity-state.mjs [--refresh-live] [--full] [--json] [--team <name>] [--leaderboard-json <file>] [--save-leaderboard-json <file>] [--save-leaderboard-history-dir <dir>] [--score-ref <ref>|--score-upstream]',
+        'Usage: node scripts/parity-state.mjs [--refresh-live] [--full] [--json] [--team <name>] [--leaderboard-json <file>] [--save-leaderboard-json <file>] [--save-leaderboard-history-dir <dir>] [--score-ref <ref>|--score-upstream] [--score-actions]',
         '',
         'Options:',
         '  --refresh-live       Fetch hosted public sessions into .cache/live-sessions first.',
@@ -47,6 +48,7 @@ function usage() {
         '  --live-dir <dir>     Override cached live-public session directory.',
         '  --score-ref <ref>    Score a clean git ref and compare it with leaderboard public.',
         '  --score-upstream     Score the configured upstream ref and compare it with leaderboard public.',
+        '  --score-actions      Fetch latest GitHub Actions Score run metadata for timing.',
         '  --full               Print per-session non-exact rows.',
         '  --json               Emit machine-readable JSON only.',
     ].join('\n');
@@ -67,6 +69,7 @@ function parseArgs(argv) {
         liveDir: DEFAULT_LIVE_DIR,
         scoreRef: null,
         scoreUpstream: false,
+        scoreActions: false,
         explicitTeam: false,
     };
 
@@ -102,6 +105,7 @@ function parseArgs(argv) {
         else if (arg === '--score-ref') options.scoreRef = argv[++i] || null;
         else if (arg.startsWith('--score-ref=')) options.scoreRef = arg.slice('--score-ref='.length);
         else if (arg === '--score-upstream') options.scoreUpstream = true;
+        else if (arg === '--score-actions') options.scoreActions = true;
         else throw new Error(`unknown argument ${arg}\n${usage()}`);
     }
 
@@ -698,13 +702,67 @@ function cleanRefEvidence(refCorpus, publicSummary, team) {
     };
 }
 
+function scoreActionsEvidence(actionsState, team, git) {
+    if (!actionsState) return null;
+    if (!actionsState.available) {
+        return {
+            available: false,
+            error: actionsState.error || 'score actions unavailable',
+        };
+    }
+    const latest = actionsState.latest || null;
+    if (!latest) {
+        return {
+            available: false,
+            error: 'no score workflow runs found',
+            repo: actionsState.repo,
+            workflow: actionsState.workflow,
+            branch: actionsState.branch,
+        };
+    }
+    const lastScoredRelation = timeRelation(team?.lastScored, latest.updatedAt);
+    const headMatchesUpstream = Boolean(latest.headSha && git.upstreamCommitFull && latest.headSha === git.upstreamCommitFull);
+    const headMatchesLocal = Boolean(latest.headSha && git.commitFull && latest.headSha === git.commitFull);
+    const completedSuccess = latest.status === 'completed' && latest.conclusion === 'success';
+    const scoreArtifact = (actionsState.artifacts || []).find((artifact) => artifact.name === 'score-results') || null;
+    return {
+        available: true,
+        repo: actionsState.repo,
+        workflow: actionsState.workflow,
+        branch: actionsState.branch,
+        latest: {
+            id: latest.id,
+            number: latest.number,
+            status: latest.status,
+            conclusion: latest.conclusion,
+            headSha: latest.headSha,
+            headShaShort: latest.headShaShort,
+            createdAt: latest.createdAt,
+            updatedAt: latest.updatedAt,
+            htmlUrl: latest.htmlUrl,
+        },
+        artifact: scoreArtifact ? {
+            id: scoreArtifact.id,
+            name: scoreArtifact.name,
+            expired: scoreArtifact.expired,
+            digest: scoreArtifact.digest,
+            createdAt: scoreArtifact.createdAt,
+        } : null,
+        lastScoredRelation,
+        headMatchesUpstream,
+        headMatchesLocal,
+        completedSuccess,
+        leaderboardPredatesLatestRun: completedSuccess && headMatchesUpstream && lastScoredRelation === 'before',
+    };
+}
+
 function chooseLeaderboardScoreCorpus(publicSummary, localCorpus, liveCorpus) {
     if (localCorpus?.available && scoreShapeMatches(localCorpus.summary, publicSummary)) return localCorpus;
     if (liveCorpus?.available && scoreShapeMatches(liveCorpus.summary, publicSummary)) return liveCorpus;
     return liveCorpus?.available ? liveCorpus : localCorpus;
 }
 
-function classifyLeaderboard({ leaderboard, teamName, localCorpus, liveCorpus, corpusComparison, git, cleanRefCorpus }) {
+function classifyLeaderboard({ leaderboard, teamName, localCorpus, liveCorpus, corpusComparison, git, cleanRefCorpus, actionsState }) {
     if (!leaderboard?.available) {
         return { class: 'unknown', reason: (leaderboard?.errors || ['leaderboard unavailable']).join(' | ') };
     }
@@ -715,12 +773,14 @@ function classifyLeaderboard({ leaderboard, teamName, localCorpus, liveCorpus, c
     const publicSummary = summarizeLeaderboardSessions(team);
     const leaderboardCorpus = makeLeaderboardCorpus(team);
     const cleanRef = cleanRefEvidence(cleanRefCorpus, publicSummary, team);
+    const actions = scoreActionsEvidence(actionsState, team, git);
     const cleanRefDelta = cleanRefCorpus?.available && leaderboardCorpus
         ? compareCorpusScores(cleanRefCorpus, leaderboardCorpus, cleanRefCorpus.label, 'leaderboard public')
         : null;
     const withCleanRef = (payload) => ({
         ...payload,
         ...(cleanRef ? { cleanRef } : {}),
+        ...(actions ? { actions } : {}),
         ...(cleanRefDelta ? { cleanRefDelta } : {}),
     });
     const scoreCorpus = chooseLeaderboardScoreCorpus(publicSummary, localCorpus, liveCorpus);
@@ -740,6 +800,21 @@ function classifyLeaderboard({ leaderboard, teamName, localCorpus, liveCorpus, c
     const publicEqual = scoresEqual(scoreCorpus.summary, publicSummary);
     const persistentHistory = !publicEqual && history.persistentMismatch;
     const motion = scoreboardMotion({ git, team, publicEqual, persistentHistory });
+    if (!publicEqual && actions?.leaderboardPredatesLatestRun) {
+        const nextAction = 'Leaderboard predates the latest successful GitHub Score run for the current upstream HEAD. Wait for or trigger the online scorer after that run, then refresh scoreboard:state.';
+        return withCleanRef({
+            class: 'leaderboard-lag',
+            reason: reasonWithCaveats(`latest GitHub Score run #${actions.latest.number} for ${actions.latest.headShaShort} completed after leaderboard lastScored; the online row has not caught up to the current pushed ref`, caveats),
+            url: leaderboard.url,
+            team: compactLeaderboardTeam(team),
+            publicSummary,
+            sessionDelta,
+            caveats,
+            motion: { ...motion, nextAction },
+            history,
+            failureSignature,
+        });
+    }
     if (publicEqual) {
         const held = team.heldOut;
         if (held && Number(held.points ?? 0) !== Number(held.maxPoints ?? 0)) {
@@ -963,12 +1038,24 @@ function printHuman(payload) {
                 console.log(`- timing: lastScored is ${motion.localHead.lastScoredRelation} local HEAD and ${motion.upstreamHead.lastScoredRelation} upstream HEAD`);
                 console.log(`- next: ${motion.nextAction}`);
             }
+            if (payload.leaderboard.actions) {
+                const actions = payload.leaderboard.actions;
+                if (actions.available) {
+                    const latest = actions.latest;
+                    const artifact = actions.artifact
+                        ? `; artifact ${actions.artifact.name} ${actions.artifact.expired ? 'expired' : 'active'}`
+                        : '; artifact unavailable';
+                    console.log(`- actions: #${latest.number} ${latest.status}/${latest.conclusion || 'unknown'} ${latest.headShaShort || 'unknown'} updated ${latest.updatedAt || 'unknown'}; leaderboard lastScored is ${actions.lastScoredRelation} Actions update${artifact}`);
+                } else {
+                    console.log(`- actions: unavailable: ${actions.error}`);
+                }
+            }
             if (payload.leaderboard.cleanRef) {
                 const ref = payload.leaderboard.cleanRef;
                 if (ref.available) {
                     console.log(`- clean-ref: ${ref.ref} ${ref.commit} at ${ref.commitTime || 'unknown'} -> ${compactScore(ref.summary)}`);
                     console.log(`- clean-ref timing: lastScored is ${ref.lastScoredRelation} clean-ref HEAD; shape ${ref.shapeMatches ? 'matches' : 'differs'}; score ${ref.publicEqual ? 'matches' : 'differs'}`);
-                    if (ref.rulesOutLocalAhead) {
+                    if (ref.rulesOutLocalAhead && !payload.leaderboard.actions?.leaderboardPredatesLatestRun) {
                         console.log('- clean-ref conclusion: local-ahead timing does not explain this public delta');
                     }
                 } else {
@@ -1027,6 +1114,14 @@ async function main() {
             ? readLeaderboardSnapshot(options.leaderboardJson, PROJECT_ROOT)
             : await fetchLeaderboard(options.baseUrl)
         : null;
+    let actionsState = null;
+    if (options.scoreActions) {
+        try {
+            actionsState = { available: true, ...await fetchActionsState({ branch: git.branch || 'main' }) };
+        } catch (err) {
+            actionsState = { available: false, error: err.message };
+        }
+    }
     let leaderboardSnapshot = null;
     if (wantLeaderboard && leaderboardData?.available && (options.saveLeaderboardJson || options.saveLeaderboardHistoryDir)) {
         try {
@@ -1050,6 +1145,7 @@ async function main() {
             corpusComparison,
             git,
             cleanRefCorpus,
+            actionsState,
         })
         : { skipped: true, reason: 'use --leaderboard, --team, or --refresh-live to compare online leaderboard data' };
 
@@ -1068,6 +1164,7 @@ async function main() {
             liveDir: options.liveDir,
             scoreRef: cleanScoreRef,
             scoreUpstream: options.scoreUpstream,
+            scoreActions: options.scoreActions,
         },
         git,
         liveFetch,
@@ -1076,6 +1173,7 @@ async function main() {
         corpusComparison,
         localVsLiveDelta,
         cleanRefCorpus,
+        actionsState,
         localCorpus,
         liveCorpus,
         sentinel,

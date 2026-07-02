@@ -11,8 +11,8 @@ commands work the same way.
 | Screen diff | `npm run screen:diff -- <session> --first` | `node scripts/screen-diff.mjs <session> --first` |
 | Verify | `npm run verify -- --target <session>` | `node scripts/verify-change.mjs --target <session>` |
 | Strict sentinel | `npm run sentinel:strict` | `node scripts/run-sentinel-suite.mjs --strict` |
-| Scoreboard state | `npm run scoreboard:state` | `node scripts/parity-state.mjs --refresh-live --score-upstream --full --save-leaderboard-json .cache/leaderboard-data.json --save-leaderboard-history-dir .cache/leaderboard-history` |
-| Scoreboard JSON | `npm run scoreboard:json` | `node scripts/parity-state.mjs --refresh-live --score-upstream --full --save-leaderboard-json .cache/leaderboard-data.json --save-leaderboard-history-dir .cache/leaderboard-history --json` |
+| Scoreboard state | `npm run scoreboard:state` | `node scripts/parity-state.mjs --refresh-live --score-upstream --score-actions --full --save-leaderboard-json .cache/leaderboard-data.json --save-leaderboard-history-dir .cache/leaderboard-history` |
+| Scoreboard JSON | `npm run scoreboard:json` | `node scripts/parity-state.mjs --refresh-live --score-upstream --score-actions --full --save-leaderboard-json .cache/leaderboard-data.json --save-leaderboard-history-dir .cache/leaderboard-history --json` |
 | Score surfaces | `npm run score:surfaces -- [session]` | `node scripts/score-surfaces.mjs [session]` |
 | Leaderboard failures | `npm run score:leaderboard-failures` | `node scripts/score-surfaces.mjs --leaderboard-failures --full` |
 | Browser score | `npm run score:browser -- [session]` | `node scripts/browser-score.mjs [--leaderboard-failures] [--shared-page] [session]` |
@@ -61,7 +61,7 @@ Important classifications:
 - `public-session-drift`: hosted public sessions changed or the cache was stale.
 - `local-dirty-or-unpushed`: local commits or WIP cannot match the leaderboard run.
 - `leaderboard-lag`: leaderboard scoring predates local HEAD.
-- `persistent-scorer-drift`: recent comparable leaderboard history repeatedly differs from local or clean-ref score, so timestamp lag alone is not a sufficient explanation.
+- `persistent-scorer-drift`: recent comparable leaderboard history repeatedly differs from local or clean-ref score, and current push/Actions timing does not explain the row.
 - `scorer-drift`: same public corpus, different local vs leaderboard public score.
 - `heldout-only-gap`: public score agrees, hidden held-out score differs.
 - `unknown`: endpoint, team, or local data was unavailable.
@@ -69,6 +69,9 @@ Important classifications:
 Current limitation: the public leaderboard JSON reports repo, `lastScored`, and
 score totals, but not the scored commit. Dirty/ahead trees are conservative;
 for unresolved motion, pass `--score-upstream` or another clean pushed ref.
+`scoreboard:*` also passes `--score-actions`; if the latest successful GitHub
+Score run for the pushed upstream head is newer than `lastScored`, classify the
+online row as lagging that pushed run rather than persistent scorer drift.
 The `refs`, `timing`, and `next` lines show whether the last run is before or
 after local/upstream HEAD and what operational action is next. In failure
 signatures, `full cells` means exact cell-only score, while `cells-only equals

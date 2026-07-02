@@ -3,6 +3,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 import {
     findLeaderboardTeam,
@@ -11,8 +12,8 @@ import {
 } from './leaderboard-lib.mjs';
 
 const PROJECT_ROOT = new URL('..', import.meta.url).pathname.replace(/\/$/, '');
-const DEFAULT_WORKFLOW = 'score.yml';
-const DEFAULT_BRANCH = 'main';
+export const DEFAULT_ACTIONS_WORKFLOW = 'score.yml';
+export const DEFAULT_ACTIONS_BRANCH = 'main';
 
 function usage() {
     return [
@@ -27,8 +28,8 @@ function usage() {
 function parseArgs(argv) {
     const out = {
         repo: null,
-        workflow: DEFAULT_WORKFLOW,
-        branch: DEFAULT_BRANCH,
+        workflow: DEFAULT_ACTIONS_WORKFLOW,
+        branch: DEFAULT_ACTIONS_BRANCH,
         leaderboardJson: existsSync(join(PROJECT_ROOT, '.cache/leaderboard-data.json'))
             ? '.cache/leaderboard-data.json'
             : null,
@@ -45,11 +46,11 @@ function parseArgs(argv) {
         } else if (arg.startsWith('--repo=')) {
             out.repo = arg.slice('--repo='.length);
         } else if (arg === '--workflow') {
-            out.workflow = argv[++i] || DEFAULT_WORKFLOW;
+            out.workflow = argv[++i] || DEFAULT_ACTIONS_WORKFLOW;
         } else if (arg.startsWith('--workflow=')) {
             out.workflow = arg.slice('--workflow='.length);
         } else if (arg === '--branch') {
-            out.branch = argv[++i] || DEFAULT_BRANCH;
+            out.branch = argv[++i] || DEFAULT_ACTIONS_BRANCH;
         } else if (arg.startsWith('--branch=')) {
             out.branch = arg.slice('--branch='.length);
         } else if (arg === '--leaderboard-json') {
@@ -83,7 +84,7 @@ function git(args, fallback = null) {
     }
 }
 
-function inferRepoFromGitRemote() {
+export function inferRepoFromGitRemote() {
     const url = git(['remote', 'get-url', 'origin']);
     if (!url) return null;
     const match = url.match(/github\.com[:/]([^/]+)\/([^/]+?)(?:\.git)?$/i);
@@ -120,7 +121,7 @@ function apiHeaders() {
     return headers;
 }
 
-async function fetchJson(url) {
+export async function fetchJson(url) {
     const errors = [];
     for (let attempt = 0; attempt < 2; attempt++) {
         try {
@@ -140,22 +141,24 @@ async function fetchJson(url) {
     throw new Error(errors.join('; '));
 }
 
-function githubApiUrl(repo, workflow, branch) {
+export function githubApiUrl(repo, workflow, branch) {
     const encodedWorkflow = encodeURIComponent(workflow);
     const params = new URLSearchParams({ branch, per_page: '1' });
     return `https://api.github.com/repos/${repo}/actions/workflows/${encodedWorkflow}/runs?${params.toString()}`;
 }
 
-async function fetchActionsState(options) {
+export async function fetchActionsState(options = {}) {
     const repo = options.repo || inferRepoFromGitRemote();
     if (!repo) throw new Error('--repo owner/repo is required when origin is not a GitHub repo');
-    const runs = await fetchJson(githubApiUrl(repo, options.workflow, options.branch));
+    const workflow = options.workflow || DEFAULT_ACTIONS_WORKFLOW;
+    const branch = options.branch || DEFAULT_ACTIONS_BRANCH;
+    const runs = await fetchJson(githubApiUrl(repo, workflow, branch));
     const latest = runs.workflow_runs?.[0] || null;
     const artifacts = latest ? await fetchJson(latest.artifacts_url) : null;
     return {
         repo,
-        workflow: options.workflow,
-        branch: options.branch,
+        workflow,
+        branch,
         totalRuns: Number(runs.total_count ?? 0),
         latest: latest ? {
             id: latest.id,
@@ -203,7 +206,7 @@ function summarizeLeaderboard(options) {
     };
 }
 
-function timeRelation(left, right) {
+export function timeRelation(left, right) {
     const l = Date.parse(left || '');
     const r = Date.parse(right || '');
     if (!Number.isFinite(l) || !Number.isFinite(r)) return 'unknown';
@@ -269,7 +272,9 @@ async function main() {
     }
 }
 
-main().catch((err) => {
-    console.error(err.message);
-    process.exit(1);
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+    main().catch((err) => {
+        console.error(err.message);
+        process.exit(1);
+    });
+}
