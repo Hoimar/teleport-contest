@@ -77,7 +77,7 @@ combined` means cell-grid misses rather than cursor-only misses.
 
 Use these when local public score is exact but the online row keeps moving:
 
-- `npm run score:play-assets`: compare checked-in `js/*.js` with public `/play/<team>/js/` assets, including nearest matching commits. Add `-- --score` to score the fetched play asset bundle in a temporary checkout.
+- `npm run score:play-assets`: compare checked-in `js/*.js` with public `/play/<team>/js/` assets, including nearest matching commits. Add `-- --score --leaderboard-json <file>` to score the fetched play asset bundle and compare it with a saved online row.
 - `npm run score:browser -- [session]`: replay the official browser path; add `--leaderboard-failures`, `--leaderboard-json <file>`, `--mode viewer|both`, or `--shared-page`.
 - `npm run score:ref -- origin/main`: score a clean code ref from `/tmp`; pair it with `parity:state -- --score-ref origin/main`. Use `--session-ref <ref>` to score that code against another tracked session corpus, and `--runner-ref <ref>` to score it with another tracked frozen scorer.
 - `npm run score:storage-scope -- [session]`: replay through one JS module process while varying storage lifetime; add `--leaderboard-failures` or `--leaderboard-json <file>`.

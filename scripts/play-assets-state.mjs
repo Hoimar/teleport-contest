@@ -6,17 +6,25 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 
+import {
+    findLeaderboardTeam,
+    leaderboardSessionRecords,
+    readLeaderboardSnapshot,
+} from './leaderboard-lib.mjs';
+
 const PROJECT_ROOT = new URL('..', import.meta.url).pathname.replace(/\/$/, '');
 const DEFAULT_BASE_URL = 'https://mazesofmenace.ai';
 
 function usage() {
     return [
-        'Usage: node scripts/play-assets-state.mjs [--team NAME] [--base-url URL] [--score] [--target <path>] [--json]',
+        'Usage: node scripts/play-assets-state.mjs [--team NAME] [--base-url URL] [--score] [--target <path>] [--leaderboard-json <file>] [--json]',
         '',
         'Compares checked-in production JS against the public /play/<team>/ mirror.',
         'Useful when leaderboard/playability behavior differs from local score.sh.',
         '--score downloads the public play JS bundle into a temp checkout and',
         'runs the frozen public scorer against the selected target.',
+        '--leaderboard-json compares the play-asset score with a saved',
+        'leaderboard snapshot for the same team.',
     ].join('\n');
 }
 
@@ -27,6 +35,7 @@ function parseArgs(argv) {
         json: false,
         score: false,
         target: 'sessions',
+        leaderboardJson: null,
     };
     for (let i = 0; i < argv.length; i++) {
         const arg = argv[i];
@@ -49,6 +58,10 @@ function parseArgs(argv) {
             out.target = argv[++i] || out.target;
         } else if (arg.startsWith('--target=')) {
             out.target = arg.slice('--target='.length);
+        } else if (arg === '--leaderboard-json') {
+            out.leaderboardJson = argv[++i] || null;
+        } else if (arg.startsWith('--leaderboard-json=')) {
+            out.leaderboardJson = arg.slice('--leaderboard-json='.length);
         } else {
             throw new Error(`unknown argument ${arg}`);
         }
@@ -247,6 +260,47 @@ function summarizeScore(rows) {
     });
 }
 
+function scoreDelta(left, right) {
+    if (!left || !right) return null;
+    return {
+        exact: left.exact - right.exact,
+        sessions: left.sessions - right.sessions,
+        screenMatched: left.screenMatched - right.screenMatched,
+        screenTotal: left.screenTotal - right.screenTotal,
+        rngMatched: left.rngMatched - right.rngMatched,
+        rngTotal: left.rngTotal - right.rngTotal,
+    };
+}
+
+function failedSet(rows) {
+    return new Set(rows.filter(row => !row.exact).map(row => row.session));
+}
+
+function compareWithLeaderboard(score, options) {
+    if (!options.leaderboardJson || !score?.available) return null;
+    const leaderboard = readLeaderboardSnapshot(options.leaderboardJson, PROJECT_ROOT);
+    const team = findLeaderboardTeam(leaderboard.data, options.team);
+    if (!team) throw new Error(`team ${options.team} not found in ${leaderboard.url}`);
+    const leaderboardRows = leaderboardSessionRecords(team);
+    const leaderboardSummary = summarizeScore(leaderboardRows);
+    const assetSummary = score.summary;
+    const assetFailed = failedSet(score.sessions);
+    const leaderboardFailed = failedSet(leaderboardRows);
+    const overlap = [...assetFailed].filter(name => leaderboardFailed.has(name)).sort();
+    return {
+        source: leaderboard.url,
+        snapshot: leaderboard.data?.timestamp || null,
+        lastScored: team.lastScored || null,
+        assetSummary,
+        leaderboardSummary,
+        delta: scoreDelta(assetSummary, leaderboardSummary),
+        assetFailed: [...assetFailed].sort(),
+        leaderboardFailed: [...leaderboardFailed].sort(),
+        overlap,
+        sameSummary: JSON.stringify(assetSummary) === JSON.stringify(leaderboardSummary),
+    };
+}
+
 async function scorePlayAssets(rows, options) {
     let dir = null;
     try {
@@ -318,6 +372,17 @@ function print(payload) {
             console.log(`- showing 20/${failed.length}; rerun with --json for all rows`);
         }
     }
+    if (payload.leaderboardComparison) {
+        const cmp = payload.leaderboardComparison;
+        const d = cmp.delta;
+        console.log('\nPlay Asset Vs Leaderboard:');
+        console.log(`- source: ${cmp.source}${cmp.snapshot ? `, snapshot ${cmp.snapshot}` : ''}${cmp.lastScored ? `, last scored ${cmp.lastScored}` : ''}`);
+        console.log(`- same summary: ${cmp.sameSummary ? 'yes' : 'no'}`);
+        console.log(`- play assets minus leaderboard: exact ${d.exact >= 0 ? '+' : ''}${d.exact}, sessions ${d.sessions >= 0 ? '+' : ''}${d.sessions} ` +
+            `S ${d.screenMatched >= 0 ? '+' : ''}${d.screenMatched}/${d.screenTotal >= 0 ? '+' : ''}${d.screenTotal} ` +
+            `R ${d.rngMatched >= 0 ? '+' : ''}${d.rngMatched}/${d.rngTotal >= 0 ? '+' : ''}${d.rngTotal}`);
+        console.log(`- failed sessions: play assets ${cmp.assetFailed.length}, leaderboard ${cmp.leaderboardFailed.length}, overlap ${cmp.overlap.length}${cmp.overlap.length ? ` (${cmp.overlap.join(', ')})` : ''}`);
+    }
 }
 
 async function main() {
@@ -332,6 +397,7 @@ async function main() {
         rows,
         score: options.score ? await scorePlayAssets(rows, options) : null,
     };
+    payload.leaderboardComparison = compareWithLeaderboard(payload.score, options);
     if (options.json) console.log(JSON.stringify(payload, null, 2));
     else print(payload);
     const bad = rows.some(row => row.status !== 'same');

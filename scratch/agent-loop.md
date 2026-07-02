@@ -67,7 +67,11 @@ and `feature_map.md`.
   - Harness truth: `scripts/play-assets-state.mjs --score` fetches `/play`
     assets into a temporary checkout and scores them; current Hoimar assets
     score `43/44`, failing only `seed2200`, so stale play assets do not explain
-    the official `29/44` row.
+    the official `29/44` row. Against the saved leaderboard snapshot, play
+    assets are `+14` sessions and `+56` screens above the online row, with
+    failed-session overlap only on `seed2200`.
+    Add `--leaderboard-json <file>` to print the direct play-assets minus
+    leaderboard delta from a saved snapshot.
   - Harness truth: `scripts/browser-score.mjs` defaults to the official browser
     path and isolates multi-session runs because shared-page module state caused
     false browser-only RNG drift in long sessions; use `--shared-page` only to
