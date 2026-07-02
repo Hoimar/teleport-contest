@@ -43,6 +43,12 @@ const KNOWN_BLOCKERS = new Map([
     ],
 ]);
 
+function asciiCompare(a, b) {
+    const aa = String(a || '');
+    const bb = String(b || '');
+    return aa < bb ? -1 : aa > bb ? 1 : 0;
+}
+
 function usage() {
     return [
         'Usage: node scripts/triage-corpus.mjs [--json] [--markdown <path>] [session-ref ...]',
@@ -330,7 +336,7 @@ function makeBuckets(records) {
 
     return [...byKey.values()].sort((a, b) => {
         if (b.count !== a.count) return b.count - a.count;
-        return a.key.localeCompare(b.key);
+        return asciiCompare(a.key, b.key);
     });
 }
 
