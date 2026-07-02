@@ -3001,6 +3001,12 @@ function canWriteWithObject(obj) {
         || (obj.oclass === TOOL_CLASS && (obj.otyp === TOWEL || obj.otyp === MAGIC_MARKER));
 }
 
+function asciiCompare(a, b) {
+    const aa = String(a || '');
+    const bb = String(b || '');
+    return aa < bb ? -1 : aa > bb ? 1 : 0;
+}
+
 function writeWithLetters() {
     ensureInventoryLetters();
     return (game.inventory || [])
@@ -3015,7 +3021,7 @@ function wieldLetters() {
         // C refs: include/objects.h:WEPTOOL(), src/invent.c:allow_category().
         // Pick-axes and other weapon-tools are offered by the wield prompt.
         .filter((obj) => obj?.oclass === WEAPON_CLASS || isWeaponTool(obj))
-        .sort((a, b) => String(a?.invlet || '').localeCompare(String(b?.invlet || '')))
+        .sort((a, b) => asciiCompare(a?.invlet, b?.invlet))
         .map((obj) => obj.invlet)
         .join('');
 }
@@ -4985,7 +4991,7 @@ function menuInventoryEntries() {
     if ((game.inventory || []).length) {
         return (game.inventory || [])
             .filter((obj) => obj && validInvlet(obj.invlet))
-            .sort((a, b) => String(a.invlet || '').localeCompare(String(b.invlet || '')))
+            .sort((a, b) => asciiCompare(a.invlet, b.invlet))
             .map((obj) => ({ cls: obj.oclass, obj, line: inventoryListing(obj, { includeWorn: true }) }));
     }
     const role = game.urole?.name?.m;
@@ -6988,7 +6994,7 @@ function containerContentMenuRows(container) {
     // object-list order as the final tie-breaker.
     return contents
         .map((obj, idx) => ({ obj, idx, key: containerLootSortName(obj).toLowerCase() }))
-        .sort((a, b) => a.key.localeCompare(b.key) || a.idx - b.idx)
+        .sort((a, b) => asciiCompare(a.key, b.key) || a.idx - b.idx)
         .map(({ obj }) => inventoryObjectName(obj, { observe: false }));
 }
 
@@ -7246,7 +7252,7 @@ function sortLootObjects(objects) {
         .sort((a, b) => {
             let diff = lootSubclass(a.obj) - lootSubclass(b.obj);
             if (diff) return diff;
-            const nameCmp = lootSortName(a.obj).localeCompare(lootSortName(b.obj));
+            const nameCmp = asciiCompare(lootSortName(a.obj), lootSortName(b.obj));
             if (nameCmp) return nameCmp;
             diff = lootBucSortValue(b.obj) - lootBucSortValue(a.obj);
             if (diff) return diff;
@@ -9975,7 +9981,7 @@ function pickupMenuEntries(objects) {
     const entries = [];
     const sortGroup = (group) => group
         .map((obj, idx) => ({ obj, idx, key: containerLootSortName(obj).toLowerCase() }))
-        .sort((a, b) => a.key.localeCompare(b.key) || a.idx - b.idx)
+        .sort((a, b) => asciiCompare(a.key, b.key) || a.idx - b.idx)
         .map(({ obj }) => obj);
     const coins = sortGroup(objects.filter(obj => obj.oclass === COIN_CLASS));
     const rings = sortGroup(objects.filter(obj => obj.oclass === RING_CLASS));
