@@ -25,14 +25,15 @@ and `feature_map.md`.
 - Leaderboard fetch succeeds from `https://mazesofmenace.ai/leaderboard/data.json`.
   Default inferred team `Hoimar` currently classifies as
   `persistent-scorer-drift`: leaderboard public
-  `29/44 S 11289/11405 R 792838/792838`, scored at
-  `2026-07-01T22:41:36.630Z`.
-- Clean-ref evidence rules out simple origin lag: `origin/main` at `f3ae03f`
-  scores `43/44 S 11351/11405 R 792838/792838` locally and in GitHub Actions,
-  while the later official leaderboard row is still `29/44`.
-- Online failure signature is screen-only: 15 failed public sessions, 116
-  missed screens, full RNG and RNG-step match for all 15, cells-only match for
-  all 15, cursor match for 14 of 15.
+  `29/44 S 11295/11405 R 792838/792838`, scored at
+  `2026-07-02T05:31:56.208Z`.
+- Clean-ref evidence rules out simple origin lag: `origin/main` at `f3d982e`
+  scores `44/44 S 11405/11405 R 792838/792838` locally, while the later
+  official leaderboard row is still `29/44`.
+- Online failure signature is screen-only: 15 failed public sessions, 110
+  missed screens, full RNG and RNG-step match for all 15; cell-only metrics
+  equal the combined screen score on all 15, so the online misses are cell-grid
+  misses rather than cursor-only misses.
 - Scratch trace/checkpoint files are agent-toolkit state and may be committed
   when useful; keep production parity and scratch-tool commits coherent.
 - Strict sentinels are exact:

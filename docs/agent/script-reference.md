@@ -69,7 +69,9 @@ Current limitation: the public leaderboard JSON reports repo, `lastScored`, and
 score totals, but not the scored commit. Dirty/ahead trees are conservative;
 for unresolved motion, pass `--score-upstream` or another clean pushed ref.
 The `refs`, `timing`, and `next` lines show whether the last run is before or
-after local/upstream HEAD and what operational action is next.
+after local/upstream HEAD and what operational action is next. In failure
+signatures, `full cells` means exact cell-only score, while `cells-only equals
+combined` means cell-grid misses rather than cursor-only misses.
 
 ## Scoreboard Drift Tools
 
@@ -85,5 +87,4 @@ Use these when local public score is exact but the online row keeps moving:
 ## Library Boundary
 
 `scripts/triage-lib.mjs` is not a human entry point. It owns session resolution,
-screen/RNG scoring, sentinel defaults, and frozen-file warnings. Prefer changing
-callers first unless multiple entry points need the same behavior.
+screen/RNG scoring, sentinel defaults, and frozen-file warnings; prefer callers first.

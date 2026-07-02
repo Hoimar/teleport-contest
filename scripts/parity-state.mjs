@@ -579,6 +579,7 @@ function leaderboardFailureSignature(team) {
             missedScreens: Number(screen.total ?? 0) - Number(screen.matched ?? 0),
             rngFull: Number(rng.matched ?? -1) === Number(rng.total ?? 0),
             rngStepsFull: Number(rngSteps.matched ?? -1) === Number(rngSteps.total ?? 0),
+            cellsFull: Number(cellsOnly.matched ?? -1) === Number(cellsOnly.total ?? 0),
             cellsOnlyEqualsScreen: Number(cellsOnly.matched ?? -1) === Number(screen.matched ?? 0) &&
                 Number(cellsOnly.total ?? -1) === Number(screen.total ?? 0),
             cursorsFull: Number(cursors.matched ?? -1) === Number(cursors.total ?? 0),
@@ -589,7 +590,8 @@ function leaderboardFailureSignature(team) {
         missedScreens: rows.reduce((acc, row) => acc + row.missedScreens, 0),
         fullRng: rows.filter((row) => row.rngFull).length,
         fullRngSteps: rows.filter((row) => row.rngStepsFull).length,
-        cellsOnlyScreen: rows.filter((row) => row.cellsOnlyEqualsScreen).length,
+        fullCells: rows.filter((row) => row.cellsFull).length,
+        cellsOnlyEqualsScreen: rows.filter((row) => row.cellsOnlyEqualsScreen).length,
         fullCursors: rows.filter((row) => row.cursorsFull).length,
         rows,
     };
@@ -915,7 +917,7 @@ function printHuman(payload) {
             }
             if (payload.leaderboard.failureSignature?.failed) {
                 const sig = payload.leaderboard.failureSignature;
-                console.log(`- online failure signature: ${sig.failed} failed public session(s), ${sig.missedScreens} missed screen(s); full RNG ${sig.fullRng}/${sig.failed}, full RNG-steps ${sig.fullRngSteps}/${sig.failed}, cells-only screen ${sig.cellsOnlyScreen}/${sig.failed}, full cursors ${sig.fullCursors}/${sig.failed}`);
+                console.log(`- online failure signature: ${sig.failed} failed public session(s), ${sig.missedScreens} missed screen(s); full RNG ${sig.fullRng}/${sig.failed}, full RNG-steps ${sig.fullRngSteps}/${sig.failed}, full cells ${sig.fullCells}/${sig.failed}, cells-only equals combined ${sig.cellsOnlyEqualsScreen}/${sig.failed}, full cursors ${sig.fullCursors}/${sig.failed}`);
             }
             if (team.heldOut) {
                 console.log(`- held-out: points ${fmtCount(team.heldOut.points, team.heldOut.maxPoints)} passing ${fmtCount(team.heldOut.passing, team.heldOut.total)}; private sessions are the cleanliness benchmark`);
