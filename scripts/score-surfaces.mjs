@@ -26,16 +26,18 @@ const DEC_TO_UNICODE = {
 
 function usage() {
     return [
-        'Usage: node scripts/score-surfaces.mjs [--full] [--limit N] [file-or-dir...]',
+        'Usage: node scripts/score-surfaces.mjs [--permission] [--full] [--limit N] [file-or-dir...]',
         '',
         'Replays sessions once and scores the same JS output with multiple screen',
         'comparison surfaces. This catches scoreboard drift caused by scorer or',
         'comparator differences rather than NetHack state/RNG parity.',
+        '--permission runs each replay worker under Node\'s permission sandbox',
+        'with project-root read access, mirroring the judge constraint more closely.',
     ].join('\n');
 }
 
 function parseArgs(argv) {
-    const out = { targets: [], full: false, limit: 20 };
+    const out = { targets: [], full: false, limit: 20, permission: false };
     for (let i = 0; i < argv.length; i++) {
         const arg = argv[i];
         if (arg === '--help' || arg === '-h') {
@@ -43,6 +45,8 @@ function parseArgs(argv) {
             process.exit(0);
         } else if (arg === '--full') {
             out.full = true;
+        } else if (arg === '--permission') {
+            out.permission = true;
         } else if (arg === '--limit') {
             out.limit = Number(argv[++i]);
         } else if (arg.startsWith('--limit=')) {
@@ -121,6 +125,18 @@ function preDecode(s) {
     }
     cur = cur.replace(/^\d{2}:\d{2}:\d{2}\.$/gm, '<time>.');
     return cur;
+}
+
+function preDecodeVersionOnly(s) {
+    let cur = String(s || '');
+    for (const re of STARTUP_VARIANT_LINES) {
+        cur = cur.replace(re, '<<VERSION_BANNER>>');
+    }
+    return cur;
+}
+
+function preDecodeTimeOnly(s) {
+    return String(s || '').replace(/^\d{2}:\d{2}:\d{2}\.$/gm, '<time>.');
 }
 
 function canonSGR(s) {
@@ -246,6 +262,19 @@ function visualCellsEqual(actual, expected) {
     return true;
 }
 
+function visualCellsEqualWith(preprocessor) {
+    return (actual, expected) => {
+        const ga = decodeScreen(preprocessor(actual));
+        const gb = decodeScreen(preprocessor(expected));
+        for (let r = 0; r < ROWS_24; r++) {
+            for (let c = 0; c < COLS_80; c++) {
+                if (diffCell(ga[r][c], gb[r][c])) return false;
+            }
+        }
+        return true;
+    };
+}
+
 function strictDisplayCellsEqual(actual, expected) {
     const ga = decodeScreen(preDecode(actual));
     const gb = decodeScreen(preDecode(expected));
@@ -277,6 +306,21 @@ const SURFACES = [
         key: 'visual',
         label: 'visual cells',
         cellsEqual: visualCellsEqual,
+    },
+    {
+        key: 'visual-no-normalize',
+        label: 'visual cells without variant normalization',
+        cellsEqual: visualCellsEqualWith(s => String(s || '')),
+    },
+    {
+        key: 'visual-no-time-normalize',
+        label: 'visual cells without timestamp normalization',
+        cellsEqual: visualCellsEqualWith(preDecodeVersionOnly),
+    },
+    {
+        key: 'visual-no-version-normalize',
+        label: 'visual cells without version-banner normalization',
+        cellsEqual: visualCellsEqualWith(preDecodeTimeOnly),
     },
     {
         key: 'strict-display',
@@ -495,7 +539,10 @@ async function main() {
     const timeoutMs = Number(process.env.SESSION_REPLAY_TIMEOUT_MS || 45000);
     const results = [];
     for (const file of files) {
-        const child = spawnSync(process.execPath, [SCRIPT_PATH, `--worker-session=${file}`], {
+        const nodeArgs = options.permission
+            ? ['--permission', `--allow-fs-read=${PROJECT_ROOT}`]
+            : [];
+        const child = spawnSync(process.execPath, [...nodeArgs, SCRIPT_PATH, `--worker-session=${file}`], {
             cwd: PROJECT_ROOT,
             encoding: 'utf8',
             timeout: timeoutMs,

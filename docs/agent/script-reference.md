@@ -72,12 +72,14 @@ after local/upstream HEAD and what operational action is next.
 
 Use these when local public score is exact but the online row keeps moving:
 
-- `npm run score:play-assets`: compare checked-in `js/*.js` with public `/play/<team>/js/` assets, including nearest matching commits.
+- `npm run score:play-assets`: compare checked-in `js/*.js` with public `/play/<team>/js/` assets, including nearest matching commits. Add `-- --score` to score the fetched play asset bundle in a temporary checkout.
 - `npm run score:browser -- [session]`: replay in headless Chromium; use `--mode official|viewer|both` and `--root <checkout>`.
-- `npm run score:ref -- origin/main`: score a clean git ref from `/tmp`; pair it with `parity:state -- --score-ref origin/main`.
+- `npm run score:ref -- origin/main`: score a clean code ref from `/tmp`; pair it with `parity:state -- --score-ref origin/main`. Use `--session-ref <ref>` to score that code against another tracked session corpus, and `--runner-ref <ref>` to score it with another tracked frozen scorer.
 - `npm run score:storage-scope -- [session]`: replay through one JS module process while varying storage lifetime.
 - `npm run score:surfaces -- [session]`: score one Node replay through visual,
-  strict, legacy, and raw screen comparators.
+  strict, legacy, raw, and variant-normalization screen comparators. Add
+  `--permission` to run replay workers under Node's permission sandbox with
+  project-root read access.
 
 ## Library Boundary
 

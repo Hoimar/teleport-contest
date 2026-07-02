@@ -12,11 +12,12 @@ const MAX_BUFFER = 512 * 1024 * 1024;
 
 function usage() {
     console.log([
-        'Usage: node scripts/score-ref.mjs [--json] [--full] [--keep] [--target <path>] [ref]',
+        'Usage: node scripts/score-ref.mjs [--json] [--full] [--keep] [--target <path>] [--session-ref <ref>] [--runner-ref <ref>] [ref]',
         '',
-        'Scores a clean git ref by unpacking it to /tmp, applying the official',
-        'frozen js/ overlay, and running that ref\'s public scorer.',
-        'Default ref is @{u}; default target is sessions.',
+        'Scores a clean code ref by unpacking it to /tmp, optionally overlaying',
+        'the target session path and/or frozen scorer from another git ref,',
+        'applying the scorer\'s official frozen js/ overlay, and running it.',
+        'Default code ref is @{u}; default target is sessions.',
     ].join('\n'));
 }
 
@@ -27,6 +28,8 @@ function parseArgs(argv) {
         json: false,
         full: false,
         keep: false,
+        sessionRef: null,
+        runnerRef: null,
     };
     for (let i = 0; i < argv.length; i++) {
         const arg = argv[i];
@@ -43,6 +46,14 @@ function parseArgs(argv) {
             options.target = argv[++i] || options.target;
         } else if (arg.startsWith('--target=')) {
             options.target = arg.slice('--target='.length);
+        } else if (arg === '--session-ref') {
+            options.sessionRef = argv[++i] || null;
+        } else if (arg.startsWith('--session-ref=')) {
+            options.sessionRef = arg.slice('--session-ref='.length);
+        } else if (arg === '--runner-ref') {
+            options.runnerRef = argv[++i] || null;
+        } else if (arg.startsWith('--runner-ref=')) {
+            options.runnerRef = arg.slice('--runner-ref='.length);
         } else if (!options.ref) {
             options.ref = arg;
         } else {
@@ -78,6 +89,36 @@ function unpackRef(ref) {
         throw new Error(tar.error?.message || tar.stderr || 'tar extract failed');
     }
     return dir;
+}
+
+function safeRelativeTarget(target) {
+    const normalized = path.posix.normalize(String(target || 'sessions').replace(/\\/g, '/'));
+    if (!normalized || normalized === '.' || normalized.startsWith('../') || path.isAbsolute(normalized)) {
+        throw new Error(`unsafe target path for session-ref overlay: ${target}`);
+    }
+    return normalized;
+}
+
+function overlayTargetFromRef(dir, ref, target) {
+    const safeTarget = safeRelativeTarget(target);
+    rmSync(path.join(dir, safeTarget), { recursive: true, force: true });
+    const archive = execFileSync('git', ['archive', '--format=tar', ref, safeTarget], {
+        cwd: PROJECT_ROOT,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        maxBuffer: MAX_BUFFER,
+    });
+    const tar = spawnSync('tar', ['-xf', '-', '-C', dir], {
+        input: archive,
+        encoding: 'utf8',
+        maxBuffer: MAX_BUFFER,
+    });
+    if (tar.error || tar.status !== 0) {
+        throw new Error(tar.error?.message || tar.stderr || `tar extract failed for ${safeTarget} from ${ref}`);
+    }
+}
+
+function overlayFrozenFromRef(dir, ref) {
+    overlayTargetFromRef(dir, ref, 'frozen');
 }
 
 function parseRunnerJson(stdout) {
@@ -164,8 +205,18 @@ export function scoreRef(ref, options = {}) {
         const commit = gitOutput(['rev-parse', '--short', ref]);
         const commitTime = gitOutput(['log', '-1', '--format=%cI', ref]);
         dir = unpackRef(ref);
-        applyFrozenOverlay(dir);
         const target = options.target || 'sessions';
+        const sessionRef = options.sessionRef || null;
+        const sessionCommitFull = sessionRef ? gitOutput(['rev-parse', sessionRef]) : commitFull;
+        const sessionCommit = sessionRef ? gitOutput(['rev-parse', '--short', sessionRef]) : commit;
+        const sessionCommitTime = sessionRef ? gitOutput(['log', '-1', '--format=%cI', sessionRef]) : commitTime;
+        if (sessionRef) overlayTargetFromRef(dir, sessionRef, target);
+        const runnerRef = options.runnerRef || null;
+        const runnerCommitFull = runnerRef ? gitOutput(['rev-parse', runnerRef]) : commitFull;
+        const runnerCommit = runnerRef ? gitOutput(['rev-parse', '--short', runnerRef]) : commit;
+        const runnerCommitTime = runnerRef ? gitOutput(['log', '-1', '--format=%cI', runnerRef]) : commitTime;
+        if (runnerRef) overlayFrozenFromRef(dir, runnerRef);
+        applyFrozenOverlay(dir);
         const run = spawnSync(process.execPath, ['frozen/ps_test_runner.mjs', target], {
             cwd: dir,
             encoding: 'utf8',
@@ -184,6 +235,14 @@ export function scoreRef(ref, options = {}) {
             commit,
             commitFull,
             commitTime,
+            sessionRef: sessionRef || ref,
+            sessionCommit,
+            sessionCommitFull,
+            sessionCommitTime,
+            runnerRef: runnerRef || ref,
+            runnerCommit,
+            runnerCommitFull,
+            runnerCommitTime,
             target,
             dir: options.keep ? dir : null,
             summary,
@@ -196,6 +255,8 @@ export function scoreRef(ref, options = {}) {
             label: `clean ref ${ref}`,
             ref,
             target: options.target || 'sessions',
+            sessionRef: options.sessionRef || ref,
+            runnerRef: options.runnerRef || ref,
             error: err instanceof Error ? err.message : String(err),
         };
     } finally {
@@ -212,6 +273,12 @@ function printHuman(report, options) {
     }
     console.log(`- ref: ${report.ref}`);
     console.log(`- commit: ${report.commit} at ${report.commitTime || 'unknown'}`);
+    if (report.sessionRef && report.sessionRef !== report.ref) {
+        console.log(`- session ref: ${report.sessionRef} (${report.sessionCommit || 'unknown'} at ${report.sessionCommitTime || 'unknown'})`);
+    }
+    if (report.runnerRef && report.runnerRef !== report.ref) {
+        console.log(`- runner ref: ${report.runnerRef} (${report.runnerCommit || 'unknown'} at ${report.runnerCommitTime || 'unknown'})`);
+    }
     console.log(`- target: ${report.target}`);
     if (report.dir) console.log(`- worktree: ${report.dir}`);
     console.log(`- ${summarizeLine(report.summary)}`);
