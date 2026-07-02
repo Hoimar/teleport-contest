@@ -25,8 +25,8 @@ and `feature_map.md`.
 - Leaderboard fetch succeeds from `https://mazesofmenace.ai/leaderboard/data.json`.
   Default inferred team `Hoimar` currently classifies as
   `persistent-scorer-drift`: leaderboard public
-  `29/44 S 11295/11405 R 792838/792838`, scored at
-  `2026-07-02T05:31:56.208Z`.
+  `29/44 S 11348/11405 R 792838/792838`, scored at
+  `2026-07-02T07:22:17.569Z`.
 - Clean-ref evidence rules out simple origin lag: `origin/main` at `e0a8d41`
   scores `44/44 S 11405/11405 R 792838/792838` locally, while the later
   official leaderboard row is still `29/44`.
@@ -34,7 +34,7 @@ and `feature_map.md`.
   --score-upstream --full` now keeps this as `persistent-scorer-drift` even
   when local harness commits are ahead, while still printing dirty/ahead
   caveats.
-- Online failure signature is screen-only: 15 failed public sessions, 110
+- Online failure signature is screen-only: 15 failed public sessions, 57
   missed screens, full RNG and RNG-step match for all 15; cell-only metrics
   equal the combined screen score on all 15, so the online misses are cell-grid
   misses rather than cursor-only misses.
@@ -64,11 +64,10 @@ and `feature_map.md`.
   - Harness truth: `scripts/score-ref.mjs` can score clean code refs with
     frozen overlay, alternate session refs, and alternate runner refs.
   - Harness truth: `scripts/play-assets-state.mjs --score` fetches `/play`
-    assets into a temporary checkout and scores them; current Hoimar assets
-    score `43/44`, failing only `seed2200`, so stale play assets do not explain
+    assets into a temporary checkout and scores them. Current Hoimar assets are
+    fully synchronized and score `44/44`, so stale play assets no longer explain
     the official `29/44` row. Against the saved leaderboard snapshot, play
-    assets are `+14` sessions and `+56` screens above the online row, with
-    failed-session overlap only on `seed2200`.
+    assets are `+15` sessions and `+57` screens above the online row.
     Add `--leaderboard-json <file>` to print the direct play-assets minus
     leaderboard delta from a saved snapshot.
   - Harness truth: `scripts/browser-score.mjs` defaults to the official browser
@@ -85,7 +84,8 @@ and `feature_map.md`.
     variants and a Node permission-sandbox mode. All visual variants remain
     exact on the 15 online-failed public seeds, so missing time/version
     normalization and basic Node permission effects do not reproduce the
-    leaderboard row.
+    leaderboard row. When driven by leaderboard failures, it now prints the
+    official failed-session reference and each local surface minus that row.
   - Harness truth: `scoreboard:state`/`scoreboard:json` now pass
     `--score-upstream`, resolving the configured upstream ref before scoring a
     clean `/tmp` checkout. The leaderboard report now names `origin/main`
@@ -106,7 +106,9 @@ and `feature_map.md`.
     The `scoreboard:*` aliases save their classified raw leaderboard payload to
     `.cache/leaderboard-data.json` for repeatable follow-up probes.
     Worker process failures now make `score-surfaces` exit non-zero, so
-    sandbox/runner failures cannot masquerade as scorer mismatches.
+    sandbox/runner failures cannot masquerade as scorer mismatches. The shared
+    leaderboard parser preserves explicit cursor totals from `data.json`
+    alongside cells/RNG for surface-reference comparisons.
   - Harness dehack: `triage-corpus` no longer carries stale hardcoded known
     blocker sessions. Bucket hypotheses now come from the live first-mismatch
     shape, and the generated divergence inventory stays a single exact public

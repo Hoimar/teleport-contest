@@ -525,20 +525,89 @@ function summarize(results) {
     return summaries;
 }
 
+function summarizeLeaderboardRows(rows) {
+    return (rows || []).reduce((acc, row) => {
+        acc.sessions++;
+        if (row.exact) acc.passing++;
+        acc.screenMatched += row.screen?.matched ?? 0;
+        acc.screenTotal += row.screen?.total ?? 0;
+        acc.cellMatched += row.cellsOnly?.matched ?? row.screen?.matched ?? 0;
+        acc.cellTotal += row.cellsOnly?.total ?? row.screen?.total ?? 0;
+        acc.cursorMatched += row.cursors?.matched ?? row.screen?.total ?? 0;
+        acc.cursorTotal += row.cursors?.total ?? row.screen?.total ?? 0;
+        acc.rngMatched += row.rng?.matched ?? 0;
+        acc.rngTotal += row.rng?.total ?? 0;
+        return acc;
+    }, {
+        sessions: 0,
+        passing: 0,
+        screenMatched: 0,
+        screenTotal: 0,
+        cellMatched: 0,
+        cellTotal: 0,
+        cursorMatched: 0,
+        cursorTotal: 0,
+        rngMatched: 0,
+        rngTotal: 0,
+    });
+}
+
 function fmtCount(count, total) {
     return `${count}/${total}`;
 }
 
+function fmtSigned(value) {
+    return `${value >= 0 ? '+' : ''}${value}`;
+}
+
+function fmtCountDelta(matched, total, refMatched, refTotal) {
+    return `${fmtSigned(matched - refMatched)}/${fmtSigned(total - refTotal)}`;
+}
+
+function formatReference(summary) {
+    return `${summary.passing}/${summary.sessions} passing ` +
+        `S ${fmtCount(summary.screenMatched, summary.screenTotal)} ` +
+        `cells ${fmtCount(summary.cellMatched, summary.cellTotal)} ` +
+        `cursors ${fmtCount(summary.cursorMatched, summary.cursorTotal)} ` +
+        `R ${fmtCount(summary.rngMatched, summary.rngTotal)}`;
+}
+
+function formatMinusReference(summary, reference) {
+    return `passing ${fmtSigned(summary.passing - reference.passing)} ` +
+        `S ${fmtCountDelta(summary.screenMatched, summary.screenTotal, reference.screenMatched, reference.screenTotal)} ` +
+        `cells ${fmtCountDelta(summary.cellMatched, summary.screenTotal, reference.cellMatched, reference.cellTotal)} ` +
+        `cursors ${fmtCountDelta(summary.cursorMatched, summary.screenTotal, reference.cursorMatched, reference.cursorTotal)} ` +
+        `R ${fmtCountDelta(summary.rngMatched, summary.rngTotal, reference.rngMatched, reference.rngTotal)}`;
+}
+
 function printResults(results, options) {
     const summaries = summarize(results);
+    const referenceRows = options.leaderboardReference?.rows || [];
+    const referenceSummary = summarizeLeaderboardRows(referenceRows);
+    const referenceNames = new Set(referenceRows.map((row) => row.session));
+    const referenceResults = referenceNames.size
+        ? results.filter((result) => referenceNames.has(result.session))
+        : [];
+    const referenceSurfaceSummaries = referenceResults.length
+        ? summarize(referenceResults)
+        : null;
     console.log(`Score surfaces: ${results.length} session(s)${options.sourceLabel ? ` from ${options.sourceLabel}` : ''}`);
+    if (referenceSummary.sessions) {
+        const subset = referenceResults.length === results.length
+            ? ''
+            : `; surface deltas compare ${referenceResults.length}/${referenceSummary.sessions} referenced session(s)`;
+        console.log(`Leaderboard reference: ${formatReference(referenceSummary)}${subset}`);
+    }
     for (const surface of SURFACES) {
         const summary = summaries[surface.key];
+        const referenceDelta = referenceSurfaceSummaries
+            ? `; minus leaderboard ${formatMinusReference(referenceSurfaceSummaries[surface.key], referenceSummary)}`
+            : '';
         console.log(`- ${surface.key}: ${summary.passing}/${summary.sessions} passing ` +
             `S ${fmtCount(summary.screenMatched, summary.screenTotal)} ` +
             `cells ${fmtCount(summary.cellMatched, summary.screenTotal)} ` +
             `cursors ${fmtCount(summary.cursorMatched, summary.screenTotal)} ` +
-            `R ${fmtCount(summary.rngMatched, summary.rngTotal)}`);
+            `R ${fmtCount(summary.rngMatched, summary.rngTotal)}${referenceDelta}`);
         const rows = options.full ? summary.rows : summary.rows.slice(0, options.limit);
         for (const row of rows) {
             const first = row.firstMismatch

@@ -166,7 +166,13 @@ export function leaderboardSessionRecords(team) {
             matched: Number(session.cellsOnly?.matched ?? session.screen?.matched ?? 0),
             total: Number(session.cellsOnly?.total ?? session.screen?.total ?? 0),
         },
-        cursorOnly: 0,
+        cursors: {
+            matched: Number(session.cursors?.matched ?? session.screen?.total ?? 0),
+            total: Number(session.cursors?.total ?? session.screen?.total ?? 0),
+        },
+        cursorOnly: Math.max(0,
+            Number(session.cellsOnly?.matched ?? session.screen?.matched ?? 0) -
+            Number(session.screen?.matched ?? 0)),
         rng: {
             matched: Number(session.rng?.matched ?? 0),
             total: Number(session.rng?.total ?? 0),
@@ -196,9 +202,18 @@ export async function expandLeaderboardFailureTargets(options, cwd = process.cwd
     }
     const team = findLeaderboardTeam(leaderboard.data, teamName);
     if (!team) throw new Error(`team ${teamName} not found in ${leaderboard.url}`);
-    const failures = failedLeaderboardSessionNames(team);
+    const records = leaderboardSessionRecords(team);
+    const failureRows = records.filter((session) => !session.exact);
+    const failures = failureRows.map((session) => session.session);
     if (!failures.length) throw new Error(`team ${team.name || teamName} has no failed public leaderboard sessions`);
     options.targets = [...failures, ...(options.targets || [])];
+    options.leaderboardReference = {
+        team: team.name || teamName,
+        source: leaderboard.url,
+        snapshot: leaderboard.data?.timestamp || null,
+        lastScored: team.lastScored || null,
+        rows: failureRows,
+    };
     const snapshotTime = leaderboard.data?.timestamp ? `, snapshot ${leaderboard.data.timestamp}` : '';
     options.sourceLabel = `leaderboard failures for ${team.name || teamName} (${leaderboard.url}${snapshotTime}, last scored ${team.lastScored || 'unknown'})`;
 }
