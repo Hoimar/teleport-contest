@@ -7,6 +7,13 @@ import { fileURLToPath } from 'node:url';
 
 import { normalizeSession } from '../frozen/session_loader.mjs';
 import { decodeScreen, diffCell, renderCell, ROWS_24, COLS_80 } from '../frozen/screen-decode.mjs';
+import {
+    DEFAULT_LEADERBOARD_BASE_URL,
+    failedLeaderboardSessionNames,
+    fetchLeaderboard,
+    findLeaderboardTeam,
+    inferTeamFromGitRemote,
+} from './leaderboard-lib.mjs';
 
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const PROJECT_ROOT = new URL('..', import.meta.url).pathname.replace(/\/$/, '');
@@ -26,18 +33,29 @@ const DEC_TO_UNICODE = {
 
 function usage() {
     return [
-        'Usage: node scripts/score-surfaces.mjs [--permission] [--full] [--limit N] [file-or-dir...]',
+        'Usage: node scripts/score-surfaces.mjs [--permission] [--leaderboard-failures] [--team <name>] [--full] [--limit N] [file-or-dir...]',
         '',
         'Replays sessions once and scores the same JS output with multiple screen',
         'comparison surfaces. This catches scoreboard drift caused by scorer or',
         'comparator differences rather than NetHack state/RNG parity.',
         '--permission runs each replay worker under Node\'s permission sandbox',
         'with project-root read access, mirroring the judge constraint more closely.',
+        '--leaderboard-failures fetches the current leaderboard and prepends its',
+        'failed public sessions to the target list.',
     ].join('\n');
 }
 
 function parseArgs(argv) {
-    const out = { targets: [], full: false, limit: 20, permission: false };
+    const out = {
+        targets: [],
+        full: false,
+        limit: 20,
+        permission: false,
+        leaderboardFailures: false,
+        team: null,
+        baseUrl: process.env.MOM_BASE_URL || DEFAULT_LEADERBOARD_BASE_URL,
+        sourceLabel: null,
+    };
     for (let i = 0; i < argv.length; i++) {
         const arg = argv[i];
         if (arg === '--help' || arg === '-h') {
@@ -47,6 +65,16 @@ function parseArgs(argv) {
             out.full = true;
         } else if (arg === '--permission') {
             out.permission = true;
+        } else if (arg === '--leaderboard-failures') {
+            out.leaderboardFailures = true;
+        } else if (arg === '--team') {
+            out.team = argv[++i] || null;
+        } else if (arg.startsWith('--team=')) {
+            out.team = arg.slice('--team='.length);
+        } else if (arg === '--base-url') {
+            out.baseUrl = argv[++i] || out.baseUrl;
+        } else if (arg.startsWith('--base-url=')) {
+            out.baseUrl = arg.slice('--base-url='.length);
         } else if (arg === '--limit') {
             out.limit = Number(argv[++i]);
         } else if (arg.startsWith('--limit=')) {
@@ -57,9 +85,25 @@ function parseArgs(argv) {
             out.targets.push(arg);
         }
     }
-    if (out.targets.length === 0) out.targets.push(DEFAULT_SESSIONS_DIR);
+    out.baseUrl = out.baseUrl.replace(/\/+$/, '');
     if (!Number.isFinite(out.limit) || out.limit < 0) throw new Error('--limit must be a non-negative number');
     return out;
+}
+
+async function expandLeaderboardFailureTargets(options) {
+    if (!options.leaderboardFailures) return;
+    const teamName = options.team || inferTeamFromGitRemote(PROJECT_ROOT);
+    if (!teamName) throw new Error('--leaderboard-failures needs --team <name> or a GitHub origin owner');
+    const leaderboard = await fetchLeaderboard(options.baseUrl);
+    if (!leaderboard.available) {
+        throw new Error(`leaderboard unavailable: ${(leaderboard.errors || []).join(' | ')}`);
+    }
+    const team = findLeaderboardTeam(leaderboard.data, teamName);
+    if (!team) throw new Error(`team ${teamName} not found in ${leaderboard.url}`);
+    const failures = failedLeaderboardSessionNames(team);
+    if (!failures.length) throw new Error(`team ${team.name || teamName} has no failed public leaderboard sessions`);
+    options.targets = [...failures, ...options.targets];
+    options.sourceLabel = `leaderboard failures for ${team.name || teamName} (${leaderboard.url}, last scored ${team.lastScored || 'unknown'})`;
 }
 
 function resolveSessionFiles(targets) {
@@ -498,7 +542,7 @@ function fmtCount(count, total) {
 
 function printResults(results, options) {
     const summaries = summarize(results);
-    console.log(`Score surfaces: ${results.length} session(s)`);
+    console.log(`Score surfaces: ${results.length} session(s)${options.sourceLabel ? ` from ${options.sourceLabel}` : ''}`);
     for (const surface of SURFACES) {
         const summary = summaries[surface.key];
         console.log(`- ${surface.key}: ${summary.passing}/${summary.sessions} passing ` +
@@ -533,6 +577,8 @@ async function main() {
     }
 
     const options = parseArgs(process.argv.slice(2));
+    await expandLeaderboardFailureTargets(options);
+    if (options.targets.length === 0) options.targets.push(DEFAULT_SESSIONS_DIR);
     const files = resolveSessionFiles(options.targets);
     if (!files.length) throw new Error('no session files found');
 

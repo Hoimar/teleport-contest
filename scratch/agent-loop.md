@@ -77,6 +77,11 @@ and `feature_map.md`.
     clean `/tmp` checkout. The leaderboard report now names `origin/main`
     rather than Git's `@{u}` shorthand while preserving explicit
     `--score-ref <ref>` for non-upstream comparisons.
+  - Harness truth: `scripts/leaderboard-lib.mjs` owns shared leaderboard
+    fetch/team/session parsing. `npm run score:leaderboard-failures` now runs
+    score-surface probes on the current failed public leaderboard sessions
+    without manually copying seed names; the latest run selected 15 Hoimar
+    failures and all visual variants passed `15/15 S 8810/8810 R 636858/636858`.
   - Harness dehack: `triage-corpus` no longer carries stale hardcoded known
     blocker sessions. Bucket hypotheses now come from the live first-mismatch
     shape, and the generated divergence inventory stays a single exact public

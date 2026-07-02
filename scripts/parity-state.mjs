@@ -16,10 +16,16 @@ import {
 import { auditHackDebt } from './hack-debt-audit.mjs';
 import { collectMemoryIssues } from './memory-lint.mjs';
 import { scoreRef } from './score-ref.mjs';
+import {
+    DEFAULT_LEADERBOARD_BASE_URL,
+    fetchLeaderboard,
+    findLeaderboardTeam,
+    inferTeamFromGitRemote,
+    leaderboardSessionRecords,
+} from './leaderboard-lib.mjs';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(SCRIPT_DIR, '..');
-const DEFAULT_BASE_URL = 'https://mazesofmenace.ai';
 const DEFAULT_LOCAL_DIR = 'sessions';
 const DEFAULT_LIVE_DIR = '.cache/live-sessions';
 
@@ -49,7 +55,7 @@ function parseArgs(argv) {
         json: false,
         leaderboard: null,
         team: null,
-        baseUrl: process.env.MOM_BASE_URL || DEFAULT_BASE_URL,
+        baseUrl: process.env.MOM_BASE_URL || DEFAULT_LEADERBOARD_BASE_URL,
         localDir: DEFAULT_LOCAL_DIR,
         liveDir: DEFAULT_LIVE_DIR,
         scoreRef: null,
@@ -92,7 +98,7 @@ function parseArgs(argv) {
     if (options.leaderboard == null) {
         options.leaderboard = options.refreshLive || options.explicitTeam;
     }
-    if (options.leaderboard && !options.team) options.team = inferTeamFromGitRemote();
+    if (options.leaderboard && !options.team) options.team = inferTeamFromGitRemote(PROJECT_ROOT);
     options.baseUrl = options.baseUrl.replace(/\/+$/, '');
     return options;
 }
@@ -119,15 +125,6 @@ function gitOutput(args) {
     } catch (_) {
         return null;
     }
-}
-
-function inferTeamFromGitRemote() {
-    const url = gitOutput(['remote', 'get-url', 'origin']);
-    if (!url) return null;
-    const ssh = url.match(/github\.com[:/]([^/]+)\/teleport-contest(?:\.git)?$/i);
-    if (ssh) return ssh[1];
-    const generic = url.match(/github\.com[:/]([^/]+)\/([^/]+?)(?:\.git)?$/i);
-    return generic ? generic[1] : null;
 }
 
 function gitState() {
@@ -414,125 +411,6 @@ async function analyzeSentinels() {
     };
 }
 
-async function fetchJson(url) {
-    const text = await fetchTextRobust(url);
-    try {
-        return JSON.parse(text);
-    } catch (err) {
-        throw new Error(`invalid JSON: ${err.message}`);
-    }
-}
-
-function sleep(ms) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function compactFetchError(err) {
-    const code = err?.cause?.code || err?.code;
-    return code ? `${err.message} (${code})` : err.message;
-}
-
-async function fetchTextNode(url) {
-    const res = await fetch(url, {
-        cache: 'no-store',
-        signal: AbortSignal.timeout(12000),
-    });
-    const text = await res.text();
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return text;
-}
-
-function fetchTextCurl(url) {
-    const child = spawnSync('curl', ['-L', '--silent', '--show-error', '--fail', '--max-time', '20', url], {
-        cwd: PROJECT_ROOT,
-        encoding: 'utf8',
-        maxBuffer: 32 * 1024 * 1024,
-    });
-    if (child.error || child.status !== 0) {
-        throw new Error(child.error?.message || child.stderr.trim() || child.stdout.trim() || `curl exited ${child.status ?? 1}`);
-    }
-    return child.stdout;
-}
-
-async function fetchTextRobust(url) {
-    const errors = [];
-    for (let attempt = 0; attempt < 2; attempt++) {
-        try {
-            return await fetchTextNode(url);
-        } catch (err) {
-            errors.push(`fetch attempt ${attempt + 1}: ${compactFetchError(err)}`);
-            await sleep(250 * (attempt + 1));
-        }
-    }
-    try {
-        return fetchTextCurl(url);
-    } catch (err) {
-        errors.push(`curl fallback: ${err.message}`);
-        throw new Error(errors.join('; '));
-    }
-}
-
-function uniqueStrings(values) {
-    return [...new Set(values.filter(Boolean))];
-}
-
-function stripCacheQuery(url) {
-    const parsed = new URL(url);
-    if (parsed.searchParams.has('t')) parsed.searchParams.delete('t');
-    return parsed.toString();
-}
-
-function extractLeaderboardDataUrls(html, pageUrl) {
-    const urls = [];
-    const dataConst = html.match(/\bDATA_URL\s*=\s*['"]([^'"]+)['"]/);
-    if (dataConst) urls.push(new URL(dataConst[1], pageUrl).toString());
-    for (const match of html.matchAll(/fetch\(\s*['"]([^'"]*data\.json[^'"]*)['"]/g)) {
-        urls.push(stripCacheQuery(new URL(match[1], pageUrl).toString()));
-    }
-    return urls;
-}
-
-async function discoverLeaderboardCandidates(baseUrl) {
-    const pages = [`${baseUrl}/leaderboard/`, `${baseUrl}/`];
-    const candidates = [];
-    const errors = [];
-    for (const pageUrl of pages) {
-        try {
-            const html = await fetchTextRobust(pageUrl);
-            candidates.push(...extractLeaderboardDataUrls(html, pageUrl));
-        } catch (err) {
-            errors.push(`${pageUrl}: ${err.message}`);
-        }
-    }
-    candidates.push(
-        `${baseUrl}/leaderboard/data.json`,
-        `${baseUrl}/data.json`,
-        `${baseUrl}/leaderboard.json`,
-    );
-    return { candidates: uniqueStrings(candidates), errors };
-}
-
-async function fetchLeaderboard(baseUrl) {
-    const { candidates, errors } = await discoverLeaderboardCandidates(baseUrl);
-    for (const url of candidates) {
-        try {
-            return { available: true, url, data: await fetchJson(url) };
-        } catch (err) {
-            errors.push(`${url}: ${err.message}`);
-        }
-    }
-    return { available: false, errors };
-}
-
-function findLeaderboardTeam(data, teamName) {
-    const teams = Array.isArray(data?.teams) ? data.teams : [];
-    if (!teamName) return null;
-    const wanted = teamName.toLowerCase();
-    return teams.find((team) => String(team.name || '').toLowerCase() === wanted) ||
-        teams.find((team) => String(team.fork || '').split('/')[0].toLowerCase() === wanted) ||
-        null;
-}
-
 function summarizeLeaderboardSessions(team) {
     if (Array.isArray(team?.sessions)) {
         return team.sessions.reduce((acc, session) => {
@@ -573,31 +451,6 @@ function compactLeaderboardTeam(team) {
         public: team.public,
         heldOut: team.heldOut,
     };
-}
-
-function leaderboardSessionRecords(team) {
-    if (!Array.isArray(team?.sessions)) return [];
-    return team.sessions.map((session) => ({
-        session: session.name,
-        exact: Boolean(session.passed),
-        screen: {
-            matched: Number(session.screen?.matched ?? 0),
-            total: Number(session.screen?.total ?? 0),
-        },
-        cellsOnly: {
-            matched: Number(session.cellsOnly?.matched ?? session.screen?.matched ?? 0),
-            total: Number(session.cellsOnly?.total ?? session.screen?.total ?? 0),
-        },
-        cursorOnly: 0,
-        rng: {
-            matched: Number(session.rng?.matched ?? 0),
-            total: Number(session.rng?.total ?? 0),
-        },
-        firstScreen: '-',
-        firstRng: '-',
-        error: null,
-        warnings: [],
-    }));
 }
 
 function makeLeaderboardCorpus(team) {

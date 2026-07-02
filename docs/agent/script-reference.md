@@ -14,6 +14,7 @@ commands work the same way.
 | Scoreboard state | `npm run scoreboard:state` | `node scripts/parity-state.mjs --refresh-live --score-upstream --full` |
 | Scoreboard JSON | `npm run scoreboard:json` | `node scripts/parity-state.mjs --refresh-live --score-upstream --full --json` |
 | Score surfaces | `npm run score:surfaces -- [session]` | `node scripts/score-surfaces.mjs [session]` |
+| Leaderboard failures | `npm run score:leaderboard-failures` | `node scripts/score-surfaces.mjs --leaderboard-failures --full` |
 | Browser score | `npm run score:browser -- [session]` | `node scripts/browser-score.mjs [session]` |
 | Play asset state | `npm run score:play-assets` | `node scripts/play-assets-state.mjs` |
 | Ref score | `npm run score:ref -- <ref>` | `node scripts/score-ref.mjs <ref>` |
@@ -78,10 +79,8 @@ Use these when local public score is exact but the online row keeps moving:
 - `npm run score:browser -- [session]`: replay in headless Chromium; use `--mode official|viewer|both` and `--root <checkout>`.
 - `npm run score:ref -- origin/main`: score a clean code ref from `/tmp`; pair it with `parity:state -- --score-ref origin/main`. Use `--session-ref <ref>` to score that code against another tracked session corpus, and `--runner-ref <ref>` to score it with another tracked frozen scorer.
 - `npm run score:storage-scope -- [session]`: replay through one JS module process while varying storage lifetime.
-- `npm run score:surfaces -- [session]`: score one Node replay through visual,
-  strict, legacy, raw, and variant-normalization screen comparators. Add
-  `--permission` to run replay workers under Node's permission sandbox with
-  project-root read access.
+- `npm run score:leaderboard-failures`: run score surfaces on the current failed public leaderboard sessions.
+- `npm run score:surfaces -- [session]`: score one Node replay through visual, strict, legacy, raw, and variant-normalization comparators. Add `--permission` or `--leaderboard-failures`.
 
 ## Library Boundary
 
