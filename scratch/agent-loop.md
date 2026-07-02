@@ -16,7 +16,7 @@ and `feature_map.md`.
   live ahead/behind state.
 - Latest verified repair units: runtime shapechange side effects, checked-in
   help pager data, scorer-drift diagnostics, and deterministic inventory sort
-  ordering.
+  ordering, plus scoreboard clean-ref aliases and corpus-triage cleanup.
 - Checked-in public corpus is exact: `44/44 S 11405/11405 R 792838/792838 C 0`.
 - Last refreshed hosted public cache is exact:
   `44/44 S 10982/10982 R 840358/840358 C 0`. It still classifies as
@@ -72,6 +72,17 @@ and `feature_map.md`.
     exact on the 15 online-failed public seeds, so missing time/version
     normalization and basic Node permission effects do not reproduce the
     leaderboard row.
+  - Harness truth: `scoreboard:state`/`scoreboard:json` now pass
+    `--score-upstream`, resolving the configured upstream ref before scoring a
+    clean `/tmp` checkout. The leaderboard report now names `origin/main`
+    rather than Git's `@{u}` shorthand while preserving explicit
+    `--score-ref <ref>` for non-upstream comparisons.
+  - Harness dehack: `triage-corpus` no longer carries stale hardcoded known
+    blocker sessions. Bucket hypotheses now come from the live first-mismatch
+    shape, and the generated divergence inventory stays a single exact public
+    bucket.
+  - Production determinism: inventory-letter range helpers now call the same
+    explicit ASCII comparator as broader inventory and loot ordering.
   - External scorer evidence: GitHub Actions artifact for pushed `f3ae03f`
     scored `43/44`, only `seed2200`, matching local clean-ref scoring. The
     official leaderboard later scored the same public corpus shape at `29/44`,
@@ -79,13 +90,13 @@ and `feature_map.md`.
   - Verification: checked-in public corpus exact
     `44/44 S 11405/11405 R 792838/792838 C 0`; strict sentinel exact
     `5/5 S 1063/1063 R 64569/64569 C 0`; focused verification stayed exact for
-    `seed0002`, `seed0399`, and `seed4500`; `hack:audit` stayed
-    `hard=0 suspicious=0`; `memory:lint ok`.
+    `seed0002`, `seed0030`, `seed0399`, `seed2200`, and `seed4500`;
+    `hack:audit` stayed `hard=0 suspicious=0`; `memory:lint ok`.
   - Regression classification: none on checked-in public, hosted public,
     focused targets, and strict sentinels. Official leaderboard remains a
     separate scorer-path drift with full RNG parity but screen misses.
   - Global next-step check: active public queue is empty. To test scoreboard
-    motion, push the 9 local commits to `origin/main` only after explicit user
+    motion, push the local commits to `origin/main` only after explicit user
     approval, then wait for/rescore the online row. Without push approval,
     continue local held-out-risk cleanup and scorer-surface reduction from fresh
     evidence rather than adding seed-specific behavior.
