@@ -93,7 +93,8 @@ and `feature_map.md`.
     `--score-ref <ref>` for non-upstream comparisons.
     The aliases also save both `.cache/leaderboard-data.json` and a
     timestamped `.cache/leaderboard-history/*.json` snapshot so current and
-    historic online rows remain replayable after the live endpoint moves.
+    historic online rows remain replayable after the live endpoint moves, and
+    the persistent-drift next-action line now points to `score:actions`.
   - Harness truth: `scripts/leaderboard-lib.mjs` owns shared leaderboard
     fetch/team/session parsing and failed-session target expansion.
     `npm run score:leaderboard-failures` now runs
