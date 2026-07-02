@@ -11,8 +11,8 @@ commands work the same way.
 | Screen diff | `npm run screen:diff -- <session> --first` | `node scripts/screen-diff.mjs <session> --first` |
 | Verify | `npm run verify -- --target <session>` | `node scripts/verify-change.mjs --target <session>` |
 | Strict sentinel | `npm run sentinel:strict` | `node scripts/run-sentinel-suite.mjs --strict` |
-| Scoreboard state | `npm run scoreboard:state` | `node scripts/parity-state.mjs --refresh-live --score-ref @{u} --full` |
-| Scoreboard JSON | `npm run scoreboard:json` | `node scripts/parity-state.mjs --refresh-live --score-ref @{u} --full --json` |
+| Scoreboard state | `npm run scoreboard:state` | `node scripts/parity-state.mjs --refresh-live --score-upstream --full` |
+| Scoreboard JSON | `npm run scoreboard:json` | `node scripts/parity-state.mjs --refresh-live --score-upstream --full --json` |
 | Score surfaces | `npm run score:surfaces -- [session]` | `node scripts/score-surfaces.mjs [session]` |
 | Browser score | `npm run score:browser -- [session]` | `node scripts/browser-score.mjs [session]` |
 | Play asset state | `npm run score:play-assets` | `node scripts/play-assets-state.mjs` |
@@ -46,7 +46,7 @@ scores that do not match the local score are reported as persistent scorer drift
 instead of plain timestamp lag.
 Use `--team <name>` when the fork owner is not the leaderboard name, `--full`
 for non-exact rows, and `--json` for automation. The `scoreboard:*` aliases
-also pass `--score-ref @{u}` so each online refresh compares the leaderboard
+also pass `--score-upstream` so each online refresh compares the leaderboard
 with the clean upstream ref that the public scorer can actually see.
 Delta sections are always `left minus right`; for example
 `S +4/+8` means four more matched screens over eight more total screens in the
@@ -66,7 +66,7 @@ Important classifications:
 
 Current limitation: the public leaderboard JSON reports repo, `lastScored`, and
 score totals, but not the scored commit. Dirty/ahead trees are conservative;
-for unresolved motion, pass `--score-ref origin/main` or another clean pushed ref.
+for unresolved motion, pass `--score-upstream` or another clean pushed ref.
 The `refs`, `timing`, and `next` lines show whether the last run is before or
 after local/upstream HEAD and what operational action is next.
 

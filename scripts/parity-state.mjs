@@ -25,7 +25,7 @@ const DEFAULT_LIVE_DIR = '.cache/live-sessions';
 
 function usage() {
     return [
-        'Usage: node scripts/parity-state.mjs [--refresh-live] [--full] [--json] [--team <name>] [--score-ref <ref>]',
+        'Usage: node scripts/parity-state.mjs [--refresh-live] [--full] [--json] [--team <name>] [--score-ref <ref>|--score-upstream]',
         '',
         'Options:',
         '  --refresh-live       Fetch hosted public sessions into .cache/live-sessions first.',
@@ -36,6 +36,7 @@ function usage() {
         '  --local-dir <dir>    Override checked-in public session directory.',
         '  --live-dir <dir>     Override cached live-public session directory.',
         '  --score-ref <ref>    Score a clean git ref and compare it with leaderboard public.',
+        '  --score-upstream     Score the configured upstream ref and compare it with leaderboard public.',
         '  --full               Print per-session non-exact rows.',
         '  --json               Emit machine-readable JSON only.',
     ].join('\n');
@@ -52,6 +53,7 @@ function parseArgs(argv) {
         localDir: DEFAULT_LOCAL_DIR,
         liveDir: DEFAULT_LIVE_DIR,
         scoreRef: null,
+        scoreUpstream: false,
         explicitTeam: false,
     };
 
@@ -80,9 +82,13 @@ function parseArgs(argv) {
         else if (arg.startsWith('--live-dir=')) options.liveDir = arg.slice('--live-dir='.length);
         else if (arg === '--score-ref') options.scoreRef = argv[++i] || null;
         else if (arg.startsWith('--score-ref=')) options.scoreRef = arg.slice('--score-ref='.length);
+        else if (arg === '--score-upstream') options.scoreUpstream = true;
         else throw new Error(`unknown argument ${arg}\n${usage()}`);
     }
 
+    if (options.scoreRef && options.scoreUpstream) {
+        throw new Error('--score-ref and --score-upstream are mutually exclusive');
+    }
     if (options.leaderboard == null) {
         options.leaderboard = options.refreshLive || options.explicitTeam;
     }
@@ -1091,6 +1097,7 @@ function printHuman(payload) {
 async function main() {
     const options = parseArgs(process.argv.slice(2));
     const git = gitState();
+    const cleanScoreRef = options.scoreUpstream ? git.upstream : options.scoreRef;
     let liveFetch = null;
     if (options.refreshLive) liveFetch = fetchLiveSessions(options.liveDir);
 
@@ -1105,7 +1112,11 @@ async function main() {
         left: localFingerprint,
         right: liveFingerprint,
     });
-    const cleanRefCorpus = options.scoreRef ? scoreRef(options.scoreRef, { target: options.localDir }) : null;
+    const cleanRefCorpus = cleanScoreRef
+        ? scoreRef(cleanScoreRef, { target: options.localDir })
+        : options.scoreUpstream
+            ? { available: false, ref: 'upstream', error: 'no configured upstream ref' }
+            : null;
     const sentinel = await analyzeSentinels();
     const audits = auditSummary();
 
@@ -1133,7 +1144,8 @@ async function main() {
             baseUrl: options.baseUrl,
             localDir: options.localDir,
             liveDir: options.liveDir,
-            scoreRef: options.scoreRef,
+            scoreRef: cleanScoreRef,
+            scoreUpstream: options.scoreUpstream,
         },
         git,
         liveFetch,
