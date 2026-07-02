@@ -115,13 +115,12 @@ and `feature_map.md`.
     bucket.
   - Production determinism: inventory-letter range helpers now call the same
     explicit ASCII comparator as broader inventory and loot ordering.
-  - External scorer evidence: GitHub Actions artifact for pushed `f3ae03f`
-    scored `43/44`, only `seed2200`, matching local clean-ref scoring. The
-    official leaderboard later scored the same public corpus shape at `29/44`,
-    so this is not explained by local commits merely being ahead of origin.
-    The workflow's direct `node frozen/ps_test_runner.mjs sessions/` path also
-    scores local `HEAD` at `44/44`, so the GitHub Actions command shape is not
-    the missing scorer branch.
+  - External scorer evidence: latest public GitHub Actions Score run is
+    `#115` for pushed `e0a8d41`, success, with non-expired `score-results`
+    artifact metadata; the leaderboard row was scored after that run updated.
+    The workflow's direct `node frozen/ps_test_runner.mjs sessions/` path scores
+    local `a2d912f` at `44/44`, so the Actions command shape is not the missing
+    scorer branch. Use `npm run score:actions` to refresh this check.
   - Verification: checked-in public corpus exact
     `44/44 S 11405/11405 R 792838/792838 C 0`; strict sentinel exact
     `5/5 S 1063/1063 R 64569/64569 C 0`; focused verification stayed exact for
