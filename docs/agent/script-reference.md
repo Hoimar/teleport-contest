@@ -45,8 +45,8 @@ so hosted-session drift does not mask deploy lag for an older leaderboard run.
 It also summarizes the recent leaderboard history window; repeated comparable
 scores that do not match the local score are reported as persistent scorer drift
 instead of plain timestamp lag.
-Use `--team <name>` when the fork owner is not the leaderboard name, `--full`
-for non-exact rows, and `--json` for automation. The `scoreboard:*` aliases
+Use `--team <name>`, `--full`, `--leaderboard-json <file>`, and `--json`
+for team, row, snapshot, and automation needs. The `scoreboard:*` aliases
 also pass `--score-upstream` so each online refresh compares the leaderboard
 with the clean upstream ref that the public scorer can actually see.
 Delta sections are always `left minus right`; for example

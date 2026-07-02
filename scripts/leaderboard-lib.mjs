@@ -1,4 +1,6 @@
 import { spawnSync, execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 export const DEFAULT_LEADERBOARD_BASE_URL = 'https://mazesofmenace.ai';
 
@@ -126,6 +128,20 @@ export async function fetchLeaderboard(baseUrl = DEFAULT_LEADERBOARD_BASE_URL) {
         }
     }
     return { available: false, errors };
+}
+
+export function readLeaderboardSnapshot(file, cwd = process.cwd()) {
+    const path = file.startsWith('/') ? file : resolve(cwd, file);
+    try {
+        return {
+            available: true,
+            url: path,
+            data: JSON.parse(readFileSync(path, 'utf8')),
+            snapshot: true,
+        };
+    } catch (err) {
+        throw new Error(`leaderboard snapshot unavailable: ${err.message}`);
+    }
 }
 
 export function findLeaderboardTeam(data, teamName) {

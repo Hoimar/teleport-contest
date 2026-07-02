@@ -22,6 +22,7 @@ import {
     findLeaderboardTeam,
     inferTeamFromGitRemote,
     leaderboardSessionRecords,
+    readLeaderboardSnapshot,
 } from './leaderboard-lib.mjs';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -31,11 +32,12 @@ const DEFAULT_LIVE_DIR = '.cache/live-sessions';
 
 function usage() {
     return [
-        'Usage: node scripts/parity-state.mjs [--refresh-live] [--full] [--json] [--team <name>] [--score-ref <ref>|--score-upstream]',
+        'Usage: node scripts/parity-state.mjs [--refresh-live] [--full] [--json] [--team <name>] [--leaderboard-json <file>] [--score-ref <ref>|--score-upstream]',
         '',
         'Options:',
         '  --refresh-live       Fetch hosted public sessions into .cache/live-sessions first.',
         '  --leaderboard        Fetch leaderboard data even without --refresh-live.',
+        '  --leaderboard-json <file>  Read saved leaderboard JSON instead of fetching.',
         '  --no-leaderboard     Skip leaderboard fetch/classification.',
         '  --team <name>        Leaderboard team name or fork owner to compare.',
         '  --base-url <url>     Override public site base URL.',
@@ -54,6 +56,7 @@ function parseArgs(argv) {
         full: false,
         json: false,
         leaderboard: null,
+        leaderboardJson: null,
         team: null,
         baseUrl: process.env.MOM_BASE_URL || DEFAULT_LEADERBOARD_BASE_URL,
         localDir: DEFAULT_LOCAL_DIR,
@@ -73,6 +76,8 @@ function parseArgs(argv) {
         else if (arg === '--json') options.json = true;
         else if (arg === '--leaderboard') options.leaderboard = true;
         else if (arg === '--no-leaderboard') options.leaderboard = false;
+        else if (arg === '--leaderboard-json') options.leaderboardJson = argv[++i] || null;
+        else if (arg.startsWith('--leaderboard-json=')) options.leaderboardJson = arg.slice('--leaderboard-json='.length);
         else if (arg === '--team') {
             options.team = argv[++i] || null;
             options.explicitTeam = true;
@@ -98,6 +103,7 @@ function parseArgs(argv) {
     if (options.leaderboard == null) {
         options.leaderboard = options.refreshLive || options.explicitTeam;
     }
+    if (options.leaderboardJson) options.leaderboard = true;
     if (options.leaderboard && !options.team) options.team = inferTeamFromGitRemote(PROJECT_ROOT);
     options.baseUrl = options.baseUrl.replace(/\/+$/, '');
     return options;
@@ -977,7 +983,11 @@ async function main() {
     const audits = auditSummary();
 
     const wantLeaderboard = options.leaderboard;
-    const leaderboardData = wantLeaderboard ? await fetchLeaderboard(options.baseUrl) : null;
+    const leaderboardData = wantLeaderboard
+        ? options.leaderboardJson
+            ? readLeaderboardSnapshot(options.leaderboardJson, PROJECT_ROOT)
+            : await fetchLeaderboard(options.baseUrl)
+        : null;
     const leaderboard = wantLeaderboard
         ? classifyLeaderboard({
             leaderboard: leaderboardData,
@@ -998,6 +1008,7 @@ async function main() {
             team: options.team,
             explicitTeam: options.explicitTeam,
             baseUrl: options.baseUrl,
+            leaderboardJson: options.leaderboardJson,
             localDir: options.localDir,
             liveDir: options.liveDir,
             scoreRef: cleanScoreRef,

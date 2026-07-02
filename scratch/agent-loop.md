@@ -82,11 +82,11 @@ and `feature_map.md`.
     score-surface probes on the current failed public leaderboard sessions
     without manually copying seed names; the latest run selected 15 Hoimar
     failures and all visual variants passed `15/15 S 8810/8810 R 636858/636858`.
-    The same probe can now take `--leaderboard-json <file>` to replay a saved
-    or historic leaderboard snapshot when the live endpoint has moved or fetch
-    access is unavailable. Worker process failures now make `score-surfaces`
-    exit non-zero, so sandbox/runner failures cannot masquerade as scorer
-    mismatches.
+    `parity:state` and the same failure probe can now take
+    `--leaderboard-json <file>` to replay a saved or historic leaderboard
+    snapshot when the live endpoint has moved or fetch access is unavailable.
+    Worker process failures now make `score-surfaces` exit non-zero, so
+    sandbox/runner failures cannot masquerade as scorer mismatches.
   - Harness dehack: `triage-corpus` no longer carries stale hardcoded known
     blocker sessions. Bucket hypotheses now come from the live first-mismatch
     shape, and the generated divergence inventory stays a single exact public

@@ -13,6 +13,7 @@ import {
     fetchLeaderboard,
     findLeaderboardTeam,
     inferTeamFromGitRemote,
+    readLeaderboardSnapshot,
 } from './leaderboard-lib.mjs';
 
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
@@ -98,26 +99,12 @@ function parseArgs(argv) {
     return out;
 }
 
-function readLeaderboardSnapshot(file) {
-    const path = file.startsWith('/') ? file : join(PROJECT_ROOT, file);
-    try {
-        return {
-            available: true,
-            url: path,
-            data: JSON.parse(readFileSync(path, 'utf8')),
-            snapshot: true,
-        };
-    } catch (err) {
-        throw new Error(`leaderboard snapshot unavailable: ${err.message}`);
-    }
-}
-
 async function expandLeaderboardFailureTargets(options) {
     if (!options.leaderboardFailures) return;
     const teamName = options.team || inferTeamFromGitRemote(PROJECT_ROOT);
     if (!teamName) throw new Error('--leaderboard-failures needs --team <name> or a GitHub origin owner');
     const leaderboard = options.leaderboardJson
-        ? readLeaderboardSnapshot(options.leaderboardJson)
+        ? readLeaderboardSnapshot(options.leaderboardJson, PROJECT_ROOT)
         : await fetchLeaderboard(options.baseUrl);
     if (!leaderboard.available) {
         throw new Error(`leaderboard unavailable: ${(leaderboard.errors || []).join(' | ')}`);
