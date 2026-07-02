@@ -731,9 +731,12 @@ function classifyLeaderboard({ leaderboard, teamName, localCorpus, liveCorpus, c
     if (cleanRef?.rulesOutLocalAhead) {
         const refScore = compactScore(cleanRef.summary);
         const cls = persistentHistory ? 'persistent-scorer-drift' : 'scorer-drift';
+        const failureProbe = failureSignature?.failed
+            ? ' Run score:leaderboard-failures to replay the current failed public sessions across local scorer surfaces.'
+            : '';
         const cleanRefMotion = {
             ...motion,
-            nextAction: 'Clean-ref evidence rules out local-ahead timing; reproduce the online scorer surface or inspect deployment/scorer artifacts.',
+            nextAction: `Clean-ref evidence rules out local-ahead timing.${failureProbe} Inspect deployment/scorer artifacts if local surfaces still pass.`,
         };
         return withCleanRef({
             class: cls,
