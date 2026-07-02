@@ -27,23 +27,22 @@ and `feature_map.md`.
   `persistent-scorer-drift`: leaderboard public
   `29/44 S 11295/11405 R 792838/792838`, scored at
   `2026-07-02T05:31:56.208Z`.
-- Clean-ref evidence rules out simple origin lag: `origin/main` at `f3d982e`
+- Clean-ref evidence rules out simple origin lag: `origin/main` at `e0a8d41`
   scores `44/44 S 11405/11405 R 792838/792838` locally, while the later
   official leaderboard row is still `29/44`.
+  `parity:state -- --leaderboard-json .cache/leaderboard-data.json
+  --score-upstream --full` now keeps this as `persistent-scorer-drift` even
+  when local harness commits are ahead, while still printing dirty/ahead
+  caveats.
 - Online failure signature is screen-only: 15 failed public sessions, 110
   missed screens, full RNG and RNG-step match for all 15; cell-only metrics
   equal the combined screen score on all 15, so the online misses are cell-grid
   misses rather than cursor-only misses.
-- Scratch trace/checkpoint files are agent-toolkit state and may be committed
-  when useful; keep production parity and scratch-tool commits coherent.
 - Strict sentinels are exact:
   `5/5 S 1063/1063 R 64569/64569 C 0`.
 - Current public classification: checked-in and hosted public corpora are exact;
   leaderboard fetch works, but default inferred team `Hoimar` differs from all
   locally reproduced scorer surfaces and remains official scorer-path drift.
-- Current sentinel regression classification: none; strict sentinel is exact.
-- Hack audit is clean: `hard=0 suspicious=0`. Production `js/` has no
-  intentional debug I/O or imports from `frozen/`.
 
 ## Latest Loop Checkpoint
 
@@ -118,6 +117,9 @@ and `feature_map.md`.
     scored `43/44`, only `seed2200`, matching local clean-ref scoring. The
     official leaderboard later scored the same public corpus shape at `29/44`,
     so this is not explained by local commits merely being ahead of origin.
+    The workflow's direct `node frozen/ps_test_runner.mjs sessions/` path also
+    scores local `HEAD` at `44/44`, so the GitHub Actions command shape is not
+    the missing scorer branch.
   - Verification: checked-in public corpus exact
     `44/44 S 11405/11405 R 792838/792838 C 0`; strict sentinel exact
     `5/5 S 1063/1063 R 64569/64569 C 0`; focused verification stayed exact for

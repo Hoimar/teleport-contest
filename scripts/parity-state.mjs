@@ -748,19 +748,25 @@ function classifyLeaderboard({ leaderboard, teamName, localCorpus, liveCorpus, c
         return withCleanRef({ class: 'same', reason: reasonWithCaveats(`leaderboard public score matches local ${scoreCorpus.label} score`, caveats), url: leaderboard.url, team: compactLeaderboardTeam(team), publicSummary, sessionDelta, caveats, motion, history, failureSignature });
     }
 
-    if (cleanRef?.rulesOutLocalAhead) {
+    const cleanRefSupportsScorerDrift = cleanRef?.shapeMatches &&
+        !cleanRef.publicEqual &&
+        (cleanRef.rulesOutLocalAhead || persistentHistory);
+    if (cleanRefSupportsScorerDrift) {
         const refScore = compactScore(cleanRef.summary);
         const cls = persistentHistory ? 'persistent-scorer-drift' : 'scorer-drift';
         const failureProbe = failureSignature?.failed
             ? ' Run npm run score:leaderboard-failures to replay the current failed public sessions across local scorer surfaces.'
             : '';
+        const evidence = cleanRef.rulesOutLocalAhead
+            ? `leaderboard lastScored is ${cleanRef.lastScoredRelation} that ref`
+            : `recent comparable leaderboard history has ${history.matchingTarget}/${history.comparable} score(s) matching local ${scoreCorpus.label}`;
         const cleanRefMotion = {
             ...motion,
             nextAction: `Clean-ref evidence rules out local-ahead timing.${failureProbe} Inspect deployment/scorer artifacts if local surfaces still pass.`,
         };
         return withCleanRef({
             class: cls,
-            reason: reasonWithCaveats(`clean ref ${cleanRef.ref} (${cleanRef.commit}) scores ${refScore}, and leaderboard lastScored is ${cleanRef.lastScoredRelation} that ref; local-ahead timing does not explain the public delta`, caveats),
+            reason: reasonWithCaveats(`clean ref ${cleanRef.ref} (${cleanRef.commit}) scores ${refScore}, and ${evidence}; local-ahead timing alone does not explain the public delta`, caveats),
             url: leaderboard.url,
             team: compactLeaderboardTeam(team),
             publicSummary,
