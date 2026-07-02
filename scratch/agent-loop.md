@@ -85,6 +85,8 @@ and `feature_map.md`.
     `parity:state` and the same failure probe can now take
     `--leaderboard-json <file>` to replay a saved or historic leaderboard
     snapshot when the live endpoint has moved or fetch access is unavailable.
+    The `scoreboard:*` aliases save their classified raw leaderboard payload to
+    `.cache/leaderboard-data.json` for repeatable follow-up probes.
     Worker process failures now make `score-surfaces` exit non-zero, so
     sandbox/runner failures cannot masquerade as scorer mismatches.
   - Harness dehack: `triage-corpus` no longer carries stale hardcoded known

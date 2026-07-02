@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -32,12 +32,13 @@ const DEFAULT_LIVE_DIR = '.cache/live-sessions';
 
 function usage() {
     return [
-        'Usage: node scripts/parity-state.mjs [--refresh-live] [--full] [--json] [--team <name>] [--leaderboard-json <file>] [--score-ref <ref>|--score-upstream]',
+        'Usage: node scripts/parity-state.mjs [--refresh-live] [--full] [--json] [--team <name>] [--leaderboard-json <file>] [--save-leaderboard-json <file>] [--score-ref <ref>|--score-upstream]',
         '',
         'Options:',
         '  --refresh-live       Fetch hosted public sessions into .cache/live-sessions first.',
         '  --leaderboard        Fetch leaderboard data even without --refresh-live.',
         '  --leaderboard-json <file>  Read saved leaderboard JSON instead of fetching.',
+        '  --save-leaderboard-json <file>  Save the classified leaderboard JSON.',
         '  --no-leaderboard     Skip leaderboard fetch/classification.',
         '  --team <name>        Leaderboard team name or fork owner to compare.',
         '  --base-url <url>     Override public site base URL.',
@@ -57,6 +58,7 @@ function parseArgs(argv) {
         json: false,
         leaderboard: null,
         leaderboardJson: null,
+        saveLeaderboardJson: null,
         team: null,
         baseUrl: process.env.MOM_BASE_URL || DEFAULT_LEADERBOARD_BASE_URL,
         localDir: DEFAULT_LOCAL_DIR,
@@ -78,6 +80,8 @@ function parseArgs(argv) {
         else if (arg === '--no-leaderboard') options.leaderboard = false;
         else if (arg === '--leaderboard-json') options.leaderboardJson = argv[++i] || null;
         else if (arg.startsWith('--leaderboard-json=')) options.leaderboardJson = arg.slice('--leaderboard-json='.length);
+        else if (arg === '--save-leaderboard-json') options.saveLeaderboardJson = argv[++i] || null;
+        else if (arg.startsWith('--save-leaderboard-json=')) options.saveLeaderboardJson = arg.slice('--save-leaderboard-json='.length);
         else if (arg === '--team') {
             options.team = argv[++i] || null;
             options.explicitTeam = true;
@@ -119,6 +123,10 @@ function readJson(file) {
 
 function relPath(p) {
     return path.relative(PROJECT_ROOT, p) || '.';
+}
+
+function resolveProjectPath(file) {
+    return path.isAbsolute(file) ? file : path.resolve(PROJECT_ROOT, file);
 }
 
 function gitOutput(args) {
@@ -787,6 +795,14 @@ function auditSummary() {
     };
 }
 
+function saveLeaderboardSnapshot(file, data) {
+    if (!file || !data) return null;
+    const target = resolveProjectPath(file);
+    mkdirSync(path.dirname(target), { recursive: true });
+    writeFileSync(target, `${JSON.stringify(data, null, 2)}\n`);
+    return relPath(target);
+}
+
 function fmtCount(matched, total) {
     return `${matched}/${total}`;
 }
@@ -887,6 +903,8 @@ function printHuman(payload) {
         console.log(`- class: ${payload.leaderboard.class}`);
         console.log(`- reason: ${payload.leaderboard.reason}`);
         if (payload.leaderboard.url) console.log(`- source: ${payload.leaderboard.url}`);
+        if (payload.leaderboardSnapshot?.saved) console.log(`- saved snapshot: ${payload.leaderboardSnapshot.saved}`);
+        if (payload.leaderboardSnapshot?.error) console.log(`- snapshot save failed: ${payload.leaderboardSnapshot.error}`);
         if (payload.leaderboard.team) {
             const team = payload.leaderboard.team;
             console.log(`- team: ${team.name} (${team.fork || 'unknown fork'}), last scored ${team.lastScored || 'unknown'}`);
@@ -988,6 +1006,14 @@ async function main() {
             ? readLeaderboardSnapshot(options.leaderboardJson, PROJECT_ROOT)
             : await fetchLeaderboard(options.baseUrl)
         : null;
+    let leaderboardSnapshot = null;
+    if (wantLeaderboard && leaderboardData?.available && options.saveLeaderboardJson) {
+        try {
+            leaderboardSnapshot = { saved: saveLeaderboardSnapshot(options.saveLeaderboardJson, leaderboardData.data) };
+        } catch (err) {
+            leaderboardSnapshot = { error: err.message };
+        }
+    }
     const leaderboard = wantLeaderboard
         ? classifyLeaderboard({
             leaderboard: leaderboardData,
@@ -1009,6 +1035,7 @@ async function main() {
             explicitTeam: options.explicitTeam,
             baseUrl: options.baseUrl,
             leaderboardJson: options.leaderboardJson,
+            saveLeaderboardJson: options.saveLeaderboardJson,
             localDir: options.localDir,
             liveDir: options.liveDir,
             scoreRef: cleanScoreRef,
@@ -1025,6 +1052,7 @@ async function main() {
         liveCorpus,
         sentinel,
         leaderboard,
+        leaderboardSnapshot,
         audits,
     };
 
