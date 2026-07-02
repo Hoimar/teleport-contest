@@ -8,11 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
     DEFAULT_LEADERBOARD_BASE_URL,
-    failedLeaderboardSessionNames,
-    fetchLeaderboard,
-    findLeaderboardTeam,
-    inferTeamFromGitRemote,
-    readLeaderboardSnapshot,
+    expandLeaderboardFailureTargets,
 } from './leaderboard-lib.mjs';
 
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
@@ -134,25 +130,6 @@ function parseArgs(argv) {
     out.browser ||= findBrowser();
     if (!out.browser) throw new Error('Chromium not found; pass --browser /path/to/chromium');
     return out;
-}
-
-async function expandLeaderboardFailureTargets(options) {
-    if (!options.leaderboardFailures) return;
-    const teamName = options.team || inferTeamFromGitRemote(PROJECT_ROOT);
-    if (!teamName) throw new Error('--leaderboard-failures needs --team <name> or a GitHub origin owner');
-    const leaderboard = options.leaderboardJson
-        ? readLeaderboardSnapshot(options.leaderboardJson, PROJECT_ROOT)
-        : await fetchLeaderboard(options.baseUrl);
-    if (!leaderboard.available) {
-        throw new Error(`leaderboard unavailable: ${(leaderboard.errors || []).join(' | ')}`);
-    }
-    const team = findLeaderboardTeam(leaderboard.data, teamName);
-    if (!team) throw new Error(`team ${teamName} not found in ${leaderboard.url}`);
-    const failures = failedLeaderboardSessionNames(team);
-    if (!failures.length) throw new Error(`team ${team.name || teamName} has no failed public leaderboard sessions`);
-    options.targets = [...failures, ...options.targets];
-    const snapshotTime = leaderboard.data?.timestamp ? `, snapshot ${leaderboard.data.timestamp}` : '';
-    options.sourceLabel = `leaderboard failures for ${team.name || teamName} (${leaderboard.url}${snapshotTime}, last scored ${team.lastScored || 'unknown'})`;
 }
 
 function findBrowser() {
@@ -829,7 +806,7 @@ async function main() {
         console.log(runnerModule());
         return;
     }
-    await expandLeaderboardFailureTargets(options);
+    await expandLeaderboardFailureTargets(options, PROJECT_ROOT);
     if (options.targets.length === 0) options.targets.push(sessionsDir());
     const sessions = resolveSessionFiles(options.targets);
     if (!sessions.length) throw new Error('no session files found');

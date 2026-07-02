@@ -92,10 +92,11 @@ and `feature_map.md`.
     timestamped `.cache/leaderboard-history/*.json` snapshot so current and
     historic online rows remain replayable after the live endpoint moves.
   - Harness truth: `scripts/leaderboard-lib.mjs` owns shared leaderboard
-    fetch/team/session parsing. `npm run score:leaderboard-failures` now runs
+    fetch/team/session parsing and failed-session target expansion.
+    `npm run score:leaderboard-failures` now runs
     score-surface probes on the current failed public leaderboard sessions
     without manually copying seed names; the latest run selected 15 Hoimar
-    failures and all visual variants passed `15/15 S 8810/8810 R 636858/636858`.
+    failures and all visual variants passed `15/15 S 8850/8850 R 646394/646394`.
     `parity:state` and the same failure probe can now take
     `--leaderboard-json <file>` to replay a saved or historic leaderboard
     snapshot when the live endpoint has moved or fetch access is unavailable.

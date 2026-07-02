@@ -183,3 +183,22 @@ export function failedLeaderboardSessionNames(team) {
         .filter((session) => !session.exact)
         .map((session) => session.session);
 }
+
+export async function expandLeaderboardFailureTargets(options, cwd = process.cwd()) {
+    if (!options.leaderboardFailures) return;
+    const teamName = options.team || inferTeamFromGitRemote(cwd);
+    if (!teamName) throw new Error('--leaderboard-failures needs --team <name> or a GitHub origin owner');
+    const leaderboard = options.leaderboardJson
+        ? readLeaderboardSnapshot(options.leaderboardJson, cwd)
+        : await fetchLeaderboard(options.baseUrl);
+    if (!leaderboard.available) {
+        throw new Error(`leaderboard unavailable: ${(leaderboard.errors || []).join(' | ')}`);
+    }
+    const team = findLeaderboardTeam(leaderboard.data, teamName);
+    if (!team) throw new Error(`team ${teamName} not found in ${leaderboard.url}`);
+    const failures = failedLeaderboardSessionNames(team);
+    if (!failures.length) throw new Error(`team ${team.name || teamName} has no failed public leaderboard sessions`);
+    options.targets = [...failures, ...(options.targets || [])];
+    const snapshotTime = leaderboard.data?.timestamp ? `, snapshot ${leaderboard.data.timestamp}` : '';
+    options.sourceLabel = `leaderboard failures for ${team.name || teamName} (${leaderboard.url}${snapshotTime}, last scored ${team.lastScored || 'unknown'})`;
+}
