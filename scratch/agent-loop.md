@@ -74,6 +74,10 @@ and `feature_map.md`.
     probe leakage.
     It also accepts `--leaderboard-failures`/`--leaderboard-json <file>` so
     browser probes can reuse the current failed leaderboard session set.
+  - Harness truth: `scripts/score-storage-scope.mjs` is a one-JS-module-process
+    storage/module leakage probe, not an official scorer replica. It accepts
+    `--leaderboard-failures`/`--leaderboard-json <file>` so leakage probes use
+    the same failed-session set as the current online row.
   - Harness truth: `scripts/score-surfaces.mjs` now has visual-normalization
     variants and a Node permission-sandbox mode. All visual variants remain
     exact on the 15 online-failed public seeds, so missing time/version

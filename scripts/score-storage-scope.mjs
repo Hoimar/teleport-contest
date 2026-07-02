@@ -5,6 +5,14 @@ import { fileURLToPath } from 'node:url';
 
 import { normalizeSession } from '../frozen/session_loader.mjs';
 import {
+    DEFAULT_LEADERBOARD_BASE_URL,
+    failedLeaderboardSessionNames,
+    fetchLeaderboard,
+    findLeaderboardTeam,
+    inferTeamFromGitRemote,
+    readLeaderboardSnapshot,
+} from './leaderboard-lib.mjs';
+import {
     compareScreen,
     keyToDisplay,
     resolveSessionRef,
@@ -17,11 +25,11 @@ const SCRIPT_PATH = fileURLToPath(import.meta.url);
 
 function usage() {
     console.log([
-        'Usage: node scripts/score-storage-scope.mjs [--scope session|run|none|both] [--order manifest|reverse] [--full] [file-or-dir...]',
+        'Usage: node scripts/score-storage-scope.mjs [--scope session|run|none|both] [--order manifest|reverse] [--leaderboard-failures] [--leaderboard-json <file>] [--full] [file-or-dir...]',
         '',
-        'Replays sessions with the official runSegment(input) shape while changing',
-        'storage isolation. This catches judge or browser behavior where VFS state',
-        'leaks across public sessions even though local score.sh isolates sessions.',
+        'Replays sessions in one JS module process while changing storage',
+        'isolation. This catches diagnostic module/VFS leakage that the official',
+        'worker-isolated score.sh path should not see between public sessions.',
     ].join('\n'));
 }
 
@@ -31,6 +39,11 @@ function parseArgs(argv) {
         order: 'manifest',
         full: false,
         limit: 20,
+        leaderboardFailures: false,
+        leaderboardJson: null,
+        team: null,
+        baseUrl: process.env.MOM_BASE_URL || DEFAULT_LEADERBOARD_BASE_URL,
+        sourceLabel: null,
         targets: [],
     };
     for (let i = 0; i < argv.length; i++) {
@@ -48,10 +61,26 @@ function parseArgs(argv) {
             options.order = arg.slice('--order='.length);
         } else if (arg === '--full') {
             options.full = true;
+        } else if (arg === '--leaderboard-failures') {
+            options.leaderboardFailures = true;
+        } else if (arg === '--leaderboard-json') {
+            options.leaderboardJson = argv[++i] || null;
+        } else if (arg.startsWith('--leaderboard-json=')) {
+            options.leaderboardJson = arg.slice('--leaderboard-json='.length);
+        } else if (arg === '--team') {
+            options.team = argv[++i] || null;
+        } else if (arg.startsWith('--team=')) {
+            options.team = arg.slice('--team='.length);
+        } else if (arg === '--base-url') {
+            options.baseUrl = argv[++i] || options.baseUrl;
+        } else if (arg.startsWith('--base-url=')) {
+            options.baseUrl = arg.slice('--base-url='.length);
         } else if (arg === '--limit') {
             options.limit = Number(argv[++i] || options.limit);
         } else if (arg.startsWith('--limit=')) {
             options.limit = Number(arg.slice('--limit='.length));
+        } else if (arg.startsWith('--')) {
+            throw new Error(`unknown argument ${arg}`);
         } else {
             options.targets.push(arg);
         }
@@ -63,7 +92,28 @@ function parseArgs(argv) {
         throw new Error(`unknown order "${options.order}"`);
     }
     if (!Number.isFinite(options.limit) || options.limit < 0) options.limit = 20;
+    options.baseUrl = options.baseUrl.replace(/\/+$/, '');
+    if (options.leaderboardJson) options.leaderboardFailures = true;
     return options;
+}
+
+async function expandLeaderboardFailureTargets(options) {
+    if (!options.leaderboardFailures) return;
+    const teamName = options.team || inferTeamFromGitRemote(PROJECT_ROOT);
+    if (!teamName) throw new Error('--leaderboard-failures needs --team <name> or a GitHub origin owner');
+    const leaderboard = options.leaderboardJson
+        ? readLeaderboardSnapshot(options.leaderboardJson, PROJECT_ROOT)
+        : await fetchLeaderboard(options.baseUrl);
+    if (!leaderboard.available) {
+        throw new Error(`leaderboard unavailable: ${(leaderboard.errors || []).join(' | ')}`);
+    }
+    const team = findLeaderboardTeam(leaderboard.data, teamName);
+    if (!team) throw new Error(`team ${teamName} not found in ${leaderboard.url}`);
+    const failures = failedLeaderboardSessionNames(team);
+    if (!failures.length) throw new Error(`team ${team.name || teamName} has no failed public leaderboard sessions`);
+    options.targets = [...failures, ...options.targets];
+    const snapshotTime = leaderboard.data?.timestamp ? `, snapshot ${leaderboard.data.timestamp}` : '';
+    options.sourceLabel = `leaderboard failures for ${team.name || teamName} (${leaderboard.url}${snapshotTime}, last scored ${team.lastScored || 'unknown'})`;
 }
 
 function readManifest() {
@@ -369,9 +419,11 @@ function printScope(report, options) {
 
 async function main() {
     const options = parseArgs(process.argv.slice(2));
+    await expandLeaderboardFailureTargets(options);
     const files = orderedFiles(resolveTargets(options.targets), options.order);
     const scopes = options.scope === 'both' ? ['session', 'run'] : [options.scope];
-    console.log(`Score storage scope: ${files.length} session(s), order ${options.order}`);
+    console.log(`Score one-process storage scope: ${files.length} session(s), order ${options.order}`);
+    if (options.sourceLabel) console.log(`Source: ${options.sourceLabel}`);
     for (const scope of scopes) {
         const report = await runScope(scope, files);
         printScope(report, options);
