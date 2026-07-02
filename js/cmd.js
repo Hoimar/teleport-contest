@@ -2229,7 +2229,7 @@ function inventoryLetterRange() {
         || (game.inventory || []).some((obj) => obj?.otyp === GOLD_PIECE || obj?.invlet === '$');
     const letters = [...new Set((game.inventory || [])
         .map((obj) => obj?.invlet)
-        .filter(validInvlet))].sort();
+        .filter(validInvlet))].sort(asciiCompare);
     // C ref: invent.c:getobj().  The suggested-letter buffer is only
     // compacted with dashes when it contains more than five letters.
     const compact = (letters.length > 5 ? compressLetters(letters) : letters.join('')) || '';
@@ -2241,13 +2241,13 @@ function inventoryLetterRangeFor(filter) {
     const letters = [...new Set((game.inventory || [])
         .filter(filter)
         .map((obj) => obj?.invlet)
-        .filter(validInvlet))].sort();
+        .filter(validInvlet))].sort(asciiCompare);
     const compact = (letters.length > 5 ? compressLetters(letters) : letters.join('')) || '';
     return compact || 'a';
 }
 
 function compressLetters(letters) {
-    const sorted = [...new Set(letters.filter(validInvlet))].sort();
+    const sorted = [...new Set(letters.filter(validInvlet))].sort(asciiCompare);
     const parts = [];
     for (let i = 0; i < sorted.length; i++) {
         let j = i;
