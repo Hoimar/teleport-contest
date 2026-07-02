@@ -32,13 +32,14 @@ const DEFAULT_LIVE_DIR = '.cache/live-sessions';
 
 function usage() {
     return [
-        'Usage: node scripts/parity-state.mjs [--refresh-live] [--full] [--json] [--team <name>] [--leaderboard-json <file>] [--save-leaderboard-json <file>] [--score-ref <ref>|--score-upstream]',
+        'Usage: node scripts/parity-state.mjs [--refresh-live] [--full] [--json] [--team <name>] [--leaderboard-json <file>] [--save-leaderboard-json <file>] [--save-leaderboard-history-dir <dir>] [--score-ref <ref>|--score-upstream]',
         '',
         'Options:',
         '  --refresh-live       Fetch hosted public sessions into .cache/live-sessions first.',
         '  --leaderboard        Fetch leaderboard data even without --refresh-live.',
         '  --leaderboard-json <file>  Read saved leaderboard JSON instead of fetching.',
         '  --save-leaderboard-json <file>  Save the classified leaderboard JSON.',
+        '  --save-leaderboard-history-dir <dir>  Also save a timestamped leaderboard JSON snapshot.',
         '  --no-leaderboard     Skip leaderboard fetch/classification.',
         '  --team <name>        Leaderboard team name or fork owner to compare.',
         '  --base-url <url>     Override public site base URL.',
@@ -59,6 +60,7 @@ function parseArgs(argv) {
         leaderboard: null,
         leaderboardJson: null,
         saveLeaderboardJson: null,
+        saveLeaderboardHistoryDir: null,
         team: null,
         baseUrl: process.env.MOM_BASE_URL || DEFAULT_LEADERBOARD_BASE_URL,
         localDir: DEFAULT_LOCAL_DIR,
@@ -82,6 +84,8 @@ function parseArgs(argv) {
         else if (arg.startsWith('--leaderboard-json=')) options.leaderboardJson = arg.slice('--leaderboard-json='.length);
         else if (arg === '--save-leaderboard-json') options.saveLeaderboardJson = argv[++i] || null;
         else if (arg.startsWith('--save-leaderboard-json=')) options.saveLeaderboardJson = arg.slice('--save-leaderboard-json='.length);
+        else if (arg === '--save-leaderboard-history-dir') options.saveLeaderboardHistoryDir = argv[++i] || null;
+        else if (arg.startsWith('--save-leaderboard-history-dir=')) options.saveLeaderboardHistoryDir = arg.slice('--save-leaderboard-history-dir='.length);
         else if (arg === '--team') {
             options.team = argv[++i] || null;
             options.explicitTeam = true;
@@ -805,6 +809,13 @@ function saveLeaderboardSnapshot(file, data) {
     return relPath(target);
 }
 
+function leaderboardHistoryFile(dir, data) {
+    if (!dir || !data) return null;
+    const raw = data.timestamp || new Date().toISOString();
+    const stamp = String(raw).replace(/[^0-9A-Za-z_-]+/g, '-').replace(/^-+|-+$/g, '') || 'snapshot';
+    return path.join(dir, `${stamp}.json`);
+}
+
 function fmtCount(matched, total) {
     return `${matched}/${total}`;
 }
@@ -906,6 +917,7 @@ function printHuman(payload) {
         console.log(`- reason: ${payload.leaderboard.reason}`);
         if (payload.leaderboard.url) console.log(`- source: ${payload.leaderboard.url}`);
         if (payload.leaderboardSnapshot?.saved) console.log(`- saved snapshot: ${payload.leaderboardSnapshot.saved}`);
+        if (payload.leaderboardSnapshot?.historySaved) console.log(`- saved history snapshot: ${payload.leaderboardSnapshot.historySaved}`);
         if (payload.leaderboardSnapshot?.error) console.log(`- snapshot save failed: ${payload.leaderboardSnapshot.error}`);
         if (payload.leaderboard.team) {
             const team = payload.leaderboard.team;
@@ -1009,9 +1021,15 @@ async function main() {
             : await fetchLeaderboard(options.baseUrl)
         : null;
     let leaderboardSnapshot = null;
-    if (wantLeaderboard && leaderboardData?.available && options.saveLeaderboardJson) {
+    if (wantLeaderboard && leaderboardData?.available && (options.saveLeaderboardJson || options.saveLeaderboardHistoryDir)) {
         try {
-            leaderboardSnapshot = { saved: saveLeaderboardSnapshot(options.saveLeaderboardJson, leaderboardData.data) };
+            leaderboardSnapshot = {};
+            if (options.saveLeaderboardJson) {
+                leaderboardSnapshot.saved = saveLeaderboardSnapshot(options.saveLeaderboardJson, leaderboardData.data);
+            }
+            if (options.saveLeaderboardHistoryDir) {
+                leaderboardSnapshot.historySaved = saveLeaderboardSnapshot(leaderboardHistoryFile(options.saveLeaderboardHistoryDir, leaderboardData.data), leaderboardData.data);
+            }
         } catch (err) {
             leaderboardSnapshot = { error: err.message };
         }
@@ -1038,6 +1056,7 @@ async function main() {
             baseUrl: options.baseUrl,
             leaderboardJson: options.leaderboardJson,
             saveLeaderboardJson: options.saveLeaderboardJson,
+            saveLeaderboardHistoryDir: options.saveLeaderboardHistoryDir,
             localDir: options.localDir,
             liveDir: options.liveDir,
             scoreRef: cleanScoreRef,

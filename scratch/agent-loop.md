@@ -88,6 +88,9 @@ and `feature_map.md`.
     clean `/tmp` checkout. The leaderboard report now names `origin/main`
     rather than Git's `@{u}` shorthand while preserving explicit
     `--score-ref <ref>` for non-upstream comparisons.
+    The aliases also save both `.cache/leaderboard-data.json` and a
+    timestamped `.cache/leaderboard-history/*.json` snapshot so current and
+    historic online rows remain replayable after the live endpoint moves.
   - Harness truth: `scripts/leaderboard-lib.mjs` owns shared leaderboard
     fetch/team/session parsing. `npm run score:leaderboard-failures` now runs
     score-surface probes on the current failed public leaderboard sessions
