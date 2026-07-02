@@ -33,7 +33,7 @@ const DEC_TO_UNICODE = {
 
 function usage() {
     return [
-        'Usage: node scripts/score-surfaces.mjs [--permission] [--leaderboard-failures] [--team <name>] [--full] [--limit N] [file-or-dir...]',
+        'Usage: node scripts/score-surfaces.mjs [--permission] [--leaderboard-failures] [--leaderboard-json <file>] [--team <name>] [--full] [--limit N] [file-or-dir...]',
         '',
         'Replays sessions once and scores the same JS output with multiple screen',
         'comparison surfaces. This catches scoreboard drift caused by scorer or',
@@ -42,6 +42,8 @@ function usage() {
         'with project-root read access, mirroring the judge constraint more closely.',
         '--leaderboard-failures fetches the current leaderboard and prepends its',
         'failed public sessions to the target list.',
+        '--leaderboard-json reads a saved leaderboard snapshot instead of fetching',
+        'live data and implies --leaderboard-failures.',
     ].join('\n');
 }
 
@@ -52,6 +54,7 @@ function parseArgs(argv) {
         limit: 20,
         permission: false,
         leaderboardFailures: false,
+        leaderboardJson: null,
         team: null,
         baseUrl: process.env.MOM_BASE_URL || DEFAULT_LEADERBOARD_BASE_URL,
         sourceLabel: null,
@@ -67,6 +70,10 @@ function parseArgs(argv) {
             out.permission = true;
         } else if (arg === '--leaderboard-failures') {
             out.leaderboardFailures = true;
+        } else if (arg === '--leaderboard-json') {
+            out.leaderboardJson = argv[++i] || null;
+        } else if (arg.startsWith('--leaderboard-json=')) {
+            out.leaderboardJson = arg.slice('--leaderboard-json='.length);
         } else if (arg === '--team') {
             out.team = argv[++i] || null;
         } else if (arg.startsWith('--team=')) {
@@ -86,15 +93,32 @@ function parseArgs(argv) {
         }
     }
     out.baseUrl = out.baseUrl.replace(/\/+$/, '');
+    if (out.leaderboardJson) out.leaderboardFailures = true;
     if (!Number.isFinite(out.limit) || out.limit < 0) throw new Error('--limit must be a non-negative number');
     return out;
+}
+
+function readLeaderboardSnapshot(file) {
+    const path = file.startsWith('/') ? file : join(PROJECT_ROOT, file);
+    try {
+        return {
+            available: true,
+            url: path,
+            data: JSON.parse(readFileSync(path, 'utf8')),
+            snapshot: true,
+        };
+    } catch (err) {
+        throw new Error(`leaderboard snapshot unavailable: ${err.message}`);
+    }
 }
 
 async function expandLeaderboardFailureTargets(options) {
     if (!options.leaderboardFailures) return;
     const teamName = options.team || inferTeamFromGitRemote(PROJECT_ROOT);
     if (!teamName) throw new Error('--leaderboard-failures needs --team <name> or a GitHub origin owner');
-    const leaderboard = await fetchLeaderboard(options.baseUrl);
+    const leaderboard = options.leaderboardJson
+        ? readLeaderboardSnapshot(options.leaderboardJson)
+        : await fetchLeaderboard(options.baseUrl);
     if (!leaderboard.available) {
         throw new Error(`leaderboard unavailable: ${(leaderboard.errors || []).join(' | ')}`);
     }
@@ -103,7 +127,8 @@ async function expandLeaderboardFailureTargets(options) {
     const failures = failedLeaderboardSessionNames(team);
     if (!failures.length) throw new Error(`team ${team.name || teamName} has no failed public leaderboard sessions`);
     options.targets = [...failures, ...options.targets];
-    options.sourceLabel = `leaderboard failures for ${team.name || teamName} (${leaderboard.url}, last scored ${team.lastScored || 'unknown'})`;
+    const snapshotTime = leaderboard.data?.timestamp ? `, snapshot ${leaderboard.data.timestamp}` : '';
+    options.sourceLabel = `leaderboard failures for ${team.name || teamName} (${leaderboard.url}${snapshotTime}, last scored ${team.lastScored || 'unknown'})`;
 }
 
 function resolveSessionFiles(targets) {
@@ -584,6 +609,7 @@ async function main() {
 
     const timeoutMs = Number(process.env.SESSION_REPLAY_TIMEOUT_MS || 45000);
     const results = [];
+    let workerProcessFailed = false;
     for (const file of files) {
         const nodeArgs = options.permission
             ? ['--permission', `--allow-fs-read=${PROJECT_ROOT}`]
@@ -595,6 +621,7 @@ async function main() {
             maxBuffer: 64 * 1024 * 1024,
         });
         if (child.error || (child.status ?? 0) !== 0) {
+            workerProcessFailed = true;
             const err = child.error?.message || child.stderr?.trim() || `exit ${child.status}`;
             results.push({
                 session: basename(file),
@@ -619,6 +646,7 @@ async function main() {
     }
 
     printResults(results, options);
+    if (workerProcessFailed) process.exitCode = 1;
 }
 
 main().catch((err) => {

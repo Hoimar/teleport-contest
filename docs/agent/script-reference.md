@@ -79,8 +79,8 @@ Use these when local public score is exact but the online row keeps moving:
 - `npm run score:browser -- [session]`: replay in headless Chromium; use `--mode official|viewer|both` and `--root <checkout>`.
 - `npm run score:ref -- origin/main`: score a clean code ref from `/tmp`; pair it with `parity:state -- --score-ref origin/main`. Use `--session-ref <ref>` to score that code against another tracked session corpus, and `--runner-ref <ref>` to score it with another tracked frozen scorer.
 - `npm run score:storage-scope -- [session]`: replay through one JS module process while varying storage lifetime.
-- `npm run score:leaderboard-failures`: run score surfaces on the current failed public leaderboard sessions.
-- `npm run score:surfaces -- [session]`: score one Node replay through visual, strict, legacy, raw, and variant-normalization comparators. Add `--permission` or `--leaderboard-failures`.
+- `npm run score:leaderboard-failures`: run score surfaces on the current failed public leaderboard sessions; add `-- --leaderboard-json <file>` for a saved or historic leaderboard snapshot.
+- `npm run score:surfaces -- [session]`: score one Node replay through visual, strict, legacy, raw, and variant-normalization comparators. Add `--permission` or `--leaderboard-failures`; worker process failures exit non-zero.
 
 ## Library Boundary
 
