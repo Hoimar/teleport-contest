@@ -11,8 +11,8 @@ commands work the same way.
 | Screen diff | `npm run screen:diff -- <session> --first` | `node scripts/screen-diff.mjs <session> --first` |
 | Verify | `npm run verify -- --target <session>` | `node scripts/verify-change.mjs --target <session>` |
 | Strict sentinel | `npm run sentinel:strict` | `node scripts/run-sentinel-suite.mjs --strict` |
-| Scoreboard state | `npm run scoreboard:state` | `node scripts/parity-state.mjs --refresh-live --full` |
-| Scoreboard JSON | `npm run scoreboard:json` | `node scripts/parity-state.mjs --refresh-live --full --json` |
+| Scoreboard state | `npm run scoreboard:state` | `node scripts/parity-state.mjs --refresh-live --score-ref @{u} --full` |
+| Scoreboard JSON | `npm run scoreboard:json` | `node scripts/parity-state.mjs --refresh-live --score-ref @{u} --full --json` |
 | Score surfaces | `npm run score:surfaces -- [session]` | `node scripts/score-surfaces.mjs [session]` |
 | Browser score | `npm run score:browser -- [session]` | `node scripts/browser-score.mjs [session]` |
 | Play asset state | `npm run score:play-assets` | `node scripts/play-assets-state.mjs` |
@@ -45,7 +45,9 @@ It also summarizes the recent leaderboard history window; repeated comparable
 scores that do not match the local score are reported as persistent scorer drift
 instead of plain timestamp lag.
 Use `--team <name>` when the fork owner is not the leaderboard name, `--full`
-for non-exact rows, and `--json` for automation.
+for non-exact rows, and `--json` for automation. The `scoreboard:*` aliases
+also pass `--score-ref @{u}` so each online refresh compares the leaderboard
+with the clean upstream ref that the public scorer can actually see.
 Delta sections are always `left minus right`; for example
 `S +4/+8` means four more matched screens over eight more total screens in the
 left corpus. Per-session rows distinguish `session-file-drift`,
@@ -84,6 +86,5 @@ Use these when local public score is exact but the online row keeps moving:
 ## Library Boundary
 
 `scripts/triage-lib.mjs` is not a human entry point. It owns session resolution,
-screen comparison, cursor-adjusted score totals, RNG extraction, sentinel
-defaults, and frozen-file warnings for the user-facing scripts. Prefer changing
-its callers first unless multiple entry points need the same behavior.
+screen/RNG scoring, sentinel defaults, and frozen-file warnings. Prefer changing
+callers first unless multiple entry points need the same behavior.
