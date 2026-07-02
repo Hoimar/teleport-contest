@@ -68,6 +68,12 @@ and `feature_map.md`.
     assets into a temporary checkout and scores them; current Hoimar assets
     score `43/44`, failing only `seed2200`, so stale play assets do not explain
     the official `29/44` row.
+  - Harness truth: `scripts/browser-score.mjs` defaults to the official browser
+    path and isolates multi-session runs because shared-page module state caused
+    false browser-only RNG drift in long sessions; use `--shared-page` only to
+    probe leakage.
+    It also accepts `--leaderboard-failures`/`--leaderboard-json <file>` so
+    browser probes can reuse the current failed leaderboard session set.
   - Harness truth: `scripts/score-surfaces.mjs` now has visual-normalization
     variants and a Node permission-sandbox mode. All visual variants remain
     exact on the 15 online-failed public seeds, so missing time/version

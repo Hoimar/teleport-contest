@@ -6,6 +6,15 @@ import { basename, extname, isAbsolute, join, normalize, relative, resolve, sep 
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
+import {
+    DEFAULT_LEADERBOARD_BASE_URL,
+    failedLeaderboardSessionNames,
+    fetchLeaderboard,
+    findLeaderboardTeam,
+    inferTeamFromGitRemote,
+    readLeaderboardSnapshot,
+} from './leaderboard-lib.mjs';
+
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 let PROJECT_ROOT = resolve(process.env.BROWSER_SCORE_ROOT || new URL('..', import.meta.url).pathname);
 
@@ -32,23 +41,31 @@ export default { env, argv, platform, version, versions, stdout, stderr, cwd, ne
 
 function usage() {
     return [
-        'Usage: node scripts/browser-score.mjs [--mode official|viewer|both] [--browser PATH] [file-or-dir...]',
+        'Usage: node scripts/browser-score.mjs [--mode official|viewer|both] [--leaderboard-failures] [--leaderboard-json <file>] [--shared-page] [--browser PATH] [file-or-dir...]',
         '',
         'Runs public sessions inside headless Chromium against browser-loaded ESM',
         'modules. This probes scorer drift that Node frozen scoring cannot see.',
+        'Default mode is official. Multi-session runs isolate each session unless',
+        '--shared-page is set.',
     ].join('\n');
 }
 
 function parseArgs(argv) {
     const out = {
         targets: [],
-        mode: 'both',
+        mode: 'official',
         browser: process.env.CHROMIUM || process.env.BROWSER || null,
         timeoutMs: Number(process.env.BROWSER_SCORE_TIMEOUT_MS || 180000),
         full: false,
         limit: 20,
         dumpRunner: false,
         root: null,
+        sharedPage: false,
+        leaderboardFailures: false,
+        leaderboardJson: null,
+        team: null,
+        baseUrl: process.env.MOM_BASE_URL || DEFAULT_LEADERBOARD_BASE_URL,
+        sourceLabel: null,
     };
     for (let i = 0; i < argv.length; i++) {
         const arg = argv[i];
@@ -75,6 +92,22 @@ function parseArgs(argv) {
             out.full = true;
         } else if (arg === '--dump-runner') {
             out.dumpRunner = true;
+        } else if (arg === '--shared-page') {
+            out.sharedPage = true;
+        } else if (arg === '--leaderboard-failures') {
+            out.leaderboardFailures = true;
+        } else if (arg === '--leaderboard-json') {
+            out.leaderboardJson = argv[++i] || null;
+        } else if (arg.startsWith('--leaderboard-json=')) {
+            out.leaderboardJson = arg.slice('--leaderboard-json='.length);
+        } else if (arg === '--team') {
+            out.team = argv[++i] || null;
+        } else if (arg.startsWith('--team=')) {
+            out.team = arg.slice('--team='.length);
+        } else if (arg === '--base-url') {
+            out.baseUrl = argv[++i] || out.baseUrl;
+        } else if (arg.startsWith('--base-url=')) {
+            out.baseUrl = arg.slice('--base-url='.length);
         } else if (arg === '--limit') {
             out.limit = Number(argv[++i]);
         } else if (arg.startsWith('--limit=')) {
@@ -96,10 +129,30 @@ function parseArgs(argv) {
         throw new Error('--limit must be a non-negative number');
     }
     if (out.root) PROJECT_ROOT = out.root;
-    if (out.targets.length === 0) out.targets.push(sessionsDir());
+    out.baseUrl = out.baseUrl.replace(/\/+$/, '');
+    if (out.leaderboardJson) out.leaderboardFailures = true;
     out.browser ||= findBrowser();
     if (!out.browser) throw new Error('Chromium not found; pass --browser /path/to/chromium');
     return out;
+}
+
+async function expandLeaderboardFailureTargets(options) {
+    if (!options.leaderboardFailures) return;
+    const teamName = options.team || inferTeamFromGitRemote(PROJECT_ROOT);
+    if (!teamName) throw new Error('--leaderboard-failures needs --team <name> or a GitHub origin owner');
+    const leaderboard = options.leaderboardJson
+        ? readLeaderboardSnapshot(options.leaderboardJson, PROJECT_ROOT)
+        : await fetchLeaderboard(options.baseUrl);
+    if (!leaderboard.available) {
+        throw new Error(`leaderboard unavailable: ${(leaderboard.errors || []).join(' | ')}`);
+    }
+    const team = findLeaderboardTeam(leaderboard.data, teamName);
+    if (!team) throw new Error(`team ${teamName} not found in ${leaderboard.url}`);
+    const failures = failedLeaderboardSessionNames(team);
+    if (!failures.length) throw new Error(`team ${team.name || teamName} has no failed public leaderboard sessions`);
+    options.targets = [...failures, ...options.targets];
+    const snapshotTime = leaderboard.data?.timestamp ? `, snapshot ${leaderboard.data.timestamp}` : '';
+    options.sourceLabel = `leaderboard failures for ${team.name || teamName} (${leaderboard.url}${snapshotTime}, last scored ${team.lastScored || 'unknown'})`;
 }
 
 function findBrowser() {
@@ -593,6 +646,62 @@ function fmtCount(value, total) {
     return `${value}/${total}`;
 }
 
+function summarizeHost(results) {
+    return results.reduce((acc, result) => {
+        acc.sessions++;
+        if (result.passed) acc.passing++;
+        acc.screenMatched += result.metrics.screens.matched;
+        acc.screenTotal += result.metrics.screens.total;
+        acc.cellMatched += result.metrics.cellsOnly.matched;
+        acc.cursorMatched += result.metrics.cursors.matched;
+        acc.rngMatched += result.metrics.rngCalls.matched;
+        acc.rngTotal += result.metrics.rngCalls.total;
+        return acc;
+    }, {
+        sessions: 0,
+        passing: 0,
+        screenMatched: 0,
+        screenTotal: 0,
+        cellMatched: 0,
+        cursorMatched: 0,
+        rngMatched: 0,
+        rngTotal: 0,
+    });
+}
+
+function mergeBrowserPayloads(payloads) {
+    const failed = payloads.find(payload => payload?.error);
+    if (failed) return failed;
+    const modeNames = new Set();
+    for (const payload of payloads) {
+        for (const mode of Object.keys(payload.modes || {})) modeNames.add(mode);
+    }
+    const modes = {};
+    for (const mode of modeNames) {
+        const results = [];
+        for (const payload of payloads) {
+            results.push(...(payload.modes?.[mode]?.results || []));
+        }
+        modes[mode] = {
+            summary: summarizeHost(results),
+            results,
+        };
+    }
+    return {
+        userAgent: payloads.find(payload => payload?.userAgent)?.userAgent || 'unknown browser',
+        isolatedSessions: true,
+        modes,
+    };
+}
+
+async function runBrowserIsolated(options, sessions) {
+    const payloads = [];
+    for (const session of sessions) {
+        payloads.push(await runBrowser(options, [session]));
+    }
+    return mergeBrowserPayloads(payloads);
+}
+
 function printPayload(payload, options) {
     if (payload.error) {
         console.log(`Browser score failed: ${payload.error}`);
@@ -604,7 +713,7 @@ function printPayload(payload, options) {
         }
         return;
     }
-    console.log(`Browser score: ${payload.userAgent || 'unknown browser'}`);
+    console.log(`Browser score: ${payload.userAgent || 'unknown browser'}${options.sourceLabel ? ` from ${options.sourceLabel}` : ''}`);
     for (const [mode, data] of Object.entries(payload.modes || {})) {
         const s = data.summary;
         console.log(`- ${mode}: ${s.passing}/${s.sessions} passing ` +
@@ -720,9 +829,13 @@ async function main() {
         console.log(runnerModule());
         return;
     }
+    await expandLeaderboardFailureTargets(options);
+    if (options.targets.length === 0) options.targets.push(sessionsDir());
     const sessions = resolveSessionFiles(options.targets);
     if (!sessions.length) throw new Error('no session files found');
-    const payload = await runBrowser(options, sessions);
+    const payload = options.sharedPage || sessions.length <= 1
+        ? await runBrowser(options, sessions)
+        : await runBrowserIsolated(options, sessions);
     printPayload(payload, options);
     if (payload.error) process.exit(1);
 }
