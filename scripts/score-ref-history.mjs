@@ -19,7 +19,7 @@ const PROJECT_ROOT = path.resolve(path.dirname(SCRIPT_PATH), '..');
 
 function usage() {
     return [
-        'Usage: node scripts/score-ref-history.mjs [--leaderboard-json <file>] [--team <name>] [--limit N] [--from <ref>] [--full] [--json] [--no-progress]',
+        'Usage: node scripts/score-ref-history.mjs [--leaderboard-json <file>] [--team <name>] [--limit N] [--from <ref>] [--per-ref-timeout-ms N] [--max-runtime-ms N] [--full] [--json] [--no-progress]',
         '',
         'Scores recent clean git refs against the current failed public',
         'leaderboard sessions. Use this to test whether a persistent online row',
@@ -38,6 +38,8 @@ function parseArgs(argv) {
         full: false,
         json: false,
         progress: true,
+        perRefTimeoutMs: 0,
+        maxRuntimeMs: 0,
     };
     for (let i = 0; i < argv.length; i++) {
         const arg = argv[i];
@@ -66,6 +68,14 @@ function parseArgs(argv) {
             out.json = true;
         } else if (arg === '--no-progress') {
             out.progress = false;
+        } else if (arg === '--per-ref-timeout-ms') {
+            out.perRefTimeoutMs = Number(argv[++i] || 0);
+        } else if (arg.startsWith('--per-ref-timeout-ms=')) {
+            out.perRefTimeoutMs = Number(arg.slice('--per-ref-timeout-ms='.length));
+        } else if (arg === '--max-runtime-ms') {
+            out.maxRuntimeMs = Number(argv[++i] || 0);
+        } else if (arg.startsWith('--max-runtime-ms=')) {
+            out.maxRuntimeMs = Number(arg.slice('--max-runtime-ms='.length));
         } else {
             throw new Error(`unknown argument ${arg}`);
         }
@@ -73,6 +83,10 @@ function parseArgs(argv) {
     if (!out.leaderboardJson) throw new Error('--leaderboard-json is required when no cached snapshot exists');
     if (!Number.isFinite(out.limit) || out.limit < 1) out.limit = 12;
     out.limit = Math.min(Math.trunc(out.limit), 200);
+    if (!Number.isFinite(out.perRefTimeoutMs) || out.perRefTimeoutMs < 0) out.perRefTimeoutMs = 0;
+    if (!Number.isFinite(out.maxRuntimeMs) || out.maxRuntimeMs < 0) out.maxRuntimeMs = 0;
+    out.perRefTimeoutMs = Math.trunc(out.perRefTimeoutMs);
+    out.maxRuntimeMs = Math.trunc(out.maxRuntimeMs);
     return out;
 }
 
@@ -215,6 +229,10 @@ function fmtDelta(delta) {
         `R ${sign(delta.rngMatched)}/${sign(delta.rngTotal)} C ${sign(delta.cursorOnly)}`;
 }
 
+function fmtElapsed(ms) {
+    return `${(ms / 1000).toFixed(1)}s`;
+}
+
 function loadLeaderboard(options) {
     const leaderboard = readLeaderboardSnapshot(options.leaderboardJson, PROJECT_ROOT);
     const teamName = options.team || inferTeamFromGitRemote(PROJECT_ROOT);
@@ -241,11 +259,22 @@ function scoreHistory(options) {
         targetDir = copyFailureSessions(leaderboard.rows);
         const commits = recentCommits(options);
         const results = [];
+        const started = Date.now();
+        let truncatedReason = null;
         for (let i = 0; i < commits.length; i++) {
+            const elapsedBefore = Date.now() - started;
+            if (options.maxRuntimeMs && elapsedBefore >= options.maxRuntimeMs) {
+                truncatedReason = `max runtime ${options.maxRuntimeMs}ms reached before ${commits[i].short}`;
+                break;
+            }
             const commit = commits[i];
-            const report = scoreRef(commit.commit, { target: targetDir });
+            const report = scoreRef(commit.commit, {
+                target: targetDir,
+                timeoutMs: options.perRefTimeoutMs,
+            });
             const summary = report.available ? normalizeSummary(report.summary) : null;
             const delta = report.available ? summaryDelta(summary, leaderboard.summary) : null;
+            const elapsedMs = Date.now() - started;
             const result = {
                 commit,
                 available: report.available,
@@ -254,12 +283,17 @@ function scoreHistory(options) {
                 delta,
                 distance: delta ? distance(delta) : Number.POSITIVE_INFINITY,
                 sameSummary: delta ? sameSummary(summary, leaderboard.summary) : false,
+                elapsedMs,
             };
             results.push(result);
             if (options.progress && !options.json) {
                 const status = result.sameSummary ? 'MATCH' : `d=${result.distance}`;
                 const summaryText = result.available ? fmtSummary(result.summary) : `unavailable: ${result.error}`;
-                console.error(`[${i + 1}/${commits.length}] ${commit.short} ${status} ${summaryText}`);
+                console.error(`[${i + 1}/${commits.length}] ${commit.short} ${status} ${summaryText} elapsed=${fmtElapsed(elapsedMs)}`);
+            }
+            if (options.maxRuntimeMs && elapsedMs >= options.maxRuntimeMs && i + 1 < commits.length) {
+                truncatedReason = `max runtime ${options.maxRuntimeMs}ms reached after ${commit.short}`;
+                break;
             }
         }
         results.sort((a, b) => a.distance - b.distance || a.commit.time.localeCompare(b.commit.time));
@@ -267,7 +301,14 @@ function scoreHistory(options) {
             generatedAt: new Date().toISOString(),
             leaderboard,
             from: options.from,
-            limit: options.limit,
+            requestedLimit: options.limit,
+            limit: commits.length,
+            scanned: results.length,
+            elapsedMs: Date.now() - started,
+            perRefTimeoutMs: options.perRefTimeoutMs,
+            maxRuntimeMs: options.maxRuntimeMs,
+            truncated: Boolean(truncatedReason),
+            truncatedReason,
             results,
         };
     } finally {
@@ -282,7 +323,11 @@ function printHuman(payload, options) {
     console.log(`- team: ${board.team} (${board.fork || 'unknown fork'}), last scored ${board.lastScored || 'unknown'}`);
     console.log(`- target: ${board.rows.length} failed leaderboard session(s)`);
     console.log(`- leaderboard reference: ${fmtSummary(board.summary)}`);
-    console.log(`- scanned: ${payload.results.length} commit(s) from ${payload.from}`);
+    const scanCount = payload.truncated ? `${payload.scanned}/${payload.limit}` : String(payload.results.length);
+    console.log(`- scanned: ${scanCount} commit(s) from ${payload.from} in ${fmtElapsed(payload.elapsedMs || 0)}`);
+    if (payload.perRefTimeoutMs) console.log(`- per-ref timeout: ${payload.perRefTimeoutMs}ms`);
+    if (payload.maxRuntimeMs) console.log(`- max runtime: ${payload.maxRuntimeMs}ms`);
+    if (payload.truncated) console.log(`- truncated: ${payload.truncatedReason}`);
     const matches = payload.results.filter((row) => row.sameSummary);
     console.log(`- exact summary matches: ${matches.length}`);
     const rows = options.full ? payload.results : payload.results.slice(0, 12);

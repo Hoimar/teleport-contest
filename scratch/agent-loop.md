@@ -16,7 +16,7 @@ and `feature_map.md`.
   live ahead/behind state.
 - Latest verified repair units: runtime shapechange side effects, checked-in
   help pager data, scorer-drift diagnostics, deterministic inventory sort
-  ordering, scoreboard clean-ref/Actions aliases/ref-history fingerprinting, and
+  ordering, scoreboard clean-ref/Actions aliases, bounded ref-history, and
   credential-gated Actions artifact score parsing.
 - Checked-in public corpus is exact: `44/44 S 11405/11405 R 792838/792838 C 0`.
 - Last refreshed hosted public cache is exact:
@@ -62,9 +62,9 @@ and `feature_map.md`.
     surfaces.
   - Harness truth: `scripts/score-ref.mjs` can score clean code refs with
     frozen overlay, alternate session refs, and alternate runner refs.
-  - Harness truth: `scripts/score-ref-history.mjs` scans recent clean refs
-    against the saved failed leaderboard subset and ranks them by distance from
-    the online row. The 2026-07-04 row did not match any of 46 recent refs.
+  - Harness truth: `scripts/score-ref-history.mjs` ranks recent clean refs
+    against the saved failed leaderboard subset. It now reports elapsed time and
+    supports bounded large scans with per-ref and overall runtime limits.
   - Harness truth: `scripts/play-assets-state.mjs --score` fetches `/play`
     assets into a temporary checkout and scores them. Current Hoimar assets are
     fully synchronized and score `44/44`, so stale play assets no longer explain
@@ -117,9 +117,9 @@ and `feature_map.md`.
   - Production determinism: inventory-letter range helpers now call the same
     explicit ASCII comparator as broader inventory and loot ordering.
   - External scorer evidence: latest successful public GitHub Actions Score run is
-    `#120` for pushed `051522d`, success, with non-expired `score-results`
+    `#122` for pushed `755e270`, success, with non-expired `score-results`
     metadata; the current leaderboard row predates that run and remains `29/44`.
-    The workflow's direct score path scores local `051522d` at `44/44`, so use
+    The workflow's direct score path scores local `755e270` at `44/44`, so use
     `score:actions:artifact` with `GITHUB_TOKEN`/`GH_TOKEN` to parse uploaded
     `score-summary.json`; anonymous artifact download currently returns HTTP 401.
   - Verification: checked-in public corpus exact

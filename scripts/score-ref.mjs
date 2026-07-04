@@ -12,7 +12,7 @@ const MAX_BUFFER = 512 * 1024 * 1024;
 
 function usage() {
     console.log([
-        'Usage: node scripts/score-ref.mjs [--json] [--full] [--keep] [--target <path>] [--session-ref <ref>] [--runner-ref <ref>] [ref]',
+        'Usage: node scripts/score-ref.mjs [--json] [--full] [--keep] [--timeout-ms N] [--target <path>] [--session-ref <ref>] [--runner-ref <ref>] [ref]',
         '',
         'Scores a clean code ref by unpacking it to /tmp, optionally overlaying',
         'the target session path and/or frozen scorer from another git ref,',
@@ -30,6 +30,7 @@ function parseArgs(argv) {
         keep: false,
         sessionRef: null,
         runnerRef: null,
+        timeoutMs: 0,
     };
     for (let i = 0; i < argv.length; i++) {
         const arg = argv[i];
@@ -54,6 +55,10 @@ function parseArgs(argv) {
             options.runnerRef = argv[++i] || null;
         } else if (arg.startsWith('--runner-ref=')) {
             options.runnerRef = arg.slice('--runner-ref='.length);
+        } else if (arg === '--timeout-ms') {
+            options.timeoutMs = Number(argv[++i] || 0);
+        } else if (arg.startsWith('--timeout-ms=')) {
+            options.timeoutMs = Number(arg.slice('--timeout-ms='.length));
         } else if (!options.ref) {
             options.ref = arg;
         } else {
@@ -61,6 +66,8 @@ function parseArgs(argv) {
         }
     }
     options.ref ||= '@{u}';
+    if (!Number.isFinite(options.timeoutMs) || options.timeoutMs < 0) options.timeoutMs = 0;
+    options.timeoutMs = Math.trunc(options.timeoutMs);
     return options;
 }
 
@@ -201,6 +208,9 @@ function summarizeLine(summary) {
 export function scoreRef(ref, options = {}) {
     let dir = null;
     try {
+        const timeoutMs = Number.isFinite(Number(options.timeoutMs)) && Number(options.timeoutMs) > 0
+            ? Math.trunc(Number(options.timeoutMs))
+            : 0;
         const commitFull = gitOutput(['rev-parse', ref]);
         const commit = gitOutput(['rev-parse', '--short', ref]);
         const commitTime = gitOutput(['log', '-1', '--format=%cI', ref]);
@@ -221,7 +231,11 @@ export function scoreRef(ref, options = {}) {
             cwd: dir,
             encoding: 'utf8',
             maxBuffer: MAX_BUFFER,
+            ...(timeoutMs ? { timeout: timeoutMs } : {}),
         });
+        if (timeoutMs && (run.error?.code === 'ETIMEDOUT' || run.signal === 'SIGTERM')) {
+            throw new Error(`ref scorer timed out after ${timeoutMs}ms`);
+        }
         if (run.error || run.status !== 0) {
             throw new Error(run.error?.message || run.stderr || run.stdout || 'ref scorer failed');
         }
@@ -243,6 +257,7 @@ export function scoreRef(ref, options = {}) {
             runnerCommit,
             runnerCommitFull,
             runnerCommitTime,
+            timeoutMs,
             target,
             dir: options.keep ? dir : null,
             summary,
@@ -257,6 +272,7 @@ export function scoreRef(ref, options = {}) {
             target: options.target || 'sessions',
             sessionRef: options.sessionRef || ref,
             runnerRef: options.runnerRef || ref,
+            timeoutMs: options.timeoutMs || 0,
             error: err instanceof Error ? err.message : String(err),
         };
     } finally {
