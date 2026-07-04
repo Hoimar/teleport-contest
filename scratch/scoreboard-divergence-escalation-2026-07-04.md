@@ -5,9 +5,11 @@
 The public leaderboard still reports Hoimar at `30/44 S 11348/11405
 R 792838/792838`, last scored `2026-07-04T16:33:38.346Z`.
 
-The current local checkout is `4d04ea0` and is harness-only ahead of
-`origin/main` by three commits. The pushed clean ref `origin/main` is
-`dfea935`.
+The current local checkout is `6ff6c1d` and is harness-only ahead of
+`origin/main` by five commits. The pushed clean ref `origin/main` is `dfea935`.
+The latest live refresh was generated at `2026-07-04T18:02:53.120Z`; it
+preserved the same public row and saved
+`.cache/leaderboard-history/2026-07-04T16-57-09-987Z.json`.
 
 Current verified local surfaces:
 
@@ -50,7 +52,7 @@ These commands were run against the current saved row unless noted otherwise:
 
 ```bash
 npm run score:leaderboard-failures -- --leaderboard-json .cache/leaderboard-data.json --full
-npm run score:false-positive-audit -- --leaderboard-json .cache/leaderboard-data.json --limit=3
+npm run score:false-positive-audit -- --leaderboard-json .cache/leaderboard-data.json --full
 npm run score:browser -- --leaderboard-json .cache/leaderboard-data.json --mode both --full --timeout-ms 240000
 npm run score:browser -- --leaderboard-json .cache/leaderboard-data.json --mode official --shared-page --full --timeout-ms 240000
 npm run score:play-assets -- --score --leaderboard-json .cache/leaderboard-data.json
@@ -71,7 +73,9 @@ Observed results:
 - current visual scorer surfaces pass the 14 online-failed sessions exactly;
 - Node permission-sandbox and `LC_ALL=C LANG=C TZ=UTC` also pass visually;
 - false-positive comparator variants miss either `0`, `5754`, or `7992`
-  screens, never the online `57`;
+  screens, never the online `57`; the approved current rerun reported `8145`
+  locally accepted non-exact terminal/string frames across the 14 online-failed
+  sessions while local visual stayed `8437/8437`;
 - official browser path passes `14/14`;
 - viewer browser path fails only `seed4500` with RNG/cursor drift;
 - one-process storage/shared-page probes fail only `seed0360` and `seed4500`
