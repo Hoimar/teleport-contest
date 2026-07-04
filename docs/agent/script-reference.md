@@ -81,7 +81,7 @@ combined` means cell-grid misses rather than cursor-only misses.
 Use these when local public score is exact but the online row keeps moving:
 
 - `npm run score:play-assets`: compare checked-in `js/*.js` with public `/play/<team>/js/` assets, including nearest matching commits. Add `-- --score --leaderboard-json <file>` to score the fetched play asset bundle and compare it with a saved online row.
-- `npm run score:actions`: inspect recent GitHub Actions Score workflow runs and score-results artifact metadata; use `score:actions:artifact` with `GITHUB_TOKEN`/`GH_TOKEN` to compare artifact totals with the saved leaderboard row.
+- `npm run score:actions`: inspect recent GitHub Actions Score workflow runs and score-results artifact metadata; use `score:actions:artifact` with `GITHUB_TOKEN`/`GH_TOKEN` or `gh auth login` to compare artifact totals with the saved leaderboard row.
 - `npm run score:browser -- [session]`: replay the official browser path; add `--leaderboard-failures`, `--leaderboard-json <file>`, `--mode viewer|both`, or `--shared-page`.
 - `npm run score:ref -- origin/main`: score a clean code ref from `/tmp`; pair it with `parity:state -- --score-ref origin/main`. Use `--session-ref <ref>` to score that code against another tracked session corpus, and `--runner-ref <ref>` to score it with another tracked frozen scorer.
 - `npm run score:ref-history`: scan recent clean refs against failed leaderboard sessions. Add `-- --limit N --full`, `--per-ref-timeout-ms N`, or `--max-runtime-ms N` for wider but bounded stale-ref searches.

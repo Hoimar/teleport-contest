@@ -117,11 +117,9 @@ and `feature_map.md`.
   - Production determinism: inventory-letter range helpers now call the same
     explicit ASCII comparator as broader inventory and loot ordering.
   - External scorer evidence: latest successful public GitHub Actions Score run is
-    `#122` for pushed `755e270`, success, with non-expired `score-results`
-    metadata; the current leaderboard row predates that run and remains `29/44`.
-    The workflow's direct score path scores local `755e270` at `44/44`, so use
-    `score:actions:artifact` with `GITHUB_TOKEN`/`GH_TOKEN` to parse uploaded
-    `score-summary.json`; anonymous artifact download currently returns HTTP 401.
+    `#124` for pushed `84bfe03`, success, and `score:actions:artifact` parses
+    the uploaded `score-summary.json` as `44/44 S 11405/11405`; the current
+    leaderboard row predates that run and remains `29/44`.
   - Verification: checked-in public corpus exact
     `44/44 S 11405/11405 R 792838/792838 C 0`; strict sentinel exact
     `5/5 S 1063/1063 R 64569/64569 C 0`; focused verification stayed exact for

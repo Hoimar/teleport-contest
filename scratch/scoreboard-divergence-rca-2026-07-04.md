@@ -138,6 +138,7 @@ leaderboard misses.
 Commands:
 
 ```bash
+npm run score:actions:artifact
 gh run download 28709753266 -R Hoimar/teleport-contest -n score-results -D /tmp/tc-score-artifact-529ca23
 gh run download 28603773306 -R Hoimar/teleport-contest -n score-results -D /tmp/tc-score-artifact-3540d42
 ```

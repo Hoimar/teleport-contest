@@ -16,6 +16,7 @@ const PROJECT_ROOT = new URL('..', import.meta.url).pathname.replace(/\/$/, '');
 export const DEFAULT_ACTIONS_WORKFLOW = 'score.yml';
 export const DEFAULT_ACTIONS_BRANCH = 'main';
 export const DEFAULT_ACTIONS_RUN_LIMIT = 10;
+let cachedGhToken = undefined;
 
 function usage() {
     return [
@@ -24,6 +25,7 @@ function usage() {
         'Reports recent GitHub Actions Score workflow runs and score-results',
         'artifact metadata for the latest successful run. With --artifact-score,',
         'downloads score-results and compares score-summary.json with the leaderboard row.',
+        'Artifact download uses GITHUB_TOKEN, GH_TOKEN, or an authenticated gh CLI session.',
         'Pair this with scoreboard:state when the public',
         'leaderboard differs from local scorer surfaces.',
     ].join('\n');
@@ -124,13 +126,31 @@ function localRefs() {
     };
 }
 
+function ghAuthToken() {
+    if (cachedGhToken !== undefined) return cachedGhToken;
+    try {
+        cachedGhToken = execFileSync('gh', ['auth', 'token'], {
+            encoding: 'utf8',
+            stdio: ['ignore', 'pipe', 'ignore'],
+            timeout: 5000,
+        }).trim() || null;
+    } catch (_) {
+        cachedGhToken = null;
+    }
+    return cachedGhToken;
+}
+
+function githubToken() {
+    return process.env.GITHUB_TOKEN || process.env.GH_TOKEN || ghAuthToken();
+}
+
 function apiHeaders() {
     const headers = {
         Accept: 'application/vnd.github+json',
         'X-GitHub-Api-Version': '2022-11-28',
         'User-Agent': 'teleport-contest-score-actions-probe',
     };
-    const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
+    const token = githubToken();
     if (token) headers.Authorization = `Bearer ${token}`;
     return headers;
 }
@@ -275,9 +295,9 @@ async function fetchArtifactScore(artifact) {
         const zip = await fetchBuffer(artifact.downloadUrl);
         return scoreFromSummaryJson(zipEntryText(zip, 'score-summary.json'));
     } catch (err) {
-        const authHint = process.env.GITHUB_TOKEN || process.env.GH_TOKEN
+        const authHint = githubToken()
             ? ''
-            : ' Set GITHUB_TOKEN or GH_TOKEN to download private GitHub Actions artifact zips.';
+            : ' Set GITHUB_TOKEN/GH_TOKEN or run gh auth login to download private GitHub Actions artifact zips.';
         return { available: false, error: `${err.message}${authHint}` };
     }
 }
