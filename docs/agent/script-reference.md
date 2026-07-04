@@ -59,7 +59,7 @@ Important classifications:
 - `same`: checked-in and hosted public sessions agree.
 - `public-session-drift`: hosted public sessions changed or the cache was stale.
 - `local-dirty-or-unpushed`: local commits or WIP cannot match the leaderboard run.
-- `leaderboard-lag`: leaderboard scoring predates local HEAD.
+- `leaderboard-lag`: leaderboard scoring predates local HEAD; `leaderboard-lag-after-persistent-drift` means this is layered over recent persistent misses.
 - `persistent-scorer-drift`: recent comparable leaderboard history repeatedly differs from local or clean-ref score, and current push/Actions timing does not explain the row.
 - `scorer-drift`: same public corpus, different local vs leaderboard public score.
 - `heldout-only-gap`: public score agrees, hidden held-out score differs.

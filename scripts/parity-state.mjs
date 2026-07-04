@@ -825,10 +825,17 @@ function classifyLeaderboard({ leaderboard, teamName, localCorpus, liveCorpus, c
     const persistentHistory = !publicEqual && history.persistentMismatch;
     const motion = scoreboardMotion({ git, team, publicEqual, persistentHistory });
     if (!publicEqual && actions?.leaderboardPredatesLatestRun) {
-        const nextAction = 'Leaderboard predates the latest successful GitHub Score run for the current upstream HEAD. Wait for or trigger the online scorer after that run, then refresh scoreboard:state.';
+        const lagAfterPersistentDrift = persistentHistory && cleanRef?.shapeMatches && !cleanRef.publicEqual;
+        const nextAction = lagAfterPersistentDrift
+            ? 'Leaderboard predates the latest successful GitHub Score run, but recent comparable history was already persistently below local. Refresh after the online scorer catches up; if it still misses, run score:leaderboard-failures, score:actions, and score:ref-history.'
+            : 'Leaderboard predates the latest successful GitHub Score run for the current upstream HEAD. Wait for or trigger the online scorer after that run, then refresh scoreboard:state.';
+        const cls = lagAfterPersistentDrift ? 'leaderboard-lag-after-persistent-drift' : 'leaderboard-lag';
+        const reason = lagAfterPersistentDrift
+            ? `latest successful GitHub Score run #${actions.compared.number} for ${actions.compared.headShaShort} completed after leaderboard lastScored, but recent comparable history has ${history.matchingTarget}/${history.comparable} score(s) matching local ${scoreCorpus.label}; the row is lagging a push after an unresolved scorer delta`
+            : `latest successful GitHub Score run #${actions.compared.number} for ${actions.compared.headShaShort} completed after leaderboard lastScored; the online row has not caught up to the current pushed ref`;
         return withCleanRef({
-            class: 'leaderboard-lag',
-            reason: reasonWithCaveats(`latest successful GitHub Score run #${actions.compared.number} for ${actions.compared.headShaShort} completed after leaderboard lastScored; the online row has not caught up to the current pushed ref`, caveats),
+            class: cls,
+            reason: reasonWithCaveats(reason, caveats),
             url: leaderboard.url,
             team: compactLeaderboardTeam(team),
             publicSummary,

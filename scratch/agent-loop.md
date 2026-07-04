@@ -24,12 +24,12 @@ and `feature_map.md`.
   checked-in sessions, but both score surfaces are exact.
 - Leaderboard fetch succeeds from `https://mazesofmenace.ai/leaderboard/data.json`.
   Default inferred team `Hoimar` currently classifies as
-  `persistent-scorer-drift`: leaderboard public
+  `leaderboard-lag-after-persistent-drift`: leaderboard public
   `29/44 S 11346/11405 R 792838/792838`, scored at
   `2026-07-04T07:13:46.843Z`.
 - Clean-ref evidence scores `origin/main`/`HEAD` at
-  `44/44 S 11405/11405 R 792838/792838`, and the leaderboard row was scored
-  after both `origin/main` and GitHub Score Actions `#118` for `3540d42`.
+  `44/44 S 11405/11405 R 792838/792838`; the leaderboard row predates latest
+  Actions but recent history was already persistently below local.
 - Online failure signature is screen-only: 15 failed public sessions, 59
   missed screens, full RNG and RNG-step match for all 15; cell-only metrics
   equal the combined screen score on all 15, so the online misses are cell-grid
@@ -131,7 +131,7 @@ and `feature_map.md`.
   - Regression classification: none on checked-in public, hosted public,
     focused targets, strict sentinels, and the visual scorer surface for the
     current failed leaderboard set. The current official leaderboard row is
-    persistent scorer drift rather than local parity drift.
+    lag layered over persistent scorer drift rather than local parity drift.
   - Global next-step check: active public queue is empty. Continue scorer-surface
     reduction from fresh evidence, especially deployment/environment probes,
     rather than adding seed-specific behavior.
