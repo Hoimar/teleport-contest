@@ -83,7 +83,10 @@ Observed results:
   `44/44`;
 - deployed `/frozen/screen-decode.mjs` matches local content; public
   `mazesofmenace` exposes only the static-site decoder, not the judge backend
-  scorer script.
+  scorer script;
+- authenticated GitHub code search for `score-fork.sh` under public
+  `davidbau` results found only the static-site comment that mentions
+  `judge/scripts/score-fork.sh`, not the script itself.
 
 ## History volatility
 
