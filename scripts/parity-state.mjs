@@ -857,12 +857,13 @@ function classifyLeaderboard({ leaderboard, teamName, localCorpus, liveCorpus, c
             ? ' Run npm run score:leaderboard-failures to replay the current failed public sessions across local scorer surfaces.'
             : '';
         const actionsProbe = ' Run npm run score:actions to inspect the latest GitHub Score workflow/artifact metadata.';
+        const refHistoryProbe = ' Run npm run score:ref-history to test whether the online row fingerprints a recent stale code ref.';
         const evidence = cleanRef.rulesOutLocalAhead
             ? `leaderboard lastScored is ${cleanRef.lastScoredRelation} that ref`
             : `recent comparable leaderboard history has ${history.matchingTarget}/${history.comparable} score(s) matching local ${scoreCorpus.label}`;
         const cleanRefMotion = {
             ...motion,
-            nextAction: `Clean-ref evidence rules out local-ahead timing.${failureProbe}${actionsProbe} Inspect deployment/scorer artifacts if local surfaces still pass.`,
+            nextAction: `Clean-ref evidence rules out local-ahead timing.${failureProbe}${actionsProbe}${refHistoryProbe} Inspect deployment/scorer artifacts if local surfaces still pass.`,
         };
         return withCleanRef({
             class: cls,

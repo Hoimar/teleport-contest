@@ -15,36 +15,36 @@ and `feature_map.md`.
 - Current branch in this workspace: `main`; use `agent:brief` Branch/status for
   live ahead/behind state.
 - Latest verified repair units: runtime shapechange side effects, checked-in
-  help pager data, scorer-drift diagnostics, and deterministic inventory sort
-  ordering, plus scoreboard clean-ref aliases and corpus-triage cleanup.
+  help pager data, scorer-drift diagnostics, deterministic inventory sort
+  ordering, scoreboard clean-ref/Actions aliases, and ref-history fingerprinting.
 - Checked-in public corpus is exact: `44/44 S 11405/11405 R 792838/792838 C 0`.
 - Last refreshed hosted public cache is exact:
   `44/44 S 10982/10982 R 840358/840358 C 0`. It still classifies as
   `public-session-drift` because 30 hosted session files differ from
   checked-in sessions, but both score surfaces are exact.
 - Leaderboard fetch succeeds from `https://mazesofmenace.ai/leaderboard/data.json`.
-  Default inferred team `Hoimar` currently classifies as `leaderboard-lag`
-  because the latest successful GitHub Score run for pushed `513765f` completed
-  after the leaderboard row: leaderboard public
-  `29/44 S 11344/11405 R 792838/792838`, scored at
-  `2026-07-02T12:52:37.197Z`.
-- Clean-ref evidence still scores `origin/main`/`HEAD` at
-  `44/44 S 11405/11405 R 792838/792838`, but `scoreboard:state` now checks
-  Actions timing before calling a pushed row persistent scorer drift.
-- Online failure signature is screen-only: 15 failed public sessions, 61
+  Default inferred team `Hoimar` currently classifies as
+  `persistent-scorer-drift`: leaderboard public
+  `29/44 S 11346/11405 R 792838/792838`, scored at
+  `2026-07-04T07:13:46.843Z`.
+- Clean-ref evidence scores `origin/main`/`HEAD` at
+  `44/44 S 11405/11405 R 792838/792838`, and the leaderboard row was scored
+  after both `origin/main` and GitHub Score Actions `#118` for `3540d42`.
+- Online failure signature is screen-only: 15 failed public sessions, 59
   missed screens, full RNG and RNG-step match for all 15; cell-only metrics
   equal the combined screen score on all 15, so the online misses are cell-grid
   misses rather than cursor-only misses.
 - Strict sentinels are exact:
   `5/5 S 1063/1063 R 64569/64569 C 0`.
 - Current public classification: checked-in and hosted public corpora are exact;
-  leaderboard fetch works; the current online row predates the pushed
-  `513765f` Score workflow run and should be refreshed again after the online
-  scorer runs.
+  leaderboard fetch works, but the online row is still below all reproduced
+  scorer surfaces. Visual surfaces, official browser replay, public `/play`
+  assets, and GitHub Actions pass; `score:ref-history` found no exact stale-ref
+  fingerprint across 46 recent commits back to `6864a80`.
 
 ## Latest Loop Checkpoint
 
-- Latest verified WIP on 2026-07-02:
+- Latest verified checkpoint on 2026-07-04:
   - Production truth: runtime shapechange now mirrors upstream armor/body side
     effects closely enough for local public parity, including gear checks after
     shapechange and deterministic pronoun/RNG behavior on armor destruction
@@ -61,11 +61,14 @@ and `feature_map.md`.
     surfaces.
   - Harness truth: `scripts/score-ref.mjs` can score clean code refs with
     frozen overlay, alternate session refs, and alternate runner refs.
+  - Harness truth: `scripts/score-ref-history.mjs` scans recent clean refs
+    against the saved failed leaderboard subset and ranks them by distance from
+    the online row. The 2026-07-04 row did not match any of 46 recent refs.
   - Harness truth: `scripts/play-assets-state.mjs --score` fetches `/play`
     assets into a temporary checkout and scores them. Current Hoimar assets are
     fully synchronized and score `44/44`, so stale play assets no longer explain
     the official `29/44` row. Against the saved leaderboard snapshot, play
-    assets are `+15` sessions and `+57` screens above the online row.
+    assets are `+15` sessions and `+59` screens above the online row.
     Add `--leaderboard-json <file>` to print the direct play-assets minus
     leaderboard delta from a saved snapshot.
   - Harness truth: `scripts/browser-score.mjs` defaults to the official browser
@@ -96,7 +99,7 @@ and `feature_map.md`.
     `npm run score:leaderboard-failures` now runs
     score-surface probes on the current failed public leaderboard sessions
     without manually copying seed names; the latest run selected 15 Hoimar
-    failures and all visual variants passed `15/15 S 8850/8850 R 646394/646394`.
+    failures and all visual variants passed `15/15 S 8796/8796 R 637545/637545`.
     `parity:state` and the same failure probe can now take
     `--leaderboard-json <file>` to replay a saved or historic leaderboard
     snapshot when the live endpoint has moved or fetch access is unavailable.
@@ -113,11 +116,11 @@ and `feature_map.md`.
   - Production determinism: inventory-letter range helpers now call the same
     explicit ASCII comparator as broader inventory and loot ordering.
   - External scorer evidence: latest successful public GitHub Actions Score run is
-    `#116` for pushed `513765f`, success, with non-expired `score-results`
-    artifact metadata; the current leaderboard row was scored before that run
+    `#118` for pushed `3540d42`, success, with non-expired `score-results`
+    artifact metadata; the current leaderboard row was scored after that run
     updated.
     The workflow's direct `node frozen/ps_test_runner.mjs sessions/` path scores
-    local `513765f` at `44/44`, so the Actions command shape is not the missing
+    local `3540d42` at `44/44`, so the Actions command shape is not the missing
     scorer branch if a later leaderboard row still misses. Use
     `npm run score:actions` to refresh this check.
   - Verification: checked-in public corpus exact
@@ -128,11 +131,9 @@ and `feature_map.md`.
   - Regression classification: none on checked-in public, hosted public,
     focused targets, strict sentinels, and the visual scorer surface for the
     current failed leaderboard set. The current official leaderboard row is
-    `leaderboard-lag`; if a later row scored after Actions `#116` still misses,
-    reopen persistent scorer drift.
-  - Global next-step check: active public queue is empty. Wait for/rescore the
-    online row after Actions `#116`; while waiting, continue local
-    held-out-risk cleanup and scorer-surface reduction from fresh evidence
+    persistent scorer drift rather than local parity drift.
+  - Global next-step check: active public queue is empty. Continue scorer-surface
+    reduction from fresh evidence, especially deployment/environment probes,
     rather than adding seed-specific behavior.
 
 - Older checkpoint history lives in git, `feature_map.md`, and `lessons.md`;

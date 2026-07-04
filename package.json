@@ -11,6 +11,7 @@
     "score:play-assets": "node scripts/play-assets-state.mjs",
     "score:actions": "node scripts/actions-score-state.mjs",
     "score:ref": "node scripts/score-ref.mjs",
+    "score:ref-history": "node scripts/score-ref-history.mjs",
     "score:storage-scope": "node scripts/score-storage-scope.mjs",
     "score:surfaces": "node scripts/score-surfaces.mjs",
     "score:leaderboard-failures": "node scripts/score-surfaces.mjs --leaderboard-failures --full",

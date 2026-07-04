@@ -1,5 +1,4 @@
 # Script Reference
-
 The scripts are the executable harness API. `npm run` aliases and direct `node`
 commands work the same way.
 
@@ -19,11 +18,11 @@ commands work the same way.
 | Play asset state | `npm run score:play-assets` | `node scripts/play-assets-state.mjs` |
 | Actions score state | `npm run score:actions` | `node scripts/actions-score-state.mjs` |
 | Ref score | `npm run score:ref -- <ref>` | `node scripts/score-ref.mjs <ref>` |
+| Ref history score | `npm run score:ref-history` | `node scripts/score-ref-history.mjs` |
 | Storage scope score | `npm run score:storage-scope -- [session]` | `node scripts/score-storage-scope.mjs [--leaderboard-failures] [session]` |
 | Hack audit | `npm run hack:audit` | `node scripts/hack-debt-audit.mjs` |
 | Memory lint | `npm run memory:lint` | `node scripts/memory-lint.mjs` |
 | Generate help data | `npm run generate:help-data` | `node scripts/generate-help-data.mjs` |
-
 ## Output Meaning
 
 - `S matched/total`: terminal screens matching upstream.
@@ -85,6 +84,7 @@ Use these when local public score is exact but the online row keeps moving:
 - `npm run score:actions`: inspect recent GitHub Actions Score workflow runs and score-results artifact metadata for the latest successful run, with a leaderboard timing cross-check when `.cache/leaderboard-data.json` is present.
 - `npm run score:browser -- [session]`: replay the official browser path; add `--leaderboard-failures`, `--leaderboard-json <file>`, `--mode viewer|both`, or `--shared-page`.
 - `npm run score:ref -- origin/main`: score a clean code ref from `/tmp`; pair it with `parity:state -- --score-ref origin/main`. Use `--session-ref <ref>` to score that code against another tracked session corpus, and `--runner-ref <ref>` to score it with another tracked frozen scorer.
+- `npm run score:ref-history`: scan recent clean refs against the failed session set from `.cache/leaderboard-data.json`, ranking refs by distance from the online row. Add `-- --limit N --full` for a wider stale-ref search.
 - `npm run score:storage-scope -- [session]`: replay through one JS module process while varying storage lifetime; add `--leaderboard-failures` or `--leaderboard-json <file>`.
 - `npm run score:leaderboard-failures`: run score surfaces on the current failed public leaderboard sessions; add `-- --leaderboard-json <file>` for a saved or historic leaderboard snapshot. When driven by leaderboard failures, the output prints the official failed-session reference and each local surface minus that row.
 - `npm run score:surfaces -- [session]`: score one Node replay through visual, strict, legacy, raw, and variant-normalization comparators. Add `--permission` or `--leaderboard-failures`; worker process failures exit non-zero.
