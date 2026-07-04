@@ -105,9 +105,9 @@ and `feature_map.md`.
     fetch/team/session parsing and failed-session target expansion.
     `npm run score:leaderboard-failures` runs score-surface probes on the
     current failed public leaderboard sessions without manual seed copying.
-    `parity:state` and the same failure probe can now take
-    `--leaderboard-json <file>` to replay a saved or historic leaderboard
-    snapshot when the live endpoint has moved or fetch access is unavailable.
+    `score:online-history` summarizes saved per-session failure volatility.
+    `parity:state` and failure probes take `--leaderboard-json <file>` to replay
+    historic snapshots when the live endpoint has moved or fetch is unavailable.
     The `scoreboard:*` aliases save their classified raw leaderboard payload to
     `.cache/leaderboard-data.json` for repeatable follow-up probes.
     Worker process failures now make `score-surfaces` exit non-zero, so
@@ -135,5 +135,5 @@ and `feature_map.md`.
     lag layered over persistent scorer drift rather than local parity drift.
   - Global next-step check: active public queue is empty. Deployed
     `frozen/screen-decode.mjs`, recent frozen runner refs, recent clean code
-    refs, and historical session refs do not fingerprint the online row. Continue
-    deployment/environment probes rather than adding seed-specific behavior.
+    refs, saved online snapshots, and historical session refs do not fingerprint
+    the online row. Continue deployment/environment probes, not seed logic.

@@ -18,6 +18,7 @@
     "score:leaderboard-failures": "node scripts/score-surfaces.mjs --leaderboard-failures --full",
     "score:false-positive-audit": "node scripts/score-false-positive-audit.mjs",
     "score:online-viewer": "node scripts/online-viewer-state.mjs",
+    "score:online-history": "node scripts/leaderboard-history-signatures.mjs",
     "sentinel": "node scripts/run-sentinel-suite.mjs",
     "sentinel:strict": "node scripts/run-sentinel-suite.mjs --strict",
     "parity:state": "node scripts/parity-state.mjs",
