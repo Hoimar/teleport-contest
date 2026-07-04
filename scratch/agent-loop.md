@@ -15,9 +15,8 @@ and `feature_map.md`.
 - Current branch in this workspace: `main`; use `agent:brief` Branch/status for
   live ahead/behind state.
 - Latest verified repair units: runtime shapechange side effects, checked-in
-  help pager data, scorer-drift diagnostics, deterministic inventory sort
-  ordering, scoreboard clean-ref/Actions aliases, bounded ref-history, and
-  credential-gated Actions artifact score parsing.
+  help pager data, deterministic inventory ordering, scoreboard diagnostics,
+  online-viewer advisory reporting, and false-positive scorer audits.
 - Checked-in public corpus is exact: `44/44 S 11405/11405 R 792838/792838 C 0`.
 - Last refreshed hosted public cache is exact:
   `44/44 S 10982/10982 R 840358/840358 C 0`. It still classifies as
@@ -26,14 +25,14 @@ and `feature_map.md`.
 - Leaderboard fetch succeeds from `https://mazesofmenace.ai/leaderboard/data.json`.
   Default inferred team `Hoimar` currently classifies as
   `leaderboard-lag-after-persistent-drift`: leaderboard public
-  `29/44 S 11346/11405 R 792838/792838`, scored at
-  `2026-07-04T07:13:46.843Z`.
+  `30/44 S 11348/11405 R 792838/792838`, scored at
+  `2026-07-04T16:33:38.346Z`.
 - Clean-ref evidence scores `origin/main`/`HEAD` at
   `44/44 S 11405/11405 R 792838/792838`; the leaderboard row predates latest
   Actions but recent history was already persistently below local.
-- Online failure signature is screen-only: 15 failed public sessions, 59
-  missed screens, full RNG and RNG-step match for all 15; cell-only metrics
-  equal the combined screen score on all 15, so the online misses are cell-grid
+- Online failure signature is screen-only: 14 failed public sessions, 57
+  missed screens, full RNG and RNG-step match for all 14; cell-only metrics
+  equal the combined screen score on all 14, so the online misses are cell-grid
   misses rather than cursor-only misses.
 - Strict sentinels are exact:
   `5/5 S 1063/1063 R 64569/64569 C 0`.
@@ -41,7 +40,11 @@ and `feature_map.md`.
   leaderboard fetch works, but the online row is still below all reproduced
   scorer surfaces. Visual surfaces, official browser replay, public `/play`
   assets, and GitHub Actions pass; `score:ref-history` found no exact stale-ref
-  fingerprint across 46 recent commits back to `6864a80`.
+  fingerprint across 46 recent commits back to `6864a80`. The current
+  false-positive audit also rejects broad local visual-comparator strictness as
+  the explanation: the 14 online-failed sessions have 8145 locally accepted
+  non-exact terminal/string frames while the online row misses only 57 screens,
+  and all 44 public sessions have accepted non-exact frames.
 
 ## Latest Loop Checkpoint
 
@@ -132,6 +135,3 @@ and `feature_map.md`.
   - Global next-step check: active public queue is empty. Continue scorer-surface
     reduction from fresh evidence, especially deployment/environment probes,
     rather than adding seed-specific behavior.
-
-- Older checkpoint history lives in git, `feature_map.md`, and `lessons.md`;
-  keep this file focused on the active loop state and next queue.

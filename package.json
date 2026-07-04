@@ -16,6 +16,7 @@
     "score:storage-scope": "node scripts/score-storage-scope.mjs",
     "score:surfaces": "node scripts/score-surfaces.mjs",
     "score:leaderboard-failures": "node scripts/score-surfaces.mjs --leaderboard-failures --full",
+    "score:false-positive-audit": "node scripts/score-false-positive-audit.mjs",
     "score:online-viewer": "node scripts/online-viewer-state.mjs",
     "sentinel": "node scripts/run-sentinel-suite.mjs",
     "sentinel:strict": "node scripts/run-sentinel-suite.mjs --strict",
