@@ -827,7 +827,7 @@ function classifyLeaderboard({ leaderboard, teamName, localCorpus, liveCorpus, c
     if (!publicEqual && actions?.leaderboardPredatesLatestRun) {
         const lagAfterPersistentDrift = persistentHistory && cleanRef?.shapeMatches && !cleanRef.publicEqual;
         const nextAction = lagAfterPersistentDrift
-            ? 'Leaderboard predates the latest successful GitHub Score run, but recent comparable history was already persistently below local. Refresh after the online scorer catches up; if it still misses, run score:leaderboard-failures, score:actions, and score:ref-history.'
+            ? 'Leaderboard predates the latest successful GitHub Score run, but recent comparable history was already persistently below local. Refresh after the online scorer catches up; if it still misses, run score:leaderboard-failures, score:actions:artifact, and score:ref-history.'
             : 'Leaderboard predates the latest successful GitHub Score run for the current upstream HEAD. Wait for or trigger the online scorer after that run, then refresh scoreboard:state.';
         const cls = lagAfterPersistentDrift ? 'leaderboard-lag-after-persistent-drift' : 'leaderboard-lag';
         const reason = lagAfterPersistentDrift
@@ -863,7 +863,7 @@ function classifyLeaderboard({ leaderboard, teamName, localCorpus, liveCorpus, c
         const failureProbe = failureSignature?.failed
             ? ' Run npm run score:leaderboard-failures to replay the current failed public sessions across local scorer surfaces.'
             : '';
-        const actionsProbe = ' Run npm run score:actions to inspect the latest GitHub Score workflow/artifact metadata.';
+        const actionsProbe = ' Run npm run score:actions:artifact to inspect the latest GitHub Score workflow artifact totals when credentials are available.';
         const refHistoryProbe = ' Run npm run score:ref-history to test whether the online row fingerprints a recent stale code ref.';
         const evidence = cleanRef.rulesOutLocalAhead
             ? `leaderboard lastScored is ${cleanRef.lastScoredRelation} that ref`
