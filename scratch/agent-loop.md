@@ -71,10 +71,9 @@ and `feature_map.md`.
   - Harness truth: `scripts/play-assets-state.mjs --score` fetches `/play`
     assets into a temporary checkout and scores them. Current Hoimar assets are
     fully synchronized and score `44/44`, so stale play assets no longer explain
-    the official `29/44` row. Against the saved leaderboard snapshot, play
-    assets are `+15` sessions and `+59` screens above the online row.
-    Add `--leaderboard-json <file>` to print the direct play-assets minus
-    leaderboard delta from a saved snapshot.
+    the official `30/44` row. Against the saved leaderboard snapshot, play
+    assets are `+14` sessions and `+57` screens above the online row; pass
+    `--leaderboard-json <file>` to print the saved-snapshot delta.
   - Harness truth: `scripts/browser-score.mjs` defaults to the official browser
     path and isolates multi-session runs because shared-page module state caused
     false browser-only RNG drift in long sessions; use `--shared-page` only to
@@ -87,10 +86,14 @@ and `feature_map.md`.
     the same failed-session set as the current online row.
   - Harness truth: `scripts/score-surfaces.mjs` now has visual-normalization
     variants and a Node permission-sandbox mode. All visual variants remain
-    exact on the 15 online-failed public seeds, so missing time/version
+    exact on the 14 online-failed public seeds, so missing time/version
     normalization and basic Node permission effects do not reproduce the
     leaderboard row. When driven by leaderboard failures, it now prints the
     official failed-session reference and each local surface minus that row.
+  - Harness truth: `scripts/score-false-positive-audit.mjs` now ranks narrow
+    comparator policies. Current `30/44` evidence: current visual/space-neutral
+    policies miss `0` screens, space-color/strict-display policies miss `5754`,
+    and raw DEC strictness misses `7992`; none reproduce the online `57`.
   - Harness truth: `scoreboard:state`/`scoreboard:json` now pass
     `--score-upstream --score-actions`, resolving the configured upstream ref
     before scoring a clean `/tmp` checkout and checking the latest successful
@@ -100,10 +103,8 @@ and `feature_map.md`.
     historic online rows remain replayable after the live endpoint moves.
   - Harness truth: `scripts/leaderboard-lib.mjs` owns shared leaderboard
     fetch/team/session parsing and failed-session target expansion.
-    `npm run score:leaderboard-failures` now runs
-    score-surface probes on the current failed public leaderboard sessions
-    without manually copying seed names; the latest run selected 15 Hoimar
-    failures and all visual variants passed `15/15 S 8796/8796 R 637545/637545`.
+    `npm run score:leaderboard-failures` runs score-surface probes on the
+    current failed public leaderboard sessions without manual seed copying.
     `parity:state` and the same failure probe can now take
     `--leaderboard-json <file>` to replay a saved or historic leaderboard
     snapshot when the live endpoint has moved or fetch access is unavailable.
@@ -120,9 +121,9 @@ and `feature_map.md`.
   - Production determinism: inventory-letter range helpers now call the same
     explicit ASCII comparator as broader inventory and loot ordering.
   - External scorer evidence: latest successful public GitHub Actions Score run is
-    `#124` for pushed `84bfe03`, success, and `score:actions:artifact` parses
+    `#126` for pushed `dfea935`, success, and `score:actions:artifact` parses
     the uploaded `score-summary.json` as `44/44 S 11405/11405`; the current
-    leaderboard row predates that run and remains `29/44`.
+    leaderboard row predates that run and remains `30/44`.
   - Verification: checked-in public corpus exact
     `44/44 S 11405/11405 R 792838/792838 C 0`; strict sentinel exact
     `5/5 S 1063/1063 R 64569/64569 C 0`; focused verification stayed exact for
@@ -132,6 +133,7 @@ and `feature_map.md`.
     focused targets, strict sentinels, and the visual scorer surface for the
     current failed leaderboard set. The current official leaderboard row is
     lag layered over persistent scorer drift rather than local parity drift.
-  - Global next-step check: active public queue is empty. Continue scorer-surface
-    reduction from fresh evidence, especially deployment/environment probes,
-    rather than adding seed-specific behavior.
+  - Global next-step check: active public queue is empty. Deployed
+    `frozen/screen-decode.mjs`, recent frozen runner refs, recent clean code
+    refs, and historical session refs do not fingerprint the online row. Continue
+    deployment/environment probes rather than adding seed-specific behavior.

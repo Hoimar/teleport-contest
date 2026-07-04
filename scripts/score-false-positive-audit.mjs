@@ -152,9 +152,7 @@ function sameCursor(actual, expected) {
         actual[2] === expected[2];
 }
 
-function visualCellsEqual(actual, expected) {
-    const ga = decodeScreen(preDecode(actual));
-    const gb = decodeScreen(preDecode(expected));
+function visualGridsEqual(ga, gb) {
     for (let r = 0; r < ROWS_24; r++) {
         for (let c = 0; c < COLS_80; c++) {
             if (diffCell(ga[r][c], gb[r][c])) return false;
@@ -163,9 +161,7 @@ function visualCellsEqual(actual, expected) {
     return true;
 }
 
-function strictDisplayCellsEqual(actual, expected) {
-    const ga = decodeScreen(preDecode(actual));
-    const gb = decodeScreen(preDecode(expected));
+function strictDisplayGridsEqual(ga, gb) {
     for (let r = 0; r < ROWS_24; r++) {
         for (let c = 0; c < COLS_80; c++) {
             const a = ga[r][c];
@@ -176,14 +172,127 @@ function strictDisplayCellsEqual(actual, expected) {
     return true;
 }
 
-function strictTerminalCellsEqual(actual, expected) {
-    const ga = decodeScreen(preDecode(actual));
-    const gb = decodeScreen(preDecode(expected));
+function strictTerminalGridsEqual(ga, gb) {
     for (let r = 0; r < ROWS_24; r++) {
         for (let c = 0; c < COLS_80; c++) {
             const a = ga[r][c];
             const b = gb[r][c];
             if (a.ch !== b.ch || a.color !== b.color || a.attr !== b.attr || a.decgfx !== b.decgfx) return false;
+        }
+    }
+    return true;
+}
+
+function sameRenderedGlyph(a, b) {
+    return renderCell(a) === renderCell(b);
+}
+
+function sameNonSpaceState(a, b) {
+    return a.color === b.color && a.attr === b.attr;
+}
+
+function bothRenderedSpace(a, b) {
+    return renderCell(a) === ' ' && renderCell(b) === ' ';
+}
+
+function cellsEqualByPolicy(a, b, policy) {
+    if (!sameRenderedGlyph(a, b)) return false;
+    if (!bothRenderedSpace(a, b)) {
+        if (policy.nonSpaceState === 'ignore') return true;
+        if (policy.nonSpaceState === 'no-bold') {
+            return a.color === b.color && (a.attr & ~2) === (b.attr & ~2);
+        }
+        return sameNonSpaceState(a, b);
+    }
+
+    switch (policy.spaceState) {
+        case 'ignore':
+            return true;
+        case 'visible':
+            return !diffCell(a, b);
+        case 'color':
+            return a.color === b.color;
+        case 'attr':
+            return a.attr === b.attr;
+        case 'bold':
+            return (a.attr & 2) === (b.attr & 2);
+        case 'color-bold':
+            return a.color === b.color && (a.attr & 2) === (b.attr & 2);
+        case 'all':
+            return a.color === b.color && a.attr === b.attr;
+        default:
+            throw new Error(`unknown spaceState policy ${policy.spaceState}`);
+    }
+}
+
+const COMPARATOR_VARIANTS = [
+    {
+        name: 'visual',
+        description: 'current visual comparator',
+        policy: { nonSpaceState: 'all', spaceState: 'visible' },
+    },
+    {
+        name: 'space-neutral',
+        description: 'ignore all SGR state on rendered spaces',
+        policy: { nonSpaceState: 'all', spaceState: 'ignore' },
+    },
+    {
+        name: 'glyph-only',
+        description: 'rendered glyphs only, ignore color and attrs',
+        policy: { nonSpaceState: 'ignore', spaceState: 'ignore' },
+    },
+    {
+        name: 'space-color',
+        description: 'strict foreground color on rendered spaces only',
+        policy: { nonSpaceState: 'all', spaceState: 'color' },
+    },
+    {
+        name: 'space-attr',
+        description: 'strict attr bits on rendered spaces only',
+        policy: { nonSpaceState: 'all', spaceState: 'attr' },
+    },
+    {
+        name: 'space-bold',
+        description: 'strict bold bit on rendered spaces only',
+        policy: { nonSpaceState: 'all', spaceState: 'bold' },
+    },
+    {
+        name: 'space-color-bold',
+        description: 'strict foreground color plus bold on rendered spaces',
+        policy: { nonSpaceState: 'all', spaceState: 'color-bold' },
+    },
+    {
+        name: 'strict-display',
+        description: 'strict rendered glyph, color, and attr on every cell',
+        policy: { nonSpaceState: 'all', spaceState: 'all' },
+    },
+    {
+        name: 'strict-display-no-bold',
+        description: 'strict rendered glyph, color, and non-bold attrs',
+        policy: { nonSpaceState: 'no-bold', spaceState: 'color' },
+    },
+];
+
+function cellsEqualRawDec(a, b) {
+    return a.ch === b.ch &&
+        a.decgfx === b.decgfx &&
+        a.color === b.color &&
+        a.attr === b.attr;
+}
+
+function gridsEqualWithPolicy(ga, gb, policy) {
+    for (let r = 0; r < ROWS_24; r++) {
+        for (let c = 0; c < COLS_80; c++) {
+            if (!cellsEqualByPolicy(ga[r][c], gb[r][c], policy)) return false;
+        }
+    }
+    return true;
+}
+
+function rawDecGridsEqual(ga, gb) {
+    for (let r = 0; r < ROWS_24; r++) {
+        for (let c = 0; c < COLS_80; c++) {
+            if (!cellsEqualRawDec(ga[r][c], gb[r][c])) return false;
         }
     }
     return true;
@@ -284,21 +393,34 @@ async function runWorker(sessionPath) {
             decEncodingOnly: 0,
             otherAcceptedEncoding: 0,
         },
+        variants: Object.fromEntries(COMPARATOR_VARIANTS.map((variant) => [
+            variant.name,
+            { matched: 0, total: canonicalScreens.length },
+        ])),
+        rawDecStrict: { matched: 0, total: canonicalScreens.length },
         firstAcceptedDiff: null,
     };
 
     for (let i = 0; i < canonicalScreens.length; i++) {
         const jsScreen = jsScreens[i] || '';
         const canonicalScreen = canonicalScreens[i] || '';
-        const cellsOk = visualCellsEqual(jsScreen, canonicalScreen);
+        const jsGrid = decodeScreen(preDecode(jsScreen));
+        const canonicalGrid = decodeScreen(preDecode(canonicalScreen));
+        const cellsOk = visualGridsEqual(jsGrid, canonicalGrid);
         const cursorOk = sameCursor(jsCursors[i], canonicalCursors[i]);
+        for (const variant of COMPARATOR_VARIANTS) {
+            if (gridsEqualWithPolicy(jsGrid, canonicalGrid, variant.policy)) {
+                summary.variants[variant.name].matched++;
+            }
+        }
+        if (rawDecGridsEqual(jsGrid, canonicalGrid)) summary.rawDecStrict.matched++;
         if (cellsOk) summary.cellsOnly.matched++;
         if (cursorOk) summary.cursors.matched++;
         if (cellsOk && cursorOk) summary.screens.matched++;
         if (!cellsOk) continue;
 
-        const strictDisplay = strictDisplayCellsEqual(jsScreen, canonicalScreen);
-        const strictTerminal = strictTerminalCellsEqual(jsScreen, canonicalScreen);
+        const strictDisplay = strictDisplayGridsEqual(jsGrid, canonicalGrid);
+        const strictTerminal = strictTerminalGridsEqual(jsGrid, canonicalGrid);
         if (!strictDisplay) {
             summary.accepted.invisibleSgrOnly++;
         } else if (!strictTerminal) {
@@ -345,6 +467,18 @@ function fmtCount(count, total) {
 
 function printResults(results, options) {
     const refs = summarizeReference(options.leaderboardReference?.rows || []);
+    const variantMeta = [
+        ...COMPARATOR_VARIANTS.map((variant) => ({
+            name: variant.name,
+            description: variant.description,
+            read(result) { return result.variants?.[variant.name]; },
+        })),
+        {
+            name: 'raw-dec-strict',
+            description: 'strict raw DEC charset state, color, and attr',
+            read(result) { return result.rawDecStrict; },
+        },
+    ];
     const totals = {
         sessions: results.length,
         missedOnline: 0,
@@ -356,6 +490,17 @@ function printResults(results, options) {
         exactTerminal: 0,
         matchingAcceptedBucket: 0,
     };
+    const variantTotals = Object.fromEntries(variantMeta.map((variant) => [variant.name, {
+        name: variant.name,
+        description: variant.description,
+        matched: 0,
+        total: 0,
+        missed: 0,
+        failedSessions: 0,
+        onlineMissed: 0,
+        matchingSessions: 0,
+        distance: 0,
+    }]));
     console.log(`False-positive audit: ${results.length} session(s)${options.sourceLabel ? ` from ${options.sourceLabel}` : ''}`);
     for (const result of results) {
         const ref = refs.get(result.session);
@@ -370,6 +515,25 @@ function printResults(results, options) {
         totals.otherAcceptedEncoding += accepted.otherAcceptedEncoding;
         totals.exactTerminal += accepted.exactTerminal;
         if (onlineMissed != null && onlineMissed === acceptedNonExact) totals.matchingAcceptedBucket++;
+
+        for (const variant of variantMeta) {
+            const score = variant.read(result);
+            if (!score) continue;
+            const missed = Math.max(0, score.total - score.matched);
+            const bucket = variantTotals[variant.name];
+            bucket.matched += score.matched;
+            bucket.total += score.total;
+            bucket.missed += missed;
+            if (missed > 0) bucket.failedSessions++;
+            if (onlineMissed != null) {
+                bucket.onlineMissed += onlineMissed;
+                if (missed === onlineMissed) bucket.matchingSessions++;
+            }
+        }
+    }
+    for (const bucket of Object.values(variantTotals)) {
+        bucket.distance = Math.abs(bucket.missed - bucket.onlineMissed) +
+            Math.abs(bucket.failedSessions - totals.sessions) * 1000;
     }
 
     const rows = options.full ? results : results.slice(0, options.limit);
@@ -406,6 +570,18 @@ function printResults(results, options) {
         `(invisibleSgr=${totals.invisibleSgrOnly}, dec=${totals.decEncodingOnly}, other=${totals.otherAcceptedEncoding})`);
     console.log(`- exact terminal/string screens among local visual passes: ${totals.exactTerminal}`);
     console.log(`- sessions where onlineMiss equals acceptedNonExact: ${totals.matchingAcceptedBucket}/${totals.sessions}`);
+    if (options.leaderboardReference?.rows?.length) {
+        console.log('## Comparator Variants');
+        const ranked = Object.values(variantTotals).sort((a, b) => a.distance - b.distance || a.missed - b.missed);
+        for (const bucket of ranked) {
+            const delta = bucket.missed - bucket.onlineMissed;
+            const sign = delta >= 0 ? `+${delta}` : String(delta);
+            console.log(`- ${bucket.name}: missed=${bucket.missed} online=${bucket.onlineMissed} ` +
+                `delta=${sign} failedSessions=${bucket.failedSessions}/${totals.sessions} ` +
+                `matchingSessions=${bucket.matchingSessions}/${totals.sessions} distance=${bucket.distance} ` +
+                `(${bucket.description})`);
+        }
+    }
 }
 
 async function main() {
