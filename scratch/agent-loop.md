@@ -16,7 +16,8 @@ and `feature_map.md`.
   live ahead/behind state.
 - Latest verified repair units: runtime shapechange side effects, checked-in
   help pager data, scorer-drift diagnostics, deterministic inventory sort
-  ordering, scoreboard clean-ref/Actions aliases, and ref-history fingerprinting.
+  ordering, scoreboard clean-ref/Actions aliases/ref-history fingerprinting, and
+  credential-gated Actions artifact score parsing.
 - Checked-in public corpus is exact: `44/44 S 11405/11405 R 792838/792838 C 0`.
 - Last refreshed hosted public cache is exact:
   `44/44 S 10982/10982 R 840358/840358 C 0`. It still classifies as
@@ -116,13 +117,11 @@ and `feature_map.md`.
   - Production determinism: inventory-letter range helpers now call the same
     explicit ASCII comparator as broader inventory and loot ordering.
   - External scorer evidence: latest successful public GitHub Actions Score run is
-    `#118` for pushed `3540d42`, success, with non-expired `score-results`
-    artifact metadata; the current leaderboard row was scored after that run
-    updated.
-    The workflow's direct `node frozen/ps_test_runner.mjs sessions/` path scores
-    local `3540d42` at `44/44`, so the Actions command shape is not the missing
-    scorer branch if a later leaderboard row still misses. Use
-    `npm run score:actions` to refresh this check.
+    `#120` for pushed `051522d`, success, with non-expired `score-results`
+    metadata; the current leaderboard row predates that run and remains `29/44`.
+    The workflow's direct score path scores local `051522d` at `44/44`, so use
+    `score:actions:artifact` with `GITHUB_TOKEN`/`GH_TOKEN` to parse uploaded
+    `score-summary.json`; anonymous artifact download currently returns HTTP 401.
   - Verification: checked-in public corpus exact
     `44/44 S 11405/11405 R 792838/792838 C 0`; strict sentinel exact
     `5/5 S 1063/1063 R 64569/64569 C 0`; focused verification stayed exact for

@@ -4,6 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { inflateRawSync } from 'node:zlib';
 
 import {
     findLeaderboardTeam,
@@ -18,10 +19,12 @@ export const DEFAULT_ACTIONS_RUN_LIMIT = 10;
 
 function usage() {
     return [
-        'Usage: node scripts/actions-score-state.mjs [--repo owner/repo] [--workflow score.yml] [--branch main] [--leaderboard-json <file>] [--team <name>] [--json]',
+        'Usage: node scripts/actions-score-state.mjs [--repo owner/repo] [--workflow score.yml] [--branch main] [--leaderboard-json <file>] [--team <name>] [--artifact-score] [--json]',
         '',
         'Reports recent GitHub Actions Score workflow runs and score-results',
-        'artifact metadata for the latest successful run. Pair this with scoreboard:state when the public',
+        'artifact metadata for the latest successful run. With --artifact-score,',
+        'downloads score-results and compares score-summary.json with the leaderboard row.',
+        'Pair this with scoreboard:state when the public',
         'leaderboard differs from local scorer surfaces.',
     ].join('\n');
 }
@@ -36,6 +39,7 @@ function parseArgs(argv) {
             ? '.cache/leaderboard-data.json'
             : null,
         team: null,
+        artifactScore: false,
         json: false,
     };
     for (let i = 0; i < argv.length; i++) {
@@ -69,6 +73,8 @@ function parseArgs(argv) {
             out.team = argv[++i] || null;
         } else if (arg.startsWith('--team=')) {
             out.team = arg.slice('--team='.length);
+        } else if (arg === '--artifact-score') {
+            out.artifactScore = true;
         } else if (arg === '--json') {
             out.json = true;
         } else {
@@ -149,6 +155,133 @@ export async function fetchJson(url) {
     throw new Error(errors.join('; '));
 }
 
+async function fetchBuffer(url) {
+    const errors = [];
+    for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+            const res = await fetch(url, {
+                headers: apiHeaders(),
+                cache: 'no-store',
+                redirect: 'follow',
+                signal: AbortSignal.timeout(30000),
+            });
+            const textPrefix = res.ok ? null : (await res.text()).replace(/\s+/g, ' ').trim().slice(0, 200);
+            if (!res.ok) {
+                const err = new Error(`HTTP ${res.status}: ${textPrefix}`);
+                err.noRetry = res.status === 401 || res.status === 403 || res.status === 404;
+                throw err;
+            }
+            return Buffer.from(await res.arrayBuffer());
+        } catch (err) {
+            if (err.noRetry) throw err;
+            errors.push(err.message);
+            await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)));
+        }
+    }
+    throw new Error(errors.join('; '));
+}
+
+function readUInt32(buffer, offset) {
+    return buffer.readUInt32LE(offset);
+}
+
+function readUInt16(buffer, offset) {
+    return buffer.readUInt16LE(offset);
+}
+
+function zipEntryText(zip, wantedName) {
+    let eocd = -1;
+    for (let i = zip.length - 22; i >= Math.max(0, zip.length - 65557); i--) {
+        if (readUInt32(zip, i) === 0x06054b50) {
+            eocd = i;
+            break;
+        }
+    }
+    if (eocd < 0) throw new Error('zip end-of-central-directory not found');
+    const entryCount = readUInt16(zip, eocd + 10);
+    let centralOffset = readUInt32(zip, eocd + 16);
+    for (let i = 0; i < entryCount; i++) {
+        if (readUInt32(zip, centralOffset) !== 0x02014b50) {
+            throw new Error('invalid zip central directory');
+        }
+        const method = readUInt16(zip, centralOffset + 10);
+        const compressedSize = readUInt32(zip, centralOffset + 20);
+        const nameLen = readUInt16(zip, centralOffset + 28);
+        const extraLen = readUInt16(zip, centralOffset + 30);
+        const commentLen = readUInt16(zip, centralOffset + 32);
+        const localOffset = readUInt32(zip, centralOffset + 42);
+        const name = zip.subarray(centralOffset + 46, centralOffset + 46 + nameLen).toString('utf8');
+        centralOffset += 46 + nameLen + extraLen + commentLen;
+        if (name !== wantedName) continue;
+        if (readUInt32(zip, localOffset) !== 0x04034b50) {
+            throw new Error(`invalid zip local header for ${wantedName}`);
+        }
+        const localNameLen = readUInt16(zip, localOffset + 26);
+        const localExtraLen = readUInt16(zip, localOffset + 28);
+        const dataStart = localOffset + 30 + localNameLen + localExtraLen;
+        const compressed = zip.subarray(dataStart, dataStart + compressedSize);
+        if (method === 0) return compressed.toString('utf8');
+        if (method === 8) return inflateRawSync(compressed).toString('utf8');
+        throw new Error(`unsupported zip compression method ${method} for ${wantedName}`);
+    }
+    throw new Error(`${wantedName} not found in score-results artifact`);
+}
+
+function scoreFromSummaryJson(raw) {
+    const parsed = JSON.parse(raw);
+    const results = Array.isArray(parsed.results) ? parsed.results : [];
+    return {
+        available: true,
+        timestamp: parsed.timestamp || null,
+        summary: results.reduce((acc, result) => {
+            acc.sessions++;
+            if (result.passed) acc.exact++;
+            acc.screenMatched += Number(result.screen?.matched ?? 0);
+            acc.screenTotal += Number(result.screen?.total ?? 0);
+            acc.rngMatched += Number(result.rng?.matched ?? 0);
+            acc.rngTotal += Number(result.rng?.total ?? 0);
+            return acc;
+        }, {
+            sessions: 0,
+            exact: 0,
+            screenMatched: 0,
+            screenTotal: 0,
+            rngMatched: 0,
+            rngTotal: 0,
+        }),
+        failures: results
+            .filter((result) => !result.passed)
+            .map((result) => result.session)
+            .sort(),
+    };
+}
+
+function scoreDelta(left, right) {
+    if (!left || !right) return null;
+    return {
+        exact: left.exact - right.exact,
+        sessions: left.sessions - right.sessions,
+        screenMatched: left.screenMatched - right.screenMatched,
+        screenTotal: left.screenTotal - right.screenTotal,
+        rngMatched: left.rngMatched - right.rngMatched,
+        rngTotal: left.rngTotal - right.rngTotal,
+    };
+}
+
+async function fetchArtifactScore(artifact) {
+    if (!artifact) return { available: false, error: 'score-results artifact unavailable' };
+    if (artifact.expired) return { available: false, error: 'score-results artifact expired' };
+    try {
+        const zip = await fetchBuffer(artifact.downloadUrl);
+        return scoreFromSummaryJson(zipEntryText(zip, 'score-summary.json'));
+    } catch (err) {
+        const authHint = process.env.GITHUB_TOKEN || process.env.GH_TOKEN
+            ? ''
+            : ' Set GITHUB_TOKEN or GH_TOKEN to download private GitHub Actions artifact zips.';
+        return { available: false, error: `${err.message}${authHint}` };
+    }
+}
+
 export function githubApiUrl(repo, workflow, branch, perPage = DEFAULT_ACTIONS_RUN_LIMIT) {
     const encodedWorkflow = encodeURIComponent(workflow);
     const params = new URLSearchParams({ branch, per_page: String(perPage) });
@@ -190,6 +323,18 @@ export async function fetchActionsState(options = {}) {
     const latestSuccessful = recentRuns.find(isSuccessfulRun) || null;
     const artifactRun = latestSuccessful || latest;
     const artifacts = artifactRun ? await fetchJson(artifactRun.artifacts_url) : null;
+    const compactArtifacts = (artifacts?.artifacts || []).map((artifact) => ({
+        id: artifact.id,
+        name: artifact.name,
+        size: artifact.size_in_bytes,
+        expired: Boolean(artifact.expired),
+        digest: artifact.digest || null,
+        createdAt: artifact.created_at,
+        updatedAt: artifact.updated_at,
+        expiresAt: artifact.expires_at,
+        downloadUrl: artifact.archive_download_url,
+    }));
+    const scoreArtifact = compactArtifacts.find((artifact) => artifact.name === 'score-results') || null;
     return {
         repo,
         workflow,
@@ -200,17 +345,8 @@ export async function fetchActionsState(options = {}) {
         latestSuccessful: compactRun(latestSuccessful),
         artifactRun: compactRun(artifactRun),
         recentRuns: recentRuns.map(compactRun),
-        artifacts: (artifacts?.artifacts || []).map((artifact) => ({
-            id: artifact.id,
-            name: artifact.name,
-            size: artifact.size_in_bytes,
-            expired: Boolean(artifact.expired),
-            digest: artifact.digest || null,
-            createdAt: artifact.created_at,
-            updatedAt: artifact.updated_at,
-            expiresAt: artifact.expires_at,
-            downloadUrl: artifact.archive_download_url,
-        })),
+        artifacts: compactArtifacts,
+        artifactScore: options.artifactScore ? await fetchArtifactScore(scoreArtifact) : null,
     };
 }
 
@@ -228,6 +364,14 @@ function summarizeLeaderboard(options) {
         lastScored: team.lastScored || null,
         public: team.public || null,
         heldOut: team.heldOut || null,
+        summary: team.public ? {
+            sessions: Number(team.public.total ?? 0),
+            exact: Number(team.public.passing ?? 0),
+            screenMatched: Number(team.public.points ?? 0),
+            screenTotal: Number(team.public.maxPoints ?? 0),
+            rngMatched: null,
+            rngTotal: null,
+        } : null,
     };
 }
 
@@ -278,6 +422,18 @@ function printHuman(payload) {
     } else {
         console.log('- artifacts: none');
     }
+    if (payload.actions.artifactScore) {
+        const artifactScore = payload.actions.artifactScore;
+        if (artifactScore.available) {
+            const s = artifactScore.summary;
+            console.log(`- artifact score: exact ${s.exact}/${s.sessions} S ${s.screenMatched}/${s.screenTotal} R ${s.rngMatched}/${s.rngTotal}${artifactScore.timestamp ? `, timestamp ${artifactScore.timestamp}` : ''}`);
+            if (artifactScore.failures.length) {
+                console.log(`- artifact failures: ${artifactScore.failures.join(', ')}`);
+            }
+        } else {
+            console.log(`- artifact score: unavailable: ${artifactScore.error}`);
+        }
+    }
     if (payload.leaderboard) {
         const board = payload.leaderboard;
         const pub = board.public || {};
@@ -289,6 +445,10 @@ function printHuman(payload) {
         const comparedRun = successful || run;
         const comparedLabel = successful ? 'latest successful Actions update' : 'latest Actions update';
         console.log(`- timing: leaderboard lastScored is ${timeRelation(board.lastScored, comparedRun.updatedAt)} ${comparedLabel}`);
+        if (payload.actions.artifactScore?.available && board.summary) {
+            const d = scoreDelta(payload.actions.artifactScore.summary, board.summary);
+            console.log(`- artifact minus leaderboard: exact ${d.exact >= 0 ? '+' : ''}${d.exact}, sessions ${d.sessions >= 0 ? '+' : ''}${d.sessions}, S ${d.screenMatched >= 0 ? '+' : ''}${d.screenMatched}/${d.screenTotal >= 0 ? '+' : ''}${d.screenTotal}`);
+        }
     }
     console.log('');
     console.log('Artifact zip downloads may require authenticated GitHub API access even when metadata is public.');

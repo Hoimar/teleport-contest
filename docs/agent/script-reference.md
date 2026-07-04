@@ -16,7 +16,7 @@ commands work the same way.
 | Leaderboard failures | `npm run score:leaderboard-failures` | `node scripts/score-surfaces.mjs --leaderboard-failures --full` |
 | Browser score | `npm run score:browser -- [session]` | `node scripts/browser-score.mjs [--leaderboard-failures] [--shared-page] [session]` |
 | Play asset state | `npm run score:play-assets` | `node scripts/play-assets-state.mjs` |
-| Actions score state | `npm run score:actions` | `node scripts/actions-score-state.mjs` |
+| Actions score state | `npm run score:actions` / `npm run score:actions:artifact` | `node scripts/actions-score-state.mjs [--artifact-score]` |
 | Ref score | `npm run score:ref -- <ref>` | `node scripts/score-ref.mjs <ref>` |
 | Ref history score | `npm run score:ref-history` | `node scripts/score-ref-history.mjs` |
 | Storage scope score | `npm run score:storage-scope -- [session]` | `node scripts/score-storage-scope.mjs [--leaderboard-failures] [session]` |
@@ -81,7 +81,7 @@ combined` means cell-grid misses rather than cursor-only misses.
 Use these when local public score is exact but the online row keeps moving:
 
 - `npm run score:play-assets`: compare checked-in `js/*.js` with public `/play/<team>/js/` assets, including nearest matching commits. Add `-- --score --leaderboard-json <file>` to score the fetched play asset bundle and compare it with a saved online row.
-- `npm run score:actions`: inspect recent GitHub Actions Score workflow runs and score-results artifact metadata for the latest successful run, with a leaderboard timing cross-check when `.cache/leaderboard-data.json` is present.
+- `npm run score:actions`: inspect recent GitHub Actions Score workflow runs and score-results artifact metadata; use `score:actions:artifact` with `GITHUB_TOKEN`/`GH_TOKEN` to compare artifact totals with the saved leaderboard row.
 - `npm run score:browser -- [session]`: replay the official browser path; add `--leaderboard-failures`, `--leaderboard-json <file>`, `--mode viewer|both`, or `--shared-page`.
 - `npm run score:ref -- origin/main`: score a clean code ref from `/tmp`; pair it with `parity:state -- --score-ref origin/main`. Use `--session-ref <ref>` to score that code against another tracked session corpus, and `--runner-ref <ref>` to score it with another tracked frozen scorer.
 - `npm run score:ref-history`: scan recent clean refs against the failed session set from `.cache/leaderboard-data.json`, ranking refs by distance from the online row. Add `-- --limit N --full` for a wider stale-ref search.
