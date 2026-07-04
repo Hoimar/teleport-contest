@@ -95,21 +95,16 @@ and `feature_map.md`.
     policies miss `0` screens, space-color/strict-display policies miss `5754`,
     and raw DEC strictness misses `7992`; none reproduce the online `57`.
   - Harness truth: `scoreboard:state`/`scoreboard:json` now pass
-    `--score-upstream --score-actions`, resolving the configured upstream ref
-    before scoring a clean `/tmp` checkout and checking the latest successful
-    GitHub Score workflow update for the pushed upstream SHA.
-    The aliases also save both `.cache/leaderboard-data.json` and a
-    timestamped `.cache/leaderboard-history/*.json` snapshot so current and
-    historic online rows remain replayable after the live endpoint moves.
+    `--score-upstream --score-actions`, save `.cache/leaderboard-data.json` and
+    `.cache/leaderboard-history/*.json`, and route next-action text through
+    online-viewer/history/false-positive probes before backend escalation.
   - Harness truth: `scripts/leaderboard-lib.mjs` owns shared leaderboard
     fetch/team/session parsing and failed-session target expansion.
     `npm run score:leaderboard-failures` runs score-surface probes on the
     current failed public leaderboard sessions without manual seed copying.
     `score:online-history` summarizes saved per-session failure volatility.
-    `parity:state` and failure probes take `--leaderboard-json <file>` to replay
-    historic snapshots when the live endpoint has moved or fetch is unavailable.
-    The `scoreboard:*` aliases save their classified raw leaderboard payload to
-    `.cache/leaderboard-data.json` for repeatable follow-up probes.
+    `parity:state` and failure probes take `--leaderboard-json <file>` for
+    repeatable saved/historic snapshot follow-up.
     Worker process failures now make `score-surfaces` exit non-zero, so
     sandbox/runner failures cannot masquerade as scorer mismatches. The shared
     leaderboard parser preserves explicit cursor totals from `data.json`
@@ -136,4 +131,5 @@ and `feature_map.md`.
   - Global next-step check: active public queue is empty. Deployed
     `frozen/screen-decode.mjs`, recent frozen runner refs, recent clean code
     refs, saved online snapshots, and historical session refs do not fingerprint
-    the online row. Continue deployment/environment probes, not seed logic.
+    the online row. Current escalation packet:
+    `scratch/scoreboard-divergence-escalation-2026-07-04.md`.
