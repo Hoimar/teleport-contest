@@ -18,6 +18,10 @@ Implemented follow-up:
   payloads are marked from `dat/symbols`;
 - the base terminal serializer now preserves C tty cursor-forward gaps,
   bright-black darkroom wire color, and single-purpose SGR transition ordering;
+- premapped Sokoban traps now use `trap_to_defsym()` colors instead of a
+  hardcoded gray/brown `^`;
+- stale terminal-grid room floors are serialized/displayed as `S_darkroom`
+  whenever the underlying map cell is out-of-sight `ROOM`;
 - active tty screens trim invisible trailing blank rows for the currently known
   prompt, inventory, and death-disclosure cases.
 
@@ -27,9 +31,10 @@ Current verification:
 - strict sentinels exact `5/5 S 1063/1063 R 64569/64569 C 0`;
 - full-public false-positive audit now has `invisibleSgr=0` and `DEC=0`;
 - current remaining accepted non-exact output is byte-string-only terminal form
-  (`1639` full-public frames, `1518` on the current online-failed subset)
-  after preserving DEC metadata, cursor-run behavior, darkroom wire color, and
-  several tty string/padding forms.
+  (`158` full-public frames, `102` on the current online-failed subset) after
+  preserving DEC metadata, cursor-run behavior, darkroom wire color, Sokoban
+  trap memory colors, stale darkroom map serialization, and several tty
+  string/padding forms.
 
 Remaining open question: this removes the DEC/Unicode and invisible-space
 cell-state false-positive classes, but the online row's sparse `54` missed
@@ -57,8 +62,41 @@ Final verification for this plan state:
 - strict sentinels: `5/5 S 1063/1063 R 64569/64569 C 0`;
 - focused targets exact: `seed0012`, `seed0108`, `seed0900`, `seed2200`,
   `seed4500`;
-- clean-process exact-string audit: `489` remaining non-exact full-public
-  frames, down from `1639` after the prior tty string cleanup.
+- storage-aware false-positive audit: `276` remaining non-exact full-public
+  byte-string-only frames, down from `1639` after the prior tty string cleanup.
+
+## 2026-07-05 second implementation update
+
+The next root-cause pass found two remaining local false-positive classes in
+the online-failed set, both exposed by `seed0360`:
+
+- Sokoban premapped traps used a local gray/brown shortcut instead of C trap
+  symbol colors (`C ref: include/defsym.h trap PCHAR rows via
+  rm.h:trap_to_defsym()`), leaving pit traps as visually accepted but
+  byte-string-wrong `^` glyphs;
+- normal map frames could keep stale default-color DEC room floors in the
+  terminal grid after sight changed, while C `newsym()`/`back_to_glyph()`
+  emits out-of-sight remembered room floor as `S_darkroom`
+  (`C refs: src/display.c:newsym(), src/display.c:back_to_glyph()`).
+
+Implementation:
+
+- `js/mklev.js` now maps premapped Sokoban traps through a general
+  `premapTrapGlyph()` color table;
+- `js/display.js` now uses one `darkRoomMapFloorColor()` helper for map-cell
+  writes, map-row serialization, terrain-only map views, and terminal-grid
+  serialization fallback.
+
+Verification:
+
+- `seed0360` stayed exact under `npm run verify -- --target seed0360` and now
+  has `acceptedNonExact=0`, `exactTerminal=833`;
+- full-public false-positive audit is down to `158` non-exact byte-string-only
+  frames (`11247/11405` exact strings);
+- current leaderboard-failed subset audit is down to `102` non-exact
+  byte-string-only frames (`8297/8399` exact strings);
+- live `parity:state --refresh-live` still reports local public `44/44`, while
+  the leaderboard row is `31/44` from an older unpushed/ahead tree.
 
 ## Diagnosis to preserve
 

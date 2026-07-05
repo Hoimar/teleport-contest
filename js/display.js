@@ -148,6 +148,18 @@ function dark_room_color_display() {
     return game.flags?.dark_room !== false && game.flags?.color !== false;
 }
 
+function darkRoomMapFloorColor(loc, x, y, ch, dec, color) {
+    if (loc?.typ !== ROOM || cansee(x, y) || !dark_room_color_display()) return null;
+    if (ch !== '~' || !dec) return null;
+    const current = color ?? NO_COLOR;
+    if (current !== NO_COLOR && current !== CLR_GRAY) return null;
+    // C refs: display.c:newsym(), display.c:back_to_glyph(),
+    // include/defsym.h:S_darkroom.  Remembered, out-of-sight room floor uses
+    // S_darkroom on color tty, which shares the room DEC glyph but carries
+    // CLR_BLACK.
+    return CLR_BLACK;
+}
+
 function remembered_glyph_for_display(loc, x, y) {
     if (!loc?.remembered_glyph) return null;
     const mem = loc.remembered_glyph;
@@ -1254,12 +1266,14 @@ export function show_glyph_cell(x, y, ch, color = NO_COLOR, decgfx = false, attr
 function write_map_cell(display, x, y, loc, forceBlank = false) {
     if (!display || !loc) return;
     const raw = loc.disp_ch ?? ' ';
+    const color = darkRoomMapFloorColor(loc, x, y, raw, !!loc.disp_decgfx, loc.disp_color)
+        ?? loc.disp_color ?? NO_COLOR;
     const blank = raw === ' '
-        && (loc.disp_color == null || loc.disp_color === CLR_GRAY || loc.disp_color === NO_COLOR)
+        && (color === CLR_GRAY || color === NO_COLOR)
         && !loc.disp_attr;
     if (blank && !forceBlank) return;
     const ch = loc.disp_decgfx ? (DEC_TO_UNICODE[raw] || raw) : raw;
-    display.setCell(x - 1, y + 1, ch, loc.disp_color ?? NO_COLOR, loc.disp_attr ?? 0);
+    display.setCell(x - 1, y + 1, ch, color, loc.disp_attr ?? 0);
     markSerializedDecCell(display, x - 1, y + 1, raw, !!loc.disp_decgfx);
 }
 
@@ -1604,8 +1618,9 @@ function render_map_row(y) {
     for (let x = firstCol; x <= lastCol; x++) {
         const loc = game.level.at(x, y);
         const ch = loc?.disp_ch ?? ' ';
-        const color = loc?.disp_color ?? NO_COLOR;
         const dec = !!loc?.disp_decgfx;
+        const color = darkRoomMapFloorColor(loc, x, y, ch, dec, loc?.disp_color)
+            ?? loc?.disp_color ?? NO_COLOR;
 
         if (ch === ' ') {
             // Space runs
@@ -1650,6 +1665,8 @@ function render_known_terrain_row(y) {
         // known map without monsters, objects, and traps, so render the base
         // terrain instead of the remembered object/monster display layer.
         const glyph = terrain_glyph(loc, x, y);
+        glyph.color = darkRoomMapFloorColor(loc, x, y, glyph.ch, glyph.dec, glyph.color)
+            ?? glyph.color;
         if (glyph.ch === '#' || glyph.ch === '>') glyph.color = NO_COLOR;
         glyphs.set(x, glyph);
         if (glyph.ch !== ' ') {
@@ -2041,7 +2058,19 @@ function colorToSerializedFg(color) {
     return ANSI_COLOR[color] ?? ANSI_DEFAULT;
 }
 
-function serializedCellColor(cell, attr) {
+function serializedMapCellColor(cell, row, col) {
+    if (!cell?._teleportDecgfx || (cell._teleportRawCh ?? cell.ch) !== '~') return null;
+    const x = col + 1;
+    const y = row - 1;
+    if (y < 0 || y >= ROWNO || x < 1 || x >= COLNO) return null;
+    const loc = game.level?.at(x, y);
+    return darkRoomMapFloorColor(loc, x, y, cell._teleportRawCh ?? cell.ch,
+        !!cell._teleportDecgfx, cell.color);
+}
+
+function serializedCellColor(cell, attr, row = -1, col = -1) {
+    const mapColor = serializedMapCellColor(cell, row, col);
+    if (mapColor != null) return mapColor;
     return cell.ch === ' ' && attr === 0 && cell.color === CLR_GRAY
         ? NO_COLOR
         : cell.color;
@@ -2055,7 +2084,7 @@ function countCursorSpaceRun(term, row, col, lastCol, wantFg, wantAttr) {
         const attr = cell.attr | 0;
         if (cell.ch !== ' ' || cell._teleportDecgfx) break;
         if (attr !== wantAttr || (attr & (ATR_INVERSE | ATR_UNDERLINE)) !== 0) break;
-        if (colorToSerializedFg(serializedCellColor(cell, attr)) !== wantFg) break;
+        if (colorToSerializedFg(serializedCellColor(cell, attr, row, c)) !== wantFg) break;
         n++;
     }
     return n;
@@ -2126,7 +2155,7 @@ function serializeTerminalGridWithDec(term) {
         for (let c = firstCol; c <= lastCol;) {
             const cell = term.grid[r][c];
             const wantAttr = cell.attr | 0;
-            const color = serializedCellColor(cell, wantAttr);
+            const color = serializedCellColor(cell, wantAttr, r, c);
             const wantFg = colorToSerializedFg(color);
             const cursorRun = countCursorSpaceRun(term, r, c, lastCol, wantFg, wantAttr);
             if (cursorRun > 4) {

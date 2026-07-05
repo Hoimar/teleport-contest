@@ -337,11 +337,42 @@ Implementation:
 Verification:
 
 - `seed0108` exact string count improved from `120/303` to `303/303`;
-- clean-process full-public exact-string audit now has `489` non-exact frames
-  (`10916/11405` exact strings);
+- storage-aware full-public false-positive audit now has `276` non-exact
+  byte-string-only frames (`11129/11405` exact strings);
 - official checked-in public score remains exact:
   `44/44 S 11405/11405 R 792838/792838 C 0`;
 - strict sentinels remained exact through focused verification.
+
+## Implemented trap-memory and stale darkroom serialization follow-up
+
+The next focused pass used `seed0360` because it carried two large
+online-failed false-positive buckets:
+
+- first accepted byte mismatch: premapped Sokoban pit traps rendered as gray
+  `^`, while C trap symbols use `S_pit`/`S_spiked_pit` `CLR_BLACK`
+  (`C ref: include/defsym.h trap PCHAR rows via rm.h:trap_to_defsym()`);
+- second accepted byte mismatch: normal map frames retained stale default-color
+  DEC room floors, while C emits remembered, out-of-sight room floor as
+  `S_darkroom` bright-black `ESC[90m`
+  (`C refs: src/display.c:newsym(), src/display.c:back_to_glyph()`).
+
+Implementation:
+
+- `js/mklev.js` now uses `premapTrapGlyph()` for premapped Sokoban traps;
+- `js/display.js` now applies a shared `darkRoomMapFloorColor()` rule when
+  writing map cells, serializing map rows, serializing terrain-only views, and
+  falling back over stale terminal-grid DEC room-floor cells.
+
+Verification:
+
+- `seed0360` stayed visually exact and strict-string clean:
+  `acceptedNonExact=0`, `exactTerminal=833`;
+- full-public false-positive audit now has `158` non-exact byte-string-only
+  frames (`11247/11405` exact strings), down from `276`;
+- current leaderboard-failed subset now has `102` non-exact byte-string-only
+  frames (`8297/8399` exact strings), down from `220`;
+- live `parity:state --refresh-live` still reports local public `44/44` but
+  leaderboard public `31/44`; the row is older than this unpushed local tree.
 
 ## Next fix plan
 
@@ -361,8 +392,9 @@ Verification:
      bucket;
    - competitor controls still reproducible via `--project-root`.
 5. With DEC, invisible-space, darkroom wire-color, darkroom memory, blindness
-   redraw, SGR-combination, and several tty-window padding differences
-   eliminated, rank remaining string-only differences by screen/session
-   coverage. Current broad cell predicates miss `0` screens, while exact-string
-   strictness still misses `489` full-public frames, not the online sparse miss
-   shape.
+   redraw, Sokoban trap-memory colors, stale darkroom serialization,
+   SGR-combination, and several tty-window padding differences eliminated,
+   rank remaining string-only differences by screen/session coverage. Current
+   broad cell predicates miss `0` screens, while exact-string strictness still
+   misses `158` full-public frames (`102` on the current online-failed subset),
+   not the online sparse miss shape.
