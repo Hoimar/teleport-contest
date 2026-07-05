@@ -132,7 +132,7 @@ const MONSTER_SYMBOLS = {
 };
 
 function tty_color(color) {
-    return color === CLR_GRAY || color === CLR_BLACK ? NO_COLOR : color;
+    return color === CLR_GRAY ? NO_COLOR : color;
 }
 
 function rogue_level_display() {
@@ -1389,6 +1389,15 @@ export function newsym(x, y) {
         if (wg) {
             show_glyph_cell(x, y, wg.ch, wg.color, false);
         } else if (loc.remembered_glyph) {
+            const roomGlyph = terrain_glyph({ ...loc, typ: ROOM }, x, y);
+            if (loc.typ === ROOM && dark_room_color_display()
+                && loc.remembered_glyph.ch === roomGlyph.ch
+                && !!loc.remembered_glyph.decgfx === !!roomGlyph.dec) {
+                // C refs: display.c:newsym(), display.c:map_background().
+                // Unseen remembered room floor is S_darkroom: same glyph,
+                // but CLR_BLACK wire color under tty dark_room+color.
+                loc.remembered_glyph = { ...loc.remembered_glyph, color: CLR_BLACK };
+            }
             if (loc.typ === CORR && (!loc.waslit || dark_room_color_display())
                 && loc.remembered_glyph.ch === '#'
                 && loc.remembered_glyph.color === CLR_WHITE) {
@@ -2017,8 +2026,7 @@ export function putDecstr(display, col, row, rawText, color = NO_COLOR, attr = 0
 }
 
 function colorToSerializedFg(color) {
-    if (color === 8 || color < 0 || color > 15) return 39;
-    return color < 8 ? 30 + color : 90 + (color - 8);
+    return ANSI_COLOR[color] ?? ANSI_DEFAULT;
 }
 
 function serializedCellColor(cell, attr) {

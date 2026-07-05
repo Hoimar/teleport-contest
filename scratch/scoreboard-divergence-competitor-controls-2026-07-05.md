@@ -193,6 +193,43 @@ only, mostly C tty SGR placement around DEC floor glyphs and cursor movement
 choices. That still does not explain the leaderboard's `54` sparse cell-grid
 misses by itself.
 
+## Implemented darkroom wire-color follow-up
+
+The next largest string-only class was C tty's `S_darkroom` handling. Upstream
+keeps the same room-floor glyph for unseen remembered room cells but changes
+the cmap color to `CLR_BLACK` when `dark_room` and tty color are enabled
+(`C refs: display.c:newsym()`, `display.c:map_background()`,
+`dat/symbols S_darkroom`). Tty emits that black as bright-black `ESC[90m`;
+the frozen decoder maps `90` to the same default visual color, so this was a
+pure byte-string difference until we preserved the wire color.
+
+Follow-up implementation:
+
+- `tty_color()` no longer discards `CLR_BLACK`;
+- the DEC-aware base serializer now uses the C tty `ANSI_COLOR` table, so
+  `CLR_BLACK` serializes as `ESC[90m` instead of plain black `ESC[30m`;
+- out-of-sight remembered room-floor glyphs are rewritten to `CLR_BLACK`
+  under `dark_room`+color while preserving the same visible glyph and DEC
+  payload.
+
+Verification after this follow-up:
+
+- `seed0002-healer-reflection-drummer` remains visual exact and improves from
+  `58` exact terminal/string frames after the first DEC fix to `593/595`;
+- online-failed subset remains local visual exact:
+  `8399/8399`, with accepted non-exact terminal screens reduced to `1618`
+  (`invisibleSgr=0`, `dec=0`, `other=1618`, exact terminal/string `6781`);
+- full public corpus remains local visual exact:
+  `11405/11405`, with accepted non-exact terminal screens reduced to `1773`
+  (`invisibleSgr=0`, `dec=0`, `other=1773`, exact terminal/string `9632`).
+
+The remaining string-only classes are now concentrated in tty windows and a
+few row-state ordering differences: option menu inverse headers/column gaps,
+overview depth lists, some final text-window trailing-newline trimming, and
+isolated DEC/SI-vs-SGR ordering. They are still much broader than the online
+`54` sparse cell-grid misses and all local cell-state comparator variants
+remain exact.
+
 Live refresh after the implementation still classified the public row as
 `local-dirty-or-unpushed`: the leaderboard last scored Hoimar at
 `2026-07-04T22:30:17.282Z`, before this local tree, and the workspace was
@@ -216,7 +253,8 @@ online row to move until the relevant commits are pushed and rescored.
    - `score:false-positive-audit --full` improved against the targeted
      bucket;
    - competitor controls still reproducible via `--project-root`.
-5. With DEC and strict cell-state differences now eliminated, rank remaining
-   string-only differences by screen/session coverage. Current broad cell
-   predicates miss `0` screens, while exact-string strictness misses thousands,
-   not the online `54`.
+5. With DEC, invisible-space, and darkroom wire-color differences now
+   eliminated, rank remaining tty-window string-only differences by
+   screen/session coverage. Current broad cell predicates miss `0` screens,
+   while exact-string strictness still misses `1773` full-public frames, not
+   the online `54`.

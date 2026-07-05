@@ -16,7 +16,8 @@ Live checkpoint only. For history, use `git log`, `git show`, `lessons.md`
   live ahead/behind state.
 - Latest verified repair units: runtime shapechange side effects, checked-in
   help data, deterministic inventory ordering, scoreboard diagnostics,
-  false-positive audits, DECgraphics metadata, and tty cursor-run serialization.
+  false-positive audits, DECgraphics metadata, tty cursor-run serialization,
+  and darkroom wire-color serialization.
 - Checked-in public corpus is exact: `44/44 S 11405/11405 R 792838/792838 C 0`.
 - Last refreshed hosted public cache is exact:
   `44/44 S 10982/10982 R 840358/840358 C 0`. It still classifies as
@@ -41,12 +42,13 @@ Live checkpoint only. For history, use `git log`, `git show`, `lessons.md`
   surfaces. Browser replay, public `/play` assets, Actions, and ref-history do
   not fingerprint the row. Competitor controls showed two online-44 repos have
   exact terminal strings, while `xeophon` has many non-exact frames but zero
-  DEC frames and matches its online/local 43/44 shape. Hoimar's DEC/Unicode
-  class is now repaired: `score:false-positive-audit --full` reports
-  full-public visual `11405/11405`, online-failed visual `8399/8399`,
-  `invisibleSgr=0`, DEC `0`, and all local cell-state variants miss `0`.
-  Remaining accepted non-exact frames are byte-string-only terminal form:
-  `7576` full-public and `6709` on the online-failed subset.
+  DEC frames and matches its online/local 43/44 shape. Hoimar's DEC/Unicode,
+  invisible-space, and darkroom wire-color classes are now repaired:
+  `score:false-positive-audit --full` reports full-public visual
+  `11405/11405`, online-failed visual `8399/8399`, `invisibleSgr=0`, DEC `0`,
+  and all local cell-state variants miss `0`. Remaining accepted non-exact
+  frames are byte-string-only terminal form: `1773` full-public and `1618` on
+  the online-failed subset.
 
 ## Latest Loop Checkpoint
 
@@ -88,7 +90,7 @@ Live checkpoint only. For history, use `git log`, `git show`, `lessons.md`
   - Harness truth: `scripts/score-false-positive-audit.mjs` now ranks narrow
     comparator policies. Current `31/44` evidence after DEC and cursor-run
     repairs: all cell-state variants miss `0` screens on the 13 online-failed
-    sessions; exact string form still differs on `6709` frames and is much
+    sessions; exact string form still differs on `1618` frames and is much
     broader than the online `54`.
   - Production truth: terminal cells can now carry raw DECgraphics payload
     metadata while retaining Unicode browser display. The base serializer emits
@@ -97,8 +99,9 @@ Live checkpoint only. For history, use `git log`, `git show`, `lessons.md`
     round-tripping stored tty screens. DECgraphics liquid, tree, iron-bars,
     altars, loot-menu frames, and swallowed-frame payloads are marked from
     `dat/symbols`; the terminal-grid serializer compresses internal uniform
-    blank runs longer than four cells with `ESC[nC` when no visible
-    inverse/underline attribute would be painted.
+    blank runs longer than four cells with `ESC[nC`, preserves unseen room
+    `S_darkroom` as bright-black `ESC[90m`, and skips only blanks with no
+    visible inverse/underline pixels.
   - Harness truth: `scoreboard:state`/`scoreboard:json` now pass
     `--score-upstream --score-actions`, save `.cache/leaderboard-data.json` and
     `.cache/leaderboard-history/*.json`, and route next-action text through

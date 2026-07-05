@@ -23,7 +23,8 @@ Current verification:
 - strict sentinels exact `5/5 S 1063/1063 R 64569/64569 C 0`;
 - full-public false-positive audit now has `invisibleSgr=0` and `DEC=0`;
 - current remaining accepted non-exact output is byte-string-only terminal form
-  (`7576` full-public frames, `6709` on the current online-failed subset).
+  (`1773` full-public frames, `1618` on the current online-failed subset)
+  after preserving DEC metadata, cursor-run behavior, and darkroom wire color.
 
 Remaining open question: this removes the DEC/Unicode and invisible-space
 cell-state false-positive classes, but the online row's sparse `54` missed
