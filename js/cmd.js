@@ -14,7 +14,7 @@ import {
     see_monsters, see_objects, see_nearby_objects, see_traps, refresh_message_clear_map_rows,
     refresh_warning_monsters, map_level_for_wizard,
     object_glyph_for_menu, serialize_known_terrain_view_screen, terrain_glyph, cls,
-    unmap_invisible_memory, installSerializedScreenHook,
+    unmap_invisible_memory, installSerializedScreenHook, putDecstr,
 } from './display.js';
 import { cansee, couldsee, vision_recalc, vision_reset } from './vision.js';
 import {
@@ -7536,13 +7536,12 @@ async function showLootPutInGoldMenu(container, selected = false, opts = {}) {
     clearLootMenuArea(23, 4);
     const gold = game._goldCount || 0;
     display.putstr(41, 0, 'Put in what?', NO_COLOR, ATR_INVERSE);
-    display.putstr(34, 2, '┌───── ', NO_COLOR, 0);
+    putDecstr(display, 34, 2, 'lqqqqq', NO_COLOR, 0);
+    display.setCell(40, 2, ' ', NO_COLOR, 0);
     display.putstr(41, 2, 'Coins', NO_COLOR, ATR_INVERSE);
-    display.putstr(34, 3, '│', NO_COLOR, 0);
-    display.putstr(35, 3, '·····', NO_COLOR, 0);
+    putDecstr(display, 34, 3, 'x~~~~~', NO_COLOR, 0);
     display.putstr(41, 3, `$ ${selected ? '+' : '-'} ${gold} gold pieces`, NO_COLOR, 0);
-    display.putstr(34, 4, '│', NO_COLOR, 0);
-    display.putstr(35, 4, '·····', NO_COLOR, 0);
+    putDecstr(display, 34, 4, 'x~~~~~', NO_COLOR, 0);
     display.putstr(41, 4, '(end)', NO_COLOR, 0);
     game._loot_action_menu = null;
     game._loot_type_menu = null;

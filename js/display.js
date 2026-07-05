@@ -485,7 +485,7 @@ export function terrain_glyph(loc, x, y) {
     case ALTAR:
         // C ref: dat/symbols DECGraphics S_altar uses the raw DEC payload
         // byte '{'; the harness cell decoder preserves that byte.
-        return { ch: '{', color: altarColor(loc), dec: false };
+        return { ch: '{', color: altarColor(loc), dec: true };
     case GRAVE:     return { ch: '|', color: CLR_WHITE, dec: false };
     case THRONE:    return { ch: '\\', color: CLR_YELLOW, dec: false };
     case TREE:
@@ -2007,9 +2007,38 @@ function markSerializedDecCell(display, col, row, raw, decgfx) {
     cell._teleportRawCh = raw;
 }
 
+export function putDecstr(display, col, row, rawText, color = NO_COLOR, attr = 0) {
+    const text = String(rawText ?? '');
+    for (let i = 0; i < text.length; i++) {
+        const raw = text[i];
+        display?.setCell?.(col + i, row, DEC_TO_UNICODE[raw] || raw, color, attr);
+        markSerializedDecCell(display, col + i, row, raw, true);
+    }
+}
+
 function colorToSerializedFg(color) {
     if (color === 8 || color < 0 || color > 15) return 39;
     return color < 8 ? 30 + color : 90 + (color - 8);
+}
+
+function serializedCellColor(cell, attr) {
+    return cell.ch === ' ' && attr === 0 && cell.color === CLR_GRAY
+        ? NO_COLOR
+        : cell.color;
+}
+
+function countCursorSpaceRun(term, row, col, lastCol, wantFg, wantAttr) {
+    if ((wantAttr & (ATR_INVERSE | ATR_UNDERLINE)) !== 0) return 0;
+    let n = 0;
+    for (let c = col; c <= lastCol; c++) {
+        const cell = term.grid[row][c];
+        const attr = cell.attr | 0;
+        if (cell.ch !== ' ' || cell._teleportDecgfx) break;
+        if (attr !== wantAttr || (attr & (ATR_INVERSE | ATR_UNDERLINE)) !== 0) break;
+        if (colorToSerializedFg(serializedCellColor(cell, attr)) !== wantFg) break;
+        n++;
+    }
+    return n;
 }
 
 function serializedSgrTransition(curFg, curAttr, wantFg, wantAttr) {
@@ -2076,10 +2105,24 @@ function serializeTerminalGridWithDec(term) {
         if (firstCol > 4) out += `\x1b[${firstCol}C`;
         else if (firstCol > 0) out += ' '.repeat(firstCol);
 
-        for (let c = firstCol; c <= lastCol; c++) {
+        for (let c = firstCol; c <= lastCol;) {
             const cell = term.grid[r][c];
-            const wantFg = colorToSerializedFg(cell.color);
             const wantAttr = cell.attr | 0;
+            const color = serializedCellColor(cell, wantAttr);
+            const wantFg = colorToSerializedFg(color);
+            const cursorRun = countCursorSpaceRun(term, r, c, lastCol, wantFg, wantAttr);
+            if (cursorRun > 4) {
+                out += serializedSgrTransition(curFg, curAttr, wantFg, wantAttr);
+                curFg = wantFg;
+                curAttr = wantAttr;
+                if (curDec) {
+                    out += '\x0f';
+                    curDec = false;
+                }
+                out += `\x1b[${cursorRun}C`;
+                c += cursorRun;
+                continue;
+            }
             out += serializedSgrTransition(curFg, curAttr, wantFg, wantAttr);
             curFg = wantFg;
             curAttr = wantAttr;
@@ -2090,6 +2133,7 @@ function serializeTerminalGridWithDec(term) {
                 curDec = wantDec;
             }
             out += wantDec ? (cell._teleportRawCh ?? cell.ch) : cell.ch;
+            c++;
         }
 
         if (curDec) {

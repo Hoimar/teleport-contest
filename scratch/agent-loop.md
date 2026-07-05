@@ -1,7 +1,7 @@
 # Teleport Implementation Loop
 
-Live checkpoint only. For history, use `git log`, `git show`, `lessons.md` (avoid token-intensive full reads as explained in `AGENTS.md`'s "## Memory Routing"),
-and `feature_map.md`.
+Live checkpoint only. For history, use `git log`, `git show`, `lessons.md`
+(avoid full reads per `AGENTS.md`), and `feature_map.md`.
 
 ## Context Rules
 
@@ -15,19 +15,18 @@ and `feature_map.md`.
 - Current branch in this workspace: `main`; use `agent:brief` Branch/status for
   live ahead/behind state.
 - Latest verified repair units: runtime shapechange side effects, checked-in
-  help pager data, deterministic inventory ordering, scoreboard diagnostics,
-  online-viewer advisory reporting, false-positive scorer audits, and
-  DECgraphics terminal serialization metadata.
+  help data, deterministic inventory ordering, scoreboard diagnostics,
+  false-positive audits, DECgraphics metadata, and tty cursor-run serialization.
 - Checked-in public corpus is exact: `44/44 S 11405/11405 R 792838/792838 C 0`.
 - Last refreshed hosted public cache is exact:
   `44/44 S 10982/10982 R 840358/840358 C 0`. It still classifies as
   `public-session-drift` because 30 hosted session files differ from
   checked-in sessions, but both score surfaces are exact.
 - Leaderboard fetch succeeds from `https://mazesofmenace.ai/leaderboard/data.json`.
-  Default inferred team `Hoimar` currently classifies as
-  `leaderboard-lag-after-persistent-drift`: leaderboard public
+  Default inferred team `Hoimar` most recently classified as
+  `local-dirty-or-unpushed`: leaderboard public
   `31/44 S 11351/11405 R 792838/792838`, scored at
-  `2026-07-04T22:30:17.282Z`.
+  `2026-07-04T22:30:17.282Z`, before the current local-ahead scorer repairs.
 - Clean-ref evidence scores `origin/main`/`HEAD` at
   `44/44 S 11405/11405 R 792838/792838`; the leaderboard row predates latest
   Actions but recent history was already persistently below local.
@@ -38,23 +37,16 @@ and `feature_map.md`.
 - Strict sentinels are exact:
   `5/5 S 1063/1063 R 64569/64569 C 0`.
 - Current public classification: checked-in and hosted public corpora are exact;
-  leaderboard fetch works, but the online row is still below all reproduced
-  scorer surfaces. Visual surfaces, official browser replay, public `/play`
-  assets, and GitHub Actions pass; `score:ref-history` found no exact stale-ref
-  fingerprint across 46 recent commits back to `6864a80`. The current
-  false-positive audit also rejects broad local visual-comparator strictness as
-  the full explanation: the 13 online-failed sessions still have 8112 locally
-  accepted non-exact terminal/string frames while the online row misses only 54
-  screens, and all 44 public sessions have accepted non-exact frames. Competitor
-  controls showed two online-44 repos (`kevinjosethomas`, `serteal`) have exact
-  terminal/string output for all public frames, while `xeophon` has many
-  accepted non-exact frames but zero DEC accepted frames and matches its
-  online/local 43/44 shape. Hoimar's DEC/Unicode false-positive class is now
-  repaired: `score:false-positive-audit --limit=0` reports full-public visual
-  `11405/11405` with DEC bucket `0`, and the online-failed subset reports
-  visual `8399/8399` with DEC bucket `0`. Remaining accepted non-exact frames
-  are invisible SGR (`5730` on the online-failed subset) and other
-  string/encoding differences (`2382`, mostly cursor-forward compression).
+  leaderboard fetch works, but the online row is still below reproduced scorer
+  surfaces. Browser replay, public `/play` assets, Actions, and ref-history do
+  not fingerprint the row. Competitor controls showed two online-44 repos have
+  exact terminal strings, while `xeophon` has many non-exact frames but zero
+  DEC frames and matches its online/local 43/44 shape. Hoimar's DEC/Unicode
+  class is now repaired: `score:false-positive-audit --full` reports
+  full-public visual `11405/11405`, online-failed visual `8399/8399`,
+  `invisibleSgr=0`, DEC `0`, and all local cell-state variants miss `0`.
+  Remaining accepted non-exact frames are byte-string-only terminal form:
+  `7576` full-public and `6709` on the online-failed subset.
 
 ## Latest Loop Checkpoint
 
@@ -94,15 +86,19 @@ and `feature_map.md`.
     leaderboard row. When driven by leaderboard failures, it now prints the
     official failed-session reference and each local surface minus that row.
   - Harness truth: `scripts/score-false-positive-audit.mjs` now ranks narrow
-    comparator policies. Current `30/44` evidence: current visual/space-neutral
-    policies miss `0` screens, space-color/strict-display policies miss `5754`,
-    and raw DEC strictness misses `7992`; none reproduce the online `57`.
+    comparator policies. Current `31/44` evidence after DEC and cursor-run
+    repairs: all cell-state variants miss `0` screens on the 13 online-failed
+    sessions; exact string form still differs on `6709` frames and is much
+    broader than the online `54`.
   - Production truth: terminal cells can now carry raw DECgraphics payload
     metadata while retaining Unicode browser display. The base serializer emits
     SO/SI around marked cells, active serialized text screens remain the outer
     capture override, and `renderTextScreen()` preserves DEC metadata when
-    round-tripping stored tty screens. DECgraphics liquid, tree, iron-bars, and
-    swallowed-frame payloads are marked from `dat/symbols`.
+    round-tripping stored tty screens. DECgraphics liquid, tree, iron-bars,
+    altars, loot-menu frames, and swallowed-frame payloads are marked from
+    `dat/symbols`; the terminal-grid serializer compresses internal uniform
+    blank runs longer than four cells with `ESC[nC` when no visible
+    inverse/underline attribute would be painted.
   - Harness truth: `scoreboard:state`/`scoreboard:json` now pass
     `--score-upstream --score-actions`, save `.cache/leaderboard-data.json` and
     `.cache/leaderboard-history/*.json`, and route next-action text through

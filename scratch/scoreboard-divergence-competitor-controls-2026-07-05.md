@@ -148,25 +148,75 @@ the online scorer's sparse `54` cell-grid misses. The next layer is not
 DEC/Unicode; it is the remaining cursor-forward/string compression and
 invisible SGR state, or a backend predicate not exposed by the public viewer.
 
+## Implemented terminal-grid follow-up
+
+After the DEC repair, a focused strict-display scan found one residual
+cell-state false-positive class: `seed0373-barbarian-quest-tour` had 11 Air
+screens where a blank cell decoded as cyan locally but default in the canonical
+tty transcript. The canonical string used `ESC[5C` to move over a run of five
+cyan Air blanks; the old base serializer wrote five literal spaces, which
+painted invisible foreground state into the decoded grid.
+
+Follow-up implementation:
+
+- added `putDecstr()` so tty-window overlays can write browser-visible Unicode
+  while preserving raw DEC payload bytes on terminal cells;
+- changed the loot put-in gold menu to draw its DEC frame/filler with raw
+  `l/q/x/~` payloads instead of literal Unicode `┌/─/│/·`;
+- marked DECgraphics altars as raw DEC payload `{` (`C ref: dat/symbols
+  DECGraphics S_altar`);
+- normalized plain `CLR_GRAY` spaces to default color in terminal-grid
+  serialization;
+- compressed internal uniform blank runs longer than four cells to `ESC[nC`
+  when the cells have no visible inverse/underline attribute and no DEC
+  metadata, preserving the active SGR state without painting skipped cells.
+
+Verification after this follow-up:
+
+- `seed0373-barbarian-quest-tour` remains exact:
+  `S 124/124 R 35386/35386 C 0`;
+- strict sentinels remain exact:
+  `5/5 S 1063/1063 R 64569/64569 C 0`;
+- online-failed subset remains local visual exact:
+  `8399/8399`, with accepted non-exact terminal screens reduced to `6709`
+  (`invisibleSgr=0`, `dec=0`, `other=6709`, exact terminal/string `1690`);
+- full public corpus remains local visual exact:
+  `11405/11405`, with accepted non-exact terminal screens reduced to `7576`
+  (`invisibleSgr=0`, `dec=0`, `other=7576`, exact terminal/string `3829`);
+- all ranked cell-state comparator variants now miss `0` screens on the
+  current 13 online-failed sessions.
+
+This is the strongest local false-positive cleanup so far: broad local visual
+acceptance no longer hides DEC state, invisible SGR-on-space state, or raw DEC
+cell-state differences. The remaining non-exact output is byte-string form
+only, mostly C tty SGR placement around DEC floor glyphs and cursor movement
+choices. That still does not explain the leaderboard's `54` sparse cell-grid
+misses by itself.
+
+Live refresh after the implementation still classified the public row as
+`local-dirty-or-unpushed`: the leaderboard last scored Hoimar at
+`2026-07-04T22:30:17.282Z`, before this local tree, and the workspace was
+ahead of `origin/main` with uncommitted serializer changes. Do not expect the
+online row to move until the relevant commits are pushed and rescored.
+
 ## Next fix plan
 
-1. Keep `--project-root` in the false-positive audit so competitor controls can
-   be rerun without copying scripts into clones.
-2. Add a focused diagnostic that prints the first accepted DEC/string
-   difference per selected screen, including raw actual/expected escape
-   context. Implemented as `--samples`, `--sample-class`, and
-   `--sample-per-session`.
-3. Compare Hoimar's DEC accepted frames against `xeophon`'s non-DEC accepted
-   frames and the current 54 online misses; look for a predicate that selects
-   dozens of Hoimar screens, not thousands.
+1. Keep `--project-root` and sample flags in the false-positive audit so
+   competitor controls can be rerun without copying scripts into clones.
+2. Push/score timing is now a first-class branch-state issue: this checkout is
+   ahead of `origin/main`, so the current leaderboard cannot validate these
+   repairs yet.
+3. If the scorer still reports a sparse 30/44-style row after these commits are
+   pushed and rescored, request or recover the backend's first failed screen
+   indices; the public viewer advisory does not expose them.
 4. Only after that predicate is known, implement the smallest serialization or
-   display-state change that removes that predicate while keeping:
+   display-state change that removes it while keeping:
    - checked-in public exact `44/44`;
    - strict sentinels exact;
-   - `score:false-positive-audit --limit=0` improved against the targeted
+   - `score:false-positive-audit --full` improved against the targeted
      bucket;
    - competitor controls still reproducible via `--project-root`.
-5. With DEC now eliminated, rank remaining accepted non-exact frames by
-   screen/session coverage and look for predicates that select dozens of
-   frames, not thousands. Current broad predicates still miss either `0` or
-   `5730` screens, not the online `54`.
+5. With DEC and strict cell-state differences now eliminated, rank remaining
+   string-only differences by screen/session coverage. Current broad cell
+   predicates miss `0` screens, while exact-string strictness misses thousands,
+   not the online `54`.
