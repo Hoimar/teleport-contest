@@ -183,6 +183,43 @@ placement cases where color is only a proxy. A full cleanup should retain a
 C-like glyph identity for remembered cells (`S_room` versus `S_darkroom`) so
 the serializer does not have to infer identity from current color or map state.
 
+## 2026-07-05 fifth implementation update
+
+The next loop split the remaining evidence into one real map-visibility bug
+and two terrain/terminal byte-form rules:
+
+- `seed0012` was not a scorer issue. JS vault fake-corridor and guard-exit
+  terrain mutations changed whether light could pass through a square without
+  invalidating the cached vision topology. C calls `unblock_point()` or
+  `recalc_block_point()` on the same paths (`C refs: vault.c:restfakecorr(),
+  vault.c:gd_move(), vision.c:unblock_point()/recalc_block_point()`). JS now
+  marks vision topology dirty for vault fake corridors and ordinary door
+  open/close/kick terrain changes.
+- `seed0002` screens 502/503 were `#terrain` known-map screens, not ordinary
+  map frames. C `detect.c:reveal_terrain_getglyph()` normalizes
+  `S_darkroom -> S_room` and `S_litcorr -> S_corr`; JS terrain-view
+  serialization no longer applies ordinary darkroom wire color there and
+  closes DEC graphics before the final color reset.
+- The save-exit terminal screen now stores only `Be seeing you...`, matching
+  `save.c:dosave() -> exit_nhwindows("Be seeing you...")`, instead of
+  materializing trailing blank rows.
+
+Live public status has also moved: `parity:state -- --refresh-live` now reports
+leaderboard public exact `44/44 S 11405/11405 R 792838/792838`; the remaining
+online gap is private held-out (`2/44`) plus local dirty work not yet scored.
+
+Verification:
+
+- `seed0012` exact-terminal audit is clean:
+  `acceptedNonExact=0`, `exactTerminal=308`;
+- `seed0002` exact-terminal audit is clean:
+  `acceptedNonExact=0`, `exactTerminal=595`;
+- `seed0013-friday13-save-then-fullmoon-restore` exact-terminal audit is
+  clean: `acceptedNonExact=0`, `exactTerminal=99`;
+- full-public false-positive audit is down to `27` byte-string-only frames
+  (`11378/11405` exact strings), with `invisibleSgr=0` and `dec=0`;
+- strict sentinels remain exact: `5/5 S 1063/1063 R 64569/64569 C 0`.
+
 ## Diagnosis to preserve
 
 The online 30/44 plateau is not a production gameplay parity bug reproduced in

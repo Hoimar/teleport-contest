@@ -1,5 +1,26 @@
 # Scoreboard Divergence RCA, second pass - 2026-07-04
 
+## 2026-07-05 addendum
+
+This report is now historical. The 2026-07-05 live refresh moved Hoimar's
+public leaderboard row to exact `44/44 S 11405/11405 R 792838/792838`; the
+remaining online gap is private held-out (`2/44`). Competitor controls still
+changed the conclusion: Hoimar did have real local visual false-positive
+classes, so production terminal-byte cleanups were valid even though the
+public plateau later resolved.
+
+Current implemented follow-up:
+
+- vault fake-corridor/guard-exit and ordinary door terrain changes now dirty
+  vision topology like C `unblock_point()` / `recalc_block_point()`;
+- `#terrain` known-map serialization follows
+  `detect.c:reveal_terrain_getglyph()` and normalizes
+  `S_darkroom -> S_room`, `S_litcorr -> S_corr`;
+- save-exit terminal output stores only `Be seeing you...`;
+- full-public false-positive audit is now `27` accepted non-exact
+  byte-string-only frames, with `invisibleSgr=0`, `dec=0`, and exact
+  terminal/string `11378/11405`.
+
 ## Executive summary
 
 The 30/44 plateau is still real, but it is not reproduced by any repo-side

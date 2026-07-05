@@ -16,32 +16,28 @@ Live checkpoint only. For history, use `git log`, `git show`, `lessons.md`
 - Latest verified repair units: runtime shapechange side effects, checked-in
   help data, deterministic inventory ordering, scoreboard diagnostics,
   false-positive audits, DECgraphics metadata, darkroom wire color, active
-  tty-screen blank-run serialization, stored terminal-cell color, and top-ten
-  trailing-row trimming.
+  tty-screen blank-run serialization, stored terminal-cell color, top-ten
+  trailing-row trimming, vault vision-topology refresh, terrain-view
+  darkroom normalization, and save-exit row trimming.
 - Checked-in public corpus is exact: `44/44 S 11405/11405 R 792838/792838 C 0`.
 - Last refreshed hosted public cache is exact:
   `44/44 S 10982/10982 R 840358/840358 C 0`; it is `public-session-drift`
   only because 30 hosted session files differ while both surfaces are exact.
 - Leaderboard fetch succeeds from `https://mazesofmenace.ai/leaderboard/data.json`.
-  Default inferred team `Hoimar` most recently classified as
-  `local-dirty-or-unpushed`: leaderboard public
-  `30/44 S 11349/11405 R 792838/792838`, scored at
-  `2026-07-05T09:14:23.208Z`, before the current local-ahead scorer repairs.
-- Clean-ref `origin/main`/`HEAD` scores `44/44 S 11405/11405 R 792838/792838`;
-  recent leaderboard history was persistently below local.
-- Online failure signature is screen-only: 14 failed public sessions, 56
-  missed screens, full RNG and RNG-step match for all 14; cell-only metrics
-  equal the combined screen score on all 14, so the online misses are cell-grid
-  misses rather than cursor-only misses.
+  Default inferred team `Hoimar` most recently classified as `heldout-only-gap`:
+  leaderboard public exact `44/44 S 11405/11405 R 792838/792838`, scored at
+  `2026-07-05T10:54:47.458Z`; held-out private remains `2/44`.
+- Clean-ref `origin/main`/`HEAD` scores `44/44 S 11405/11405 R 792838/792838`.
+- The earlier public online failure signature was screen-only cell-grid drift,
+  but the current live public row no longer reproduces that plateau.
 - Strict sentinels are exact: `5/5 S 1063/1063 R 64569/64569 C 0`.
-- Current public classification: checked-in and hosted public corpora are exact;
-  leaderboard fetch works, but the online row is still below reproduced scorer
-  surfaces. Browser replay, `/play` assets, Actions, and ref-history do not
-  fingerprint the row. Competitor controls showed online-44 repos have exact
-  strings; Hoimar's DEC/Unicode, invisible-space, darkroom wire-color, SGR, and
-  tty padding classes are now repaired. Current storage-aware audit: local visual
-  `44/44`, `invisibleSgr=0`, DEC `0`, cell variants miss `0`, exact-string form
-  misses `60` full-public frames (`7` on the online-failed subset).
+- Current public classification: checked-in, hosted public, and leaderboard
+  public corpora are exact. Competitor controls showed online-44 repos have
+  exact strings; Hoimar's DEC/Unicode, invisible-space, darkroom wire-color,
+  SGR, tty padding, stored-cell-color, terrain-view, and terminal-exit classes
+  are now mostly repaired. Current full-public audit: local visual `44/44`,
+  `invisibleSgr=0`, DEC `0`, accepted non-exact byte-string-only frames `27`,
+  exact terminal/string `11378/11405`.
 
 ## Latest Loop Checkpoint
 

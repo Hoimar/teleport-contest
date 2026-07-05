@@ -493,3 +493,42 @@ The remaining live-failed local byte-form cases are limited to `seed0002` and
    broad cell predicates miss `0` screens, while exact-string strictness still
    misses `60` full-public frames (`7` on the current online-failed subset),
    not the online sparse miss shape.
+
+## Implemented vault/terrain exact-string follow-up
+
+The next pass was driven by exact-terminal false-positive auditing, not by the
+now-moved live public row. `parity:state -- --refresh-live` now reports Hoimar
+leaderboard public exact `44/44 S 11405/11405 R 792838/792838`; the remaining
+online gap is private held-out (`2/44`). The production cleanup still matters
+for hidden cleanliness because local visual parity had been accepting byte-form
+differences.
+
+Implementation:
+
+- vault fake-corridor and guard-exit terrain changes now mark the vision
+  obstruction topology dirty, matching C's `unblock_point()` /
+  `recalc_block_point()` calls on those paths;
+- ordinary door open/close/kick terrain changes now use the same topology
+  refresh helper;
+- the loot put-in-gold menu restores the underlying map cells instead of
+  painting fake DEC room fillers;
+- `#terrain` known-map serialization follows
+  `detect.c:reveal_terrain_getglyph()`: terrain view normalizes
+  `S_darkroom -> S_room` and `S_litcorr -> S_corr`, and its row epilogue emits
+  SI before the final color reset;
+- save-exit uses the single `exit_nhwindows("Be seeing you...")` text row
+  instead of retaining invisible trailing blank rows.
+
+Verification:
+
+- `seed0012` exact-terminal audit is clean:
+  `acceptedNonExact=0`, `exactTerminal=308`;
+- `seed0002` exact-terminal audit is clean:
+  `acceptedNonExact=0`, `exactTerminal=595`;
+- `seed0013-friday13-save-then-fullmoon-restore` exact-terminal audit is
+  clean: `acceptedNonExact=0`, `exactTerminal=99`;
+- full public corpus remains local visual exact:
+  `11405/11405`, with accepted non-exact terminal screens reduced to `27`
+  (`invisibleSgr=0`, `dec=0`, `other=27`, exact terminal/string `11378`);
+- strict sentinels remain exact:
+  `5/5 S 1063/1063 R 64569/64569 C 0`.
