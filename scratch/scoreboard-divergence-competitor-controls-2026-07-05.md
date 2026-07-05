@@ -367,12 +367,59 @@ Verification:
 
 - `seed0360` stayed visually exact and strict-string clean:
   `acceptedNonExact=0`, `exactTerminal=833`;
-- full-public false-positive audit now has `158` non-exact byte-string-only
-  frames (`11247/11405` exact strings), down from `276`;
-- current leaderboard-failed subset now has `102` non-exact byte-string-only
-  frames (`8297/8399` exact strings), down from `220`;
+- before the active-screen follow-up, full-public false-positive audit had
+  `158` non-exact byte-string-only frames (`11247/11405` exact strings), down
+  from `276`;
+- before the active-screen follow-up, the current leaderboard-failed subset had
+  `102` non-exact byte-string-only frames (`8297/8399` exact strings), down
+  from `220`;
 - live `parity:state --refresh-live` still reports local public `44/44` but
   leaderboard public `31/44`; the row is older than this unpushed local tree.
+
+## Implemented active tty-screen blank-run follow-up
+
+The next focused pass targeted active tty screens that bypass the base
+terminal-grid serializer. The first sample was an active help/about text page
+in `seed2200`; follow-up samples in `seed4500` exposed the same class in
+`#enhance`, `#wizintrinsic`, and compact final `#wizwhere` pages.
+
+Root cause:
+
+- C text windows store literal strings and `process_text_window()` prints them
+  after cursoring to column 1; C does not encode row spaces as cursor-forward
+  bytes (`C refs: win/tty/wintty.c:tty_putstr(),
+  win/tty/wintty.c:process_text_window()`);
+- JS active help-text screens return a stored serialized string through
+  `display.js:activeSerializedTextScreen()`, bypassing the base terminal-grid
+  serializer that already normalizes blank-cell runs longer than four columns
+  to `ESC[nC`;
+- manually stored active menu screens such as `#enhance` and `#wizintrinsic`
+  have the same bypass, but inverse/underline blanks must remain literal
+  because they are painted tty menu cells.
+
+Implementation:
+
+- `js/cmd.js` now serializes active help-text, enhance, and intrinsic menu
+  rows with the same default-blank-run wire normalization as the terminal
+  serializer;
+- compact final help pages now trim trailing blank rows after their inline More
+  prompt.
+
+Verification:
+
+- `seed2200` remains exact: `S 230/230 R 3018/3018 C 0`;
+- targeted exact-terminal audit is clean:
+  `acceptedNonExact=0`, `exactTerminal=230`;
+- `seed4500` remains exact and its accepted byte-string-only frames dropped
+  from `18` to `7`;
+- full-public false-positive audit now has `101` non-exact byte-string-only
+  frames (`11304/11405` exact strings), down from `158`;
+- current leaderboard-failed subset now has `48` non-exact byte-string-only
+  frames (`8351/8399` exact strings), down from `102`;
+- text/help/menu guard sessions stayed exact for `seed0108`, `seed0360`,
+  `seed0383`, `seed4500`, and both `seed0013` variants;
+- strict sentinels, hack audit, memory lint, and `git diff --check` remain
+  clean in the focused verification runs.
 
 ## Next fix plan
 
@@ -396,5 +443,5 @@ Verification:
    SGR-combination, and several tty-window padding differences eliminated,
    rank remaining string-only differences by screen/session coverage. Current
    broad cell predicates miss `0` screens, while exact-string strictness still
-   misses `158` full-public frames (`102` on the current online-failed subset),
+   misses `101` full-public frames (`48` on the current online-failed subset),
    not the online sparse miss shape.

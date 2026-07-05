@@ -16,8 +16,8 @@ Live checkpoint only. For history, use `git log`, `git show`, `lessons.md`
   live ahead/behind state.
 - Latest verified repair units: runtime shapechange side effects, checked-in
   help data, deterministic inventory ordering, scoreboard diagnostics,
-  false-positive audits, DECgraphics metadata, tty cursor-run serialization,
-  and darkroom wire-color serialization.
+  false-positive audits, DECgraphics metadata, darkroom wire color, and active
+  tty-screen blank-run serialization.
 - Checked-in public corpus is exact: `44/44 S 11405/11405 R 792838/792838 C 0`.
 - Last refreshed hosted public cache is exact:
   `44/44 S 10982/10982 R 840358/840358 C 0`. It still classifies as
@@ -28,9 +28,8 @@ Live checkpoint only. For history, use `git log`, `git show`, `lessons.md`
   `local-dirty-or-unpushed`: leaderboard public
   `31/44 S 11351/11405 R 792838/792838`, scored at
   `2026-07-04T22:30:17.282Z`, before the current local-ahead scorer repairs.
-- Clean-ref evidence scores `origin/main`/`HEAD` at
-  `44/44 S 11405/11405 R 792838/792838`; the leaderboard row predates latest
-  Actions but recent history was already persistently below local.
+- Clean-ref `origin/main`/`HEAD` scores `44/44 S 11405/11405 R 792838/792838`;
+  recent leaderboard history was persistently below local.
 - Online failure signature is screen-only: 13 failed public sessions, 54
   missed screens, full RNG and RNG-step match for all 13; cell-only metrics
   equal the combined screen score on all 13, so the online misses are cell-grid
@@ -38,14 +37,12 @@ Live checkpoint only. For history, use `git log`, `git show`, `lessons.md`
 - Strict sentinels are exact: `5/5 S 1063/1063 R 64569/64569 C 0`.
 - Current public classification: checked-in and hosted public corpora are exact;
   leaderboard fetch works, but the online row is still below reproduced scorer
-  surfaces. Browser replay, public `/play` assets, Actions, and ref-history do
-  not fingerprint the row. Competitor controls showed two online-44 repos have
-  exact terminal strings, while `xeophon` has many non-exact frames but zero
-  DEC frames and matches its online/local 43/44 shape. Hoimar's DEC/Unicode,
-  invisible-space, darkroom wire-color, SGR sequencing, and several tty padding
-  classes are now repaired. Final storage-aware false-positive audit still has
-  local visual `44/44`, `invisibleSgr=0`, DEC `0`, and all cell-state variants
-  miss `0`; byte-string-only terminal form is `158` full-public frames (`102` on the online-failed subset).
+  surfaces. Browser replay, `/play` assets, Actions, and ref-history do not
+  fingerprint the row. Competitor controls showed online-44 repos have exact
+  strings; Hoimar's DEC/Unicode, invisible-space, darkroom wire-color, SGR, and
+  tty padding classes are now repaired. Current storage-aware audit: local visual
+  `44/44`, `invisibleSgr=0`, DEC `0`, cell variants miss `0`, exact-string form
+  misses `101` full-public frames (`48` on the online-failed subset).
 
 ## Latest Loop Checkpoint
 
@@ -85,9 +82,9 @@ Live checkpoint only. For history, use `git log`, `git show`, `lessons.md`
     leaderboard row. When driven by leaderboard failures, it now prints the
     official failed-session reference and each local surface minus that row.
   - Harness truth: `scripts/score-false-positive-audit.mjs` now ranks narrow
-    comparator policies. Current evidence after DEC/cursor/darkroom and tty
-    string repairs: all cell-state variants miss `0`; exact string form still
-    differs on `158` checked-in public frames (`102` on the online-failed
+    comparator policies. Current evidence after DEC/cursor/darkroom and active
+    tty-screen repairs: all cell-state variants miss `0`; exact string form
+    still differs on `101` checked-in public frames (`48` on the online-failed
     subset) and is broader than the online sparse miss shape.
   - Production truth: terminal cells can now carry raw DECgraphics payload
     metadata while retaining Unicode browser display. The base serializer emits
@@ -104,7 +101,9 @@ Live checkpoint only. For history, use `git log`, `git show`, `lessons.md`
     `#wipe` now uses blindness-toggle vision redraw instead of stale-memory
     `docrt()`, making `seed0108` exact-string clean. Sokoban premapped traps
     now use C trap colors, and stale DEC room-floor grid cells serialize as
-    `S_darkroom` when their map cell is out-of-sight `ROOM`. Active tty screens trim known trailing blank rows; level-teleport rows use cursor-forward padding.
+    `S_darkroom` when their map cell is out-of-sight `ROOM`. Active help,
+    enhance, and intrinsic screens use cursor-forward padding for long default
+    blank runs and trim compact final help pages after their More row.
   - Harness truth: `scoreboard:state`/`scoreboard:json` now pass
     `--score-upstream --score-actions`, save `.cache/leaderboard-data.json` and
     `.cache/leaderboard-history/*.json`, and route next-action text through

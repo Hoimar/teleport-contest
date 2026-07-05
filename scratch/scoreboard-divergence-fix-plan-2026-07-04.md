@@ -31,10 +31,10 @@ Current verification:
 - strict sentinels exact `5/5 S 1063/1063 R 64569/64569 C 0`;
 - full-public false-positive audit now has `invisibleSgr=0` and `DEC=0`;
 - current remaining accepted non-exact output is byte-string-only terminal form
-  (`158` full-public frames, `102` on the current online-failed subset) after
+  (`101` full-public frames, `48` on the current online-failed subset) after
   preserving DEC metadata, cursor-run behavior, darkroom wire color, Sokoban
-  trap memory colors, stale darkroom map serialization, and several tty
-  string/padding forms.
+  trap memory colors, stale darkroom map serialization, active-screen blank-run
+  serialization, and several tty string/padding forms.
 
 Remaining open question: this removes the DEC/Unicode and invisible-space
 cell-state false-positive classes, but the online row's sparse `54` missed
@@ -91,12 +91,62 @@ Verification:
 
 - `seed0360` stayed exact under `npm run verify -- --target seed0360` and now
   has `acceptedNonExact=0`, `exactTerminal=833`;
-- full-public false-positive audit is down to `158` non-exact byte-string-only
-  frames (`11247/11405` exact strings);
-- current leaderboard-failed subset audit is down to `102` non-exact
-  byte-string-only frames (`8297/8399` exact strings);
+- before the active-screen follow-up, full-public false-positive audit was down
+  to `158` non-exact byte-string-only frames (`11247/11405` exact strings);
+- before the active-screen follow-up, the current leaderboard-failed subset
+  audit was down to `102` non-exact byte-string-only frames (`8297/8399` exact
+  strings);
 - live `parity:state --refresh-live` still reports local public `44/44`, while
   the leaderboard row is `31/44` from an older unpushed/ahead tree.
+
+## 2026-07-05 third implementation update
+
+The next local false-positive pass targeted active tty screens that bypass the
+base terminal-grid serializer. The first remaining accepted byte mismatch was
+a `seed2200` help/about page with literal long spaces in JS and cursor-forward
+gaps in the C-recorded terminal string; follow-up `seed4500` samples exposed
+the same class in `#enhance`, `#wizintrinsic`, and compact final `#wizwhere`
+pages.
+
+Root cause:
+
+- C text windows store literal row text and `process_text_window()` cursors to
+  column 1 before printing each row; C does not rewrite row text into
+  cursor-forward escapes (`C refs: win/tty/wintty.c:tty_putstr(),
+  win/tty/wintty.c:process_text_window()`);
+- JS active help-text screens are pre-serialized strings returned by
+  `display.js:activeSerializedTextScreen()`, so they bypass the terminal-grid
+  serializer that already converts blank cell runs longer than four columns to
+  `ESC[nC`;
+- manually stored active menu screens have the same bypass, but inverse and
+  underline spaces are painted tty cells and must remain literal.
+
+Implementation:
+
+- `js/cmd.js` now serializes active help-text, enhance, and intrinsic menu rows
+  through the same default-blank-run wire normalization used by the terminal
+  serializer;
+- compact final help pages trim trailing blank rows after their inline More
+  prompt;
+- this is a general active tty-screen serialization rule, not a seed-specific
+  patch and not a claim that C rewrites stored text-window spaces.
+
+Verification:
+
+- `seed2200` remains exact: `S 230/230 R 3018/3018 C 0`;
+- targeted exact-terminal audit is clean:
+  `acceptedNonExact=0`, `exactTerminal=230`;
+- `seed4500` remains exact and its accepted byte-string-only frames dropped
+  from `18` to `7`;
+- full-public false-positive audit is down to `101` non-exact byte-string-only
+  frames (`11304/11405` exact strings);
+- current leaderboard-failed subset audit is down to `48` non-exact
+  byte-string-only frames (`8351/8399` exact strings);
+- focused text/help guards remain exact: `seed0108`,
+  `seed0013-friday13-save-then-fullmoon-restore`,
+  `seed0013-rogue-friday13-combat`, plus earlier `seed0360`, `seed4500`,
+  `seed0030`, and `seed0106`;
+- strict sentinels remain exact in each `verify` run.
 
 ## Diagnosis to preserve
 
