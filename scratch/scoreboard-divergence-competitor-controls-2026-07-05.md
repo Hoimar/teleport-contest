@@ -277,6 +277,40 @@ Live refresh after the implementation still classified the public row as
 ahead of `origin/main` with uncommitted serializer changes. Do not expect the
 online row to move until the relevant commits are pushed and rescored.
 
+## Implemented darkroom memory follow-up
+
+The next pass found that several high-volume `ESC[90m~` misses were stale
+map-memory color state rather than terminal serialization:
+
+- `docrt()` in C calls `vision_recalc(2)` before displaying `lev->glyph`, so
+  out-of-sight remembered `S_room` floors are converted to `S_darkroom`
+  (`C refs: src/display.c:docrt_flags(), src/vision.c:vision_recalc()`);
+- magic mapping uses `magic_map_background()`, which converts out-of-sight,
+  not-remembered-lit `ROOM` floor from `S_room` to `DARKROOMSYM`
+  (`C ref: src/display.c:magic_map_background()`);
+- `S_room`/`S_ndoor` and `S_darkroom` share DEC raw `~`, but only
+  `S_darkroom` carries `CLR_BLACK` and serializes as `ESC[90m`.
+
+Implementation:
+
+- factored remembered map-glyph correction in `display.js`;
+- applied the C `docrt()` darkroom correction to remembered room floors;
+- applied the C magic-mapping darkroom correction to mapped room background;
+- guarded corridor darkening with `!cansee(x,y)` after `seed0900` exposed that
+  visible remembered corridors must retain lit-corridor white.
+
+Verification after this follow-up:
+
+- official checked-in public score is exact:
+  `44/44 S 11405/11405 R 792838/792838 C 0`;
+- strict sentinels remain exact:
+  `5/5 S 1063/1063 R 64569/64569 C 0`;
+- focused targets stayed exact for `seed0012`, `seed0900`, `seed2200`, and
+  `seed4500`;
+- clean-process full-public exact-string audit now has `672` non-exact frames
+  (`10733/11405` exact strings), down from `1639` after the tty
+  string-serialization follow-up.
+
 ## Next fix plan
 
 1. Keep `--project-root` and sample flags in the false-positive audit so
@@ -294,8 +328,8 @@ online row to move until the relevant commits are pushed and rescored.
    - `score:false-positive-audit --full` improved against the targeted
      bucket;
    - competitor controls still reproducible via `--project-root`.
-5. With DEC, invisible-space, darkroom wire-color, SGR-combination, and several
-   tty-window padding differences eliminated, rank remaining string-only
-   differences by screen/session coverage. Current broad cell predicates miss
-   `0` screens, while exact-string strictness still misses `1639` full-public
-   frames, not the online `54`.
+5. With DEC, invisible-space, darkroom wire-color, darkroom memory,
+   SGR-combination, and several tty-window padding differences eliminated, rank
+   remaining string-only differences by screen/session coverage. Current broad
+   cell predicates miss `0` screens, while exact-string strictness still misses
+   `672` full-public frames, not the online sparse miss shape.

@@ -37,6 +37,25 @@ cell-grid screens are still not reproduced by broad local strictness
 predicates. The current live row also cannot reflect this tree until the
 local-ahead commits are pushed and rescored.
 
+## 2026-07-05 implementation update
+
+The production follow-up is now implemented in `js/display.js`:
+
+- C `docrt()` darkroom memory conversion is applied to out-of-sight remembered
+  room floors (`C refs: src/display.c:docrt_flags(), src/vision.c:vision_recalc()`);
+- C `magic_map_background()` darkroom conversion is applied when magic mapping
+  stores/shows out-of-sight, not-remembered-lit room floor;
+- visible corridor memory is guarded from the darkening helper after
+  `seed0900` exposed the over-broad corridor case.
+
+Final verification for this plan state:
+
+- official checked-in public score: `44/44 S 11405/11405 R 792838/792838 C 0`;
+- strict sentinels: `5/5 S 1063/1063 R 64569/64569 C 0`;
+- focused targets exact: `seed0012`, `seed0900`, `seed2200`, `seed4500`;
+- clean-process exact-string audit: `672` remaining non-exact full-public
+  frames, down from `1639` after the prior tty string cleanup.
+
 ## Diagnosis to preserve
 
 The online 30/44 plateau is not a production gameplay parity bug reproduced in

@@ -148,6 +148,30 @@ function dark_room_color_display() {
     return game.flags?.dark_room !== false && game.flags?.color !== false;
 }
 
+function remembered_glyph_for_display(loc, x, y) {
+    if (!loc?.remembered_glyph) return null;
+    const mem = loc.remembered_glyph;
+    if (loc.typ === ROOM && !cansee(x, y) && dark_room_color_display()) {
+        const roomGlyph = terrain_glyph({ ...loc, typ: ROOM }, x, y);
+        if (mem.ch === roomGlyph.ch && !!mem.decgfx === !!roomGlyph.dec) {
+            // C refs: display.c:docrt_flags(), vision.c:vision_recalc(),
+            // display.c:newsym().  docrt() shuts down vision before drawing
+            // memory, so unseen remembered room floor is S_darkroom.
+            loc.remembered_glyph = { ...mem, color: CLR_BLACK };
+        }
+    }
+    if (loc.typ === CORR && !cansee(x, y) && (!loc.waslit || dark_room_color_display())
+        && loc.remembered_glyph.ch === '#'
+        && loc.remembered_glyph.color === CLR_WHITE) {
+        // C ref: display.c:newsym().  With dark_room+color, an out-of-sight
+        // remembered lit corridor is redisplayed dark.
+        const tg = terrain_glyph(loc, x, y);
+        tg.color = NO_COLOR;
+        loc.remembered_glyph = { ch: tg.ch, color: tg.color, decgfx: tg.dec };
+    }
+    return loc.remembered_glyph;
+}
+
 function hell_level_display() {
     const uz = game.u?.uz;
     return !!game.dungeons?.[uz?.dnum ?? 0]?.flags?.hellish;
@@ -1178,6 +1202,12 @@ export function map_level_for_wizard(revealTraps = false) {
             const trap = (game.level.traps || []).find(t => t.tx === x && t.ty === y);
             const covered = terrain_covers_objects(loc);
             let glyph = terrain_glyph(loc, x, y);
+            if (!visible && !loc.waslit && loc.typ === ROOM && glyph.ch === '~' && glyph.dec) {
+                // C ref: src/display.c:magic_map_background().  Magic
+                // mapping corrects unseen, not-remembered-lit ROOM floors to
+                // DARKROOMSYM before storing/displaying the memory glyph.
+                glyph = { ...glyph, color: CLR_BLACK };
+            }
             let mappedForeground = false;
             if (trap?.tseen && !covered) {
                 glyph = trap_glyph(trap);
@@ -1389,31 +1419,13 @@ export function newsym(x, y) {
         if (wg) {
             show_glyph_cell(x, y, wg.ch, wg.color, false);
         } else if (loc.remembered_glyph) {
-            const roomGlyph = terrain_glyph({ ...loc, typ: ROOM }, x, y);
-            if (loc.typ === ROOM && dark_room_color_display()
-                && loc.remembered_glyph.ch === roomGlyph.ch
-                && !!loc.remembered_glyph.decgfx === !!roomGlyph.dec) {
-                // C refs: display.c:newsym(), display.c:map_background().
-                // Unseen remembered room floor is S_darkroom: same glyph,
-                // but CLR_BLACK wire color under tty dark_room+color.
-                loc.remembered_glyph = { ...loc.remembered_glyph, color: CLR_BLACK };
-            }
-            if (loc.typ === CORR && (!loc.waslit || dark_room_color_display())
-                && loc.remembered_glyph.ch === '#'
-                && loc.remembered_glyph.color === CLR_WHITE) {
-                // C ref: display.c:newsym().  With dark_room+color, an
-                // out-of-sight remembered lit corridor is redisplayed dark.
-                const tg = terrain_glyph(loc, x, y);
-                tg.color = NO_COLOR;
-                loc.remembered_glyph = { ch: tg.ch, color: tg.color, decgfx: tg.dec };
-            }
             // Out of sight but remembered - show remembered glyph.
+            const mem = remembered_glyph_for_display(loc, x, y);
             const obj = game.level?.objects?.find(o => o.ox === x && o.oy === y);
             const attr = obj
                 ? object_pile_display_attr(x, y, obj)
-                : (loc.remembered_glyph.attr || 0);
-            show_glyph_cell(x, y, loc.remembered_glyph.ch,
-                loc.remembered_glyph.color, loc.remembered_glyph.decgfx, attr);
+                : (mem.attr || 0);
+            show_glyph_cell(x, y, mem.ch, mem.color, mem.decgfx, attr);
         } else {
             show_glyph_cell(x, y, ' ', NO_COLOR, false);
         }
@@ -1524,12 +1536,12 @@ export async function docrt() {
                 // map glyph, but visible cells are redrawn from current terrain.
                 newsym(x, y);
             } else if (loc?.remembered_glyph) {
+                const mem = remembered_glyph_for_display(loc, x, y);
                 const obj = game.level?.objects?.find(o => o.ox === x && o.oy === y);
                 const attr = obj
                     ? object_pile_display_attr(x, y, obj)
-                    : (loc.remembered_glyph.attr || 0);
-                show_glyph_cell(x, y, loc.remembered_glyph.ch,
-                    loc.remembered_glyph.color, loc.remembered_glyph.decgfx, attr);
+                    : (mem.attr || 0);
+                show_glyph_cell(x, y, mem.ch, mem.color, mem.decgfx, attr);
             }
         }
     see_monsters();
