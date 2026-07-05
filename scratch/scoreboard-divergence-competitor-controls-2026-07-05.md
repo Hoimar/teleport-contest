@@ -230,6 +230,47 @@ isolated DEC/SI-vs-SGR ordering. They are still much broader than the online
 `54` sparse cell-grid misses and all local cell-state comparator variants
 remain exact.
 
+## Implemented tty string-serialization follow-up
+
+The next pass cleaned up several C tty byte-string forms while keeping the
+visual scorer surface unchanged:
+
+- basic and simple options now use C-like cursor-forward gaps for column runs
+  longer than four cells, and basic option headings keep inverse video active
+  across the padded heading field;
+- active prompt/menu screens trim trailing blank rows instead of materializing
+  24-row byte strings for fruit prompts, death inventory disclosure pages, and
+  inventory/throw-inventory second pages;
+- terminal SGR serialization now emits ordered single-purpose SGR sequences
+  (`ESC[7m ESC[31m`, `ESC[27m ESC[97m`) instead of combined forms not present
+  in the recorded C corpus;
+- unreachable wizard level-teleport menu rows use cursor-forward padding in
+  place of the missing selector, matching `dungeon.c:tport_menu()`;
+- overview disclosure capture uses the DEC-aware base serializer instead of
+  the frozen terminal fallback.
+
+Verification after this follow-up:
+
+- official checked-in public score remains exact:
+  `44/44 S 11405/11405 R 792838/792838 C 0`;
+- strict sentinels remain exact:
+  `5/5 S 1063/1063 R 64569/64569 C 0`;
+- focused targets stayed exact for `seed0007`, `seed0012`, `seed0360`,
+  `seed0361`, `seed0373`, `seed2200`, and `seed4500`;
+- online-failed subset remains local visual exact:
+  `8399/8399`, with accepted non-exact terminal screens reduced to `1518`
+  (`invisibleSgr=0`, `dec=0`, `other=1518`, exact terminal/string `6881`);
+- full public corpus remains local visual exact:
+  `11405/11405`, with accepted non-exact terminal screens reduced to `1639`
+  (`invisibleSgr=0`, `dec=0`, `other=1639`, exact terminal/string `9766`);
+- all ranked cell-state comparator variants still miss `0` screens on the
+  current 13 online-failed sessions.
+
+The remaining non-exact output is still byte-string-only and still much
+broader than the online `54`: mostly C tty SGR placement around DEC floor
+glyphs, terminal-exit trailing blank/newline trimming, enhance/skill menu
+cursor gaps, and a few DEC/SI-vs-SGR ordering cases.
+
 Live refresh after the implementation still classified the public row as
 `local-dirty-or-unpushed`: the leaderboard last scored Hoimar at
 `2026-07-04T22:30:17.282Z`, before this local tree, and the workspace was
@@ -253,8 +294,8 @@ online row to move until the relevant commits are pushed and rescored.
    - `score:false-positive-audit --full` improved against the targeted
      bucket;
    - competitor controls still reproducible via `--project-root`.
-5. With DEC, invisible-space, and darkroom wire-color differences now
-   eliminated, rank remaining tty-window string-only differences by
-   screen/session coverage. Current broad cell predicates miss `0` screens,
-   while exact-string strictness still misses `1773` full-public frames, not
-   the online `54`.
+5. With DEC, invisible-space, darkroom wire-color, SGR-combination, and several
+   tty-window padding differences eliminated, rank remaining string-only
+   differences by screen/session coverage. Current broad cell predicates miss
+   `0` screens, while exact-string strictness still misses `1639` full-public
+   frames, not the online `54`.

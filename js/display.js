@@ -2057,21 +2057,19 @@ function serializedSgrTransition(curFg, curAttr, wantFg, wantAttr) {
     const curBold = (curAttr & 2) !== 0;
     const curUnder = (curAttr & 4) !== 0;
     const curInv = (curAttr & 1) !== 0;
-    const needReset = (curBold && !wantBold) || (curUnder && !wantUnder) || (curInv && !wantInv);
     const codes = [];
-    if (needReset) {
+    if (wantFg === 39 && wantAttr === 0 && curAttr !== 0) {
         codes.push(0);
-        if (wantBold) codes.push(1);
-        if (wantUnder) codes.push(4);
-        if (wantInv) codes.push(7);
-        if (wantFg !== 39) codes.push(wantFg);
     } else {
+        if (curBold && !wantBold) codes.push(22);
+        if (curUnder && !wantUnder) codes.push(24);
+        if (curInv && !wantInv) codes.push(27);
         if (wantBold && !curBold) codes.push(1);
         if (wantUnder && !curUnder) codes.push(4);
         if (wantInv && !curInv) codes.push(7);
         if (wantFg !== curFg) codes.push(wantFg);
     }
-    return codes.length ? `\x1b[${codes.join(';')}m` : '';
+    return codes.map((code) => `\x1b[${code}m`).join('');
 }
 
 function serializeTerminalGridWithDec(term) {

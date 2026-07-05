@@ -14,8 +14,12 @@ Implemented follow-up:
 - the base serializer emits SO/SI around marked DEC cells while active text
   screens still return their stored serialized bytes;
 - DEC metadata round-trips through `renderTextScreen()`;
-- liquid, tree, iron-bars, and swallowed-frame DECgraphics payloads are marked
-  from `dat/symbols`.
+- liquid, tree, iron-bars, altar, loot-frame, and swallowed-frame DECgraphics
+  payloads are marked from `dat/symbols`;
+- the base terminal serializer now preserves C tty cursor-forward gaps,
+  bright-black darkroom wire color, and single-purpose SGR transition ordering;
+- active tty screens trim invisible trailing blank rows for the currently known
+  prompt, inventory, and death-disclosure cases.
 
 Current verification:
 
@@ -23,8 +27,9 @@ Current verification:
 - strict sentinels exact `5/5 S 1063/1063 R 64569/64569 C 0`;
 - full-public false-positive audit now has `invisibleSgr=0` and `DEC=0`;
 - current remaining accepted non-exact output is byte-string-only terminal form
-  (`1773` full-public frames, `1618` on the current online-failed subset)
-  after preserving DEC metadata, cursor-run behavior, and darkroom wire color.
+  (`1639` full-public frames, `1518` on the current online-failed subset)
+  after preserving DEC metadata, cursor-run behavior, darkroom wire color, and
+  several tty string/padding forms.
 
 Remaining open question: this removes the DEC/Unicode and invisible-space
 cell-state false-positive classes, but the online row's sparse `54` missed

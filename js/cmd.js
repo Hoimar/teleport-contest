@@ -5067,11 +5067,10 @@ function showDeathInventoryDisclosurePage(index = 0) {
         : (game._death_inventory_disclosure_pages = deathInventoryDisclosurePages());
     const page = pages[Math.max(0, Math.min(index, pages.length - 1))] || [];
     game._death_inventory_disclosure_page = Math.max(0, Math.min(index, pages.length - 1));
-    const rows = Array(C.TERMINAL_ROWS || 24).fill('');
-    for (let row = 0; row < Math.min(rows.length, page.length); row++) rows[row] = page[row];
+    const rows = page.slice(0, C.TERMINAL_ROWS || 24);
     const lastRow = Math.min(rows.length - 1, Math.max(0, page.length - 1));
     const cursorCol = Math.min(COLNO - 1, (rows[lastRow] || '').length);
-    const screen = rows.join('\n');
+    const screen = trimSerializedScreen(rows.join('\n'));
     setDisclosureWindowScreen(screen, [cursorCol, lastRow], 'death-inventory');
     game.context.move = 0;
 }
@@ -12176,7 +12175,8 @@ function showOverviewScreen(options = {}) {
         const attr = line.heading && !options.final ? ATR_INVERSE : 0;
         display.putstr(textCol + (line.indent || 0), row, line.text, NO_COLOR, attr);
     }
-    const screen = serialize_terminal_grid(display);
+    installSerializedScreenHook(display);
+    const screen = serializeBaseTerminalGrid(display);
     setDisclosureWindowScreen(
         screen,
         [textCol + '(end)'.length + 1, lines.length - 1],
@@ -18026,15 +18026,23 @@ function optionBoxValue(name) {
     return def && optionBool(def.container, def.key, def.defaultValue) ? 'X' : ' ';
 }
 
+function ttyColumnGap(n) {
+    return n > 4 ? `\x1b[${n}C` : ' '.repeat(Math.max(0, n));
+}
+
+function basicOptionHeading(label) {
+    return ` \x1b[7m${label}${ttyColumnGap(32 - String(label).length)}\x1b[0m`;
+}
+
 function basicOptionLine(key, name, value, suffix = '') {
-    return ` ${key} - ${name.padEnd(24)}[${value}]${suffix}`;
+    return ` ${key} - ${name}${ttyColumnGap(24 - String(name).length)}[${value}]${suffix}`;
 }
 
 function basicOptionsLines(page) {
     if (page === 1) {
         return [
             '',
-            ' \x1b[7m Map\x1b[0m',
+            basicOptionHeading(' Map'),
             basicOptionLine('a', 'bgcolors', optionBool('iflags', 'bgcolors', true) ? 'X' : ' '),
             basicOptionLine('b', 'color', optionBoxValue('color')),
             basicOptionLine('c', 'customcolors', optionBoxValue('customcolors')),
@@ -18045,7 +18053,7 @@ function basicOptionsLines(page) {
             basicOptionLine('h', 'sparkle', optionBoxValue('sparkle')),
             basicOptionLine('i', 'symset', 'DECgraphics, active, handler=DEC'),
             '',
-            ' \x1b[7m Status\x1b[0m',
+            basicOptionHeading(' Status'),
             basicOptionLine('j', 'hitpointbar', optionBoxValue('hitpointbar')),
             basicOptionLine('k', 'menu colors', '(0 currently set)'),
             basicOptionLine('l', 'showexp', optionBoxValue('showexp')),
@@ -18061,12 +18069,12 @@ function basicOptionsLines(page) {
         '',
         ' ? - show help',
         '',
-        ' \x1b[7m General\x1b[0m',
+        basicOptionHeading(' General'),
         basicOptionLine('a', 'fruit', currentFruitName()),
         basicOptionLine('b', 'number_pad', '0=off'),
         basicOptionLine('c', 'price_quotes', optionBoxValue('price_quotes')),
         '',
-        ' \x1b[7m Behavior\x1b[0m',
+        basicOptionHeading(' Behavior'),
         basicOptionLine('d', 'autodig', optionBoxValue('autodig')),
         basicOptionLine('e', 'autoopen', optionBoxValue('autoopen')),
         basicOptionLine('f', 'autopickup', optionBoxValue('autopickup')),
@@ -18203,11 +18211,11 @@ async function handleBasicOptionsMenuKey(ch) {
 function optionLine(menu, page, key, name, spaces, value = null) {
     const selected = menu?.selected?.has(`${page}:${key}`) ? '+' : '-';
     const shown = value ?? simpleOptionValue(name);
-    return ` ${key} ${selected} ${name}\x1b[${spaces}C[${shown}]`;
+    return ` ${key} ${selected} ${name}${ttyColumnGap(spaces)}[${shown}]`;
 }
 
 function fixedOptionLine(name, spaces, value) {
-    return `\x1b[5C${name}\x1b[${spaces}C[${value}]`;
+    return `\x1b[5C${name}${ttyColumnGap(spaces)}[${value}]`;
 }
 
 function startupOptionValue(kind) {
@@ -22477,7 +22485,7 @@ function showThrowInventoryMenuPage2() {
     const lastRow = lines.length - 1;
     const lastText = lines[lastRow]?.text || '';
     const cursorCol = menuCol + lastText.length;
-    const screen = serialize_terminal_grid(display);
+    const screen = trimSerializedScreen(serialize_terminal_grid(display));
     setThrowInventoryMenuScreen(screen, [Math.min(cursorCol, COLNO - 1), lastRow], 2);
     return true;
 }
@@ -22549,7 +22557,7 @@ function showInventoryMenuPage2() {
     const lastRow = lines.length - 1;
     const lastText = lines[lastRow]?.text || '';
     const cursorCol = menuCol + lastText.length;
-    const screen = serialize_terminal_grid(display);
+    const screen = trimSerializedScreen(serialize_terminal_grid(display));
     setInventoryMenuScreen(screen, [Math.min(cursorCol, COLNO - 1), lastRow], 2);
     return true;
 }
@@ -24612,10 +24620,16 @@ async function showPromptLine(text, options = {}) {
 }
 
 function screenWithPromptLine(screen, text) {
-    const rows = String(screen || '').split('\n');
-    while (rows.length < 24) rows.push('');
+    const rows = String(screen || '').split('\n').slice(0, C.TERMINAL_ROWS);
     rows[0] = text;
-    return rows.slice(0, 24).join('\n');
+    return trimSerializedScreen(rows.join('\n'));
+}
+
+function trimSerializedScreen(screen) {
+    const rows = String(screen || '').split('\n').slice(0, C.TERMINAL_ROWS);
+    let lastRow = rows.length - 1;
+    while (lastRow > 0 && rows[lastRow] === '') lastRow--;
+    return rows.slice(0, lastRow + 1).join('\n');
 }
 
 async function showDrinkInventoryPrompt() {
@@ -26207,7 +26221,10 @@ function renderLevelTeleportPage(pageIndex) {
         if (row.type === 'heading') {
             lines.push(` \x1b[7m${row.text}\x1b[0m`);
         } else if (row.cannotReach) {
-            lines.push(`     ${currentLevelMarker(row.target)} ${row.text}`);
+            const marker = currentLevelMarker(row.target);
+            lines.push(marker === ' '
+                ? `${ttyColumnGap(7)}${row.text}`
+                : `${ttyColumnGap(5)}${marker} ${row.text}`);
         } else {
             lines.push(` ${row.letter} - ${currentLevelMarker(row.target)} ${row.text}`);
             choices[row.letter] = row.target;
