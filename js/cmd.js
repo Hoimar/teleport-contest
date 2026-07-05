@@ -3358,7 +3358,11 @@ function mappedEngravingGlyph(loc) {
 
 function mappedIronBarsGlyph() {
     // C refs: display.c:back_to_glyph(), include/defsym.h:S_bars.
-    return { ch: '|', color: CLR_CYAN, dec: false };
+    return {
+        ch: '|',
+        color: CLR_CYAN,
+        dec: String(game._nhopts?.symset || '').toLowerCase() === 'decgraphics',
+    };
 }
 
 function restoreMappedForegroundAfterMonsterRefresh(options = {}) {

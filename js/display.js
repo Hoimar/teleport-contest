@@ -12,7 +12,7 @@ import {
     HWALL, VWALL, TLCORNER, TRCORNER, BLCORNER, BRCORNER,
     CROSSWALL, TUWALL, TDWALL, TLWALL, TRWALL,
     TREE, FOUNTAIN, SINK, ALTAR, GRAVE, THRONE, POOL, MOAT, WATER, LAVAPOOL, LAVAWALL, ICE, AIR, CLOUD,
-    DBWALL, DRAWBRIDGE_UP, DRAWBRIDGE_DOWN, DB_UNDER, DB_MOAT, DB_LAVA, DB_ICE, DB_FLOOR,
+    DBWALL, DRAWBRIDGE_UP, DRAWBRIDGE_DOWN, IRONBARS, DB_UNDER, DB_MOAT, DB_LAVA, DB_ICE, DB_FLOOR,
     D_NODOOR, D_ISOPEN, D_CLOSED, D_LOCKED,
     AM_MASK, AM_CHAOTIC, AM_NEUTRAL, AM_LAWFUL, AM_SANCTUM,
     ARROW_TRAP, DART_TRAP, ROCKTRAP, SQKY_BOARD, BEAR_TRAP, LANDMINE,
@@ -488,20 +488,28 @@ export function terrain_glyph(loc, x, y) {
         return { ch: '{', color: altarColor(loc), dec: false };
     case GRAVE:     return { ch: '|', color: CLR_WHITE, dec: false };
     case THRONE:    return { ch: '\\', color: CLR_YELLOW, dec: false };
-    case TREE:      return { ch: 'g', color: CLR_GREEN, dec: false };
+    case TREE:
+        // C ref: dat/symbols DECGraphics S_tree uses the meta-g plus/minus
+        // payload, so tty output keeps DEC mode active for this byte.
+        return { ch: 'g', color: CLR_GREEN, dec: true };
     case POOL:
     case MOAT:
         // C ref: display.c:back_to_glyph() S_pool.  The tty DECgraphics wire
-        // glyph for liquid surfaces is the backtick diamond byte.
-        return { ch: '`', color: CLR_BLUE, dec: false };
+        // glyph for liquid surfaces is emitted in DEC mode with the backtick
+        // diamond payload byte.
+        return { ch: '`', color: CLR_BLUE, dec: true };
     case WATER:
-        return { ch: '`', color: CLR_BRIGHT_BLUE, dec: false };
+        return { ch: '`', color: CLR_BRIGHT_BLUE, dec: true };
     case LAVAPOOL:
-        return { ch: '`', color: CLR_RED, dec: false };
+        return { ch: '`', color: CLR_RED, dec: true };
     case LAVAWALL:
-        return { ch: '`', color: CLR_ORANGE, dec: false };
+        return { ch: '`', color: CLR_ORANGE, dec: true };
     case ICE:
         return { ch: '~', color: CLR_CYAN, dec: true };
+    case IRONBARS:
+        // C ref: dat/symbols DECGraphics S_bars uses the meta-| not-equals
+        // payload, so tty output keeps DEC mode active for this byte.
+        return { ch: '|', color: CLR_CYAN, dec: true };
     case DBWALL:
         return { ch: '#', color: CLR_BROWN, dec: false };
     case DRAWBRIDGE_UP:
@@ -1222,11 +1230,12 @@ function write_map_cell(display, x, y, loc, forceBlank = false) {
     if (blank && !forceBlank) return;
     const ch = loc.disp_decgfx ? (DEC_TO_UNICODE[raw] || raw) : raw;
     display.setCell(x - 1, y + 1, ch, loc.disp_color ?? NO_COLOR, loc.disp_attr ?? 0);
+    markSerializedDecCell(display, x - 1, y + 1, raw, !!loc.disp_decgfx);
 }
 
 const SWALLOW_CHARS = [
     ['/', 'o', '\\'],
-    ['│', '@', '│'],
+    ['x', '@', 'x'],
     ['\\', 's', '/'],
 ];
 
@@ -1255,7 +1264,7 @@ function build_swallowed_overlay() {
             if (x < 1 || x >= COLNO || y < 0 || y >= ROWNO) continue;
             const ch = SWALLOW_CHARS[dy + 1][dx + 1];
             if (ch === '@') {
-                overlay.set(`${x},${y}`, { ch, color: CLR_WHITE });
+                overlay.set(`${x},${y}`, { ch, color: CLR_WHITE, dec: false });
                 continue;
             }
             let color = game.u.ustuck.data?.color ?? CLR_GREEN;
@@ -1263,7 +1272,7 @@ function build_swallowed_overlay() {
                 const mdat = MONSTER_DATA[rn2Display(MONSTER_DATA.length)] || null;
                 color = mdat ? (mdat[7] ?? NO_COLOR) : color;
             }
-            overlay.set(`${x},${y}`, { ch, color });
+            overlay.set(`${x},${y}`, { ch, color, dec: primary_decgraphics() && (ch === 'o' || ch === 'x' || ch === 's') });
         }
     }
 
@@ -1535,6 +1544,7 @@ function render_map_row(y) {
         if (gap > 4) output += `\x1b[${gap}C`;
         else if (gap > 0) output += ' '.repeat(gap);
         let activeColor = ANSI_DEFAULT;
+        let activeDec = false;
         for (let x = firstCol; x <= lastCol; x++) {
             const sg = swallowed_glyph_at(x, y) || { ch: ' ', color: NO_COLOR };
             const wantAnsi = ANSI_COLOR[sg.color] ?? ANSI_DEFAULT;
@@ -1542,8 +1552,12 @@ function render_map_row(y) {
                 output += `\x1b[${wantAnsi}m`;
                 activeColor = wantAnsi;
             }
+            const wantDec = !!sg.dec;
+            if (wantDec && !activeDec) { output += '\x0e'; activeDec = true; }
+            else if (!wantDec && activeDec) { output += '\x0f'; activeDec = false; }
             output += sg.ch;
         }
+        if (activeDec) output += '\x0f';
         if (activeColor !== ANSI_DEFAULT) output += `\x1b[${ANSI_DEFAULT}m`;
         return output;
     }
@@ -1885,6 +1899,7 @@ export function renderTextScreen(display, screen, cursor = null) {
         }
 
         if (state.col < 80) {
+            const raw = ch;
             display.setCell(
                 state.col,
                 state.row,
@@ -1892,6 +1907,7 @@ export function renderTextScreen(display, screen, cursor = null) {
                 state.color,
                 state.attr,
             );
+            markSerializedDecCell(display, state.col, state.row, raw, state.dec);
         }
         state.col++;
     }
@@ -1973,12 +1989,138 @@ function activeSerializedTextScreen() {
     return null;
 }
 
+function clearSerializedDecCell(cell) {
+    if (!cell) return;
+    delete cell._teleportDecgfx;
+    delete cell._teleportRawCh;
+}
+
+function markSerializedDecCell(display, col, row, raw, decgfx) {
+    const term = display?.terminal || display;
+    const cell = term?.grid?.[row]?.[col];
+    if (!cell) return;
+    if (!decgfx) {
+        clearSerializedDecCell(cell);
+        return;
+    }
+    cell._teleportDecgfx = true;
+    cell._teleportRawCh = raw;
+}
+
+function colorToSerializedFg(color) {
+    if (color === 8 || color < 0 || color > 15) return 39;
+    return color < 8 ? 30 + color : 90 + (color - 8);
+}
+
+function serializedSgrTransition(curFg, curAttr, wantFg, wantAttr) {
+    if (curFg === wantFg && curAttr === wantAttr) return '';
+    const wantBold = (wantAttr & 2) !== 0;
+    const wantUnder = (wantAttr & 4) !== 0;
+    const wantInv = (wantAttr & 1) !== 0;
+    const curBold = (curAttr & 2) !== 0;
+    const curUnder = (curAttr & 4) !== 0;
+    const curInv = (curAttr & 1) !== 0;
+    const needReset = (curBold && !wantBold) || (curUnder && !wantUnder) || (curInv && !wantInv);
+    const codes = [];
+    if (needReset) {
+        codes.push(0);
+        if (wantBold) codes.push(1);
+        if (wantUnder) codes.push(4);
+        if (wantInv) codes.push(7);
+        if (wantFg !== 39) codes.push(wantFg);
+    } else {
+        if (wantBold && !curBold) codes.push(1);
+        if (wantUnder && !curUnder) codes.push(4);
+        if (wantInv && !curInv) codes.push(7);
+        if (wantFg !== curFg) codes.push(wantFg);
+    }
+    return codes.length ? `\x1b[${codes.join(';')}m` : '';
+}
+
+function serializeTerminalGridWithDec(term) {
+    if (!term?.grid) return '';
+    let lastRow = 0;
+    for (let r = 0; r < term.rows; r++) {
+        for (let c = 0; c < term.cols; c++) {
+            if (term.grid[r][c].ch !== ' ') {
+                lastRow = r;
+                break;
+            }
+        }
+    }
+
+    let out = '';
+    let curFg = 39;
+    let curAttr = 0;
+    let curDec = false;
+    for (let r = 0; r <= lastRow; r++) {
+        let lastCol = -1;
+        for (let c = term.cols - 1; c >= 0; c--) {
+            if (term.grid[r][c].ch !== ' ') {
+                lastCol = c;
+                break;
+            }
+        }
+        if (lastCol < 0) {
+            if (r < lastRow) out += '\n';
+            continue;
+        }
+
+        let firstCol = 0;
+        for (let c = 0; c <= lastCol; c++) {
+            if (term.grid[r][c].ch !== ' ') {
+                firstCol = c;
+                break;
+            }
+        }
+        if (firstCol > 4) out += `\x1b[${firstCol}C`;
+        else if (firstCol > 0) out += ' '.repeat(firstCol);
+
+        for (let c = firstCol; c <= lastCol; c++) {
+            const cell = term.grid[r][c];
+            const wantFg = colorToSerializedFg(cell.color);
+            const wantAttr = cell.attr | 0;
+            out += serializedSgrTransition(curFg, curAttr, wantFg, wantAttr);
+            curFg = wantFg;
+            curAttr = wantAttr;
+
+            const wantDec = !!cell._teleportDecgfx;
+            if (wantDec !== curDec) {
+                out += wantDec ? '\x0e' : '\x0f';
+                curDec = wantDec;
+            }
+            out += wantDec ? (cell._teleportRawCh ?? cell.ch) : cell.ch;
+        }
+
+        if (curDec) {
+            out += '\x0f';
+            curDec = false;
+        }
+        out += serializedSgrTransition(curFg, curAttr, 39, 0);
+        curFg = 39;
+        curAttr = 0;
+        if (r < lastRow) out += '\n';
+    }
+    return out;
+}
+
 export function installSerializedScreenHook(display = game.nhDisplay) {
     const term = display?.terminal || display;
-    if (!term?.serialize || term._teleportSerializeBase) return;
+    if (!term) return;
+    if (term.setCell && !term._teleportSetCellBase) {
+        const originalSetCell = term.setCell.bind(term);
+        Object.defineProperty(term, '_teleportSetCellBase', { value: originalSetCell });
+        term.setCell = (col, row, ch, color, attr = 0) => {
+            const result = originalSetCell(col, row, ch, color, attr);
+            clearSerializedDecCell(term.grid?.[row]?.[col]);
+            return result;
+        };
+    }
+    if (!term.serialize || term._teleportSerializeBase) return;
     const originalSerialize = term.serialize.bind(term);
-    Object.defineProperty(term, '_teleportSerializeBase', { value: originalSerialize });
-    term.serialize = () => activeSerializedTextScreen() || originalSerialize();
+    Object.defineProperty(term, '_teleportSerializeOriginal', { value: originalSerialize });
+    Object.defineProperty(term, '_teleportSerializeBase', { value: () => serializeTerminalGridWithDec(term) });
+    term.serialize = () => activeSerializedTextScreen() || term._teleportSerializeBase();
 }
 
 function currentLatchedMoreScreen() {
@@ -2223,7 +2365,14 @@ function _buildScreenOutput(options = {}) {
                 for (let x = 1; x < COLNO; x++) {
                     const sg = swallowed_glyph_at(x, y);
                     if (!sg) continue;
-                    display.setCell(x - 1, y + 1, sg.ch, tty_color(sg.color), 0);
+                    display.setCell(
+                        x - 1,
+                        y + 1,
+                        sg.dec ? (DEC_TO_UNICODE[sg.ch] || sg.ch) : sg.ch,
+                        tty_color(sg.color),
+                        0,
+                    );
+                    markSerializedDecCell(display, x - 1, y + 1, sg.ch, !!sg.dec);
                 }
             }
         }

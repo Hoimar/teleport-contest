@@ -115,6 +115,39 @@ needs a row/screen-level predicate that preserves every transient text/menu
 screen and measurably collapses the DEC accepted bucket without reducing
 visual parity.
 
+## Implemented DEC serialization fix
+
+The broad rewrite above was replaced with a narrow terminal-grid metadata fix:
+
+- install the serialized-screen hook at segment startup;
+- preserve raw DEC payload bytes on terminal grid cells while browser-visible
+  cells remain Unicode;
+- make the base serializer DEC-aware but keep active serialized text screens as
+  the outer override;
+- round-trip DEC metadata through `renderTextScreen()`;
+- mark DECgraphics liquid, tree, iron-bars, and swallowed-frame payload bytes
+  according to `dat/symbols`.
+
+Verification after the fix:
+
+- checked-in public remains exact:
+  `44/44 S 11405/11405 R 792838/792838 C 0`;
+- strict sentinels remain exact:
+  `5/5 S 1063/1063 R 64569/64569 C 0`;
+- `seed4500-knight-coverage` remains exact:
+  `S 1814/1814 R 108275/108275 C 0`;
+- full-public false-positive audit still has visual `11405/11405`, but the DEC
+  bucket is now `0` (`10919` accepted non-exact frames remain:
+  invisible SGR `6924`, other string/encoding `3995`);
+- online-failed subset visual remains `8399/8399`, and its DEC bucket is now
+  `0` (`8112` accepted non-exact frames remain: invisible SGR `5730`, other
+  string/encoding `2382`).
+
+This repairs a real local false-positive class, but it still does not reproduce
+the online scorer's sparse `54` cell-grid misses. The next layer is not
+DEC/Unicode; it is the remaining cursor-forward/string compression and
+invisible SGR state, or a backend predicate not exposed by the public viewer.
+
 ## Next fix plan
 
 1. Keep `--project-root` in the false-positive audit so competitor controls can
@@ -133,3 +166,7 @@ visual parity.
    - `score:false-positive-audit --limit=0` improved against the targeted
      bucket;
    - competitor controls still reproducible via `--project-root`.
+5. With DEC now eliminated, rank remaining accepted non-exact frames by
+   screen/session coverage and look for predicates that select dozens of
+   frames, not thousands. Current broad predicates still miss either `0` or
+   `5730` screens, not the online `54`.

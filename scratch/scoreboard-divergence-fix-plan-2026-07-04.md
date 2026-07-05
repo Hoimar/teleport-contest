@@ -1,5 +1,32 @@
 # Scoreboard Divergence Fix Plan - 2026-07-04
 
+## 2026-07-05 status
+
+This plan is superseded by the competitor-control audit and DEC serialization
+repair in `scratch/scoreboard-divergence-competitor-controls-2026-07-05.md`.
+The original harness/operations scope was still useful, but the stronger
+competitor controls showed a real local false-positive class: Hoimar emitted
+visual-equivalent Unicode/non-DEC terminal cells for many DECgraphics frames.
+
+Implemented follow-up:
+
+- terminal grid cells now retain raw DEC payload metadata;
+- the base serializer emits SO/SI around marked DEC cells while active text
+  screens still return their stored serialized bytes;
+- DEC metadata round-trips through `renderTextScreen()`;
+- liquid, tree, iron-bars, and swallowed-frame DECgraphics payloads are marked
+  from `dat/symbols`.
+
+Current verification:
+
+- checked-in public exact `44/44 S 11405/11405 R 792838/792838 C 0`;
+- strict sentinels exact `5/5 S 1063/1063 R 64569/64569 C 0`;
+- full-public false-positive audit DEC bucket is now `0`.
+
+Remaining open question: this removes the DEC/Unicode false-positive class, but
+the online row's sparse `54` missed cell-grid screens are still not reproduced
+by broad local strictness predicates.
+
 ## Diagnosis to preserve
 
 The online 30/44 plateau is not a production gameplay parity bug reproduced in

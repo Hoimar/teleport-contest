@@ -16,7 +16,8 @@ and `feature_map.md`.
   live ahead/behind state.
 - Latest verified repair units: runtime shapechange side effects, checked-in
   help pager data, deterministic inventory ordering, scoreboard diagnostics,
-  online-viewer advisory reporting, and false-positive scorer audits.
+  online-viewer advisory reporting, false-positive scorer audits, and
+  DECgraphics terminal serialization metadata.
 - Checked-in public corpus is exact: `44/44 S 11405/11405 R 792838/792838 C 0`.
 - Last refreshed hosted public cache is exact:
   `44/44 S 10982/10982 R 840358/840358 C 0`. It still classifies as
@@ -42,32 +43,25 @@ and `feature_map.md`.
   assets, and GitHub Actions pass; `score:ref-history` found no exact stale-ref
   fingerprint across 46 recent commits back to `6864a80`. The current
   false-positive audit also rejects broad local visual-comparator strictness as
-  the full explanation: the 13 online-failed sessions have 8112 locally accepted
-  non-exact terminal/string frames while the online row misses only 54 screens,
-  and all 44 public sessions have accepted non-exact frames. Competitor controls
-  now show two online-44 repos (`kevinjosethomas`, `serteal`) have exact
+  the full explanation: the 13 online-failed sessions still have 8112 locally
+  accepted non-exact terminal/string frames while the online row misses only 54
+  screens, and all 44 public sessions have accepted non-exact frames. Competitor
+  controls showed two online-44 repos (`kevinjosethomas`, `serteal`) have exact
   terminal/string output for all public frames, while `xeophon` has many
   accepted non-exact frames but zero DEC accepted frames and matches its
-  online/local 43/44 shape. The current narrower suspect is Hoimar's DEC/Unicode
-  accepted frame subset, not a generic scorer outage. `score:false-positive-audit`
-  now supports `--samples N --sample-class <class> --sample-per-session`;
-  current DEC samples show Unicode box glyphs (`┌`, `│`) versus canonical raw
-  DEC chars (`l`, `x`) with `decgfx=1`, while string-only samples are mostly
-  cursor-forward compression differences.
+  online/local 43/44 shape. Hoimar's DEC/Unicode false-positive class is now
+  repaired: `score:false-positive-audit --limit=0` reports full-public visual
+  `11405/11405` with DEC bucket `0`, and the online-failed subset reports
+  visual `8399/8399` with DEC bucket `0`. Remaining accepted non-exact frames
+  are invisible SGR (`5730` on the online-failed subset) and other
+  string/encoding differences (`2382`, mostly cursor-forward compression).
 
 ## Latest Loop Checkpoint
 
 - Latest verified checkpoint on 2026-07-04:
-  - Production truth: runtime shapechange now mirrors upstream armor/body side
-    effects closely enough for local public parity, including gear checks after
-    shapechange and deterministic pronoun/RNG behavior on armor destruction
-    (`C refs: polyself.c:rehumanize()`, `polyself.c:break_armor()`,
-    `do_wear.c:Armor_gone()`).
-  - Production truth: inventory and loot ordering now use byte-style ASCII
-    comparison instead of host ICU collation, matching C `strcmp()` ordering and
-    avoiding runtime-locale display drift.
-  - Data truth: generated help pager data is checked in, so clean checkouts no
-    longer depend on a local untracked helper output for the public corpus.
+  - Production/data truth: recent verified public-parity repairs include
+    shapechange armor/body side effects, byte-style inventory/loot ordering, and
+    checked-in generated help pager data.
   - Harness truth: `scripts/parity-state.mjs` classifies persistent official
     scorer drift against a clean ref, reports online failure signatures, and
     compares leaderboard rows with checked-in, hosted, and clean-ref public
@@ -103,6 +97,12 @@ and `feature_map.md`.
     comparator policies. Current `30/44` evidence: current visual/space-neutral
     policies miss `0` screens, space-color/strict-display policies miss `5754`,
     and raw DEC strictness misses `7992`; none reproduce the online `57`.
+  - Production truth: terminal cells can now carry raw DECgraphics payload
+    metadata while retaining Unicode browser display. The base serializer emits
+    SO/SI around marked cells, active serialized text screens remain the outer
+    capture override, and `renderTextScreen()` preserves DEC metadata when
+    round-tripping stored tty screens. DECgraphics liquid, tree, iron-bars, and
+    swallowed-frame payloads are marked from `dat/symbols`.
   - Harness truth: `scoreboard:state`/`scoreboard:json` now pass
     `--score-upstream --score-actions`, save `.cache/leaderboard-data.json` and
     `.cache/leaderboard-history/*.json`, and route next-action text through
