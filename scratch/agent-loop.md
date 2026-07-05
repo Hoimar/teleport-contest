@@ -25,14 +25,14 @@ and `feature_map.md`.
 - Leaderboard fetch succeeds from `https://mazesofmenace.ai/leaderboard/data.json`.
   Default inferred team `Hoimar` currently classifies as
   `leaderboard-lag-after-persistent-drift`: leaderboard public
-  `30/44 S 11348/11405 R 792838/792838`, scored at
-  `2026-07-04T16:33:38.346Z`.
+  `31/44 S 11351/11405 R 792838/792838`, scored at
+  `2026-07-04T22:30:17.282Z`.
 - Clean-ref evidence scores `origin/main`/`HEAD` at
   `44/44 S 11405/11405 R 792838/792838`; the leaderboard row predates latest
   Actions but recent history was already persistently below local.
-- Online failure signature is screen-only: 14 failed public sessions, 57
-  missed screens, full RNG and RNG-step match for all 14; cell-only metrics
-  equal the combined screen score on all 14, so the online misses are cell-grid
+- Online failure signature is screen-only: 13 failed public sessions, 54
+  missed screens, full RNG and RNG-step match for all 13; cell-only metrics
+  equal the combined screen score on all 13, so the online misses are cell-grid
   misses rather than cursor-only misses.
 - Strict sentinels are exact:
   `5/5 S 1063/1063 R 64569/64569 C 0`.
@@ -42,9 +42,14 @@ and `feature_map.md`.
   assets, and GitHub Actions pass; `score:ref-history` found no exact stale-ref
   fingerprint across 46 recent commits back to `6864a80`. The current
   false-positive audit also rejects broad local visual-comparator strictness as
-  the explanation: the 14 online-failed sessions have 8145 locally accepted
-  non-exact terminal/string frames while the online row misses only 57 screens,
-  and all 44 public sessions have accepted non-exact frames.
+  the full explanation: the 13 online-failed sessions have 8112 locally accepted
+  non-exact terminal/string frames while the online row misses only 54 screens,
+  and all 44 public sessions have accepted non-exact frames. Competitor controls
+  now show two online-44 repos (`kevinjosethomas`, `serteal`) have exact
+  terminal/string output for all public frames, while `xeophon` has many
+  accepted non-exact frames but zero DEC accepted frames and matches its
+  online/local 43/44 shape. The current narrower suspect is Hoimar's DEC/Unicode
+  accepted frame subset, not a generic scorer outage.
 
 ## Latest Loop Checkpoint
 

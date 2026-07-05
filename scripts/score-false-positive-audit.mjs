@@ -2,7 +2,7 @@
 
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
-import { basename, join } from 'node:path';
+import { basename, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { normalizeSession } from '../frozen/session_loader.mjs';
@@ -13,8 +13,8 @@ import {
 } from './leaderboard-lib.mjs';
 
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
-const PROJECT_ROOT = new URL('..', import.meta.url).pathname.replace(/\/$/, '');
-const DEFAULT_SESSIONS_DIR = join(PROJECT_ROOT, 'sessions');
+const DEFAULT_PROJECT_ROOT = new URL('..', import.meta.url).pathname.replace(/\/$/, '');
+let PROJECT_ROOT = resolveProjectRoot(process.argv.slice(2));
 
 const STARTUP_VARIANT_LINES = [
     /Version\s+\d+\.\d+\.\d+[^\n]*/,
@@ -22,7 +22,7 @@ const STARTUP_VARIANT_LINES = [
 
 function usage() {
     return [
-        'Usage: node scripts/score-false-positive-audit.mjs [--leaderboard-failures] [--leaderboard-json <file>] [--team <name>] [--full] [file-or-dir...]',
+        'Usage: node scripts/score-false-positive-audit.mjs [--project-root <dir>] [--leaderboard-failures] [--leaderboard-json <file>] [--team <name>] [--full] [file-or-dir...]',
         '',
         'Replays sessions with the official local visual comparator, then counts',
         'screens that pass locally only because stricter terminal/string encodings',
@@ -41,6 +41,7 @@ function parseArgs(argv) {
         team: null,
         baseUrl: process.env.MOM_BASE_URL || DEFAULT_LEADERBOARD_BASE_URL,
         sourceLabel: null,
+        projectRoot: PROJECT_ROOT,
     };
     for (let i = 0; i < argv.length; i++) {
         const arg = argv[i];
@@ -67,6 +68,10 @@ function parseArgs(argv) {
             out.baseUrl = argv[++i] || out.baseUrl;
         } else if (arg.startsWith('--base-url=')) {
             out.baseUrl = arg.slice('--base-url='.length);
+        } else if (arg === '--project-root') {
+            out.projectRoot = resolve(argv[++i] || out.projectRoot);
+        } else if (arg.startsWith('--project-root=')) {
+            out.projectRoot = resolve(arg.slice('--project-root='.length));
         } else if (arg.startsWith('--')) {
             throw new Error(`unknown argument ${arg}`);
         } else {
@@ -79,10 +84,20 @@ function parseArgs(argv) {
     return out;
 }
 
+function resolveProjectRoot(argv) {
+    for (let i = 0; i < argv.length; i++) {
+        const arg = argv[i];
+        if (arg === '--project-root') return resolve(argv[i + 1] || DEFAULT_PROJECT_ROOT);
+        if (arg.startsWith('--project-root=')) return resolve(arg.slice('--project-root='.length));
+    }
+    return resolve(DEFAULT_PROJECT_ROOT);
+}
+
 function resolveSessionFiles(targets) {
     const files = [];
-    const manifest = existsSync(DEFAULT_SESSIONS_DIR)
-        ? readdirSync(DEFAULT_SESSIONS_DIR).filter(file => file.endsWith('.session.json')).sort()
+    const sessionsDir = join(PROJECT_ROOT, 'sessions');
+    const manifest = existsSync(sessionsDir)
+        ? readdirSync(sessionsDir).filter(file => file.endsWith('.session.json')).sort()
         : [];
     for (const target of targets) {
         const targetPath = target.startsWith('/') ? target : join(PROJECT_ROOT, target);
@@ -90,12 +105,12 @@ function resolveSessionFiles(targets) {
             const normalized = target.endsWith('.session.json') ? target : `${target}.session.json`;
             const exact = manifest.find(file => file === normalized || file === target);
             if (exact) {
-                files.push(join(DEFAULT_SESSIONS_DIR, exact));
+                files.push(join(sessionsDir, exact));
                 continue;
             }
             const fuzzy = manifest.filter(file => file.includes(target));
             if (fuzzy.length === 1) {
-                files.push(join(DEFAULT_SESSIONS_DIR, fuzzy[0]));
+                files.push(join(sessionsDir, fuzzy[0]));
                 continue;
             }
             if (fuzzy.length > 1) {
@@ -501,7 +516,10 @@ function printResults(results, options) {
         matchingSessions: 0,
         distance: 0,
     }]));
-    console.log(`False-positive audit: ${results.length} session(s)${options.sourceLabel ? ` from ${options.sourceLabel}` : ''}`);
+    const rootLabel = options.projectRoot && options.projectRoot !== DEFAULT_PROJECT_ROOT
+        ? ` in ${options.projectRoot}`
+        : '';
+    console.log(`False-positive audit: ${results.length} session(s)${rootLabel}${options.sourceLabel ? ` from ${options.sourceLabel}` : ''}`);
     for (const result of results) {
         const ref = refs.get(result.session);
         const onlineMissed = ref?.missed ?? null;
@@ -594,8 +612,9 @@ async function main() {
     }
 
     const options = parseArgs(process.argv.slice(2));
+    PROJECT_ROOT = options.projectRoot;
     await expandLeaderboardFailureTargets(options, PROJECT_ROOT);
-    if (options.targets.length === 0) options.targets.push(DEFAULT_SESSIONS_DIR);
+    if (options.targets.length === 0) options.targets.push(join(PROJECT_ROOT, 'sessions'));
     const files = resolveSessionFiles(options.targets);
     if (!files.length) throw new Error('no session files found');
 
@@ -603,7 +622,7 @@ async function main() {
     const results = [];
     let workerProcessFailed = false;
     for (const file of files) {
-        const child = spawnSync(process.execPath, [SCRIPT_PATH, `--worker-session=${file}`], {
+        const child = spawnSync(process.execPath, [SCRIPT_PATH, `--project-root=${PROJECT_ROOT}`, `--worker-session=${file}`], {
             cwd: PROJECT_ROOT,
             encoding: 'utf8',
             timeout: timeoutMs,
