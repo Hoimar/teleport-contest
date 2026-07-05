@@ -4349,6 +4349,7 @@ function deathTopTenScreen() {
         const displayRank = unrankedCurrent && entryRank === rank ? 0 : entryRank;
         lines.push(...topTenEntryLines(displayRank, entries[i], entryRank === rank));
     }
+    while (lines.length > 1 && lines[lines.length - 1] === '') lines.pop();
     game._death_topten_screen = lines.join('\n');
     return game._death_topten_screen;
 }

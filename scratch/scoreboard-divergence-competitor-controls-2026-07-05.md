@@ -2,15 +2,17 @@
 
 ## Live state
 
-`npm run scoreboard:state` refreshed the live row at
-`2026-07-05T01:10:27.461Z`.
+The latest live viewer refresh in this loop was
+`2026-07-05T09:38:15.071Z`.
 
 - Hoimar local/clean-ref public: `44/44 S 11405/11405 R 792838/792838 C 0`.
-- Hoimar leaderboard public: `31/44 S 11351/11405 R 792838/792838`.
-- Current online miss shape: 13 failed public sessions, 54 missed screens,
-  full RNG, full RNG-steps, and full cursors on all failed sessions.
-- Latest successful GitHub Score run: `#127` for `25be420`, after the
-  leaderboard `lastScored`; Actions artifact remains exact `44/44`.
+- Hoimar leaderboard public: `30/44 S 11349/11405 R 792838/792838`,
+  `lastScored=2026-07-05T09:14:23.208Z`.
+- Current online miss shape: 14 failed public sessions, 56 missed screens,
+  full RNG, full RNG-steps, and full cursors on all failed sessions; cells-only
+  equals combined for all 14, so the misses are cell-grid misses.
+- Current local tree is ahead of `origin/main`; the live row predates the
+  terminal-serialization fixes below.
 
 ## Competitor controls
 
@@ -184,7 +186,7 @@ Verification after this follow-up:
   `11405/11405`, with accepted non-exact terminal screens reduced to `7576`
   (`invisibleSgr=0`, `dec=0`, `other=7576`, exact terminal/string `3829`);
 - all ranked cell-state comparator variants now miss `0` screens on the
-  current 13 online-failed sessions.
+  then-current 13 online-failed sessions.
 
 This is the strongest local false-positive cleanup so far: broad local visual
 acceptance no longer hides DEC state, invisible SGR-on-space state, or raw DEC
@@ -264,7 +266,7 @@ Verification after this follow-up:
   `11405/11405`, with accepted non-exact terminal screens reduced to `1639`
   (`invisibleSgr=0`, `dec=0`, `other=1639`, exact terminal/string `9766`);
 - all ranked cell-state comparator variants still miss `0` screens on the
-  current 13 online-failed sessions.
+  then-current 13 online-failed sessions.
 
 The remaining non-exact output is still byte-string-only and still much
 broader than the online `54`: mostly C tty SGR placement around DEC floor
@@ -373,8 +375,8 @@ Verification:
 - before the active-screen follow-up, the current leaderboard-failed subset had
   `102` non-exact byte-string-only frames (`8297/8399` exact strings), down
   from `220`;
-- live `parity:state --refresh-live` still reports local public `44/44` but
-  leaderboard public `31/44`; the row is older than this unpushed local tree.
+- live `parity:state --refresh-live` still reported local public `44/44` but
+  leaderboard public `31/44`; that row was older than this unpushed local tree.
 
 ## Implemented active tty-screen blank-run follow-up
 
@@ -414,12 +416,58 @@ Verification:
   from `18` to `7`;
 - full-public false-positive audit now has `101` non-exact byte-string-only
   frames (`11304/11405` exact strings), down from `158`;
-- current leaderboard-failed subset now has `48` non-exact byte-string-only
+- then-current leaderboard-failed subset now had `48` non-exact byte-string-only
   frames (`8351/8399` exact strings), down from `102`;
 - text/help/menu guard sessions stayed exact for `seed0108`, `seed0360`,
   `seed0383`, `seed4500`, and both `seed0013` variants;
 - strict sentinels, hack audit, memory lint, and `git diff --check` remain
   clean in the focused verification runs.
+
+## Implemented stored terminal-color follow-up
+
+The next samples showed two different string-only issues that the previous
+map-color fallback could not safely solve:
+
+- `seed0373` Air rows needed the leading `ESC[nC` gap to inherit the stored
+  cyan cell state before the cursor-forward escape instead of starting the row
+  in default color;
+- `seed4500`, `seed0360`, and `seed0002` showed that retroactively recoloring
+  stale terminal cells from the current map location can over-paint room-floor
+  memory. Final terminal serialization should prefer the cell state already
+  written by `newsym()`/tty drawing, not recompute `S_darkroom` from
+  `game.level`;
+- `seed0030` exposed a terminal-exit top-ten byte-form edge: the final
+  top-ten screen should not retain invisible trailing empty rows after the last
+  ranking line.
+
+Implementation:
+
+- `js/display.js` removed the terminal-grid map-color fallback from final
+  serialization and now serializes the stored terminal cell color directly;
+- leading cursor-forward gaps transition to the first skipped cell's stored
+  color/attribute state before emitting `ESC[nC`;
+- `js/cmd.js:deathTopTenScreen()` trims trailing empty rows from the generated
+  top-ten text window.
+
+Verification:
+
+- `seed0030`, `seed0373`, `seed4500`, `seed0360`, `seed0002`, `seed0012`, and
+  `seed0367` stayed exact under `npm run verify -- --target <session>`;
+- targeted exact-terminal audits for `seed0030` and `seed0373` are clean:
+  `acceptedNonExact=0`;
+- live online-failed subset remains local visual exact:
+  `8723/8723`, with accepted non-exact terminal screens reduced to `7`
+  (`invisibleSgr=0`, `dec=0`, `other=7`, exact terminal/string `8716`);
+- full public corpus remains local visual exact:
+  `11405/11405`, with accepted non-exact terminal screens reduced to `60`
+  (`invisibleSgr=0`, `dec=0`, `other=60`, exact terminal/string `11345`);
+- all ranked cell-state comparator variants still miss `0` screens on the
+  current 14 online-failed sessions, while the live row reports `56` cell-grid
+  misses from a scorer run that predates this local tree.
+
+The remaining live-failed local byte-form cases are limited to `seed0002` and
+`seed0012` darkroom placement edges. They need explicit retained glyph identity
+(`S_room` versus `S_darkroom`) rather than another color-only inference rule.
 
 ## Next fix plan
 
@@ -443,5 +491,5 @@ Verification:
    SGR-combination, and several tty-window padding differences eliminated,
    rank remaining string-only differences by screen/session coverage. Current
    broad cell predicates miss `0` screens, while exact-string strictness still
-   misses `101` full-public frames (`48` on the current online-failed subset),
+   misses `60` full-public frames (`7` on the current online-failed subset),
    not the online sparse miss shape.

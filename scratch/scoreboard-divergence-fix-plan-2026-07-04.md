@@ -20,10 +20,13 @@ Implemented follow-up:
   bright-black darkroom wire color, and single-purpose SGR transition ordering;
 - premapped Sokoban traps now use `trap_to_defsym()` colors instead of a
   hardcoded gray/brown `^`;
-- stale terminal-grid room floors are serialized/displayed as `S_darkroom`
-  whenever the underlying map cell is out-of-sight `ROOM`;
+- stale terminal-grid room floors are not recolored from the current map during
+  final serialization; stored terminal cell color is now authoritative until
+  explicit retained `S_room`/`S_darkroom` identity is ported;
 - active tty screens trim invisible trailing blank rows for the currently known
   prompt, inventory, and death-disclosure cases.
+- leading cursor-forward gaps preserve the first skipped blank cell's stored
+  color/attribute state, and final top-ten screens trim trailing empty rows.
 
 Current verification:
 
@@ -31,10 +34,10 @@ Current verification:
 - strict sentinels exact `5/5 S 1063/1063 R 64569/64569 C 0`;
 - full-public false-positive audit now has `invisibleSgr=0` and `DEC=0`;
 - current remaining accepted non-exact output is byte-string-only terminal form
-  (`101` full-public frames, `48` on the current online-failed subset) after
+  (`60` full-public frames, `7` on the current online-failed subset) after
   preserving DEC metadata, cursor-run behavior, darkroom wire color, Sokoban
-  trap memory colors, stale darkroom map serialization, active-screen blank-run
-  serialization, and several tty string/padding forms.
+  trap memory colors, stored terminal-cell color, active-screen blank-run
+  serialization, top-ten trimming, and several tty string/padding forms.
 
 Remaining open question: this removes the DEC/Unicode and invisible-space
 cell-state false-positive classes, but the online row's sparse `54` missed
@@ -96,8 +99,8 @@ Verification:
 - before the active-screen follow-up, the current leaderboard-failed subset
   audit was down to `102` non-exact byte-string-only frames (`8297/8399` exact
   strings);
-- live `parity:state --refresh-live` still reports local public `44/44`, while
-  the leaderboard row is `31/44` from an older unpushed/ahead tree.
+- live `parity:state --refresh-live` still reported local public `44/44`, while
+  the leaderboard row was `31/44` from an older unpushed/ahead tree.
 
 ## 2026-07-05 third implementation update
 
@@ -140,7 +143,7 @@ Verification:
   from `18` to `7`;
 - full-public false-positive audit is down to `101` non-exact byte-string-only
   frames (`11304/11405` exact strings);
-- current leaderboard-failed subset audit is down to `48` non-exact
+- then-current leaderboard-failed subset audit was down to `48` non-exact
   byte-string-only frames (`8351/8399` exact strings);
 - focused text/help guards remain exact: `seed0108`,
   `seed0013-friday13-save-then-fullmoon-restore`,
@@ -148,13 +151,47 @@ Verification:
   `seed0030`, and `seed0106`;
 - strict sentinels remain exact in each `verify` run.
 
+## 2026-07-05 fourth implementation update
+
+The next false-positive pass cleaned up the byte-form cases that were caused
+by final terminal serialization rather than gameplay:
+
+- `seed0373` had a leading Air-row cursor-forward gap where the skipped blank
+  cells were cyan in the terminal grid. The serializer now enters the first
+  skipped cell's stored color/attribute state before emitting `ESC[nC`;
+- `seed4500`, `seed0360`, and `seed0002` showed that the earlier map-color
+  fallback over-recolored stale room-floor cells from current `game.level`
+  state. Final serialization now uses the stored terminal cell color instead
+  of recomputing `S_darkroom` from the map at the end of the frame;
+- `seed0030` had a terminal-exit top-ten screen with one invisible trailing
+  empty row. The generated top-ten text window now trims trailing empty rows.
+
+Verification:
+
+- focused targets exact: `seed0030`, `seed0373`, `seed4500`, `seed0360`,
+  `seed0002`, `seed0012`, and `seed0367`;
+- targeted exact-terminal audits are clean for `seed0030` and `seed0373`;
+- live online-failed subset audit is down to `7` non-exact byte-string-only
+  frames (`8716/8723` exact strings);
+- full-public false-positive audit is down to `60` non-exact byte-string-only
+  frames (`11345/11405` exact strings);
+- all local cell-state variants still miss `0` screens on the current
+  online-failed set.
+
+The remaining `seed0002`/`seed0012` byte-form edges are both darkroom
+placement cases where color is only a proxy. A full cleanup should retain a
+C-like glyph identity for remembered cells (`S_room` versus `S_darkroom`) so
+the serializer does not have to infer identity from current color or map state.
+
 ## Diagnosis to preserve
 
 The online 30/44 plateau is not a production gameplay parity bug reproduced in
-this checkout. It is a leaderboard-only scorer/deployment/comparator/data-path
-split. The current row's exact RNG and cursor totals, plus exact local
-visual/browser/play-assets/Actions results, make a production `js/` output
-change the wrong fix.
+this checkout. Competitor controls proved that local visual false positives
+were real, so production terminal-byte serialization fixes were in scope. After
+those fixes, the current local tree still has exact local visual parity and
+no cell-state false positives on the live-failed set; the remaining local
+differences are byte-string-only and do not reproduce the online row's sparse
+cell-grid misses.
 
 ## Fix scope
 

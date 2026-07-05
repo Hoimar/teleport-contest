@@ -12,27 +12,26 @@ Live checkpoint only. For history, use `git log`, `git show`, `lessons.md`
 
 ## Current State
 
-- Current branch in this workspace: `main`; use `agent:brief` Branch/status for
-  live ahead/behind state.
+- Current branch: `main`; use `agent:brief` Branch/status for live ref state.
 - Latest verified repair units: runtime shapechange side effects, checked-in
   help data, deterministic inventory ordering, scoreboard diagnostics,
-  false-positive audits, DECgraphics metadata, darkroom wire color, and active
-  tty-screen blank-run serialization.
+  false-positive audits, DECgraphics metadata, darkroom wire color, active
+  tty-screen blank-run serialization, stored terminal-cell color, and top-ten
+  trailing-row trimming.
 - Checked-in public corpus is exact: `44/44 S 11405/11405 R 792838/792838 C 0`.
 - Last refreshed hosted public cache is exact:
-  `44/44 S 10982/10982 R 840358/840358 C 0`. It still classifies as
-  `public-session-drift` because 30 hosted session files differ from
-  checked-in sessions, but both score surfaces are exact.
+  `44/44 S 10982/10982 R 840358/840358 C 0`; it is `public-session-drift`
+  only because 30 hosted session files differ while both surfaces are exact.
 - Leaderboard fetch succeeds from `https://mazesofmenace.ai/leaderboard/data.json`.
   Default inferred team `Hoimar` most recently classified as
   `local-dirty-or-unpushed`: leaderboard public
-  `31/44 S 11351/11405 R 792838/792838`, scored at
-  `2026-07-04T22:30:17.282Z`, before the current local-ahead scorer repairs.
+  `30/44 S 11349/11405 R 792838/792838`, scored at
+  `2026-07-05T09:14:23.208Z`, before the current local-ahead scorer repairs.
 - Clean-ref `origin/main`/`HEAD` scores `44/44 S 11405/11405 R 792838/792838`;
   recent leaderboard history was persistently below local.
-- Online failure signature is screen-only: 13 failed public sessions, 54
-  missed screens, full RNG and RNG-step match for all 13; cell-only metrics
-  equal the combined screen score on all 13, so the online misses are cell-grid
+- Online failure signature is screen-only: 14 failed public sessions, 56
+  missed screens, full RNG and RNG-step match for all 14; cell-only metrics
+  equal the combined screen score on all 14, so the online misses are cell-grid
   misses rather than cursor-only misses.
 - Strict sentinels are exact: `5/5 S 1063/1063 R 64569/64569 C 0`.
 - Current public classification: checked-in and hosted public corpora are exact;
@@ -42,7 +41,7 @@ Live checkpoint only. For history, use `git log`, `git show`, `lessons.md`
   strings; Hoimar's DEC/Unicode, invisible-space, darkroom wire-color, SGR, and
   tty padding classes are now repaired. Current storage-aware audit: local visual
   `44/44`, `invisibleSgr=0`, DEC `0`, cell variants miss `0`, exact-string form
-  misses `101` full-public frames (`48` on the online-failed subset).
+  misses `60` full-public frames (`7` on the online-failed subset).
 
 ## Latest Loop Checkpoint
 
@@ -84,7 +83,7 @@ Live checkpoint only. For history, use `git log`, `git show`, `lessons.md`
   - Harness truth: `scripts/score-false-positive-audit.mjs` now ranks narrow
     comparator policies. Current evidence after DEC/cursor/darkroom and active
     tty-screen repairs: all cell-state variants miss `0`; exact string form
-    still differs on `101` checked-in public frames (`48` on the online-failed
+    still differs on `60` checked-in public frames (`7` on the online-failed
     subset) and is broader than the online sparse miss shape.
   - Production truth: terminal cells can now carry raw DECgraphics payload
     metadata while retaining Unicode browser display. The base serializer emits
@@ -100,10 +99,12 @@ Live checkpoint only. For history, use `git log`, `git show`, `lessons.md`
     `S_darkroom` memory correction without darkening visible corridors.
     `#wipe` now uses blindness-toggle vision redraw instead of stale-memory
     `docrt()`, making `seed0108` exact-string clean. Sokoban premapped traps
-    now use C trap colors, and stale DEC room-floor grid cells serialize as
-    `S_darkroom` when their map cell is out-of-sight `ROOM`. Active help,
-    enhance, and intrinsic screens use cursor-forward padding for long default
-    blank runs and trim compact final help pages after their More row.
+    now use C trap colors. Terminal-grid serialization now trusts stored cell
+    color rather than recoloring stale cells from current map state; leading
+    cursor-forward gaps preserve skipped-cell color state. Active help, enhance,
+    and intrinsic screens use cursor-forward padding for long default blank
+    runs and trim compact final help pages after their More row. Final top-ten
+    text windows trim trailing empty rows.
   - Harness truth: `scoreboard:state`/`scoreboard:json` now pass
     `--score-upstream --score-actions`, save `.cache/leaderboard-data.json` and
     `.cache/leaderboard-history/*.json`, and route next-action text through
@@ -125,8 +126,9 @@ Live checkpoint only. For history, use `git log`, `git show`, `lessons.md`
   - Verification: checked-in public corpus exact
     `44/44 S 11405/11405 R 792838/792838 C 0`; strict sentinel exact
     `5/5 S 1063/1063 R 64569/64569 C 0`; focused verification stayed exact for
-    `seed0007`, `seed0012`, `seed0360`, `seed0361`, `seed0373`, `seed0900`,
-    `seed2200`, and `seed4500`; `hack:audit` stayed `hard=0 suspicious=0`;
+    `seed0002`, `seed0012`, `seed0030`, `seed0360`, `seed0361`, `seed0367`,
+    `seed0373`, `seed0900`, `seed2200`, and `seed4500`; `hack:audit` stayed
+    `hard=0 suspicious=0`;
     `memory:lint ok`.
   - Regression classification: none on checked-in public, hosted public,
     focused targets, strict sentinels, and the visual scorer surface for the
@@ -135,5 +137,4 @@ Live checkpoint only. For history, use `git log`, `git show`, `lessons.md`
   - Global next-step check: active public queue is empty. Deployed
     `frozen/screen-decode.mjs`, recent frozen runner refs, recent clean code
     refs, saved online snapshots, and historical session refs do not fingerprint
-    the online row. Current escalation packet:
-    `scratch/scoreboard-divergence-escalation-2026-07-04.md`.
+    the online row.
