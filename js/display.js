@@ -2094,7 +2094,7 @@ function countCursorSpaceRun(term, row, col, lastCol, wantFg, wantAttr) {
     return n;
 }
 
-function serializedSgrTransition(curFg, curAttr, wantFg, wantAttr) {
+function serializedSgrTransition(curFg, curAttr, wantFg, wantAttr, allowFullReset = false) {
     if (curFg === wantFg && curAttr === wantAttr) return '';
     const wantBold = (wantAttr & 2) !== 0;
     const wantUnder = (wantAttr & 4) !== 0;
@@ -2103,7 +2103,7 @@ function serializedSgrTransition(curFg, curAttr, wantFg, wantAttr) {
     const curUnder = (curAttr & 4) !== 0;
     const curInv = (curAttr & 1) !== 0;
     const codes = [];
-    if (wantFg === 39 && wantAttr === 0 && curAttr !== 0) {
+    if (allowFullReset && wantFg === 39 && wantAttr === 0 && curAttr !== 0) {
         codes.push(0);
     } else {
         if (curBold && !wantBold) codes.push(22);
@@ -2203,7 +2203,7 @@ function serializeTerminalGridWithDec(term) {
             out += '\x0f';
             curDec = false;
         }
-        out += serializedSgrTransition(curFg, curAttr, 39, 0);
+        out += serializedSgrTransition(curFg, curAttr, 39, 0, true);
         curFg = 39;
         curAttr = 0;
         if (r < lastRow) out += '\n';

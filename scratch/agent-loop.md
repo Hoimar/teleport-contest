@@ -36,8 +36,12 @@ Live checkpoint only. For history, use `git log`, `git show`, `lessons.md`
   exact strings; Hoimar's DEC/Unicode, invisible-space, darkroom wire-color,
   SGR, tty padding, stored-cell-color, terrain-view, and terminal-exit classes
   are now mostly repaired. Current full-public audit: local visual `44/44`,
-  `invisibleSgr=0`, DEC `0`, accepted non-exact byte-string-only frames `27`,
-  exact terminal/string `11378/11405`.
+  `invisibleSgr=0`, DEC `0`, accepted non-exact byte-string-only frames `18`,
+  exact terminal/string `11387/11405`. The latest serializer cleanup removed
+  the `seed0006` in-row SGR reset class by using selective attr/color shutdown
+  during rows while keeping full reset for row cleanup; remaining samples are
+  bright-black DEC floor wire-placement clusters in `seed1500`, `seed2600`,
+  and `seed5006`.
 
 ## Latest Loop Checkpoint
 

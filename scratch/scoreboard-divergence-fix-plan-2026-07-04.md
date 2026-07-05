@@ -27,6 +27,8 @@ Implemented follow-up:
   prompt, inventory, and death-disclosure cases.
 - leading cursor-forward gaps preserve the first skipped blank cell's stored
   color/attribute state, and final top-ten screens trim trailing empty rows.
+- terminal-grid SGR cleanup now uses selective attr/color shutdown for in-row
+  transitions while preserving full reset at row cleanup.
 
 Current verification:
 
@@ -34,10 +36,11 @@ Current verification:
 - strict sentinels exact `5/5 S 1063/1063 R 64569/64569 C 0`;
 - full-public false-positive audit now has `invisibleSgr=0` and `DEC=0`;
 - current remaining accepted non-exact output is byte-string-only terminal form
-  (`60` full-public frames, `7` on the current online-failed subset) after
+  (`18` full-public frames) after
   preserving DEC metadata, cursor-run behavior, darkroom wire color, Sokoban
   trap memory colors, stored terminal-cell color, active-screen blank-run
-  serialization, top-ten trimming, and several tty string/padding forms.
+  serialization, top-ten trimming, terrain-view normalization, save-exit
+  trimming, selective in-row SGR reset, and several tty string/padding forms.
 
 Remaining open question: this removes the DEC/Unicode and invisible-space
 cell-state false-positive classes, but the online row's sparse `54` missed
@@ -219,6 +222,36 @@ Verification:
 - full-public false-positive audit is down to `27` byte-string-only frames
   (`11378/11405` exact strings), with `invisibleSgr=0` and `dec=0`;
 - strict sentinels remain exact: `5/5 S 1063/1063 R 64569/64569 C 0`.
+
+## 2026-07-05 sixth implementation update
+
+The next exact-string sample was `seed0006`: JS used a full `ESC[0m` reset
+when leaving inverse/white state mid-row before continuing with default-color
+DEC floor glyphs. C tty distinguishes attribute/color shutdown while still
+using full reset for screen/row cleanup (`C refs:
+win/tty/termcap.c:term_end_attr(), win/tty/termcap.c:term_end_color()`).
+
+Implementation:
+
+- `js/display.js:serializedSgrTransition()` now accepts an explicit
+  `allowFullReset` flag;
+- in-row transitions keep the selective path (`ESC[27m` plus color reset when
+  needed);
+- terminal row cleanup still allows the full reset path so early menu and
+  character-selection screens keep their C byte form.
+
+Verification:
+
+- `seed0006` exact-terminal audit is clean:
+  `acceptedNonExact=0`, `exactTerminal=123`;
+- `seed0002` and `seed0013-friday13-save-then-fullmoon-restore` exact-terminal
+  audits stay clean;
+- full-public false-positive audit is down to `18` byte-string-only frames
+  (`11387/11405` exact strings), with `invisibleSgr=0` and `dec=0`;
+- remaining samples cluster in `seed1500`, `seed2600`, and `seed5006` around
+  bright-black DEC floor wire placement; a broad stored-cell recoloring
+  experiment regressed `seed0360` and `seed4500`, so this is retained-glyph
+  identity/timing debt rather than a safe current-visibility color heuristic.
 
 ## Diagnosis to preserve
 

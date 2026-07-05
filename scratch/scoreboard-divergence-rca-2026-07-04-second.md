@@ -17,9 +17,11 @@ Current implemented follow-up:
   `detect.c:reveal_terrain_getglyph()` and normalizes
   `S_darkroom -> S_room`, `S_litcorr -> S_corr`;
 - save-exit terminal output stores only `Be seeing you...`;
-- full-public false-positive audit is now `27` accepted non-exact
+- in-row terminal-grid SGR transitions now use selective attr/color shutdown,
+  while row cleanup still uses full reset;
+- full-public false-positive audit is now `18` accepted non-exact
   byte-string-only frames, with `invisibleSgr=0`, `dec=0`, and exact
-  terminal/string `11378/11405`.
+  terminal/string `11387/11405`.
 
 ## Executive summary
 

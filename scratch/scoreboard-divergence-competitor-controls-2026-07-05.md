@@ -488,11 +488,10 @@ The remaining live-failed local byte-form cases are limited to `seed0002` and
    - competitor controls still reproducible via `--project-root`.
 5. With DEC, invisible-space, darkroom wire-color, darkroom memory, blindness
    redraw, Sokoban trap-memory colors, stale darkroom serialization,
-   SGR-combination, and several tty-window padding differences eliminated,
+   SGR-combination, in-row reset form, and several tty-window padding differences eliminated,
    rank remaining string-only differences by screen/session coverage. Current
-   broad cell predicates miss `0` screens, while exact-string strictness still
-   misses `60` full-public frames (`7` on the current online-failed subset),
-   not the online sparse miss shape.
+   broad cell predicates miss `0` screens, while exact-string strictness now
+   misses `18` full-public frames, not the earlier online sparse miss shape.
 
 ## Implemented vault/terrain exact-string follow-up
 
@@ -532,3 +531,32 @@ Verification:
   (`invisibleSgr=0`, `dec=0`, `other=27`, exact terminal/string `11378`);
 - strict sentinels remain exact:
   `5/5 S 1063/1063 R 64569/64569 C 0`.
+
+## Implemented in-row SGR reset follow-up
+
+The next strict-string sample was `seed0006`, where the serializer used a full
+`ESC[0m` reset while leaving inverse/white state in the middle of a map row.
+That fixed nothing visually, but it differed from C tty's selective shutdown
+path before the row continued. A rejected experiment removed full-reset usage
+globally and regressed early character-selection/menu frames, so the final
+change keeps row cleanup separate from in-row transitions.
+
+Implementation:
+
+- `serializedSgrTransition()` takes an `allowFullReset` flag;
+- ordinary in-row attr/color changes emit selective transitions;
+- terminal row cleanup still emits the full reset form when leaving non-default
+  attributes.
+
+Verification:
+
+- `seed0006` exact-terminal audit is clean:
+  `acceptedNonExact=0`, `exactTerminal=123`;
+- `seed0002` and `seed0013-friday13-save-then-fullmoon-restore` stay
+  exact-terminal clean;
+- full public corpus remains local visual exact:
+  `11405/11405`, with accepted non-exact terminal screens reduced to `18`
+  (`invisibleSgr=0`, `dec=0`, `other=18`, exact terminal/string `11387`);
+- remaining samples are bright-black DEC floor wire-placement clusters in
+  `seed1500`, `seed2600`, and `seed5006`, not a reproduced online cell-grid
+  predicate.
