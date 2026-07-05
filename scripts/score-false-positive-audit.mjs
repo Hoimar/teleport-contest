@@ -22,7 +22,7 @@ const STARTUP_VARIANT_LINES = [
 
 function usage() {
     return [
-        'Usage: node scripts/score-false-positive-audit.mjs [--project-root <dir>] [--leaderboard-failures] [--leaderboard-json <file>] [--team <name>] [--full] [file-or-dir...]',
+        'Usage: node scripts/score-false-positive-audit.mjs [--project-root <dir>] [--leaderboard-failures] [--leaderboard-json <file>] [--team <name>] [--samples N] [--sample-class <class>] [--sample-per-session] [--full] [file-or-dir...]',
         '',
         'Replays sessions with the official local visual comparator, then counts',
         'screens that pass locally only because stricter terminal/string encodings',
@@ -36,6 +36,9 @@ function parseArgs(argv) {
         targets: [],
         full: false,
         limit: 20,
+        samples: 0,
+        sampleClass: null,
+        samplePerSession: false,
         leaderboardFailures: false,
         leaderboardJson: null,
         team: null,
@@ -54,6 +57,16 @@ function parseArgs(argv) {
             out.limit = Number(argv[++i] || out.limit);
         } else if (arg.startsWith('--limit=')) {
             out.limit = Number(arg.slice('--limit='.length));
+        } else if (arg === '--samples') {
+            out.samples = Number(argv[++i] || out.samples);
+        } else if (arg.startsWith('--samples=')) {
+            out.samples = Number(arg.slice('--samples='.length));
+        } else if (arg === '--sample-class') {
+            out.sampleClass = argv[++i] || null;
+        } else if (arg.startsWith('--sample-class=')) {
+            out.sampleClass = arg.slice('--sample-class='.length);
+        } else if (arg === '--sample-per-session') {
+            out.samplePerSession = true;
         } else if (arg === '--leaderboard-failures') {
             out.leaderboardFailures = true;
         } else if (arg === '--leaderboard-json') {
@@ -79,6 +92,7 @@ function parseArgs(argv) {
         }
     }
     if (!Number.isFinite(out.limit) || out.limit < 0) out.limit = 20;
+    if (!Number.isFinite(out.samples) || out.samples < 0) out.samples = 0;
     out.baseUrl = out.baseUrl.replace(/\/+$/, '');
     if (out.leaderboardJson) out.leaderboardFailures = true;
     return out;
@@ -332,6 +346,31 @@ function firstStrictSample(actual, expected) {
     return null;
 }
 
+function visibleSnippet(text, index) {
+    const start = Math.max(0, index - 12);
+    const end = Math.min(text.length, index + 24);
+    return text.slice(start, end)
+        .replace(/\x1b/g, '\\e')
+        .replace(/\x0e/g, '\\x0e')
+        .replace(/\x0f/g, '\\x0f')
+        .replace(/\n/g, '\\n');
+}
+
+function firstStringSample(actual, expected) {
+    const a = String(actual || '');
+    const b = String(expected || '');
+    const max = Math.max(a.length, b.length);
+    for (let i = 0; i < max; i++) {
+        if (a[i] === b[i]) continue;
+        return {
+            offset: i,
+            actual: visibleSnippet(a, i),
+            expected: visibleSnippet(b, i),
+        };
+    }
+    return null;
+}
+
 function makeStorageHandle() {
     const storage = new Map();
     return {
@@ -414,6 +453,7 @@ async function runWorker(sessionPath) {
         ])),
         rawDecStrict: { matched: 0, total: canonicalScreens.length },
         firstAcceptedDiff: null,
+        acceptedSamples: [],
     };
 
     for (let i = 0; i < canonicalScreens.length; i++) {
@@ -436,6 +476,13 @@ async function runWorker(sessionPath) {
 
         const strictDisplay = strictDisplayGridsEqual(jsGrid, canonicalGrid);
         const strictTerminal = strictTerminalGridsEqual(jsGrid, canonicalGrid);
+        const acceptedClass = !strictDisplay
+            ? 'invisible-sgr'
+            : !strictTerminal
+                ? 'dec-encoding'
+                : jsScreen !== canonicalScreen
+                    ? 'string-encoding'
+                    : 'exact';
         if (!strictDisplay) {
             summary.accepted.invisibleSgrOnly++;
         } else if (!strictTerminal) {
@@ -449,13 +496,20 @@ async function runWorker(sessionPath) {
         if (!summary.firstAcceptedDiff && (!strictTerminal || jsScreen !== canonicalScreen)) {
             summary.firstAcceptedDiff = {
                 index: i,
-                class: !strictDisplay
-                    ? 'invisible-sgr'
-                    : !strictTerminal
-                        ? 'dec-encoding'
-                        : 'string-encoding',
-                sample: firstStrictSample(jsScreen, canonicalScreen),
+                class: acceptedClass,
+                sample: acceptedClass === 'string-encoding'
+                    ? firstStringSample(jsScreen, canonicalScreen)
+                    : firstStrictSample(jsScreen, canonicalScreen),
             };
+        }
+        if (acceptedClass !== 'exact' && summary.acceptedSamples.length < 64) {
+            summary.acceptedSamples.push({
+                index: i,
+                class: acceptedClass,
+                sample: acceptedClass === 'string-encoding'
+                    ? firstStringSample(jsScreen, canonicalScreen)
+                    : firstStrictSample(jsScreen, canonicalScreen),
+            });
         }
     }
 
@@ -598,6 +652,34 @@ function printResults(results, options) {
                 `delta=${sign} failedSessions=${bucket.failedSessions}/${totals.sessions} ` +
                 `matchingSessions=${bucket.matchingSessions}/${totals.sessions} distance=${bucket.distance} ` +
                 `(${bucket.description})`);
+        }
+    }
+    if (options.samples > 0) {
+        console.log('## Accepted Difference Samples');
+        let printed = 0;
+        const sessionSamples = new Map();
+        for (const result of results) {
+            for (const sample of result.acceptedSamples || []) {
+                if (options.sampleClass && sample.class !== options.sampleClass) continue;
+                if (options.samplePerSession) {
+                    const used = sessionSamples.get(result.session) || 0;
+                    if (used >= 1) break;
+                    sessionSamples.set(result.session, used + 1);
+                }
+                const cell = sample.sample;
+                const where = cell?.offset != null
+                    ? ` offset=${cell.offset} actual="${cell.actual}" expected="${cell.expected}"`
+                    : cell
+                    ? ` row=${cell.row} col=${cell.col} actual=${JSON.stringify(cell.actual)} expected=${JSON.stringify(cell.expected)}`
+                    : '';
+                console.log(`- ${result.session} screen=${sample.index} class=${sample.class}${where}`);
+                printed++;
+                if (printed >= options.samples) return;
+            }
+        }
+        if (!printed) {
+            const suffix = options.sampleClass ? ` for ${options.sampleClass}` : '';
+            console.log(`- none${suffix}`);
         }
     }
 }

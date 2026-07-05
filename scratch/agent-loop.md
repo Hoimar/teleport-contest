@@ -49,7 +49,11 @@ and `feature_map.md`.
   terminal/string output for all public frames, while `xeophon` has many
   accepted non-exact frames but zero DEC accepted frames and matches its
   online/local 43/44 shape. The current narrower suspect is Hoimar's DEC/Unicode
-  accepted frame subset, not a generic scorer outage.
+  accepted frame subset, not a generic scorer outage. `score:false-positive-audit`
+  now supports `--samples N --sample-class <class> --sample-per-session`;
+  current DEC samples show Unicode box glyphs (`┌`, `│`) versus canonical raw
+  DEC chars (`l`, `x`) with `decgfx=1`, while string-only samples are mostly
+  cursor-forward compression differences.
 
 ## Latest Loop Checkpoint
 
@@ -114,16 +118,9 @@ and `feature_map.md`.
     sandbox/runner failures cannot masquerade as scorer mismatches. The shared
     leaderboard parser preserves explicit cursor totals from `data.json`
     alongside cells/RNG for surface-reference comparisons.
-  - Harness dehack: `triage-corpus` no longer carries stale hardcoded known
-    blocker sessions. Bucket hypotheses now come from the live first-mismatch
-    shape, and the generated divergence inventory stays a single exact public
-    bucket.
-  - Production determinism: inventory-letter range helpers now call the same
-    explicit ASCII comparator as broader inventory and loot ordering.
-  - External scorer evidence: latest successful public GitHub Actions Score run is
-    `#126` for pushed `dfea935`, success, and `score:actions:artifact` parses
-    the uploaded `score-summary.json` as `44/44 S 11405/11405`; the current
-    leaderboard row predates that run and remains `30/44`.
+  - External scorer evidence: latest successful public GitHub Actions Score run
+    still parses the uploaded `score-summary.json` as `44/44 S 11405/11405`;
+    the live leaderboard row remains below that artifact.
   - Verification: checked-in public corpus exact
     `44/44 S 11405/11405 R 792838/792838 C 0`; strict sentinel exact
     `5/5 S 1063/1063 R 64569/64569 C 0`; focused verification stayed exact for

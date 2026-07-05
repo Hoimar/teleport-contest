@@ -42,7 +42,8 @@ same public session, `seed0009-swimmer-mforce`, with exact RNG/cursors and
 
 `scripts/score-false-positive-audit.mjs` now accepts `--project-root <dir>` so
 the same audit logic can replay an external checkout's `js/` against that
-checkout's sessions.
+checkout's sessions. It also accepts `--samples N`, `--sample-class <class>`,
+and `--sample-per-session` for concrete accepted-difference examples.
 
 Full-public audit totals:
 
@@ -62,6 +63,24 @@ Current Hoimar online-failed subset:
 - exact terminal/string screens: `287`;
 - broad local variants still miss either `0`, `5730`, or `7965` screens, not
   the online `54`.
+
+Per-session DEC samples from the current online-failed set are consistent:
+Hoimar emits Unicode box glyphs such as `┌` or `│` with `decgfx=0`, while the
+canonical session expects raw DEC characters such as `l` or `x` with
+`decgfx=1`.
+
+Per-session string-only samples are mostly cursor-forward compression
+differences in menus/status text. Example: Hoimar emits literal spaces after
+`Copyright 1985-2026`, while the canonical session emits `ESC[13C` before the
+same visible text. These decode to the same grid and are separate from the DEC
+glyph issue.
+
+The public Session Viewer source was fetched from
+`https://mazesofmenace.ai/sessions-viewer/viz.mjs`. Hub mode imports
+`/play/<fork>/js/jsmain.js`, loads canonical `/sessions/`, and reads
+`/leaderboard/data.json` only as a per-session advisory. It does not expose the
+backend leaderboard's per-screen miss indices; it recomputes timeline diffs in
+the browser with the same `diffCell` visual comparator.
 
 ## Interpretation
 
@@ -102,7 +121,8 @@ visual parity.
    be rerun without copying scripts into clones.
 2. Add a focused diagnostic that prints the first accepted DEC/string
    difference per selected screen, including raw actual/expected escape
-   context. The existing per-session sample is too coarse.
+   context. Implemented as `--samples`, `--sample-class`, and
+   `--sample-per-session`.
 3. Compare Hoimar's DEC accepted frames against `xeophon`'s non-DEC accepted
    frames and the current 54 online misses; look for a predicate that selects
    dozens of Hoimar screens, not thousands.
