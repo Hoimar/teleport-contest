@@ -46,8 +46,7 @@ Live checkpoint only. For history, use `git log`, `git show`, `lessons.md`
   invisible-space, darkroom wire-color, SGR sequencing, and several tty padding
   classes are now repaired. Final clean-process exact-string audit still has
   local visual `44/44`, `invisibleSgr=0`, DEC `0`, and all cell-state variants
-  miss `0`; remaining byte-string-only terminal form is `672` full-public
-  frames, much broader than the online sparse miss shape.
+  miss `0`; byte-string-only terminal form is `489` full-public frames.
 
 ## Latest Loop Checkpoint
 
@@ -89,8 +88,8 @@ Live checkpoint only. For history, use `git log`, `git show`, `lessons.md`
   - Harness truth: `scripts/score-false-positive-audit.mjs` now ranks narrow
     comparator policies. Current evidence after DEC/cursor/darkroom and tty
     string repairs: all cell-state variants miss `0`; exact string form still
-    differs on `672` checked-in public frames and is much broader than the
-    online sparse miss shape.
+    differs on `489` checked-in public frames and is broader than the online
+    sparse miss shape.
   - Production truth: terminal cells can now carry raw DECgraphics payload
     metadata while retaining Unicode browser display. The base serializer emits
     SO/SI around marked cells, active serialized text screens remain the outer
@@ -103,8 +102,9 @@ Live checkpoint only. For history, use `git log`, `git show`, `lessons.md`
     transitions, and skips only blanks with no visible inverse/underline
     pixels. `docrt()` and magic mapping now apply C's out-of-sight ROOM
     `S_darkroom` memory correction without darkening visible corridors.
-    Active tty screens trim known trailing blank-row false positives and
-    level-teleport unreachable rows use cursor-forward padding.
+    `#wipe` now uses blindness-toggle vision redraw instead of stale-memory
+    `docrt()`, making `seed0108` exact-string clean. Active tty screens trim
+    known trailing blank rows; level-teleport rows use cursor-forward padding.
   - Harness truth: `scoreboard:state`/`scoreboard:json` now pass
     `--score-upstream --score-actions`, save `.cache/leaderboard-data.json` and
     `.cache/leaderboard-history/*.json`, and route next-action text through

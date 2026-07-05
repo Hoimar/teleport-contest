@@ -13276,7 +13276,11 @@ async function doWipeCommand() {
             game.u.uprops.blind = 0;
             game.u.uprops.blinded = 0;
         }
-        await docrt();
+        // C ref: src/potion.c:toggle_blindness().  Regaining sight
+        // recalculates vision and redraws in-sight cells; a full docrt()
+        // would redisplay stale darkroom memory before visible terrain.
+        vision_recalc(2);
+        vision_recalc(0);
         await pline("You've got the glop off.  You can see again.");
     } else {
         await pline('Your face is already clean.');

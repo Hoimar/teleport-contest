@@ -47,13 +47,17 @@ The production follow-up is now implemented in `js/display.js`:
   stores/shows out-of-sight, not-remembered-lit room floor;
 - visible corridor memory is guarded from the darkening helper after
   `seed0900` exposed the over-broad corridor case.
+- `#wipe` clears cream blindness through the JS blindness-toggle vision redraw
+  path rather than stale-memory `docrt()`, matching
+  `C ref: src/potion.c:toggle_blindness()`.
 
 Final verification for this plan state:
 
 - official checked-in public score: `44/44 S 11405/11405 R 792838/792838 C 0`;
 - strict sentinels: `5/5 S 1063/1063 R 64569/64569 C 0`;
-- focused targets exact: `seed0012`, `seed0900`, `seed2200`, `seed4500`;
-- clean-process exact-string audit: `672` remaining non-exact full-public
+- focused targets exact: `seed0012`, `seed0108`, `seed0900`, `seed2200`,
+  `seed4500`;
+- clean-process exact-string audit: `489` remaining non-exact full-public
   frames, down from `1639` after the prior tty string cleanup.
 
 ## Diagnosis to preserve

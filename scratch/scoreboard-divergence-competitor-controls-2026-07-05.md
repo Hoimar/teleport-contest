@@ -311,6 +311,38 @@ Verification after this follow-up:
   (`10733/11405` exact strings), down from `1639` after the tty
   string-serialization follow-up.
 
+## Implemented blindness redraw follow-up
+
+The largest remaining exact-string bucket after darkroom memory was
+`seed0108-wizard-extcmd-wishlist` (`183` frames). Its first mismatch was the
+inverse darkroom case: after `#wipe` cleared cream blindness, visible room
+dots remained serialized as bright-black `S_darkroom` even though C displayed
+ordinary visible `S_room` dots.
+
+Root cause:
+
+- C `make_blinded(0)` calls `toggle_blindness()`, which performs
+  `vision_recalc(0)` and redraws in-sight cells immediately
+  (`C ref: src/potion.c:toggle_blindness()`);
+- JS `doWipeCommand()` cleared blindness and called `docrt()`, which restored
+  remembered map glyphs and preserved stale darkroom color on visible room
+  cells.
+
+Implementation:
+
+- `doWipeCommand()` now forces the JS blindness-toggle redraw path with
+  `vision_recalc(2); vision_recalc(0)` before printing the `#wipe` message;
+- the stale-memory `docrt()` redraw is no longer used for this path.
+
+Verification:
+
+- `seed0108` exact string count improved from `120/303` to `303/303`;
+- clean-process full-public exact-string audit now has `489` non-exact frames
+  (`10916/11405` exact strings);
+- official checked-in public score remains exact:
+  `44/44 S 11405/11405 R 792838/792838 C 0`;
+- strict sentinels remained exact through focused verification.
+
 ## Next fix plan
 
 1. Keep `--project-root` and sample flags in the false-positive audit so
@@ -328,8 +360,9 @@ Verification after this follow-up:
    - `score:false-positive-audit --full` improved against the targeted
      bucket;
    - competitor controls still reproducible via `--project-root`.
-5. With DEC, invisible-space, darkroom wire-color, darkroom memory,
-   SGR-combination, and several tty-window padding differences eliminated, rank
-   remaining string-only differences by screen/session coverage. Current broad
-   cell predicates miss `0` screens, while exact-string strictness still misses
-   `672` full-public frames, not the online sparse miss shape.
+5. With DEC, invisible-space, darkroom wire-color, darkroom memory, blindness
+   redraw, SGR-combination, and several tty-window padding differences
+   eliminated, rank remaining string-only differences by screen/session
+   coverage. Current broad cell predicates miss `0` screens, while exact-string
+   strictness still misses `489` full-public frames, not the online sparse miss
+   shape.
